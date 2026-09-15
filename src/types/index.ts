@@ -70,7 +70,23 @@ export interface Song {
   youtube_url?: string
   lyrics?: string
   chords?: string
+  raw_content?: string
+  cifra_club_url?: string
+  source?: 'CIFRA_CLUB' | 'MANUAL' | string
   notes?: string
+  created: string
+  updated: string
+}
+
+export interface SongVideo {
+  id: string
+  church_id: string
+  song_id: string
+  youtube_video_id: string
+  title?: string
+  channel_name?: string
+  thumbnail_url?: string
+  is_primary: boolean
   created: string
   updated: string
 }

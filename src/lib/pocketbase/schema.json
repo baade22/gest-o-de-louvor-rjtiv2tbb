@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T02:59:25.561Z",
+  "generatedAt": "2026-09-15T13:09:50.870Z",
   "collections": [
     {
       "name": "users",
@@ -357,6 +357,24 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "raw_content",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cifra_club_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -594,6 +612,81 @@
         "CREATE INDEX idx_event_members_event ON event_members (event_id)",
         "CREATE INDEX idx_event_members_member ON event_members (member_id)",
         "CREATE INDEX idx_event_members_status ON event_members (status)"
+      ]
+    },
+    {
+      "name": "song_videos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "song_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "songs"
+        },
+        {
+          "name": "youtube_video_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "channel_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "thumbnail_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_primary",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_song_videos_church ON song_videos (church_id)",
+        "CREATE INDEX idx_song_videos_song ON song_videos (song_id)"
       ]
     }
   ]
