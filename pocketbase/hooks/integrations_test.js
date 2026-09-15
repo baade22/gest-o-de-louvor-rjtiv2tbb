@@ -57,7 +57,13 @@ routerAdd(
       if (existing.length > 0) {
         integrationRecord = existing[0]
         if (!keyToTest) {
-          const creds = integrationRecord.get('credentials') || {}
+          const rawCreds = integrationRecord.get('credentials')
+          let creds = rawCreds
+          if (typeof rawCreds === 'string' && rawCreds) {
+            try {
+              creds = JSON.parse(rawCreds)
+            } catch (_) {}
+          }
           if (creds && typeof creds === 'object' && creds.apiKey) {
             keyToTest = String(creds.apiKey).trim()
           }

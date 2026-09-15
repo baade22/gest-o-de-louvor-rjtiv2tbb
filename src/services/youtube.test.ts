@@ -86,11 +86,15 @@ describe('Serviço de YouTube (Frontend & Integração)', () => {
   it('trata erro de chave de API não configurada (503)', async () => {
     vi.spyOn(pb, 'send').mockRejectedValueOnce({
       status: 503,
-      data: { code: 'API_KEY_MISSING' },
+      data: {
+        code: 'API_KEY_MISSING',
+        message:
+          'Para pesquisar vídeos do YouTube dentro do LouvorFlow, cadastre uma API Key em Configurações → Integrações.',
+      },
     })
 
     await expect(searchYouTubeVideos('Oceanos')).rejects.toThrow(
-      'A chave da API do YouTube não está configurada no servidor (YOUTUBE_API_KEY).',
+      'Para pesquisar vídeos do YouTube dentro do LouvorFlow, cadastre uma API Key em Configurações → Integrações.',
     )
   })
 

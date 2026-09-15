@@ -132,14 +132,15 @@ export default function IntegrationsSettings() {
       console.error(err)
       toast({
         title: 'Erro ao salvar credencial',
-        description: err.message || 'Falha ao salvar API Key.',
+        description:
+          err.message ||
+          'Falha ao persistir a credencial no banco de dados. Verifique suas permissões.',
         variant: 'destructive',
       })
     } finally {
       setIsSavingKey(false)
     }
   }
-
   // Testar conexão
   const handleTestConnection = async (directKey?: string) => {
     if (!currentChurch) return
@@ -517,18 +518,19 @@ export default function IntegrationsSettings() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isTesting}
+                  disabled={isTesting || isSavingKey}
                   onClick={() => handleTestConnection(apiKeyInput.trim())}
                   className="rounded-xl border-slate-200 text-xs"
+                  title="Testa a chave digitada sem salvá-la no banco"
                 >
                   <RefreshCw className={`h-3 w-3 mr-1 ${isTesting ? 'animate-spin' : ''}`} />
-                  Testar chave
+                  {isTesting ? 'Testando...' : 'Apenas testar'}
                 </Button>
               )}
 
               <Button
                 type="submit"
-                disabled={isSavingKey}
+                disabled={isSavingKey || isTesting}
                 className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs"
               >
                 {isSavingKey ? 'Salvando...' : 'Salvar API Key'}

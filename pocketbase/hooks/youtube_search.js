@@ -23,8 +23,26 @@ routerAdd(
 
     // 2. Chave de API do YouTube: busca primeiro da congregação
     let apiKey = ''
+    let effectiveChurchId = churchId
 
-    if (churchId) {
+    // Se church_id não veio na query, tenta inferir pela associação do usuário logado
+    if (!effectiveChurchId && e.auth) {
+      try {
+        const memberships = $app.findRecordsByFilter(
+          'church_members',
+          'user_id = {:userId} && is_active = true',
+          '-role',
+          1,
+          0,
+          { userId: e.auth.id },
+        )
+        if (memberships.length > 0) {
+          effectiveChurchId = memberships[0].getString('church_id')
+        }
+      } catch (_) {}
+    }
+
+    if (effectiveChurchId) {
       try {
         const integrations = $app.findRecordsByFilter(
           'integrations',
@@ -32,10 +50,16 @@ routerAdd(
           '',
           1,
           0,
-          { churchId: churchId },
+          { churchId: effectiveChurchId },
         )
-        if (integrations.length > 0) {
-          const creds = integrations[0].get('credentials') || {}
+        if (integrations && integrations.length > 0) {
+          const rawCreds = integrations[0].get('credentials')
+          let creds = rawCreds
+          if (typeof rawCreds === 'string' && rawCreds) {
+            try {
+              creds = JSON.parse(rawCreds)
+            } catch (_) {}
+          }
           if (creds && typeof creds === 'object' && creds.apiKey) {
             apiKey = String(creds.apiKey).trim()
           }

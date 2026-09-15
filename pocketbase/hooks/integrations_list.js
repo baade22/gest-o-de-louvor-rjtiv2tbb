@@ -57,17 +57,23 @@ routerAdd(
       const result = []
       for (let i = 0; i < records.length; i++) {
         const rec = records[i]
-        const creds = rec.get('credentials') || {}
+        const rawCreds = rec.get('credentials')
+        let creds = rawCreds
+        if (typeof rawCreds === 'string' && rawCreds) {
+          try {
+            creds = JSON.parse(rawCreds)
+          } catch (_) {}
+        }
         let hasApiKey = false
         let maskedApiKey = ''
 
         if (creds && typeof creds === 'object' && creds.apiKey) {
           hasApiKey = true
-          const keyStr = String(creds.apiKey)
+          const keyStr = String(creds.apiKey).trim()
           if (keyStr.length > 8) {
             maskedApiKey =
               keyStr.substring(0, 4) + '••••••••••••••••' + keyStr.substring(keyStr.length - 4)
-          } else {
+          } else if (keyStr) {
             maskedApiKey = '••••••••••••••••'
           }
         }

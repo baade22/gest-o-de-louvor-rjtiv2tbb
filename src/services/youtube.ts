@@ -56,7 +56,8 @@ export async function searchYouTubeVideos(
 
     if (response.code === 'API_KEY_MISSING') {
       throw new Error(
-        'A chave da API do YouTube não foi configurada no servidor (YOUTUBE_API_KEY). Contate o administrador.',
+        response.message ||
+          'Para pesquisar vídeos do YouTube dentro do LouvorFlow, cadastre uma API Key em Configurações → Integrações.',
       )
     }
 
@@ -72,7 +73,8 @@ export async function searchYouTubeVideos(
     }
     if (err?.status === 503 || err?.data?.code === 'API_KEY_MISSING') {
       throw new Error(
-        'A chave da API do YouTube não está configurada no servidor (YOUTUBE_API_KEY).',
+        err?.data?.message ||
+          'Para pesquisar vídeos do YouTube dentro do LouvorFlow, cadastre uma API Key em Configurações → Integrações.',
       )
     }
     if (err?.data?.message) {
