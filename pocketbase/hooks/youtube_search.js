@@ -2,7 +2,7 @@
 // GET /backend/v1/youtube/search?q=...&church_id=... (requer autenticação)
 // Chave utilizada:
 // 1) Credencial configurada pela igreja via collection `integrations` (ADMIN painel)
-// 2) Fallback para variável de ambiente YOUTUBE_API_KEY se a igreja ainda não configurou
+// 2) Fallback para variável de ambiente YOUTUBE_API_KEY se a congregação ainda não configurou
 
 routerAdd(
   'GET',
@@ -53,21 +53,61 @@ routerAdd(
           { churchId: effectiveChurchId },
         )
         if (integrations && integrations.length > 0) {
-          const rawCreds = integrations[0].get('credentials')
-          let creds = rawCreds
-          if (typeof rawCreds === 'string' && rawCreds) {
+          const rec = integrations[0]
+          let creds = null
+
+          // Tentativa 1: getString() (PocketBase serializa campo JSON nativamente como string)
+          try {
+            const str = rec.getString('credentials')
+            if (str && typeof str === 'string') {
+              const parsed = JSON.parse(str)
+              creds = parsed
+              if (typeof creds === 'string') {
+                creds = JSON.parse(creds)
+              }
+            }
+          } catch (_) {}
+
+          // Tentativa 2: get() caso retorne objeto direto ou array de bytes Goja ([]byte)
+          if (!creds || typeof creds !== 'object') {
             try {
-              creds = JSON.parse(rawCreds)
+              const raw = rec.get('credentials')
+              if (raw && typeof raw === 'object') {
+                if (Array.isArray(raw)) {
+                  let byteStr = ''
+                  for (let b = 0; b < raw.length; b++) {
+                    byteStr += String.fromCharCode(raw[b])
+                  }
+                  const parsed = JSON.parse(byteStr)
+                  creds = parsed
+                  if (typeof creds === 'string') {
+                    creds = JSON.parse(creds)
+                  }
+                } else {
+                  creds = raw
+                }
+              } else if (typeof raw === 'string' && raw) {
+                const parsed = JSON.parse(raw)
+                creds = parsed
+                if (typeof creds === 'string') {
+                  creds = JSON.parse(creds)
+                }
+              }
             } catch (_) {}
           }
-          if (creds && typeof creds === 'object' && creds.apiKey) {
-            apiKey = String(creds.apiKey).trim()
+
+          if (creds && typeof creds === 'object') {
+            if (creds.apiKey) {
+              apiKey = String(creds.apiKey).trim()
+            } else if (creds.key) {
+              apiKey = String(creds.key).trim()
+            }
           }
         }
       } catch (_) {}
     }
 
-    // Fallback razoável para a variável de ambiente se a igreja não tiver configurado ainda
+    // Fallback razoável para a variável de ambiente se a congregação não tiver configurado ainda
     if (!apiKey) {
       apiKey = $os.getenv('YOUTUBE_API_KEY') || ''
     }

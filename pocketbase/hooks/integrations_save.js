@@ -1,7 +1,7 @@
-// Hook para salvar credenciais de integração por igreja
+// Hook para salvar credenciais de integração por congregação
 // POST /backend/v1/integrations/save
 // Body: { church_id, provider, apiKey, name, configuration }
-// Somente ADMIN da igreja pode salvar. As credenciais são salvas no banco.
+// Somente ADMIN da congregação pode salvar. As credenciais são salvas no banco.
 
 routerAdd(
   'POST',
@@ -66,9 +66,10 @@ routerAdd(
       record.set('name', name)
       record.set('enabled', true)
 
-      // Atualiza credentials se fornecido apiKey
+      // Atualiza credentials se fornecido apiKey (armazenado como objeto JSON canônico)
       if (apiKey) {
-        record.set('credentials', { apiKey: String(apiKey).trim() })
+        const cleanKey = String(apiKey).trim()
+        record.set('credentials', { apiKey: cleanKey })
       }
       if (configuration) {
         record.set('configuration', configuration)

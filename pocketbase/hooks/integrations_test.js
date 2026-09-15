@@ -57,15 +57,54 @@ routerAdd(
       if (existing.length > 0) {
         integrationRecord = existing[0]
         if (!keyToTest) {
-          const rawCreds = integrationRecord.get('credentials')
-          let creds = rawCreds
-          if (typeof rawCreds === 'string' && rawCreds) {
+          let creds = null
+
+          // Tentativa 1: getString()
+          try {
+            const str = integrationRecord.getString('credentials')
+            if (str && typeof str === 'string') {
+              const parsed = JSON.parse(str)
+              creds = parsed
+              if (typeof creds === 'string') {
+                creds = JSON.parse(creds)
+              }
+            }
+          } catch (_) {}
+
+          // Tentativa 2: get() com suporte a objeto direto ou byte array Goja
+          if (!creds || typeof creds !== 'object') {
             try {
-              creds = JSON.parse(rawCreds)
+              const raw = integrationRecord.get('credentials')
+              if (raw && typeof raw === 'object') {
+                if (Array.isArray(raw)) {
+                  let byteStr = ''
+                  for (let b = 0; b < raw.length; b++) {
+                    byteStr += String.fromCharCode(raw[b])
+                  }
+                  const parsed = JSON.parse(byteStr)
+                  creds = parsed
+                  if (typeof creds === 'string') {
+                    creds = JSON.parse(creds)
+                  }
+                } else {
+                  creds = raw
+                }
+              } else if (typeof raw === 'string' && raw) {
+                const parsed = JSON.parse(raw)
+                creds = parsed
+                if (typeof creds === 'string') {
+                  creds = JSON.parse(creds)
+                }
+              }
             } catch (_) {}
           }
-          if (creds && typeof creds === 'object' && creds.apiKey) {
-            keyToTest = String(creds.apiKey).trim()
+
+          if (creds && typeof creds === 'object') {
+            if (creds.apiKey) {
+              keyToTest = String(creds.apiKey).trim()
+            } else if (creds.key) {
+              keyToTest = String(creds.key).trim()
+            }
           }
         }
       }
