@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T13:09:50.870Z",
+  "generatedAt": "2026-09-15T13:29:03.620Z",
   "collections": [
     {
       "name": "users",
@@ -687,6 +687,93 @@
       "indexes": [
         "CREATE INDEX idx_song_videos_church ON song_videos (church_id)",
         "CREATE INDEX idx_song_videos_song ON song_videos (song_id)"
+      ]
+    },
+    {
+      "name": "integrations",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "credentials",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "configuration",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["CONNECTED", "DISCONNECTED", "ERROR"]
+        },
+        {
+          "name": "last_tested_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_error_message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_integrations_church ON integrations (church_id)",
+        "CREATE UNIQUE INDEX idx_integrations_church_provider ON integrations (church_id, provider)"
       ]
     }
   ]

@@ -24,7 +24,19 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { transposeCifraText, transposeNote } from '@/lib/transposition'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  transposeCifraText,
+  transposeNote,
+  AVAILABLE_KEYS,
+  getSemitoneDifference,
+} from '@/lib/transposition'
 import { useToast } from '@/hooks/use-toast'
 import { YouTubeSearchModal } from '@/components/YouTubeSearchModal'
 import {
@@ -479,60 +491,89 @@ export default function SongDetail() {
       )}
 
       {/* CONTROLES DE TRANSPOSIÇÃO E FONTE (Sticky mobile-first para ensaios) */}
+      {/* Exibe: "Tom original: G / Tom para visualizar: [ G ▼ ] [-] 0 [+]" de acordo com o requisito 7 */}
       <div className="sticky top-16 lg:top-0 z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-        {/* Stepper de Transposição */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
-            Transposição:
-          </span>
-
-          <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={semitones <= -11}
-              onClick={() => handleTranspose(-1)}
-              aria-label="Diminuir meio tom"
-              className="h-8 w-8 rounded-lg hover:bg-white text-slate-700"
+        {/* Seletor visual de tom + Stepper de Transposição */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+            <span>Tom original:</span>
+            <Badge
+              variant="outline"
+              className="font-extrabold text-xs px-2 py-0.5 bg-slate-50 text-slate-900 border-slate-300"
             >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-
-            <div className="px-3 min-w-[90px] text-center">
-              <span className="text-xs font-bold text-teal-800">
-                Tom: <strong className="text-sm font-extrabold">{currentKey}</strong>
-              </span>
-              {semitones !== 0 && (
-                <span className="text-[10px] text-slate-500 block leading-none">
-                  {semitones > 0 ? `+${semitones}` : semitones} semitons
-                </span>
-              )}
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={semitones >= 11}
-              onClick={() => handleTranspose(1)}
-              aria-label="Aumentar meio tom"
-              className="h-8 w-8 rounded-lg hover:bg-white text-slate-700"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+              {song.key}
+            </Badge>
           </div>
 
-          {semitones !== 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleResetTranspose}
-              aria-label="Restaurar tom original"
-              title="Restaurar tom original"
-              className="h-8 w-8 text-slate-400 hover:text-slate-600"
+          <span className="text-slate-300 hidden sm:inline">/</span>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-teal-900">Tom para visualizar:</span>
+            <Select
+              value={currentKey}
+              onValueChange={(newTargetKey) => {
+                if (song?.key) {
+                  const diff = getSemitoneDifference(song.key, newTargetKey)
+                  setSemitones(diff)
+                }
+              }}
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
-          )}
+              <SelectTrigger className="h-8 min-w-[70px] text-xs font-bold rounded-lg border-teal-300 bg-teal-50/50 text-teal-900">
+                <SelectValue placeholder={currentKey} />
+              </SelectTrigger>
+              <SelectContent className="max-h-56">
+                {AVAILABLE_KEYS.map((k) => (
+                  <SelectItem key={k} value={k} className="text-xs">
+                    {k}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Stepper [-] offset [+] */}
+            <div className="flex items-center bg-slate-100 rounded-xl p-0.5 border border-slate-200 ml-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={semitones <= -11}
+                onClick={() => handleTranspose(-1)}
+                aria-label="Diminuir meio tom"
+                className="h-7 w-7 rounded-lg hover:bg-white text-slate-700"
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+
+              <div className="px-2 min-w-[36px] text-center">
+                <span className="text-xs font-extrabold text-slate-800">
+                  {semitones > 0 ? `+${semitones}` : semitones}
+                </span>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={semitones >= 11}
+                onClick={() => handleTranspose(1)}
+                aria-label="Aumentar meio tom"
+                className="h-7 w-7 rounded-lg hover:bg-white text-slate-700"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+
+            {semitones !== 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleResetTranspose}
+                aria-label="Restaurar tom original"
+                title="Restaurar tom original"
+                className="h-8 w-8 text-slate-400 hover:text-slate-600"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stepper de Tamanho de Fonte (A- / A+) */}

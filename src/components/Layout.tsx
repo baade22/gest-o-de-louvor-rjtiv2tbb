@@ -10,6 +10,7 @@ import {
   Sliders,
   UserCircle,
   Settings,
+  Zap,
   LogOut,
   Menu,
   X,
@@ -100,6 +101,12 @@ export default function Layout() {
       label: 'Meu Perfil',
       icon: UserCircle,
       allowed: true,
+    },
+    {
+      to: '/configuracoes/integracoes',
+      label: 'Integrações',
+      icon: Zap,
+      allowed: isAdmin,
     },
     {
       to: '/configuracoes',

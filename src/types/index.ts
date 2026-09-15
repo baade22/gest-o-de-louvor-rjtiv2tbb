@@ -91,6 +91,39 @@ export interface SongVideo {
   updated: string
 }
 
+export type IntegrationProvider =
+  | 'youtube'
+  | 'whatsapp'
+  | 'email'
+  | 'google'
+  | 'push'
+  | 'sms'
+  | 'storage'
+export type IntegrationStatus = 'CONNECTED' | 'DISCONNECTED' | 'ERROR'
+
+export interface IntegrationItem {
+  id?: string
+  church_id: string
+  provider: IntegrationProvider | string
+  name: string
+  enabled: boolean
+  status: IntegrationStatus
+  last_tested_at?: string | null
+  last_error_message?: string
+  configuration?: Record<string, unknown>
+  has_credentials?: boolean
+  masked_key?: string
+  created?: string
+  updated?: string
+}
+
+export interface TestIntegrationResult {
+  success: boolean
+  status: IntegrationStatus
+  message: string
+  last_tested_at?: string
+}
+
 export interface EventItem {
   id: string
   church_id: string

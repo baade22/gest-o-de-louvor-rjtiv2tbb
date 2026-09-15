@@ -1,6 +1,8 @@
 // Hook de busca no YouTube Data API v3 para o LouvorFlow
-// GET /backend/v1/youtube/search?q=... (requer autenticação)
-// Chave lida server-side: $os.getenv("YOUTUBE_API_KEY")
+// GET /backend/v1/youtube/search?q=...&church_id=... (requer autenticação)
+// Chave utilizada:
+// 1) Credencial configurada pela igreja via collection `integrations` (ADMIN painel)
+// 2) Fallback para variável de ambiente YOUTUBE_API_KEY se a igreja ainda não configurou
 
 routerAdd(
   'GET',
@@ -8,7 +10,9 @@ routerAdd(
   (e) => {
     // 1. Validação do parâmetro de busca
     const query = e.request.url.query().get('q') || ''
+    const churchId = e.request.url.query().get('church_id') || ''
     const trimmedQuery = query.trim()
+
     if (!trimmedQuery) {
       return e.json(400, {
         code: 'EMPTY_QUERY',
@@ -17,12 +21,38 @@ routerAdd(
       })
     }
 
-    // 2. Chave de API do YouTube
-    const apiKey = $os.getenv('YOUTUBE_API_KEY') || ''
+    // 2. Chave de API do YouTube: busca primeiro da congregação
+    let apiKey = ''
+
+    if (churchId) {
+      try {
+        const integrations = $app.findRecordsByFilter(
+          'integrations',
+          'church_id = {:churchId} && provider = "youtube" && enabled = true',
+          '',
+          1,
+          0,
+          { churchId: churchId },
+        )
+        if (integrations.length > 0) {
+          const creds = integrations[0].get('credentials') || {}
+          if (creds && typeof creds === 'object' && creds.apiKey) {
+            apiKey = String(creds.apiKey).trim()
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Fallback razoável para a variável de ambiente se a igreja não tiver configurado ainda
+    if (!apiKey) {
+      apiKey = $os.getenv('YOUTUBE_API_KEY') || ''
+    }
+
     if (!apiKey) {
       return e.json(503, {
         code: 'API_KEY_MISSING',
-        message: 'A chave da API do YouTube (YOUTUBE_API_KEY) não está configurada no servidor.',
+        message:
+          'Para pesquisar vídeos do YouTube dentro do LouvorFlow, cadastre uma API Key em Configurações → Integrações.',
         items: [],
       })
     }

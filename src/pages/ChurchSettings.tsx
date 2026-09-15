@@ -156,6 +156,38 @@ export default function ChurchSettings() {
         </CardContent>
       </Card>
 
+      {/* Central de Integrações do LouvorFlow */}
+      <Card className="rounded-2xl border-slate-200 shadow-xs">
+        <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span className="text-teal-700 font-extrabold text-lg">⚡</span>
+              <span>Central de Integrações</span>
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500 mt-0.5">
+              Conecte YouTube Data API, serviços de mensagem e notificações externas
+            </CardDescription>
+          </div>
+          <Badge className="bg-teal-100 text-teal-800 border-teal-200 text-xs">
+            Exclusivo ADMIN
+          </Badge>
+        </CardHeader>
+
+        <CardContent className="p-6 space-y-4">
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Configure credenciais próprias para sua congregação sem precisar mexer em código ou
+            variáveis de ambiente do servidor. As chaves são protegidas com isolamento total
+            multi-tenant.
+          </p>
+
+          <a href="/configuracoes/integracoes">
+            <Button className="w-full sm:w-auto rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold gap-1.5">
+              <span>Acessar Painel de Integrações</span>
+            </Button>
+          </a>
+        </CardContent>
+      </Card>
+
       {/* Placeholder de Assinatura / Billing (Preparado para módulos futuros) */}
       <Card className="rounded-2xl border-slate-200 shadow-xs opacity-90">
         <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">

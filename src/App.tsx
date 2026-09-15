@@ -23,6 +23,7 @@ import MusicianForm from '@/pages/MusicianForm'
 import RolesManagement from '@/pages/RolesManagement'
 import UserProfile from '@/pages/UserProfile'
 import ChurchSettings from '@/pages/ChurchSettings'
+import IntegrationsSettings from '@/pages/IntegrationsSettings'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -186,6 +187,14 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <ChurchSettings />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/configuracoes/integracoes"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <IntegrationsSettings />
                 </RequireAuth>
               }
             />

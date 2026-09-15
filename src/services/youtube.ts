@@ -28,15 +28,23 @@ export interface YouTubeSearchResponse {
  * Não expõe a chave da API ao frontend.
  * Converte erros em mensagens amigáveis em pt-BR.
  */
-export async function searchYouTubeVideos(query: string): Promise<YouTubeSearchResult[]> {
+export async function searchYouTubeVideos(
+  query: string,
+  churchId?: string,
+): Promise<YouTubeSearchResult[]> {
   const trimmed = query.trim()
   if (!trimmed) {
     throw new Error('Informe o termo para pesquisa de vídeos.')
   }
 
+  const queryParams = new URLSearchParams({ q: trimmed })
+  if (churchId) {
+    queryParams.set('church_id', churchId)
+  }
+
   try {
     const response = await pb.send<YouTubeSearchResponse>(
-      `/backend/v1/youtube/search?q=${encodeURIComponent(trimmed)}`,
+      `/backend/v1/youtube/search?${queryParams.toString()}`,
       {
         method: 'GET',
       },

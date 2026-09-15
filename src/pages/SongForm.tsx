@@ -28,7 +28,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import { AVAILABLE_KEYS } from '@/lib/transposition'
-import { parseSongContent } from '@/lib/songParser'
+import {
+  parseSongContent,
+  SongSection,
+  serializeSections,
+  extractSectionsFromText,
+  SECTION_MARKERS,
+} from '@/lib/songParser'
+import { ArrowUp, ArrowDown, Trash2, PlusCircle, FileEdit } from 'lucide-react'
 import { CifraClubSearchModal } from '@/components/CifraClubSearchModal'
 import { YouTubeSearchModal } from '@/components/YouTubeSearchModal'
 import { addVideoToSong, getVideosForSong } from '@/services/songVideos'
@@ -67,14 +74,21 @@ export default function SongForm() {
   // Vídeo selecionado no YouTube para persistir após salvar
   const [pendingVideo, setPendingVideo] = useState<YouTubeSearchResult | null>(null)
 
+  // Seções estruturadas para edição manual avançada
+  const [sections, setSections] = useState<SongSection[]>([])
+  const [showSectionManager, setShowSectionManager] = useState(false)
+
   // Aba ativa de visualização pós-processamento
-  const [contentPreviewTab, setContentPreviewTab] = useState<'chords' | 'lyrics'>('chords')
+  const [contentPreviewTab, setContentPreviewTab] = useState<'chords' | 'lyrics' | 'sections'>(
+    'chords',
+  )
 
   useEffect(() => {
     if (isEditing && id) {
       const fetchSong = async () => {
         try {
           const song = await pb.collection('songs').getOne<Song>(id)
+          const initialChords = song.chords || song.raw_content || ''
           setFormData({
             title: song.title || '',
             artist: song.artist || '',
@@ -89,6 +103,9 @@ export default function SongForm() {
             source: song.source || 'MANUAL',
             notes: song.notes || '',
           })
+          if (initialChords) {
+            setSections(extractSectionsFromText(initialChords))
+          }
         } catch (err) {
           console.error(err)
           toast({
@@ -122,11 +139,81 @@ export default function SongForm() {
       chords: parsed.chords,
       lyrics: parsed.lyrics,
     }))
+    setSections(parsed.sections)
 
     toast({
       title: 'Conteúdo processado com sucesso!',
-      description: 'Letra + Cifra e Somente Letra geradas. Você pode ajustar manualmente abaixo.',
+      description: `${parsed.sections.length} seções identificadas. Você pode ajustar manualmente a letra, acordes e seções abaixo.`,
     })
+  }
+
+  // Operações sobre seções (Requisito 4: editar letra, acordes, corrigir seções, renomear, adicionar, remover e reordenar)
+  const handleUpdateSectionName = (index: number, newName: string) => {
+    const updated = [...sections]
+    updated[index].name = newName.toUpperCase()
+    setSections(updated)
+    const newChords = serializeSections(updated)
+    const reParsed = parseSongContent(newChords)
+    setFormData((prev) => ({
+      ...prev,
+      chords: newChords,
+      lyrics: reParsed.lyrics,
+    }))
+  }
+
+  const handleUpdateSectionContent = (index: number, newContent: string) => {
+    const updated = [...sections]
+    updated[index].content = newContent
+    setSections(updated)
+    const newChords = serializeSections(updated)
+    const reParsed = parseSongContent(newChords)
+    setFormData((prev) => ({
+      ...prev,
+      chords: newChords,
+      lyrics: reParsed.lyrics,
+    }))
+  }
+
+  const handleAddSection = () => {
+    const newSec: SongSection = {
+      id: `sec_${Date.now()}`,
+      name: 'VERSO',
+      type: 'VERSO',
+      content: '',
+    }
+    const updated = [...sections, newSec]
+    setSections(updated)
+    const newChords = serializeSections(updated)
+    setFormData((prev) => ({ ...prev, chords: newChords }))
+  }
+
+  const handleRemoveSection = (index: number) => {
+    const updated = sections.filter((_, i) => i !== index)
+    setSections(updated)
+    const newChords = serializeSections(updated)
+    const reParsed = parseSongContent(newChords)
+    setFormData((prev) => ({
+      ...prev,
+      chords: newChords,
+      lyrics: reParsed.lyrics,
+    }))
+  }
+
+  const handleMoveSection = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= sections.length) return
+    const updated = [...sections]
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setSections(updated)
+    const newChords = serializeSections(updated)
+    const reParsed = parseSongContent(newChords)
+    setFormData((prev) => ({
+      ...prev,
+      chords: newChords,
+      lyrics: reParsed.lyrics,
+    }))
   }
 
   // Recebe dados da referência do Cifra Club
@@ -516,15 +603,18 @@ export default function SongForm() {
 
             <Tabs
               value={contentPreviewTab}
-              onValueChange={(v) => setContentPreviewTab(v as 'chords' | 'lyrics')}
+              onValueChange={(v) => setContentPreviewTab(v as 'chords' | 'lyrics' | 'sections')}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 rounded-xl bg-slate-100 p-1">
+              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-slate-100 p-1">
                 <TabsTrigger value="chords" className="rounded-lg text-xs font-bold py-2">
                   (A) Letra + Cifra
                 </TabsTrigger>
                 <TabsTrigger value="lyrics" className="rounded-lg text-xs font-bold py-2">
                   (B) Somente Letra
+                </TabsTrigger>
+                <TabsTrigger value="sections" className="rounded-lg text-xs font-bold py-2">
+                  (C) Editor de Seções ({sections.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -568,6 +658,104 @@ export default function SongForm() {
                     className="text-xs rounded-xl border-slate-200 leading-relaxed bg-white"
                   />
                 </div>
+              </TabsContent>
+
+              {/* Aba Editor de Seções (Requisito 4: editar letra, acordes, alterar nome, adicionar, remover e reordenar) */}
+              <TabsContent value="sections" className="mt-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Gestão Estruturada de Seções (Refrão, Verso, Ponte, etc.)
+                    </Label>
+                    <p className="text-[11px] text-slate-500">
+                      Reordene com as setas, renomeie os marcadores ou edite letra e acordes por
+                      bloco.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAddSection}
+                    className="rounded-xl border-teal-200 text-teal-800 hover:bg-teal-50 text-xs font-semibold gap-1"
+                  >
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    Adicionar Seção
+                  </Button>
+                </div>
+
+                {sections.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 border border-dashed rounded-xl bg-slate-50">
+                    <p className="text-xs font-medium">
+                      Nenhuma seção estruturada. Clique em &quot;Processar conteúdo&quot; acima para
+                      extrair automaticamente.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sections.map((sec, idx) => (
+                      <div
+                        key={sec.id || idx}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5 shadow-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-xs font-bold text-slate-400 w-5">#{idx + 1}</span>
+                            <Input
+                              value={sec.name}
+                              onChange={(e) => handleUpdateSectionName(idx, e.target.value)}
+                              placeholder="Nome da seção (ex: REFRÃO)"
+                              className="h-8 text-xs font-bold uppercase max-w-[200px] rounded-lg border-slate-200 bg-slate-50"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveSection(idx, 'up')}
+                              aria-label="Mover seção para cima"
+                              className="h-7 w-7 text-slate-500 hover:text-slate-900"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={idx === sections.length - 1}
+                              onClick={() => handleMoveSection(idx, 'down')}
+                              aria-label="Mover seção para baixo"
+                              className="h-7 w-7 text-slate-500 hover:text-slate-900"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveSection(idx)}
+                              aria-label="Remover seção"
+                              className="h-7 w-7 text-slate-400 hover:text-red-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <Textarea
+                          rows={4}
+                          value={sec.content}
+                          onChange={(e) => handleUpdateSectionContent(idx, e.target.value)}
+                          placeholder="Letra e acordes desta seção..."
+                          className="font-mono text-xs rounded-lg border-slate-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>

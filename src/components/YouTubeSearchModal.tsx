@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Search, Youtube, Check, AlertTriangle, ExternalLink, Loader2 } from 'lucide-react'
 import { searchYouTubeVideos, YouTubeSearchResult } from '@/services/youtube'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface YouTubeSearchModalProps {
   open: boolean
@@ -40,6 +41,8 @@ export function YouTubeSearchModal({
     }
   }, [open, initialQuery])
 
+  const { currentChurch } = useAuth()
+
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     const trimmed = query.trim()
@@ -53,7 +56,7 @@ export function YouTubeSearchModal({
     setHasSearched(true)
 
     try {
-      const items = await searchYouTubeVideos(trimmed)
+      const items = await searchYouTubeVideos(trimmed, currentChurch?.id)
       setResults(items)
       if (items.length === 0) {
         setErrorMessage('Nenhum vídeo encontrado para este termo de busca.')
@@ -121,10 +124,12 @@ export function YouTubeSearchModal({
               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 mt-0.5" />
               <div className="space-y-1">
                 <p className="font-semibold">{errorMessage}</p>
-                {errorMessage.includes('YOUTUBE_API_KEY') && (
+                {(errorMessage.includes('YOUTUBE_API_KEY') ||
+                  errorMessage.includes('Configurações → Integrações')) && (
                   <p className="text-[11px] text-amber-800">
-                    Dica: Configure a variável de ambiente <code>YOUTUBE_API_KEY</code> no painel de
-                    segredos do backend para habilitar a busca oficial.
+                    Dica: Configure a chave em{' '}
+                    <strong>Configurações → Integrações → YouTube</strong> no painel administrativo
+                    para habilitar a busca oficial.
                   </p>
                 )}
               </div>
