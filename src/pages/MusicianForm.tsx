@@ -117,10 +117,19 @@ export default function MusicianForm() {
     const trimmedName = formData.name.trim()
     const trimmedEmail = formData.email.trim().toLowerCase()
 
-    if (!trimmedName) {
+    if (!trimmedName || trimmedName.replace(/\s+/g, '').length === 0) {
       toast({
         title: 'Nome obrigatório',
         description: 'Por favor, informe o nome completo do membro (não pode ser apenas espaços).',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (trimmedName.length < 2) {
+      toast({
+        title: 'Nome muito curto',
+        description: 'O nome deve ter pelo menos 2 caracteres.',
         variant: 'destructive',
       })
       return

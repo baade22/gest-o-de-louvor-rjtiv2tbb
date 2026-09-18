@@ -89,3 +89,10 @@ export async function listMusicians(churchId: string): Promise<MusicianDetailRes
   )
   return response.items || []
 }
+
+/**
+ * Remove/desvincula um músico da equipe da igreja.
+ */
+export async function removeMusician(memberId: string): Promise<void> {
+  await pb.collection('church_members').delete(memberId)
+}

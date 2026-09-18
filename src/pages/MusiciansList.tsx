@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import { listMusicians } from '@/services/musicians'
+import { listMusicians, removeMusician } from '@/services/musicians'
 import type { Role } from '@/types'
 import { Users, Search, Plus, Phone, Mail, Edit, Trash2, MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -83,7 +83,7 @@ export default function MusiciansList() {
       return
 
     try {
-      await pb.collection('church_members').delete(memberId)
+      await removeMusician(memberId)
       toast({
         title: 'Membro removido',
         description: 'O músico foi desvinculado com sucesso.',

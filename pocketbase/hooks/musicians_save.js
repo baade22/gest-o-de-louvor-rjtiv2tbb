@@ -28,8 +28,11 @@ routerAdd(
     if (!churchId) {
       return e.json(400, { message: 'Igreja não informada.' })
     }
-    if (!name) {
+    if (!name || name.replace(/\s+/g, '').length === 0) {
       return e.json(400, { message: 'O nome é obrigatório e não pode conter apenas espaços.' })
+    }
+    if (name.length < 2) {
+      return e.json(400, { message: 'O nome deve ter pelo menos 2 caracteres.' })
     }
     if (!email) {
       return e.json(400, { message: 'O e-mail é obrigatório.' })

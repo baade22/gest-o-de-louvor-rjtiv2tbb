@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import pb from '@/lib/pocketbase/client'
-import { saveMusician, getMusician, listMusicians, type MusicianPayload } from './musicians'
+import {
+  saveMusician,
+  getMusician,
+  listMusicians,
+  removeMusician,
+  type MusicianPayload,
+} from './musicians'
 
 vi.mock('@/lib/pocketbase/client', () => {
   return {
@@ -201,5 +207,17 @@ describe('musicians service', () => {
         role_ids: ['r1'],
       }),
     ).rejects.toEqual(errorResponse)
+  })
+
+  it('deve desvincular músico usando removeMusician', async () => {
+    const mockDelete = vi.fn().mockResolvedValueOnce(true)
+    vi.mocked(pb.collection).mockReturnValue({
+      delete: mockDelete,
+    } as unknown as ReturnType<typeof pb.collection>)
+
+    await removeMusician('member_del_123')
+
+    expect(pb.collection).toHaveBeenCalledWith('church_members')
+    expect(mockDelete).toHaveBeenCalledWith('member_del_123')
   })
 })
