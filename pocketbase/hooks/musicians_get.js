@@ -11,7 +11,21 @@ routerAdd(
       return e.json(401, { message: 'Não autorizado' })
     }
 
-    const memberId = String(e.requestInfo().pathParams['id'] || '').trim()
+    let rawParam = ''
+    try {
+      if (e.request && typeof e.request.pathValue === 'function') {
+        rawParam = e.request.pathValue('id')
+      }
+    } catch (_) {}
+    if (!rawParam) {
+      try {
+        const reqInfo = e.requestInfo ? e.requestInfo() : null
+        if (reqInfo && reqInfo.pathParams) {
+          rawParam = reqInfo.pathParams['id']
+        }
+      } catch (_) {}
+    }
+    const memberId = String(rawParam || '').trim()
     const churchId = String(e.requestInfo().query['church_id'] || '').trim()
 
     if (!memberId) {

@@ -141,6 +141,36 @@ describe('musicians service', () => {
     expect(result.role_ids).toEqual(['role_1'])
   })
 
+  it('deve codificar corretamente o path param id na chamada ao endpoint GET /backend/v1/musicians/{id}', async () => {
+    const mockDetail = {
+      id: 't0mi4tyz475q3fg',
+      church_id: '8minai50ybqzkek',
+      user_id: 'm1rkrip07w5zcuv',
+      role: 'LIDER' as const,
+      phone: '8199999999',
+      is_active: true,
+      created: '2026-09-18T12:00:00Z',
+      updated: '2026-09-18T12:00:00Z',
+      name: 'Vinni Silva',
+      email: 'viniciuslva.ferreira@gmail.com',
+      role_ids: ['role_violao'],
+      roles: [],
+    }
+
+    vi.mocked(pb.send).mockResolvedValueOnce(mockDetail)
+
+    const memberId = 't0mi4tyz475q3fg'
+    const churchId = '8minai50ybqzkek'
+    const res = await getMusician(memberId, churchId)
+
+    expect(pb.send).toHaveBeenCalledWith(
+      '/backend/v1/musicians/t0mi4tyz475q3fg?church_id=8minai50ybqzkek',
+      { method: 'GET' },
+    )
+    expect(res.id).toBe('t0mi4tyz475q3fg')
+    expect(res.name).toBe('Vinni Silva')
+  })
+
   it('deve listar membros com listMusicians trazendo nomes, emails e papéis consolidados', async () => {
     const mockListResponse = {
       items: [

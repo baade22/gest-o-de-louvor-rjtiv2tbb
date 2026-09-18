@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T13:13:25.805Z",
+  "generatedAt": "2026-09-18T14:06:33.520Z",
   "collections": [
     {
       "name": "users",
@@ -159,11 +159,11 @@
       "name": "church_members",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
+        "view": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
+        "update": "@request.auth.id != '' && (user_id = @request.auth.id || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')))",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
       },
       "fields": [
         {
