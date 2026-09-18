@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import type { ChurchMember, Role, MemberRole, User } from '@/types'
-import { ArrowLeft, Save, User as UserIcon, Phone, Mail, Shield, Check } from 'lucide-react'
+import { saveMusician, getMusician } from '@/services/musicians'
+import type { Role } from '@/types'
+import { ArrowLeft, Save, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,7 +38,7 @@ export default function MusicianForm() {
     selectedRoleIds: [] as string[],
   })
 
-  // Carrega lista de funções disponíveis na igreja
+  // Carrega lista de funções/instrumentos disponíveis na igreja
   useEffect(() => {
     if (!currentChurch) return
     const fetchRoles = async () => {
@@ -48,41 +49,37 @@ export default function MusicianForm() {
         })
         setAvailableRoles(roles)
       } catch (err) {
-        console.error(err)
+        console.error('Erro ao carregar funções:', err)
       }
     }
     fetchRoles()
   }, [currentChurch])
 
-  // Se editando, busca dados do membro
+  // Se editando, busca dados consolidados do membro via serviço do backend
   useEffect(() => {
     if (isEditing && id && currentChurch) {
       const fetchMemberData = async () => {
         try {
-          const member = await pb.collection('church_members').getOne<ChurchMember>(id, {
-            expand: 'user_id',
-          })
-          const user = member.expand?.user_id
-
-          // Busca as funções já atribuídas
-          const memberRoles = await pb.collection('member_roles').getFullList<MemberRole>({
-            filter: `member_id = "${member.id}"`,
-          })
-          const roleIds = memberRoles.map((mr) => mr.role_id)
-
+          // Busca diretamente no endpoint do backend (com superuser no servidor para retornar name e email)
+          const data = await getMusician(id, currentChurch.id)
           setFormData({
-            name: user?.name || '',
-            email: user?.email || '',
-            phone: member.phone || '',
-            role: member.role || 'MUSICO',
-            is_active: member.is_active,
-            selectedRoleIds: roleIds,
+            name: data.name || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            role: data.role || 'MUSICO',
+            is_active: data.is_active,
+            selectedRoleIds: data.role_ids || [],
           })
-        } catch (err) {
-          console.error(err)
+        } catch (err: unknown) {
+          console.error('Erro ao carregar dados do músico:', err)
+          const errorObj = err as { data?: { message?: string }; message?: string }
+          const errorMsg =
+            errorObj.data?.message ||
+            errorObj.message ||
+            'Músico não encontrado ou sem permissão de acesso.'
           toast({
             title: 'Erro ao carregar músico',
-            description: 'Músico não encontrado.',
+            description: errorMsg,
             variant: 'destructive',
           })
           navigate('/musicians')
@@ -92,7 +89,7 @@ export default function MusicianForm() {
       }
       fetchMemberData()
     }
-  }, [id, isEditing, currentChurch])
+  }, [id, isEditing, currentChurch, navigate, toast])
 
   const toggleRole = (roleId: string) => {
     setFormData((prev) => {
@@ -108,12 +105,41 @@ export default function MusicianForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!currentChurch) return
-
-    if (!formData.name.trim() || !formData.email.trim()) {
+    if (!currentChurch) {
       toast({
-        title: 'Campos obrigatórios',
-        description: 'Por favor, informe nome e e-mail do músico.',
+        title: 'Igreja não selecionada',
+        description: 'Selecione uma igreja ativa para continuar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const trimmedName = formData.name.trim()
+    const trimmedEmail = formData.email.trim().toLowerCase()
+
+    if (!trimmedName) {
+      toast({
+        title: 'Nome obrigatório',
+        description: 'Por favor, informe o nome completo do membro (não pode ser apenas espaços).',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!trimmedEmail) {
+      toast({
+        title: 'E-mail obrigatório',
+        description: 'Por favor, informe o e-mail do músico.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailPattern.test(trimmedEmail)) {
+      toast({
+        title: 'E-mail inválido',
+        description: 'Insira um formato de e-mail válido (ex: nome@igreja.com).',
         variant: 'destructive',
       })
       return
@@ -130,90 +156,37 @@ export default function MusicianForm() {
 
     setIsSubmitting(true)
     try {
-      if (isEditing && id) {
-        // Atualiza membro
-        const member = await pb.collection('church_members').getOne<ChurchMember>(id)
-        await pb.collection('church_members').update(id, {
-          role: formData.role,
-          phone: formData.phone.trim() || null,
-          is_active: formData.is_active,
-        })
+      // PERSISTÊNCIA REAL: Dispara para a API do backend
+      // O backend persiste em _pb_users_auth_ (name, email), church_members e member_roles
+      const result = await saveMusician({
+        church_id: currentChurch.id,
+        member_id: isEditing ? id : undefined,
+        name: trimmedName,
+        email: trimmedEmail,
+        phone: formData.phone.trim(),
+        role: formData.role,
+        is_active: formData.is_active,
+        role_ids: formData.selectedRoleIds,
+      })
 
-        // Atualiza nome do usuário
-        if (member.user_id) {
-          await pb.collection('users').update(member.user_id, {
-            name: formData.name.trim(),
-          })
-        }
-
-        // Sincroniza funções (remove antigas e adiciona novas)
-        const oldRoles = await pb.collection('member_roles').getFullList<MemberRole>({
-          filter: `member_id = "${id}"`,
-        })
-        for (const mr of oldRoles) {
-          await pb.collection('member_roles').delete(mr.id)
-        }
-        for (const roleId of formData.selectedRoleIds) {
-          await pb.collection('member_roles').create({
-            church_id: currentChurch.id,
-            member_id: id,
-            role_id: roleId,
-          })
-        }
-
-        toast({
-          title: 'Músico atualizado',
-          description: 'Os dados foram alterados com sucesso.',
-        })
-      } else {
-        // Novo membro: verifica se usuário já existe com esse email ou cria
-        let targetUserId: string
-        try {
-          const existingUser = await pb
-            .collection('users')
-            .getFirstListItem<User>(`email = "${formData.email.trim()}"`)
-          targetUserId = existingUser.id
-        } catch (_) {
-          // Cria novo usuário com senha padrão inicial
-          const newUser = await pb.collection('users').create({
-            email: formData.email.trim(),
-            password: 'Skip@Pass',
-            passwordConfirm: 'Skip@Pass',
-            name: formData.name.trim(),
-          })
-          targetUserId = newUser.id
-        }
-
-        // Cria o church_member
-        const newMember = await pb.collection('church_members').create({
-          church_id: currentChurch.id,
-          user_id: targetUserId,
-          role: formData.role,
-          phone: formData.phone.trim() || null,
-          is_active: formData.is_active,
-        })
-
-        // Atribui funções
-        for (const roleId of formData.selectedRoleIds) {
-          await pb.collection('member_roles').create({
-            church_id: currentChurch.id,
-            member_id: newMember.id,
-            role_id: roleId,
-          })
-        }
-
-        toast({
-          title: 'Músico cadastrado!',
-          description: 'O músico agora faz parte da equipe da igreja.',
-        })
-      }
+      // Mensagem de sucesso confirmada SOMENTE após resposta positiva do banco
+      toast({
+        title: isEditing ? 'Músico atualizado!' : 'Músico cadastrado!',
+        description: result.message || 'Dados e funções persistidos com sucesso.',
+      })
 
       navigate('/musicians')
-    } catch (err) {
-      console.error(err)
+    } catch (err: unknown) {
+      console.error('Falha ao salvar músico:', err)
+      const errorObj = err as { data?: { message?: string }; message?: string }
+      const errorMsg =
+        errorObj.data?.message ||
+        errorObj.message ||
+        'Não foi possível salvar o músico no banco de dados. Tente novamente.'
+
       toast({
         title: 'Erro ao salvar',
-        description: 'Não foi possível cadastrar ou atualizar o músico.',
+        description: errorMsg,
         variant: 'destructive',
       })
     } finally {
@@ -274,7 +247,6 @@ export default function MusicianForm() {
               <Input
                 id="email"
                 type="email"
-                disabled={isEditing}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="joao@igreja.com.br"
@@ -300,7 +272,7 @@ export default function MusicianForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="role" className="text-xs font-semibold text-slate-700">
-                Permissão no Sistema
+                Permissão no LouvorFlow
               </Label>
               <Select
                 value={formData.role}
@@ -363,7 +335,7 @@ export default function MusicianForm() {
             </div>
             {formData.selectedRoleIds.length === 0 && (
               <p className="text-[11px] text-amber-600">
-                Selecione pelo menos uma função que o músico executa.
+                Selecione pelo menos uma função ou instrumento que o músico executa.
               </p>
             )}
           </div>
@@ -380,7 +352,11 @@ export default function MusicianForm() {
               className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold gap-2"
             >
               <Save className="h-4 w-4" />
-              {isSubmitting ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Cadastrar Músico'}
+              {isSubmitting
+                ? 'Gravando no banco...'
+                : isEditing
+                  ? 'Salvar Alterações'
+                  : 'Cadastrar Músico'}
             </Button>
           </div>
         </form>

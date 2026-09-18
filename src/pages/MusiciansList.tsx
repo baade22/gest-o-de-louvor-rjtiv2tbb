@@ -2,21 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import type { ChurchMember, Role, MemberRole } from '@/types'
-import {
-  Users,
-  Search,
-  Plus,
-  Phone,
-  Mail,
-  Edit,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  MoreVertical,
-  Shield,
-  Sliders,
-} from 'lucide-react'
+import { listMusicians } from '@/services/musicians'
+import type { Role } from '@/types'
+import { Users, Search, Plus, Phone, Mail, Edit, Trash2, MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -30,12 +18,23 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
 
+interface MusicianItem {
+  id: string
+  church_id: string
+  user_id: string
+  role: 'ADMIN' | 'LIDER' | 'MUSICO'
+  phone?: string
+  is_active: boolean
+  name: string
+  email: string
+  roles: Role[]
+}
+
 export default function MusiciansList() {
   const { currentChurch, isAdmin } = useAuth()
   const { toast } = useToast()
 
-  const [members, setMembers] = useState<ChurchMember[]>([])
-  const [memberRolesMap, setMemberRolesMap] = useState<Record<string, Role[]>>({})
+  const [members, setMembers] = useState<MusicianItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -43,32 +42,30 @@ export default function MusiciansList() {
     if (!currentChurch) return
     setIsLoading(true)
     try {
-      const records = await pb.collection('church_members').getFullList<ChurchMember>({
-        filter: `church_id = "${currentChurch.id}"`,
-        expand: 'user_id',
-        sort: '-created',
-      })
-      setMembers(records)
-
-      // Busca papéis atribuídos a cada membro
-      const memberRolesList = await pb.collection('member_roles').getFullList<MemberRole>({
-        filter: `church_id = "${currentChurch.id}"`,
-        expand: 'role_id',
-      })
-
-      const map: Record<string, Role[]> = {}
-      for (const mr of memberRolesList) {
-        if (!map[mr.member_id]) map[mr.member_id] = []
-        if (mr.expand?.role_id) {
-          map[mr.member_id].push(mr.expand.role_id)
-        }
-      }
-      setMemberRolesMap(map)
-    } catch (err) {
-      console.error(err)
+      const data = await listMusicians(currentChurch.id)
+      setMembers(
+        data.map((m) => ({
+          id: m.id,
+          church_id: m.church_id,
+          user_id: m.user_id,
+          role: m.role,
+          phone: m.phone,
+          is_active: m.is_active,
+          name: m.name || 'Músico',
+          email: m.email || '',
+          roles: m.roles || [],
+        })),
+      )
+    } catch (err: unknown) {
+      console.error('Erro ao buscar músicos:', err)
+      const errorObj = err as { data?: { message?: string }; message?: string }
+      const errorMsg =
+        errorObj.data?.message ||
+        errorObj.message ||
+        'Não foi possível carregar a equipe de música.'
       toast({
         title: 'Erro ao buscar músicos',
-        description: 'Não foi possível carregar a equipe de música.',
+        description: errorMsg,
         variant: 'destructive',
       })
     } finally {
@@ -82,9 +79,7 @@ export default function MusiciansList() {
 
   const handleDeleteMember = async (memberId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (
-      !window.confirm('Tem certeza que deseja remover este membro da equipe de música da igreja?')
-    )
+    if (!window.confirm('Tem certeza que deseja desvincular este músico da equipe da igreja?'))
       return
 
     try {
@@ -105,9 +100,8 @@ export default function MusiciansList() {
   }
 
   const filteredMembers = members.filter((m) => {
-    const user = m.expand?.user_id
-    const name = user?.name || ''
-    const email = user?.email || ''
+    const name = m.name || ''
+    const email = m.email || ''
     const phone = m.phone || ''
     const query = search.toLowerCase()
     return (
@@ -182,8 +176,7 @@ export default function MusiciansList() {
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {filteredMembers.map((member) => {
-            const user = member.expand?.user_id
-            const roles = memberRolesMap[member.id] || []
+            const roles = member.roles || []
 
             return (
               <div
@@ -197,13 +190,13 @@ export default function MusiciansList() {
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="h-12 w-12 rounded-full bg-teal-50 text-teal-800 font-bold flex items-center justify-center shrink-0 border border-teal-100 text-base">
-                    {user?.name ? user.name[0].toUpperCase() : 'M'}
+                    {member.name ? member.name[0].toUpperCase() : 'M'}
                   </div>
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-base font-bold text-slate-900 group-hover:text-teal-800 transition-colors truncate">
-                        {user?.name || 'Músico'}
+                        {member.name}
                       </h3>
                       <Badge
                         variant="outline"
@@ -224,10 +217,10 @@ export default function MusiciansList() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-                      {user?.email && (
+                      {member.email && (
                         <span className="flex items-center gap-1 truncate">
                           <Mail className="h-3.5 w-3.5 text-slate-400" />
-                          {user.email}
+                          {member.email}
                         </span>
                       )}
                       {member.phone && (
