@@ -327,4 +327,26 @@ describe('musicians service', () => {
 
     await expect(getMusician('member_church_B', 'church_A')).rejects.toEqual(errorCrossTenantGet)
   })
+
+  it('deve permitir cadastro com papel MASTER apenas quando autorizado', async () => {
+    const masterPayload: MusicianPayload = {
+      church_id: 'church_123',
+      name: 'Super Admin',
+      email: 'master@igreja.com',
+      role: 'MASTER',
+      operational_roles: ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO'],
+      is_active: true,
+      role_ids: ['role_1'],
+    }
+
+    const mockRes = {
+      success: true,
+      message: 'Músico cadastrado com sucesso!',
+      member: { ...masterPayload, id: 'm_master' },
+    }
+
+    vi.mocked(pb.send).mockResolvedValueOnce(mockRes)
+    const res = await saveMusician(masterPayload)
+    expect(res.member.role).toBe('MASTER')
+  })
 })

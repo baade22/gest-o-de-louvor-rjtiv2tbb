@@ -15,7 +15,7 @@ routerAdd(
       return e.json(400, { message: 'church_id é obrigatório' })
     }
 
-    // 1. Valida se o usuário é ADMIN da igreja
+    // 1. Valida se o usuário é MASTER ou ADMIN da igreja
     try {
       const userMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -31,8 +31,10 @@ routerAdd(
       }
 
       const role = userMemberships[0].getString('role')
-      if (role !== 'ADMIN') {
-        return e.json(403, { message: 'Apenas administradores podem gerenciar integrações' })
+      if (role !== 'ADMIN' && role !== 'MASTER') {
+        return e.json(403, {
+          message: 'Apenas administradores ou MASTER podem gerenciar integrações',
+        })
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente' })

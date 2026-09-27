@@ -96,11 +96,19 @@ routerAdd(
         }
       }
 
+      let opRoles = []
+      try {
+        const raw = member.get('operational_roles')
+        if (Array.isArray(raw)) opRoles = raw
+        else if (typeof raw === 'string' && raw) opRoles = JSON.parse(raw)
+      } catch (_) {}
+
       return e.json(200, {
         id: member.id,
         church_id: member.getString('church_id'),
         user_id: userId,
         role: member.getString('role'),
+        operational_roles: opRoles,
         phone: member.getString('phone'),
         is_active: member.getBool('is_active'),
         created: member.getString('created'),

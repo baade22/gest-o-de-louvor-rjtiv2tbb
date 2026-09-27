@@ -20,7 +20,7 @@ routerAdd(
       return e.json(400, { message: 'church_id e provider são obrigatórios' })
     }
 
-    // 1. Validação de perfil ADMIN
+    // 1. Validação de perfil MASTER ou ADMIN
     try {
       const userMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -31,8 +31,14 @@ routerAdd(
         { churchId: churchId, userId: authRecord.id },
       )
 
-      if (userMemberships.length === 0 || userMemberships[0].getString('role') !== 'ADMIN') {
+      if (userMemberships.length === 0) {
         return e.json(403, { message: 'Apenas administradores podem desconectar integrações' })
+      }
+      const role = userMemberships[0].getString('role')
+      if (role !== 'ADMIN' && role !== 'MASTER') {
+        return e.json(403, {
+          message: 'Apenas administradores ou MASTER podem desconectar integrações',
+        })
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente' })

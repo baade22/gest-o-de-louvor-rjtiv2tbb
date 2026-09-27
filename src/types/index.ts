@@ -1,4 +1,5 @@
-export type AppRole = 'ADMIN' | 'LIDER' | 'MUSICO'
+export type AppRole = 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
+export type OperationalRole = 'MUSICO' | 'SOM' | 'PROJECAO' | 'MIDIA' | 'ILUMINACAO'
 
 export interface User {
   id: string
@@ -35,6 +36,7 @@ export interface ChurchMember {
   church_id: string
   user_id: string
   role: AppRole
+  operational_roles?: OperationalRole[]
   phone?: string
   is_active: boolean
   created: string
@@ -44,6 +46,31 @@ export interface ChurchMember {
     user_id?: User
     church_id?: Church
   }
+}
+
+export interface UserPermissions {
+  church_id: string
+  role: AppRole
+  operational_roles: OperationalRole[]
+  is_master: boolean
+  is_admin: boolean
+  is_leader: boolean
+  permissions: string[]
+  modules: string[]
+}
+
+export interface Invitation {
+  id: string
+  church_id: string
+  email: string
+  name: string
+  token: string
+  role: AppRole
+  operational_roles?: OperationalRole[]
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'CANCELLED'
+  expires_at: string
+  accepted_at?: string | null
+  created: string
 }
 
 export interface MemberRole {
@@ -93,6 +120,7 @@ export interface SongVideo {
 
 export type IntegrationProvider =
   | 'youtube'
+  | 'holyrics'
   | 'whatsapp'
   | 'email'
   | 'google'
@@ -164,6 +192,7 @@ export interface EventMember {
   response_at?: string
   decline_reason?: string
   notes?: string
+  team_area?: string
   created: string
   updated: string
   expand?: {

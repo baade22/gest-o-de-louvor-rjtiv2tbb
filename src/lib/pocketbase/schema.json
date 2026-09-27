@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-27T21:21:37.861Z",
+  "generatedAt": "2026-09-27T21:40:43.630Z",
   "collections": [
     {
       "name": "users",
@@ -161,9 +161,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
         "view": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && (user_id = @request.auth.id || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')))",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
+        "update": "@request.auth.id != '' && (user_id = @request.auth.id || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')))",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
       },
       "fields": [
         {
@@ -185,7 +185,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["ADMIN", "LIDER", "MUSICO"]
+          "selectValues": ["MASTER", "ADMIN", "LIDER", "MUSICO"]
         },
         {
           "name": "phone",
@@ -212,6 +212,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "operational_roles",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -605,6 +611,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "team_area",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -774,6 +786,101 @@
       "indexes": [
         "CREATE INDEX idx_integrations_church ON integrations (church_id)",
         "CREATE UNIQUE INDEX idx_integrations_church_provider ON integrations (church_id, provider)"
+      ]
+    },
+    {
+      "name": "invitations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["MASTER", "ADMIN", "LIDER", "MUSICO"]
+        },
+        {
+          "name": "operational_roles",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "role_ids",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"]
+        },
+        {
+          "name": "expires_at",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "accepted_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_invitations_token ON invitations (token)",
+        "CREATE INDEX idx_invitations_church ON invitations (church_id)",
+        "CREATE INDEX idx_invitations_email ON invitations (email)"
       ]
     }
   ]

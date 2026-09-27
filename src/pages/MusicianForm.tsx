@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
 import { saveMusician, getMusician } from '@/services/musicians'
-import type { Role } from '@/types'
+import type { Role, AppRole } from '@/types'
 import { ArrowLeft, Save, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast'
 export default function MusicianForm() {
   const { id } = useParams<{ id: string }>()
   const isEditing = Boolean(id)
-  const { currentChurch } = useAuth()
+  const { currentChurch, isMaster } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -33,7 +33,8 @@ export default function MusicianForm() {
     name: '',
     email: '',
     phone: '',
-    role: 'MUSICO' as 'ADMIN' | 'LIDER' | 'MUSICO',
+    role: 'MUSICO' as AppRole,
+    operational_roles: ['MUSICO'] as string[],
     is_active: true,
     selectedRoleIds: [] as string[],
   })
@@ -67,7 +68,8 @@ export default function MusicianForm() {
             email: data.email || '',
             phone: data.phone || '',
             role: data.role || 'MUSICO',
-            is_active: data.is_active,
+            operational_roles: data.operational_roles || ['MUSICO'],
+            is_active: data.is_active ?? true,
             selectedRoleIds: data.role_ids || [],
           })
         } catch (err: unknown) {
@@ -174,6 +176,7 @@ export default function MusicianForm() {
         email: trimmedEmail,
         phone: formData.phone.trim(),
         role: formData.role,
+        operational_roles: formData.operational_roles,
         is_active: formData.is_active,
         role_ids: formData.selectedRoleIds,
       })
@@ -285,17 +288,20 @@ export default function MusicianForm() {
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(val) =>
-                  setFormData({ ...formData, role: val as 'ADMIN' | 'LIDER' | 'MUSICO' })
-                }
+                onValueChange={(val) => setFormData({ ...formData, role: val as AppRole })}
               >
                 <SelectTrigger className="rounded-xl border-slate-200">
                   <SelectValue placeholder="Selecione o nível" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MUSICO">Músico (Visualiza e confirma escalas)</SelectItem>
+                  <SelectItem value="MUSICO">Operacional (Músico / Áudio / Projeção)</SelectItem>
                   <SelectItem value="LIDER">Líder (Cria cultos, repertórios e escalas)</SelectItem>
-                  <SelectItem value="ADMIN">Administrador (Acesso total)</SelectItem>
+                  <SelectItem value="ADMIN">Administrador (Gestão de congregação)</SelectItem>
+                  {isMaster && (
+                    <SelectItem value="MASTER" className="font-bold text-amber-900">
+                      MASTER (Acesso 100% irrestrito)
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

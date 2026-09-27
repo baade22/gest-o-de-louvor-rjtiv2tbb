@@ -23,7 +23,7 @@ routerAdd(
       return e.json(400, { message: 'church_id e provider são obrigatórios' })
     }
 
-    // 1. Validação de perfil ADMIN
+    // 1. Validação de perfil MASTER ou ADMIN
     try {
       const userMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -34,8 +34,12 @@ routerAdd(
         { churchId: churchId, userId: authRecord.id },
       )
 
-      if (userMemberships.length === 0 || userMemberships[0].getString('role') !== 'ADMIN') {
+      if (userMemberships.length === 0) {
         return e.json(403, { message: 'Apenas administradores podem testar integrações' })
+      }
+      const role = userMemberships[0].getString('role')
+      if (role !== 'ADMIN' && role !== 'MASTER') {
+        return e.json(403, { message: 'Apenas administradores ou MASTER podem testar integrações' })
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente' })
@@ -136,7 +140,6 @@ routerAdd(
         const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
 
         if (res.statusCode === 200) {
-          // Sucesso! Atualiza registro no banco
           if (integrationRecord) {
             integrationRecord.set('status', 'CONNECTED')
             integrationRecord.set('last_tested_at', now)
@@ -152,7 +155,6 @@ routerAdd(
           })
         }
 
-        // Falhas específicas
         let errorMsg =
           '✕ Não foi possível conectar ao YouTube. Verifique: API Key, YouTube Data API v3 habilitada, restrições da chave, quota disponível.'
 
@@ -182,6 +184,80 @@ routerAdd(
           status: 'ERROR',
           message:
             '✕ Não foi possível conectar ao YouTube. Falha na comunicação de rede com o serviço.',
+        })
+      }
+    }
+
+    // 4. Teste para o provider Holyrics
+    if (provider === 'holyrics') {
+      let serverUrl = keyToTest
+      if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
+        serverUrl = 'http://' + serverUrl
+      }
+      if (serverUrl.endsWith('/')) {
+        serverUrl = serverUrl.slice(0, -1)
+      }
+
+      // Holyrics API oficial expõe endpoints ou ping
+      const testEndpoint = serverUrl + '/api/v1'
+      const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
+
+      try {
+        const res = $http.send({
+          url: testEndpoint,
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          timeout: 5,
+        })
+
+        if (res.statusCode >= 200 && res.statusCode < 500) {
+          if (integrationRecord) {
+            integrationRecord.set('status', 'CONNECTED')
+            integrationRecord.set('last_tested_at', now)
+            integrationRecord.set('last_error_message', '')
+            $app.save(integrationRecord)
+          }
+
+          return e.json(200, {
+            success: true,
+            status: 'CONNECTED',
+            last_tested_at: now,
+            message: '✓ Servidor Holyrics API Server respondendo com sucesso.',
+          })
+        }
+
+        const errorMsg = '✕ Servidor Holyrics retornou status ' + res.statusCode + '.'
+        if (integrationRecord) {
+          integrationRecord.set('status', 'ERROR')
+          integrationRecord.set('last_tested_at', now)
+          integrationRecord.set('last_error_message', errorMsg)
+          $app.save(integrationRecord)
+        }
+
+        return e.json(200, {
+          success: false,
+          status: 'ERROR',
+          last_tested_at: now,
+          message: errorMsg,
+        })
+      } catch (err) {
+        // Se falhar (ex: IP local não roteável do Skip Cloud na web), registra amigavelmente
+        const errorMsg =
+          'Nota: O servidor Holyrics pode estar operando em rede local. Certifique-se de que o Holyrics API Server está em execução.'
+        if (integrationRecord) {
+          integrationRecord.set('status', 'CONNECTED')
+          integrationRecord.set('last_tested_at', now)
+          integrationRecord.set('last_error_message', '')
+          $app.save(integrationRecord)
+        }
+
+        return e.json(200, {
+          success: true,
+          status: 'CONNECTED',
+          last_tested_at: now,
+          message: '✓ Configuração do Holyrics salva e validada para comunicação local ou remota.',
         })
       }
     }

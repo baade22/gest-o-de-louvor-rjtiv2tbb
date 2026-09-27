@@ -41,16 +41,24 @@ routerAdd(
     if (!emailRegex.test(email)) {
       return e.json(400, { message: 'Informe um formato de e-mail válido.' })
     }
-    if (!['ADMIN', 'LIDER', 'MUSICO'].includes(role)) {
+    const operationalRoles = Array.isArray(body.operational_roles)
+      ? body.operational_roles
+      : ['MUSICO']
+
+    if (!['MASTER', 'ADMIN', 'LIDER', 'MUSICO'].includes(role)) {
       return e.json(400, {
-        message: 'Nível de permissão inválido. Deve ser ADMIN, LIDER ou MUSICO.',
+        message: 'Nível de permissão inválido. Deve ser MASTER, ADMIN, LIDER ou MUSICO.',
       })
     }
-    if (roleIds.length === 0) {
+    // Se o usuário tiver papel MUSICO ou tiver instrumentos, valida roleIds apenas se for músico
+    const isMusicianProfile = operationalRoles.includes('MUSICO') || role === 'MUSICO'
+    if (isMusicianProfile && roleIds.length === 0) {
       return e.json(400, { message: 'Selecione ao menos um instrumento ou função para o músico.' })
     }
 
-    // 2. Validação Multi-tenant & Autorização de ADMIN
+    // 2. Validação Multi-tenant & Autorização (MASTER ou ADMIN)
+    // PROTEÇÃO CRÍTICA DO MASTER:
+    // Nenhum usuário operacional ou ADMIN comum pode criar MASTER, promover outro para MASTER ou promover a si mesmo.
     try {
       const callerMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -68,9 +76,16 @@ routerAdd(
       }
 
       const callerRole = callerMemberships[0].getString('role')
-      if (callerRole !== 'ADMIN') {
+      if (callerRole !== 'ADMIN' && callerRole !== 'MASTER') {
         return e.json(403, {
           message: 'Apenas administradores desta igreja podem cadastrar ou editar membros.',
+        })
+      }
+
+      // Proteção de MASTER: apenas quem já é MASTER pode atribuir perfil MASTER
+      if (role === 'MASTER' && callerRole !== 'MASTER') {
+        return e.json(403, {
+          message: 'Apenas o perfil MASTER pode conceder ou alterar permissões de nível MASTER.',
         })
       }
     } catch (err) {
@@ -127,6 +142,7 @@ routerAdd(
 
         // Atualizar church_members
         memberRecord.set('role', role)
+        memberRecord.set('operational_roles', operationalRoles)
         memberRecord.set('phone', phone || null)
         memberRecord.set('is_active', isActive)
         $app.save(memberRecord)
@@ -200,6 +216,7 @@ routerAdd(
           // Reativa ou atualiza membro existente
           newMember = existingMember[0]
           newMember.set('role', role)
+          newMember.set('operational_roles', operationalRoles)
           newMember.set('phone', phone || null)
           newMember.set('is_active', isActive)
           $app.save(newMember)
@@ -209,6 +226,7 @@ routerAdd(
           newMember.set('church_id', churchId)
           newMember.set('user_id', userRecord.id)
           newMember.set('role', role)
+          newMember.set('operational_roles', operationalRoles)
           newMember.set('phone', phone || null)
           newMember.set('is_active', isActive)
           $app.save(newMember)

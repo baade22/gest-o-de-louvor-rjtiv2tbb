@@ -11,13 +11,19 @@ import {
   UserCircle,
   Settings,
   Zap,
+  Volume2,
+  Tv,
+  Image as ImageIcon,
+  Sun,
+  CheckSquare,
+  UserPlus,
   LogOut,
   Menu,
   X,
   ChevronLeft,
   ChevronRight,
   Church as ChurchIcon,
-  Sparkles,
+  Crown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,8 +42,12 @@ export default function Layout() {
     currentChurch,
     userChurches,
     role,
+    operationalRoles,
+    isMaster,
     isAdmin,
     isLeader,
+    hasModule,
+    hasOperationalRole,
     switchChurch,
     logout,
     isAuthenticated,
@@ -55,28 +65,41 @@ export default function Layout() {
     )
   }
 
-  // Definição dos itens de navegação baseado no papel
-  // ADMIN: tudo
-  // LÍDER: Dashboard, Músicos (view), Músicas, Eventos, Minhas Escalas, Perfil
-  // MÚSICO: Dashboard, Músicas, Minhas Escalas, Perfil
+  // Definição dos itens de navegação baseado nas regras e permissões:
+  // MASTER: 100% dos módulos
+  // MÚSICO (somente): Início, Minhas Escalas, Músicas, Meu Perfil. NÃO exibe Som, Projeção, Mídia, Iluminação, Usuários, Integrações, Configurações
+  // SOM: Início, Minhas Escalas, Eventos, Som, Meu Perfil
+  // PROJEÇÃO: Início, Minhas Escalas, Eventos, Projeção, Mídias, Meu Perfil
+  // MÍDIA: Início, Minhas Escalas, Eventos, Mídias, Tarefas, Meu Perfil
+  // ILUMINAÇÃO: Início, Minhas Escalas, Eventos, Iluminação, Meu Perfil
+  // UNIÃO: usuário com múltiplas funções operacionais vê a união perfeita
+  const canSeeSongs = isMaster || isAdmin || isLeader || hasOperationalRole('MUSICO')
+  const canSeeEvents =
+    isMaster ||
+    isAdmin ||
+    isLeader ||
+    hasOperationalRole('SOM') ||
+    hasOperationalRole('PROJECAO') ||
+    hasOperationalRole('MIDIA') ||
+    hasOperationalRole('ILUMINACAO')
+  const canSeeSound = isMaster || isAdmin || hasOperationalRole('SOM')
+  const canSeeProjection = isMaster || isAdmin || hasOperationalRole('PROJECAO')
+  const canSeeMedia =
+    isMaster || isAdmin || hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
+  const canSeeLighting = isMaster || isAdmin || hasOperationalRole('ILUMINACAO')
+  const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
+  const canSeeMusicians = isMaster || isAdmin || isLeader
+  const canSeeInvitations = isMaster || isAdmin
+  const canSeeRoles = isMaster || isAdmin
+  const canSeeIntegrations = isMaster || isAdmin
+  const canSeeSettings = isMaster || isAdmin
+
   const navItems = [
     {
       to: '/dashboard',
-      label: 'Dashboard',
+      label: 'Início',
       icon: LayoutDashboard,
       allowed: true,
-    },
-    {
-      to: '/songs',
-      label: 'Músicas',
-      icon: Music2,
-      allowed: true,
-    },
-    {
-      to: '/events',
-      label: 'Eventos & Cultos',
-      icon: CalendarDays,
-      allowed: isAdmin || isLeader,
     },
     {
       to: '/minhas-escalas',
@@ -85,16 +108,64 @@ export default function Layout() {
       allowed: true,
     },
     {
+      to: '/songs',
+      label: 'Músicas',
+      icon: Music2,
+      allowed: canSeeSongs,
+    },
+    {
+      to: '/events',
+      label: 'Eventos & Cultos',
+      icon: CalendarDays,
+      allowed: canSeeEvents,
+    },
+    {
+      to: '/som',
+      label: 'Som',
+      icon: Volume2,
+      allowed: canSeeSound,
+    },
+    {
+      to: '/projecao',
+      label: 'Projeção',
+      icon: Tv,
+      allowed: canSeeProjection,
+    },
+    {
+      to: '/midias',
+      label: 'Mídias',
+      icon: ImageIcon,
+      allowed: canSeeMedia,
+    },
+    {
+      to: '/tarefas',
+      label: 'Tarefas',
+      icon: CheckSquare,
+      allowed: canSeeTasks,
+    },
+    {
+      to: '/iluminacao',
+      label: 'Iluminação',
+      icon: Sun,
+      allowed: canSeeLighting,
+    },
+    {
       to: '/musicians',
-      label: 'Músicos',
+      label: 'Músicos & Membros',
       icon: Users,
-      allowed: isAdmin || isLeader,
+      allowed: canSeeMusicians,
+    },
+    {
+      to: '/convites',
+      label: 'Convites',
+      icon: UserPlus,
+      allowed: canSeeInvitations,
     },
     {
       to: '/roles',
       label: 'Funções & Instrumentos',
       icon: Sliders,
-      allowed: isAdmin,
+      allowed: canSeeRoles,
     },
     {
       to: '/perfil',
@@ -106,13 +177,13 @@ export default function Layout() {
       to: '/configuracoes/integracoes',
       label: 'Integrações',
       icon: Zap,
-      allowed: isAdmin,
+      allowed: canSeeIntegrations,
     },
     {
       to: '/configuracoes',
       label: 'Configurações',
       icon: Settings,
-      allowed: isAdmin,
+      allowed: canSeeSettings,
     },
   ].filter((item) => item.allowed)
 
@@ -122,6 +193,7 @@ export default function Layout() {
   }
 
   const roleLabels: Record<string, { label: string; bg: string }> = {
+    MASTER: { label: 'MASTER', bg: 'bg-amber-100 text-amber-900 border-amber-300 font-bold' },
     ADMIN: { label: 'Administrador', bg: 'bg-teal-100 text-teal-800 border-teal-200' },
     LIDER: { label: 'Líder de Louvor', bg: 'bg-violet-100 text-violet-800 border-violet-200' },
     MUSICO: { label: 'Músico', bg: 'bg-slate-100 text-slate-800 border-slate-200' },
@@ -415,7 +487,7 @@ export default function Layout() {
 
         {/* Minimal Mobile Version Footer */}
         <footer className="lg:hidden py-3 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
-          LouvorFlow v1.0 • Gestão Ministerial de Louvor
+          LouvorFlow v0.0.12 • Gestão Ministerial de Louvor
         </footer>
       </div>
     </div>

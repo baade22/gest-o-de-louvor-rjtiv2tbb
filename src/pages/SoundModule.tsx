@@ -1,0 +1,102 @@
+import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Volume2, ArrowLeft, ShieldCheck, Radio, Sliders } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import pb from '@/lib/pocketbase/client'
+import { useAuth } from '@/contexts/AuthContext'
+
+export default function SoundModule() {
+  const { currentChurch } = useAuth()
+  const [backendAllowed, setBackendAllowed] = useState<boolean | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    // Validação server-side em tempo de execução
+    const checkBackend = async () => {
+      try {
+        const churchId = currentChurch?.id || ''
+        const res = await pb.send<{ allowed: boolean; message?: string }>(
+          `/backend/v1/modules/access?module=sound&church_id=${churchId}`,
+          { method: 'GET' },
+        )
+        setBackendAllowed(res.allowed)
+      } catch (err: any) {
+        setBackendAllowed(false)
+        setErrorMsg(err.data?.message || err.message || 'Acesso negado pelo backend')
+      }
+    }
+    checkBackend()
+  }, [currentChurch?.id])
+
+  if (backendAllowed === false) {
+    return (
+      <div className="max-w-xl mx-auto py-12 text-center space-y-4">
+        <h2 className="text-xl font-bold text-red-600">Acesso Bloqueado pelo Servidor</h2>
+        <p className="text-sm text-slate-600">{errorMsg}</p>
+        <Link to="/dashboard">
+          <Button variant="outline">Voltar ao Início</Button>
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar ao Início
+        </Link>
+        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
+          Módulo Operacional • Som & Áudio
+        </Badge>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="h-12 w-12 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center">
+          <Volume2 className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Operação de Som
+          </h1>
+          <p className="text-sm text-slate-500">
+            Painel da equipe de áudio e sonorização de <strong>{currentChurch?.name}</strong>.
+          </p>
+        </div>
+      </div>
+
+      <Card className="rounded-2xl border-slate-200 shadow-xs">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Radio className="h-5 w-5 text-sky-600" />
+            Módulo em preparação
+          </CardTitle>
+          <CardDescription>
+            A estrutura de acesso por função está ativa e protegida.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-2">
+            <p className="font-semibold text-slate-800">Módulo disponível em breve</p>
+            <p>
+              Este espaço concentrará os canais de mesa, patch list, microfones atribuídos a cada
+              músico da escala do evento e notas técnicas de passagem de som.
+            </p>
+            <div className="flex items-center gap-2 text-emerald-700 font-medium pt-1">
+              <ShieldCheck className="h-4 w-4" />
+              <span>
+                Validação de permissão operacional (SOM / MASTER) confirmada pelo backend.
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

@@ -24,6 +24,13 @@ import RolesManagement from '@/pages/RolesManagement'
 import UserProfile from '@/pages/UserProfile'
 import ChurchSettings from '@/pages/ChurchSettings'
 import IntegrationsSettings from '@/pages/IntegrationsSettings'
+import SoundModule from '@/pages/SoundModule'
+import ProjectionModule from '@/pages/ProjectionModule'
+import MediaModule from '@/pages/MediaModule'
+import LightingModule from '@/pages/LightingModule'
+import TasksModule from '@/pages/TasksModule'
+import InvitationsManagement from '@/pages/InvitationsManagement'
+import InviteAccept from '@/pages/InviteAccept'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -35,6 +42,9 @@ const App = () => (
         <Routes>
           {/* Public Login Route */}
           <Route path="/login" element={<Login />} />
+
+          {/* Rota pública de aceite de convite e definição de senha */}
+          <Route path="/convite/:token" element={<InviteAccept />} />
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>
@@ -131,6 +141,62 @@ const App = () => (
               element={
                 <RequireAuth>
                   <MyScales />
+                </RequireAuth>
+              }
+            />
+
+            {/* Módulos Operacionais Protegidos por Função */}
+            <Route
+              path="/som"
+              element={
+                <RequireAuth requireModule="sound">
+                  <SoundModule />
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/projecao"
+              element={
+                <RequireAuth requireModule="projection">
+                  <ProjectionModule />
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/midias"
+              element={
+                <RequireAuth requireModule="media">
+                  <MediaModule />
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/tarefas"
+              element={
+                <RequireAuth requireModule="tasks">
+                  <TasksModule />
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/iluminacao"
+              element={
+                <RequireAuth requireModule="lighting">
+                  <LightingModule />
+                </RequireAuth>
+              }
+            />
+
+            {/* Gestão de Convites */}
+            <Route
+              path="/convites"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <InvitationsManagement />
                 </RequireAuth>
               }
             />

@@ -7,7 +7,8 @@ export interface MusicianPayload {
   name: string
   email: string
   phone?: string
-  role: 'ADMIN' | 'LIDER' | 'MUSICO'
+  role: 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
+  operational_roles?: string[]
   is_active: boolean
   role_ids: string[]
 }
@@ -16,7 +17,8 @@ export interface MusicianDetailResponse {
   id: string
   church_id: string
   user_id: string
-  role: 'ADMIN' | 'LIDER' | 'MUSICO'
+  role: 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
+  operational_roles?: string[]
   phone?: string
   is_active: boolean
   created: string

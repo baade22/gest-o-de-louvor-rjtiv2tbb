@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import pb from '@/lib/pocketbase/client'
-import type { User, Church, ChurchMember, AppRole } from '@/types'
+import type { User, Church, ChurchMember, AppRole, OperationalRole, UserPermissions } from '@/types'
 
 interface AuthContextType {
   user: User | null
@@ -8,13 +8,20 @@ interface AuthContextType {
   currentMember: ChurchMember | null
   userChurches: Church[]
   role: AppRole | null
+  operationalRoles: OperationalRole[]
+  permissions: string[]
+  allowedModules: string[]
   isLoading: boolean
   isAuthenticated: boolean
+  isMaster: boolean
   isAdmin: boolean
   isLeader: boolean
   isMusician: boolean
-  canManageContent: boolean // Admin or Lider
-  canManageChurch: boolean // Admin only
+  hasOperationalRole: (opRole: OperationalRole) => boolean
+  hasPermission: (perm: string) => boolean
+  hasModule: (moduleName: string) => boolean
+  canManageContent: boolean // Admin or Lider or Master
+  canManageChurch: boolean // Admin or Master
   login: (email: string, pass: string) => Promise<void>
   logout: () => void
   switchChurch: (churchId: string) => Promise<void>
@@ -29,6 +36,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentMember, setCurrentMember] = useState<ChurchMember | null>(null)
   const [userChurches, setUserChurches] = useState<Church[]>([])
   const [role, setRole] = useState<AppRole | null>(null)
+  const [operationalRoles, setOperationalRoles] = useState<OperationalRole[]>([])
+  const [permissions, setPermissions] = useState<string[]>([])
+  const [allowedModules, setAllowedModules] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
   const loadUserData = useCallback(async () => {
@@ -83,9 +93,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentMember(selectedMember)
           setRole(selectedMember.role)
           localStorage.setItem('louvorflow_church_id', selectedMember.church_id)
+
+          // Buscar permissões consolidadas do backend
+          try {
+            const permRes = await pb.send<UserPermissions>(
+              `/backend/v1/permissions/me?church_id=${selectedMember.church_id}`,
+              { method: 'GET' },
+            )
+            setOperationalRoles(permRes.operational_roles || [])
+            setPermissions(permRes.permissions || [])
+            setAllowedModules(permRes.modules || [])
+          } catch (_) {
+            const ops = (selectedMember.operational_roles as OperationalRole[]) || ['MUSICO']
+            setOperationalRoles(ops)
+          }
         }
       } else {
-        // If no church membership found directly, check if there's a demo church and attach admin if email matches
         const allChurches = await pb.collection('churches').getList<Church>(1, 1, {
           filter: 'is_active = true',
         })
@@ -93,7 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const defaultChurch = allChurches.items[0]
           setCurrentChurch(defaultChurch)
           setUserChurches([defaultChurch])
-          setRole('ADMIN')
+          setRole('MASTER')
+          setOperationalRoles(['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO'])
         }
       }
     } catch (err) {
@@ -133,6 +157,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentMember(null)
     setUserChurches([])
     setRole(null)
+    setOperationalRoles([])
+    setPermissions([])
+    setAllowedModules([])
   }
 
   const switchChurch = async (churchId: string) => {
@@ -150,6 +177,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentMember(membership)
         setRole(membership.role)
         localStorage.setItem('louvorflow_church_id', churchId)
+
+        try {
+          const permRes = await pb.send<UserPermissions>(
+            `/backend/v1/permissions/me?church_id=${churchId}`,
+            { method: 'GET' },
+          )
+          setOperationalRoles(permRes.operational_roles || [])
+          setPermissions(permRes.permissions || [])
+          setAllowedModules(permRes.modules || [])
+        } catch (_) {
+          const ops = (membership.operational_roles as OperationalRole[]) || ['MUSICO']
+          setOperationalRoles(ops)
+        }
       }
     } catch (err) {
       console.error('Erro ao trocar de igreja:', err)
@@ -163,9 +203,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const isAuthenticated = !!user
-  const isAdmin = role === 'ADMIN'
-  const isLeader = role === 'LIDER'
-  const isMusician = role === 'MUSICO'
+  const isMaster = role === 'MASTER'
+  const isAdmin = role === 'ADMIN' || isMaster
+  const isLeader = role === 'LIDER' || isAdmin
+  const isMusician = operationalRoles.includes('MUSICO') || role === 'MUSICO'
+
+  const hasOperationalRole = (op: OperationalRole) => {
+    if (isMaster) return true
+    return operationalRoles.includes(op)
+  }
+
+  const hasPermission = (perm: string) => {
+    if (isMaster) return true
+    return permissions.includes(perm)
+  }
+
+  const hasModule = (moduleName: string) => {
+    if (isMaster) return true
+    return allowedModules.includes(moduleName)
+  }
+
   const canManageContent = isAdmin || isLeader
   const canManageChurch = isAdmin
 
@@ -177,11 +234,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentMember,
         userChurches,
         role,
+        operationalRoles,
+        permissions,
+        allowedModules,
         isLoading,
         isAuthenticated,
+        isMaster,
         isAdmin,
         isLeader,
         isMusician,
+        hasOperationalRole,
+        hasPermission,
+        hasModule,
         canManageContent,
         canManageChurch,
         login,

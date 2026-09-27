@@ -22,7 +22,8 @@ interface MusicianItem {
   id: string
   church_id: string
   user_id: string
-  role: 'ADMIN' | 'LIDER' | 'MUSICO'
+  role: 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
+  operational_roles?: string[]
   phone?: string
   is_active: boolean
   name: string
@@ -49,9 +50,10 @@ export default function MusiciansList() {
           church_id: m.church_id,
           user_id: m.user_id,
           role: m.role,
+          operational_roles: m.operational_roles || [],
           phone: m.phone,
           is_active: m.is_active,
-          name: m.name || 'Músico',
+          name: m.name || 'Membro',
           email: m.email || '',
           roles: m.roles || [],
         })),
@@ -210,10 +212,25 @@ export default function MusiciansList() {
                       </Badge>
                       <Badge
                         variant="secondary"
-                        className="text-[10px] font-semibold bg-slate-100 text-slate-700"
+                        className={`text-[10px] font-semibold ${
+                          member.role === 'MASTER'
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                            : member.role === 'ADMIN'
+                              ? 'bg-teal-50 text-teal-800 border-teal-200'
+                              : 'bg-slate-100 text-slate-700'
+                        }`}
                       >
                         {member.role}
                       </Badge>
+                      {member.operational_roles &&
+                        member.operational_roles.map((op) => (
+                          <span
+                            key={op}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-50 text-slate-600 border border-slate-200"
+                          >
+                            {op}
+                          </span>
+                        ))}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
