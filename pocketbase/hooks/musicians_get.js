@@ -37,19 +37,24 @@ routerAdd(
       const targetChurchId = churchId || member.getString('church_id')
 
       // Validação de acesso à congregação
+      // Se fornecido church_id na query e for diferente da igreja do membro, nega acesso imediatamente
+      if (churchId && churchId !== member.getString('church_id')) {
+        return e.json(403, { message: 'Sem acesso a este membro' })
+      }
+
+      const memberChurchId = member.getString('church_id')
       const userMemberships = $app.findRecordsByFilter(
         'church_members',
         'church_id = {:churchId} && user_id = {:userId} && is_active = true',
         '',
         1,
         0,
-        { churchId: targetChurchId, userId: authRecord.id },
+        { churchId: memberChurchId, userId: authRecord.id },
       )
 
       if (userMemberships.length === 0) {
         return e.json(403, { message: 'Sem acesso a este membro' })
       }
-
       const userId = member.getString('user_id')
       let userName = ''
       let userEmail = ''

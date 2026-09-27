@@ -52,7 +52,7 @@ routerAdd(
 
     // 2. Validação Multi-tenant & Autorização de ADMIN
     try {
-      const adminMemberships = $app.findRecordsByFilter(
+      const callerMemberships = $app.findRecordsByFilter(
         'church_members',
         'church_id = {:churchId} && user_id = {:userId} && is_active = true',
         '',
@@ -61,7 +61,14 @@ routerAdd(
         { churchId: churchId, userId: authRecord.id },
       )
 
-      if (adminMemberships.length === 0 || adminMemberships[0].getString('role') !== 'ADMIN') {
+      if (callerMemberships.length === 0) {
+        return e.json(403, {
+          message: 'Sem acesso a esta congregação.',
+        })
+      }
+
+      const callerRole = callerMemberships[0].getString('role')
+      if (callerRole !== 'ADMIN') {
         return e.json(403, {
           message: 'Apenas administradores desta igreja podem cadastrar ou editar membros.',
         })

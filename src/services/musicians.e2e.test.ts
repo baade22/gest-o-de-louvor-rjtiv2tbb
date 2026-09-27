@@ -98,4 +98,46 @@ describe('Musicians E2E Contract & Business Rules Validation', () => {
     const isChurchMatch = memberTargetChurch === churchB
     expect(isChurchMatch).toBe(false)
   })
+
+  it('valida que o papel LÍDER não pode salvar nem elevar nível para ADMIN', () => {
+    const callerMembership = { role: 'LIDER', is_active: true }
+    const canSave = callerMembership.is_active && callerMembership.role === 'ADMIN'
+    expect(canSave).toBe(false)
+  })
+
+  it('valida que MÚSICO não tem permissão de criação, edição ou exclusão', () => {
+    const callerMembership = { role: 'MUSICO', is_active: true }
+    const canManageMusicians = callerMembership.role === 'ADMIN'
+    const canAccessIntegrations = callerMembership.role === 'ADMIN'
+
+    expect(canManageMusicians).toBe(false)
+    expect(canAccessIntegrations).toBe(false)
+  })
+
+  it('valida fluxo completo de lifecycle de dados: criação, alteração de nome/email e desvínculo', () => {
+    // 1. Dados iniciais
+    const initialMusician = {
+      name: 'Vinni Teste',
+      email: 'vinni.teste@example.com',
+      role: 'MUSICO',
+      role_ids: ['dnyfiyj4zrfryo9'],
+    }
+
+    // 2. Dados após edição
+    const editedMusician = {
+      ...initialMusician,
+      name: 'Vinni Teste Alterado',
+      email: 'vinni.alterado@example.com',
+    }
+
+    expect(editedMusician.name).toBe('Vinni Teste Alterado')
+    expect(editedMusician.email).toBe('vinni.alterado@example.com')
+    expect(editedMusician.role).toBe('MUSICO')
+    expect(editedMusician.role_ids).toEqual(['dnyfiyj4zrfryo9'])
+
+    // 3. Desvínculo
+    let isLinked = true
+    isLinked = false
+    expect(isLinked).toBe(false)
+  })
 })

@@ -250,4 +250,81 @@ describe('musicians service', () => {
     expect(pb.collection).toHaveBeenCalledWith('church_members')
     expect(mockDelete).toHaveBeenCalledWith('member_del_123')
   })
+
+  it('deve simular validação de segurança: ADMIN da Igreja A não pode alterar membro da Igreja B', async () => {
+    const errorCrossTenant = {
+      status: 403,
+      data: { message: 'Acesso negado: este membro pertence a outra igreja.' },
+    }
+
+    vi.mocked(pb.send).mockRejectedValueOnce(errorCrossTenant)
+
+    await expect(
+      saveMusician({
+        church_id: 'church_A',
+        member_id: 'member_from_church_B',
+        name: 'Tentativa Cross-tenant',
+        email: 'cross@teste.com',
+        role: 'MUSICO',
+        is_active: true,
+        role_ids: ['role_1'],
+      }),
+    ).rejects.toEqual(errorCrossTenant)
+  })
+
+  it('deve simular validação de segurança: MÚSICO bloqueado com 403 ao tentar salvar', async () => {
+    const errorForbidden = {
+      status: 403,
+      data: {
+        message: 'Apenas administradores desta igreja podem cadastrar ou editar membros.',
+      },
+    }
+
+    vi.mocked(pb.send).mockRejectedValueOnce(errorForbidden)
+
+    await expect(
+      saveMusician({
+        church_id: 'church_A',
+        name: 'Músico Tentando Salvar',
+        email: 'musico@teste.com',
+        role: 'MUSICO',
+        is_active: true,
+        role_ids: ['role_1'],
+      }),
+    ).rejects.toEqual(errorForbidden)
+  })
+
+  it('deve simular validação de segurança: LÍDER bloqueado com 403 ao tentar elevar role para ADMIN', async () => {
+    const errorLeaderBlocked = {
+      status: 403,
+      data: {
+        message: 'Apenas administradores desta igreja podem cadastrar ou editar membros.',
+      },
+    }
+
+    vi.mocked(pb.send).mockRejectedValueOnce(errorLeaderBlocked)
+
+    await expect(
+      saveMusician({
+        church_id: 'church_A',
+        member_id: 'member_123',
+        name: 'Elevação para ADMIN',
+        email: 'lider.upgrade@teste.com',
+        role: 'ADMIN',
+        is_active: true,
+        role_ids: ['role_1'],
+      }),
+    ).rejects.toEqual(errorLeaderBlocked)
+  })
+
+  it('deve simular bloqueio de acesso direto por ID cross-tenant no GET /backend/v1/musicians/{id}', async () => {
+    const errorCrossTenantGet = {
+      status: 403,
+      data: { message: 'Sem acesso a este membro' },
+    }
+
+    vi.mocked(pb.send).mockRejectedValueOnce(errorCrossTenantGet)
+
+    await expect(getMusician('member_church_B', 'church_A')).rejects.toEqual(errorCrossTenantGet)
+  })
 })
