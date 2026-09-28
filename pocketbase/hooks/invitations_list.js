@@ -84,9 +84,19 @@ routerAdd(
         let opRoles = []
         try {
           const raw = inv.get('operational_roles')
-          if (Array.isArray(raw)) opRoles = raw
-          else if (typeof raw === 'string' && raw) opRoles = JSON.parse(raw)
+          if (typeof raw === 'string' && raw) {
+            opRoles = JSON.parse(raw)
+          } else if (Array.isArray(raw)) {
+            if (raw.length > 0 && typeof raw[0] === 'number') {
+              let str = ''
+              for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
+              opRoles = JSON.parse(str)
+            } else {
+              opRoles = raw
+            }
+          }
         } catch (_) {}
+        if (!Array.isArray(opRoles)) opRoles = []
 
         list.push({
           id: inv.id,

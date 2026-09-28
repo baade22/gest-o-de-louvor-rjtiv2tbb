@@ -69,19 +69,40 @@ routerAdd('POST', '/backend/v1/invitations/accept', (e) => {
   let opRoles = []
   try {
     const raw = inv.get('operational_roles')
-    if (Array.isArray(raw)) opRoles = raw
-    else if (typeof raw === 'string' && raw) opRoles = JSON.parse(raw)
+    if (typeof raw === 'string' && raw) {
+      opRoles = JSON.parse(raw)
+    } else if (Array.isArray(raw)) {
+      if (raw.length > 0 && typeof raw[0] === 'number') {
+        let str = ''
+        for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
+        opRoles = JSON.parse(str)
+      } else {
+        opRoles = raw
+      }
+    }
   } catch (_) {}
-  if (opRoles.length === 0) {
+  if (!Array.isArray(opRoles) || opRoles.length === 0) {
     opRoles = ['MUSICO']
   }
 
   let roleIds = []
   try {
     const rawR = inv.get('role_ids')
-    if (Array.isArray(rawR)) roleIds = rawR
-    else if (typeof rawR === 'string' && rawR) roleIds = JSON.parse(rawR)
+    if (typeof rawR === 'string' && rawR) {
+      roleIds = JSON.parse(rawR)
+    } else if (Array.isArray(rawR)) {
+      if (rawR.length > 0 && typeof rawR[0] === 'number') {
+        let strR = ''
+        for (let b = 0; b < rawR.length; b++) strR += String.fromCharCode(rawR[b])
+        roleIds = JSON.parse(strR)
+      } else {
+        roleIds = rawR
+      }
+    }
   } catch (_) {}
+  if (!Array.isArray(roleIds)) {
+    roleIds = []
+  }
 
   // 1. Cria ou atualiza o usuário na tabela de auth com a senha definida por ele mesmo
   try {
@@ -135,23 +156,53 @@ routerAdd('POST', '/backend/v1/invitations/accept', (e) => {
     }
 
     // 3. Vincula funções/instrumentos em member_roles se houver
-    if (roleIds.length > 0) {
+    // SEGURANÇA E ROBUSTEZ:
+    // Deriva estritamente da congregação do convite (churchId).
+    // Valida cada role_id para garantir que existe na collection `roles` pertencente a esta MESMA igreja.
+    // Ignora IDs inválidos/inexistentes/de outra igreja com segurança, sem derrubar a ativação.
+    if (roleIds && roleIds.length > 0) {
       for (let i = 0; i < roleIds.length; i++) {
-        const rId = roleIds[i]
-        const existingMr = $app.findRecordsByFilter(
-          'member_roles',
-          'member_id = {:memberId} && role_id = {:roleId}',
-          '',
-          1,
-          0,
-          { memberId: memberRecord.id, roleId: rId },
-        )
-        if (existingMr.length === 0) {
-          const mr = new Record(memberRolesCol)
-          mr.set('church_id', churchId)
-          mr.set('member_id', memberRecord.id)
-          mr.set('role_id', rId)
-          $app.save(mr)
+        const rawId = roleIds[i]
+        if (!rawId || typeof rawId !== 'string') continue
+        const cleanRoleId = String(rawId).trim()
+        if (!cleanRoleId) continue
+
+        // Valida se o ID existe de fato na collection roles e pertence à congregação do convite
+        let validRole = null
+        try {
+          const roleRecord = $app.findRecordById('roles', cleanRoleId)
+          if (roleRecord && roleRecord.getString('church_id') === churchId) {
+            validRole = roleRecord
+          }
+        } catch (_) {
+          // ID não existe na tabela roles: ignora silenciosamente sem falhar a ativação
+        }
+
+        if (!validRole) continue
+
+        // Verifica se o vínculo já existe
+        try {
+          const existingMr = $app.findRecordsByFilter(
+            'member_roles',
+            'member_id = {:memberId} && role_id = {:roleId}',
+            '',
+            1,
+            0,
+            { memberId: memberRecord.id, roleId: validRole.id },
+          )
+          if (existingMr.length === 0) {
+            const mr = new Record(memberRolesCol)
+            mr.set('church_id', churchId)
+            mr.set('member_id', memberRecord.id)
+            mr.set('role_id', validRole.id)
+            $app.save(mr)
+          }
+        } catch (mrErr) {
+          // Caso ocorra qualquer inconsistência ao salvar member_role, loga e continua
+          // para nunca travar a ativação de acesso do usuário
+          console.log(
+            '[INVITE_ACCEPT] Erro ao vincular role_id ' + cleanRoleId + ': ' + mrErr.message,
+          )
         }
       }
     }

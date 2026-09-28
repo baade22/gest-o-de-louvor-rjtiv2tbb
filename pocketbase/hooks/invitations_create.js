@@ -23,7 +23,20 @@ routerAdd(
     const operationalRoles = Array.isArray(body.operational_roles)
       ? body.operational_roles
       : ['MUSICO']
-    const roleIds = Array.isArray(body.role_ids) ? body.role_ids : []
+    const rawRoleIds = Array.isArray(body.role_ids) ? body.role_ids : []
+    const roleIds = []
+    for (let r = 0; r < rawRoleIds.length; r++) {
+      const candidateId = String(rawRoleIds[r] || '').trim()
+      if (!candidateId) continue
+      try {
+        const foundRole = $app.findRecordById('roles', candidateId)
+        if (foundRole && foundRole.getString('church_id') === churchId) {
+          roleIds.push(foundRole.id)
+        }
+      } catch (_) {
+        // Ignora role_ids de outra congregação ou inexistentes
+      }
+    }
 
     if (!churchId) {
       return e.json(400, { message: 'church_id é obrigatório' })
