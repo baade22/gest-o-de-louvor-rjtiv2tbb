@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-28T01:12:21.464Z",
+  "generatedAt": "2026-09-28T01:22:11.398Z",
   "collections": [
     {
       "name": "users",
@@ -456,6 +456,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "holyrics_event_id",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -881,6 +887,437 @@
         "CREATE UNIQUE INDEX idx_invitations_token ON invitations (token)",
         "CREATE INDEX idx_invitations_church ON invitations (church_id)",
         "CREATE INDEX idx_invitations_email ON invitations (email)"
+      ]
+    },
+    {
+      "name": "event_tasks",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "team_area",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["LOUVOR", "SOM", "PROJECAO", "MIDIA", "ILUMINACAO"]
+        },
+        {
+          "name": "assigned_to",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "church_members"
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "church_members"
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"]
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["BAIXA", "NORMAL", "ALTA", "URGENTE"]
+        },
+        {
+          "name": "completed_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_event_tasks_church ON event_tasks (church_id)",
+        "CREATE INDEX idx_event_tasks_event ON event_tasks (event_id)",
+        "CREATE INDEX idx_event_tasks_assigned ON event_tasks (assigned_to)",
+        "CREATE INDEX idx_event_tasks_status ON event_tasks (status)",
+        "CREATE INDEX idx_event_tasks_area ON event_tasks (team_area)"
+      ]
+    },
+    {
+      "name": "media_assets",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "file",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["VIDEO", "IMAGEM", "AUDIO", "DOCUMENTO"]
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "AGENDA",
+            "ANIVERSARIANTES",
+            "AVISOS",
+            "CULTOS",
+            "EVENTOS",
+            "VIDEO_ESPECIAL",
+            "OUTROS"
+          ]
+        },
+        {
+          "name": "size",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "uploaded_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "church_members"
+        },
+        {
+          "name": "assigned_operator",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "church_members"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ENVIADA", "RECEBIDA", "BAIXADA", "IMPORTADA_HOLYRICS", "CONCLUIDA"]
+        },
+        {
+          "name": "holyrics_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "downloaded_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "downloaded_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "church_members"
+        },
+        {
+          "name": "imported_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imported_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "church_members"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_media_assets_church ON media_assets (church_id)",
+        "CREATE INDEX idx_media_assets_event ON media_assets (event_id)",
+        "CREATE INDEX idx_media_assets_operator ON media_assets (assigned_operator)",
+        "CREATE INDEX idx_media_assets_status ON media_assets (status)",
+        "CREATE INDEX idx_media_assets_category ON media_assets (category)"
+      ]
+    },
+    {
+      "name": "notifications",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user_id = @request.auth.id",
+        "view": "@request.auth.id != '' && user_id = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user_id = @request.auth.id",
+        "delete": "@request.auth.id != '' && user_id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "link",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "read",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "read_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_notifications_church ON notifications (church_id)",
+        "CREATE INDEX idx_notifications_user_read ON notifications (user_id, read)"
+      ]
+    },
+    {
+      "name": "audit_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entity_type",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_audit_logs_church ON audit_logs (church_id)",
+        "CREATE INDEX idx_audit_logs_entity ON audit_logs (entity_type, entity_id)",
+        "CREATE INDEX idx_audit_logs_event ON audit_logs (event_id)"
       ]
     }
   ]

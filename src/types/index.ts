@@ -161,8 +161,100 @@ export interface EventItem {
   end_time?: string
   description?: string
   status: 'Planejado' | 'Confirmado' | 'Realizado' | 'Cancelado'
+  holyrics_event_id?: string
   created: string
   updated: string
+}
+
+export type TeamArea = 'LOUVOR' | 'SOM' | 'PROJECAO' | 'MIDIA' | 'ILUMINACAO'
+
+export type TaskStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA'
+export type TaskPriority = 'BAIXA' | 'NORMAL' | 'ALTA' | 'URGENTE'
+
+export interface EventTask {
+  id: string
+  church_id: string
+  event_id: string
+  title: string
+  description?: string
+  team_area: TeamArea
+  assigned_to?: string
+  created_by?: string
+  due_date?: string
+  status: TaskStatus
+  priority: TaskPriority
+  completed_at?: string
+  notes?: string
+  created: string
+  updated: string
+  assigned_user?: {
+    member_id: string
+    user_id: string
+    name: string
+    email: string
+  } | null
+  created_user?: {
+    member_id: string
+    user_id: string
+    name: string
+    email: string
+  } | null
+}
+
+export type MediaType = 'VIDEO' | 'IMAGEM' | 'AUDIO' | 'DOCUMENTO'
+export type MediaCategory =
+  | 'AGENDA'
+  | 'ANIVERSARIANTES'
+  | 'AVISOS'
+  | 'CULTOS'
+  | 'EVENTOS'
+  | 'VIDEO_ESPECIAL'
+  | 'OUTROS'
+
+export type MediaStatus = 'ENVIADA' | 'RECEBIDA' | 'BAIXADA' | 'IMPORTADA_HOLYRICS' | 'CONCLUIDA'
+
+export interface MediaAsset {
+  id: string
+  church_id: string
+  event_id: string
+  name: string
+  file: string
+  media_type: MediaType
+  category: MediaCategory
+  size?: number
+  duration?: number
+  uploaded_by?: string
+  assigned_operator?: string
+  status: MediaStatus
+  holyrics_status?: string
+  downloaded_at?: string
+  downloaded_by?: string
+  imported_at?: string
+  imported_by?: string
+  created: string
+  updated: string
+  expand?: {
+    uploaded_by?: ChurchMember & { expand?: { user_id?: User } }
+    assigned_operator?: ChurchMember & { expand?: { user_id?: User } }
+    downloaded_by?: ChurchMember & { expand?: { user_id?: User } }
+    imported_by?: ChurchMember & { expand?: { user_id?: User } }
+    event_id?: EventItem
+  }
+}
+
+export interface InternalNotification {
+  id: string
+  church_id: string
+  user_id: string
+  title: string
+  message: string
+  type: string
+  source: string
+  event_id?: string
+  link?: string
+  read: boolean
+  read_at?: string
+  created: string
 }
 
 export interface EventSong {

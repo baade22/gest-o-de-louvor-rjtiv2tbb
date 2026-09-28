@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { NotificationsBell } from '@/components/NotificationsBell'
 import {
   LayoutDashboard,
   Users,
@@ -309,6 +310,14 @@ export default function Layout() {
 
         {/* User Card & Logout Footer */}
         <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+          {!collapsed && (
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/60">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Notificações
+              </span>
+              <NotificationsBell />
+            </div>
+          )}
           <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
             <div className="h-9 w-9 rounded-full bg-teal-700/10 text-teal-800 font-bold flex items-center justify-center shrink-0 border border-teal-200">
               {user?.name ? user.name[0].toUpperCase() : 'U'}
@@ -372,6 +381,9 @@ export default function Layout() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Central de Notificações Internas */}
+          <NotificationsBell />
+
           {currentRoleBadge && (
             <Badge
               variant="outline"
@@ -487,7 +499,7 @@ export default function Layout() {
 
         {/* Minimal Mobile Version Footer */}
         <footer className="lg:hidden py-3 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
-          LouvorFlow v0.0.12 • Gestão Ministerial de Louvor
+          LouvorFlow v0.0.14 • Gestão Ministerial de Louvor
         </footer>
       </div>
     </div>

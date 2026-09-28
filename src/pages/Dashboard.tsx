@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import type { EventItem, EventMember, Song } from '@/types'
+import type { EventItem, EventMember, Song, EventTask, MediaAsset } from '@/types'
+import { listEventTasks } from '@/services/tasks'
+import { listAllChurchMedia } from '@/services/media'
 import {
   CalendarDays,
   Music2,
@@ -34,7 +36,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
 export default function Dashboard() {
-  const { currentChurch, currentMember, user, isAdmin, isLeader } = useAuth()
+  const { currentChurch, currentMember, user, isAdmin, isLeader, isMaster } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
 
@@ -44,6 +46,8 @@ export default function Dashboard() {
     scheduledMusicians: 0,
     pendingConfirmations: 0,
     upcomingEventsCount: 0,
+    pendingMedias: 0,
+    pendingTasks: 0,
   })
   const [nextEvent, setNextEvent] = useState<EventItem | null>(null)
   const [myUpcomingScales, setMyUpcomingScales] = useState<EventMember[]>([])
@@ -88,11 +92,30 @@ export default function Dashboard() {
         pendingCount = membersList.filter((m) => m.status === 'PENDENTE').length
       }
 
+      let pendingMedias = 0
+      let pendingTasks = 0
+      try {
+        const churchMedias = await listAllChurchMedia(currentChurch.id)
+        pendingMedias = churchMedias.filter(
+          (m) => m.status !== 'CONCLUIDA' && m.status !== 'IMPORTADA_HOLYRICS',
+        ).length
+        if (firstUpcoming) {
+          const tasks = await listEventTasks(currentChurch.id, firstUpcoming.id)
+          pendingTasks = tasks.filter(
+            (t) => t.status === 'PENDENTE' || t.status === 'EM_ANDAMENTO',
+          ).length
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+
       setStats({
         totalSongs: songsRes.totalItems,
         scheduledMusicians: totalMembersScheduled,
         pendingConfirmations: pendingCount,
         upcomingEventsCount: upcoming.length,
+        pendingMedias,
+        pendingTasks,
       })
 
       // 4. Próximas escalas do usuário logado
@@ -330,15 +353,25 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Confirmações Pendentes */}
+        {/* Mídias ou Confirmações dependendo do papel */}
         <Card className="rounded-2xl border-slate-200 shadow-xs hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">Confirmações Pendentes</p>
+              <p className="text-xs font-semibold text-slate-500">
+                {isMaster || isAdmin ? 'Mídias Pendentes' : 'Confirmações Pendentes'}
+              </p>
               <h4 className="text-2xl font-extrabold text-amber-600 mt-1">
-                {isLoading ? <Skeleton className="h-8 w-12" /> : stats.pendingConfirmations}
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : isMaster || isAdmin ? (
+                  stats.pendingMedias
+                ) : (
+                  stats.pendingConfirmations
+                )}
               </h4>
-              <p className="text-[11px] text-amber-600 font-medium mt-1">Aguardando resposta</p>
+              <p className="text-[11px] text-amber-600 font-medium mt-1">
+                {isMaster || isAdmin ? 'Para download/Holyrics' : 'Aguardando resposta'}
+              </p>
             </div>
             <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
               <AlertCircle className="h-6 w-6" />
