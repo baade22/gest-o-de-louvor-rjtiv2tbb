@@ -28,15 +28,12 @@ O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no com
 ## 📦 Como Instalar e Executar
 
 1. Baixe ou copie a pasta `agent/` para o computador da igreja.
-2. No terminal (Prompt de Comando ou PowerShell no Windows, Terminal no macOS/Linux), entre na pasta do Agent:
+2. No terminal (Prompt de Comando ou PowerShell no Windows, Terminal no macOS/Linux), entre na pasta descompactada do Agent.
+3. Como a pasta `dist/` já vem pré-compilada no pacote, você pode rodar diretamente:
    ```bash
-   cd agent
-   ```
-3. Instale as dependências (se necessário) ou execute diretamente:
-   ```bash
-   npm run build
    npm start
    ```
+   *(Ou caso queira recompilar a partir do código-fonte TypeScript: rode `npm install`, depois `npm run build` e `npm start`).*
 4. O Agent iniciará o painel web local na porta **8765**:
    👉 Abra o navegador em: **`http://localhost:8765`**
 

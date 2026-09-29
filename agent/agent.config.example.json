@@ -1,0 +1,14 @@
+{
+  "saasUrl": "https://gestao-de-louvor-f51d5.shrd00.internal.goskip.dev",
+  "agentId": "",
+  "agentToken": "",
+  "churchId": "",
+  "churchName": "",
+  "machineName": "PC-Projecao-Holyrics",
+  "holyricsHost": "127.0.0.1",
+  "holyricsPort": 8091,
+  "holyricsToken": "",
+  "agentWebPort": 8765,
+  "pollIntervalMs": 2500,
+  "heartbeatIntervalMs": 15000
+}
