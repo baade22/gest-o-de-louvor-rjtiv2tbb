@@ -7,6 +7,7 @@
   "scripts": {
     "start": "vite dev",
     "dev": "vite",
+    "pack:agent": "node -e \"import('./src/buildZipScript.mjs')\"",
     "prebuild": "node -e \"import('./src/buildZipScript.mjs')\"",
     "build:agent": "tsc -p agent/tsconfig.json",
     "build": "vite build",

@@ -9,7 +9,10 @@ try {
   execSync(`node "${tscBin}" -p agent/tsconfig.json`, { stdio: 'inherit' })
   const distDir = path.resolve(process.cwd(), 'agent', 'dist')
   const distFiles = fs.existsSync(distDir) ? fs.readdirSync(distDir) : []
-  console.log('[Agent Build] TypeScript do Agent compilado para agent/dist/ com arquivos:', distFiles)
+  console.log(
+    '[Agent Build] TypeScript do Agent compilado para agent/dist/ com arquivos:',
+    distFiles,
+  )
 } catch (err) {
   console.error('[Agent Build] Erro ao compilar TypeScript do Agent:', err.message)
 }
