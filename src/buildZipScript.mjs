@@ -5,8 +5,11 @@ import zlib from 'node:zlib'
 
 // Garante compilação do TypeScript do Agent antes de empacotar no ZIP
 try {
-  execSync('npx tsc -p agent/tsconfig.json', { stdio: 'inherit' })
-  console.log('[Agent Build] TypeScript do Agent compilado com sucesso para agent/dist/')
+  const tscBin = path.resolve(process.cwd(), 'node_modules', 'typescript', 'bin', 'tsc')
+  execSync(`node "${tscBin}" -p agent/tsconfig.json`, { stdio: 'inherit' })
+  const distDir = path.resolve(process.cwd(), 'agent', 'dist')
+  const distFiles = fs.existsSync(distDir) ? fs.readdirSync(distDir) : []
+  console.log('[Agent Build] TypeScript do Agent compilado para agent/dist/ com arquivos:', distFiles)
 } catch (err) {
   console.error('[Agent Build] Erro ao compilar TypeScript do Agent:', err.message)
 }

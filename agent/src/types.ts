@@ -34,6 +34,15 @@ export interface HolyricsApiResponse<T = any> {
   rawText?: string
 }
 
+export interface DiagnosticStep {
+  name: string
+  label: string
+  status: 'OK' | 'TIMEOUT' | 'ERROR' | 'SKIPPED'
+  durationMs: number
+  detail?: string
+  technicalCause?: string
+}
+
 export interface SearchSongDiagnosticResult {
   endpoint: string
   method: string
@@ -45,6 +54,8 @@ export interface SearchSongDiagnosticResult {
   status: 'ok' | 'error'
   error?: string
   matches?: HolyricsSongItem[]
+  checklist?: DiagnosticStep[]
+  technicalCause?: string
 }
 
 export interface HolyricsTokenInfo {

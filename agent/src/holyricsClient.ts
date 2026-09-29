@@ -271,6 +271,90 @@ export class HolyricsClient {
   public async diagnoseSearchSong(
     query: string,
   ): Promise<import('./types.js').SearchSongDiagnosticResult> {
+    const checklist: import('./types.js').DiagnosticStep[] = []
+    let technicalCause: string | undefined = undefined
+
+    // Etapa 1: Agent em si (Local)
+    checklist.push({
+      name: 'agent',
+      label: 'Agent',
+      status: 'OK',
+      durationMs: 0,
+      detail: 'LouvorFlow Agent ativo em execução',
+    })
+
+    // Etapa 2 & 3: Holyrics API / GetVersion / Autenticação via testConnection
+    const startConn = Date.now()
+    const connTest = await this.testConnection()
+    const connDuration = Date.now() - startConn
+
+    if (connTest.connected) {
+      checklist.push({
+        name: 'holyrics_api',
+        label: 'Holyrics API',
+        status: 'OK',
+        durationMs: connDuration,
+        detail: `Conectado em ${this.getBaseUrl()}`,
+      })
+
+      checklist.push({
+        name: 'get_version',
+        label: 'GetVersion',
+        status: 'OK',
+        durationMs: connDuration,
+        detail: connTest.version ? `Versão Holyrics: ${connTest.version}` : 'Versão 2.x detectada',
+      })
+
+      if (connTest.tokenValid) {
+        checklist.push({
+          name: 'authentication',
+          label: 'Autenticação',
+          status: 'OK',
+          durationMs: connDuration,
+          detail: 'Token aceito pelo Holyrics API Server',
+        })
+      } else {
+        technicalCause = connTest.error || 'Token do Holyrics inválido ou permissão negada'
+        checklist.push({
+          name: 'authentication',
+          label: 'Autenticação',
+          status: 'ERROR',
+          durationMs: connDuration,
+          detail: connTest.error || 'Token inválido',
+          technicalCause,
+        })
+      }
+    } else {
+      const isTimeout = (connTest.error || '').includes('TIMEOUT')
+      const statusType = isTimeout ? 'TIMEOUT' : 'ERROR'
+      technicalCause =
+        connTest.error || 'Holyrics API Server não está acessível na porta configurada'
+
+      checklist.push({
+        name: 'holyrics_api',
+        label: 'Holyrics API',
+        status: statusType,
+        durationMs: connDuration,
+        detail: connTest.error || 'Porta inacessível',
+        technicalCause,
+      })
+      checklist.push({
+        name: 'get_version',
+        label: 'GetVersion',
+        status: 'SKIPPED',
+        durationMs: 0,
+        detail: 'Não executado devido à falha de conexão',
+      })
+      checklist.push({
+        name: 'authentication',
+        label: 'Autenticação',
+        status: 'SKIPPED',
+        durationMs: 0,
+        detail: 'Não executado devido à falha de conexão',
+      })
+    }
+
+    // Etapa 4: SearchSong (Busca real)
     const payload = {
       text: query,
       title: true,
@@ -287,17 +371,47 @@ export class HolyricsClient {
         : res.error?.message || 'Erro'
       : undefined
 
+    const searchDuration = res.durationMs || 0
+    let searchStepStatus: 'OK' | 'TIMEOUT' | 'ERROR' = 'OK'
+    let searchStepCause: string | undefined = undefined
+
+    if (res.status === 'ok') {
+      searchStepStatus = 'OK'
+    } else if (errStr === 'TIMEOUT_HOLYRICS') {
+      searchStepStatus = 'TIMEOUT'
+      searchStepCause = 'Tempo limite excedido na chamada SearchSong ao Holyrics (>= 3000ms).'
+      if (!technicalCause) technicalCause = searchStepCause
+    } else {
+      searchStepStatus = 'ERROR'
+      searchStepCause = errStr || `Erro HTTP ${res.httpStatus || 0}`
+      if (!technicalCause) technicalCause = searchStepCause
+    }
+
+    checklist.push({
+      name: 'search_song',
+      label: 'SearchSong',
+      status: searchStepStatus,
+      durationMs: searchDuration,
+      detail:
+        searchStepStatus === 'OK'
+          ? `${list.length} músicas encontradas`
+          : searchStepCause || 'Erro na busca',
+      technicalCause: searchStepCause,
+    })
+
     return {
       endpoint: `${this.getBaseUrl()}/api/SearchSong`,
       method: 'POST',
       payloadSent: payload,
       httpStatus: res.httpStatus || 0,
-      durationMs: res.durationMs || 0,
+      durationMs: searchDuration,
       count: list.length,
       rawResponse: (res.rawText || '').slice(0, 2000),
       status: res.status,
       error: errStr,
       matches: list,
+      checklist,
+      technicalCause,
     }
   }
 

@@ -17,7 +17,33 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
     }
   } catch (_) {}
 
-  const paramId = e.request.pathParam('id')
+  let rawParam = ''
+  try {
+    if (e.request && typeof e.request.pathValue === 'function') {
+      rawParam = e.request.pathValue('id')
+    }
+  } catch (_) {}
+
+  if (!rawParam) {
+    try {
+      const reqInfo = e.requestInfo ? e.requestInfo() : null
+      if (reqInfo && reqInfo.pathParams && reqInfo.pathParams['id']) {
+        rawParam = reqInfo.pathParams['id']
+      }
+    } catch (_) {}
+  }
+
+  if (!rawParam) {
+    try {
+      const urlPath = String(e.request?.url?.path || e.request?.url || '')
+      const match = urlPath.match(/\/backend\/v1\/agent\/commands\/([^/?#]+)\/result/)
+      if (match && match[1]) {
+        rawParam = decodeURIComponent(match[1])
+      }
+    } catch (_) {}
+  }
+
+  const paramId = String(rawParam || '').trim()
   const body = e.requestInfo().body || {}
   const status = String(body.status || 'DONE').toUpperCase()
   const result = body.result || null

@@ -73,10 +73,18 @@ O painel local (`http://localhost:8765`) possui uma ferramenta dedicada para tes
   - Sempre que ao clicar em "Enviar para playlist do Holyrics" no SaaS a música demorar a responder ou o SaaS relatar tempo esgotado.
   - Para verificar se o Holyrics está ativo, se a permissão `SearchSong` está habilitada no token do Holyrics e se o acervo local contém a canção.
 - **Como interpretar os resultados na tela:**
+  - **Checklist por etapa:** Exibe o status individual de cada etapa essencial:
+    - `Agent → OK`
+    - `Holyrics API → OK`
+    - `GetVersion → OK`
+    - `Autenticação → OK`
+    - `SearchSong → OK / TIMEOUT / ERROR`
+  - **Tempo por etapa:** Milissegundos despendidos em cada checagem individual.
+  - **Causa técnica identificada:** Caso alguma etapa falhe ou retorne timeout, explica com exatidão a causa técnica (ex.: `Tempo limite excedido na chamada SearchSong ao Holyrics (>= 3000ms)`, `Token inválido`, ou `CONNECTION_REFUSED`).
   - **Endpoint utilizado:** Exibe `http://127.0.0.1:8091/api/SearchSong` (o token de autenticação **nunca** é exibido na tela nem aparece nos logs locais, preservando a segurança).
   - **Método HTTP:** `POST`.
   - **Status HTTP:** Deve ser `200 (OK)`. Se retornar 401 ou erro de token, revise as permissões em Menu Arquivo > Configurações > API Server no Holyrics.
-  - **Tempo de resposta:** Tempo em milissegundos da resposta local (geralmente menor que 100ms).
+  - **Tempo total:** Tempo em milissegundos da chamada local.
   - **Músicas encontradas:** Quantidade de itens correspondentes encontrados no acervo do Holyrics.
   - **Resposta Retornada:** Trecho do JSON bruto recebido do Holyrics para conferência imediata.
 

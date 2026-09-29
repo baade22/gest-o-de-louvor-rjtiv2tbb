@@ -12,7 +12,33 @@ routerAdd(
       return e.json(401, { success: false, message: 'Não autorizado.' })
     }
 
-    const commandIdParam = String(e.request.pathParam('command_id') || '').trim()
+    let rawParam = ''
+    try {
+      if (e.request && typeof e.request.pathValue === 'function') {
+        rawParam = e.request.pathValue('command_id')
+      }
+    } catch (_) {}
+
+    if (!rawParam) {
+      try {
+        const reqInfo = e.requestInfo ? e.requestInfo() : null
+        if (reqInfo && reqInfo.pathParams && reqInfo.pathParams['command_id']) {
+          rawParam = reqInfo.pathParams['command_id']
+        }
+      } catch (_) {}
+    }
+
+    if (!rawParam) {
+      try {
+        const urlPath = String(e.request?.url?.path || e.request?.url || '')
+        const match = urlPath.match(/\/backend\/v1\/holyrics\/commands\/([^/?#]+)\/status/)
+        if (match && match[1]) {
+          rawParam = decodeURIComponent(match[1])
+        }
+      } catch (_) {}
+    }
+
+    const commandIdParam = String(rawParam || '').trim()
     if (!commandIdParam) {
       return e.json(400, { success: false, message: 'command_id é obrigatório.' })
     }

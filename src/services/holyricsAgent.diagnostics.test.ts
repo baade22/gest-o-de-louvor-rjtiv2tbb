@@ -101,6 +101,35 @@ describe('Holyrics SearchSong Parser & Respostas (0, 1, N resultados)', () => {
     expect(diag.httpStatus).toBe(200)
     expect(diag.count).toBe(1)
     expect(diag.payloadSent.text).toBe('Graça')
+    expect(diag.checklist).toBeDefined()
+    expect(diag.checklist?.length).toBeGreaterThanOrEqual(4)
+    expect(diag.checklist?.some((s) => s.label === 'Agent' && s.status === 'OK')).toBe(true)
+    expect(diag.checklist?.some((s) => s.label === 'SearchSong' && s.status === 'OK')).toBe(true)
+  })
+
+  it('Diagnosticar SearchSong com TIMEOUT inclui checklist com status TIMEOUT e causa técnica', async () => {
+    const client = new HolyricsClient('127.0.0.1', 8091, 'secret-local-token')
+    globalThis.fetch = vi.fn().mockImplementation((url) => {
+      const u = String(url)
+      if (u.includes('GetTokenInfo')) {
+        return Promise.resolve({
+          status: 200,
+          ok: true,
+          text: async () => JSON.stringify({ status: 'ok', data: { version: '2.30.0' } }),
+        } as any)
+      }
+      // Timeout no SearchSong
+      const abortErr = new Error('The operation was aborted')
+      abortErr.name = 'AbortError'
+      return Promise.reject(abortErr)
+    })
+
+    const diag = await client.diagnoseSearchSong('MusicaDemorada')
+    expect(diag.status).toBe('error')
+    expect(diag.error).toBe('TIMEOUT_HOLYRICS')
+    expect(diag.technicalCause).toContain('Tempo limite excedido')
+    const searchStep = diag.checklist?.find((s) => s.label === 'SearchSong')
+    expect(searchStep?.status).toBe('TIMEOUT')
   })
 })
 

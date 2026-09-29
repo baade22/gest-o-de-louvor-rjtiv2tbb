@@ -262,11 +262,24 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
       </div>
 
       <div id="diagResultContainer" style="display: none; background: #0b1120; border: 1px solid var(--card-border); border-radius: 8px; padding: 14px; font-size: 0.8rem; line-height: 1.5;">
+        <!-- Checklist de Diagnóstico por Etapa -->
+        <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border);">
+          <div style="font-weight: 700; color: #38bdf8; margin-bottom: 8px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">
+            📋 Checklist de Diagnóstico por Etapa
+          </div>
+          <div id="diagChecklist" style="display: flex; flex-direction: column; gap: 6px;">
+            <!-- Preenchido dinamicamente -->
+          </div>
+          <div id="diagTechnicalCauseContainer" style="display: none; margin-top: 10px; padding: 8px 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--red); border-radius: 6px; color: #fca5a5;">
+            <strong>Causa técnica identificada:</strong> <span id="diagTechnicalCauseText"></span>
+          </div>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
           <div><strong style="color: var(--text-muted);">Endpoint:</strong> <span id="diagEndpoint" style="color: #38bdf8;"></span></div>
           <div><strong style="color: var(--text-muted);">Método HTTP:</strong> <span id="diagMethod">POST</span></div>
           <div><strong style="color: var(--text-muted);">Status HTTP:</strong> <span id="diagHttpStatus"></span></div>
-          <div><strong style="color: var(--text-muted);">Tempo de Resposta:</strong> <span id="diagDuration"></span></div>
+          <div><strong style="color: var(--text-muted);">Tempo Total:</strong> <span id="diagDuration"></span></div>
           <div><strong style="color: var(--text-muted);">Músicas Encontradas:</strong> <span id="diagCount" style="font-weight: 700;"></span></div>
           <div><strong style="color: var(--text-muted);">Status Interno:</strong> <span id="diagStatus"></span></div>
         </div>
@@ -362,10 +375,57 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
         });
         const data = await res.json();
         container.style.display = 'block';
+
+        // Renderiza Checklist por etapa
+        const checklistEl = document.getElementById('diagChecklist');
+        checklistEl.innerHTML = '';
+        const steps = data.checklist || [
+          { label: 'Agent', status: 'OK', durationMs: 0 },
+          { label: 'Holyrics API', status: data.httpStatus === 200 ? 'OK' : 'ERROR', durationMs: data.durationMs },
+          { label: 'GetVersion', status: data.httpStatus === 200 ? 'OK' : 'ERROR', durationMs: data.durationMs },
+          { label: 'Autenticação', status: data.httpStatus === 200 ? 'OK' : 'ERROR', durationMs: data.durationMs },
+          { label: 'SearchSong', status: data.status === 'ok' ? 'OK' : data.error === 'TIMEOUT_HOLYRICS' ? 'TIMEOUT' : 'ERROR', durationMs: data.durationMs }
+        ];
+
+        steps.forEach(s => {
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.justifyContent = 'space-between';
+          row.style.alignItems = 'center';
+          row.style.padding = '4px 8px';
+          row.style.background = '#020617';
+          row.style.borderRadius = '4px';
+
+          const statusColor = s.status === 'OK' ? 'var(--green)' : s.status === 'TIMEOUT' ? 'var(--amber)' : s.status === 'SKIPPED' ? 'var(--text-muted)' : 'var(--red)';
+          const statusIcon = s.status === 'OK' ? '✓' : s.status === 'TIMEOUT' ? '⏱' : s.status === 'SKIPPED' ? '—' : '✗';
+          const detailSpan = s.detail ? '<span style="font-size: 0.72rem; color: var(--text-muted);">(' + s.detail + ')</span>' : '';
+          const durSpan = s.durationMs !== undefined ? s.durationMs + ' ms' : '';
+
+          row.innerHTML = '<div style="display: flex; align-items: center; gap: 8px;">' +
+            '<span style="font-weight: 700; color: ' + statusColor + '; width: 16px;">' + statusIcon + '</span>' +
+            '<span style="font-weight: 600;">' + s.label + '</span>' +
+            detailSpan +
+            '</div>' +
+            '<div style="display: flex; align-items: center; gap: 10px;">' +
+            '<span style="font-size: 0.72rem; color: var(--text-muted);">' + durSpan + '</span>' +
+            '<span style="font-weight: 700; font-size: 0.75rem; color: ' + statusColor + ';">' + s.status + '</span>' +
+            '</div>';
+          checklistEl.appendChild(row);        });
+
+        // Exibe Causa Técnica se houver
+        const causeContainer = document.getElementById('diagTechnicalCauseContainer');
+        const causeText = document.getElementById('diagTechnicalCauseText');
+        if (data.technicalCause || (data.status !== 'ok' && data.error)) {
+          causeContainer.style.display = 'block';
+          causeText.innerText = data.technicalCause || data.error || 'Falha na comunicação';
+        } else {
+          causeContainer.style.display = 'none';
+        }
+
         document.getElementById('diagEndpoint').innerText = data.endpoint || 'http://127.0.0.1:8091/api/SearchSong';
         document.getElementById('diagHttpStatus').innerText = data.httpStatus + (data.httpStatus === 200 ? ' (OK)' : '');
         document.getElementById('diagHttpStatus').style.color = data.httpStatus === 200 ? 'var(--green)' : 'var(--red)';
-        document.getElementById('diagDuration').innerText = data.durationMs + ' ms';
+        document.getElementById('diagDuration').innerText = (data.durationMs || 0) + ' ms';
         document.getElementById('diagCount').innerText = data.count !== undefined ? data.count : 0;
         document.getElementById('diagCount').style.color = data.count > 0 ? 'var(--green)' : 'var(--amber)';
         document.getElementById('diagStatus').innerText = data.status || (data.success ? 'ok' : 'error');
