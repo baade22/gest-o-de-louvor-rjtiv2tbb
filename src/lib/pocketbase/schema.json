@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-28T01:22:11.398Z",
+  "generatedAt": "2026-09-29T01:43:49.930Z",
   "collections": [
     {
       "name": "users",
@@ -1318,6 +1318,312 @@
         "CREATE INDEX idx_audit_logs_church ON audit_logs (church_id)",
         "CREATE INDEX idx_audit_logs_entity ON audit_logs (entity_type, entity_id)",
         "CREATE INDEX idx_audit_logs_event ON audit_logs (event_id)"
+      ]
+    },
+    {
+      "name": "holyrics_agents",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "machine_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "platform",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "version",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ONLINE", "OFFLINE"]
+        },
+        {
+          "name": "last_seen_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paired_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pairing_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pairing_expires_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "agent_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "holyrics_detected",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "holyrics_version",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "api_port",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_holyrics_agents_church ON holyrics_agents (church_id)",
+        "CREATE INDEX idx_holyrics_agents_code ON holyrics_agents (pairing_code)",
+        "CREATE INDEX idx_holyrics_agents_token ON holyrics_agents (agent_token)",
+        "CREATE INDEX idx_holyrics_agents_status ON holyrics_agents (status)"
+      ]
+    },
+    {
+      "name": "holyrics_commands",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "command_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "agent_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "holyrics_agents"
+        },
+        {
+          "name": "action",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["TEST_CONNECTION", "SEARCH_SONG", "ADD_TO_PLAYLIST"]
+        },
+        {
+          "name": "payload",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PENDING", "SENT", "DONE", "FAILED", "EXPIRED"]
+        },
+        {
+          "name": "result",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "executed_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_holyrics_commands_id ON holyrics_commands (command_id)",
+        "CREATE INDEX idx_holyrics_commands_agent ON holyrics_commands (agent_id, status)",
+        "CREATE INDEX idx_holyrics_commands_church ON holyrics_commands (church_id)"
+      ]
+    },
+    {
+      "name": "holyrics_sync_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "agent_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "holyrics_agents"
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "song_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "songs"
+        },
+        {
+          "name": "holyrics_song_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["SUCCESS", "ERROR"]
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_holyrics_sync_logs_church ON holyrics_sync_logs (church_id)",
+        "CREATE INDEX idx_holyrics_sync_logs_agent ON holyrics_sync_logs (agent_id)",
+        "CREATE INDEX idx_holyrics_sync_logs_song ON holyrics_sync_logs (song_id)"
       ]
     }
   ]

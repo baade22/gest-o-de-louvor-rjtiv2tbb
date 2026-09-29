@@ -37,6 +37,7 @@ import {
   testIntegrationConnection,
   disconnectIntegration,
 } from '@/services/integrations'
+import { HolyricsAgentCard } from '@/components/HolyricsAgentCard'
 
 function HolyricsIntegrationCard({
   currentChurch,
@@ -683,44 +684,8 @@ export default function IntegrationsSettings() {
           </div>
         </div>
 
-        {/* CARD 2: HOLYRICS (API SERVER OFICIAL) */}
-        <HolyricsIntegrationCard
-          currentChurch={currentChurch}
-          integration={integrations.find((i) => i.provider === 'holyrics')}
-          onRefresh={fetchIntegrations}
-        />
-
-        {/* CARD 3: WHATSAPP (EM BREVE) */}
-        <div className="bg-white/80 rounded-2xl border border-dashed border-slate-200 p-5 shadow-xs flex flex-col justify-between opacity-80">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <MessageSquare className="h-6 w-6" />
-              </div>
-              <Badge
-                variant="outline"
-                className="text-[10px] bg-slate-100 text-slate-500 font-bold"
-              >
-                Em breve
-              </Badge>
-            </div>
-
-            <div>
-              <h3 className="text-base font-bold text-slate-900">WhatsApp</h3>
-              <p className="text-xs text-slate-400 font-medium">WhatsApp Business API</p>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Notificação automática de escalas para músicos e líderes via mensagens do WhatsApp.
-            </p>
-          </div>
-
-          <div className="pt-4 mt-4 border-t border-slate-100">
-            <Button disabled variant="outline" className="w-full rounded-xl text-xs font-medium">
-              Disponível em breve
-            </Button>
-          </div>
-        </div>
+        {/* CARD 2: HOLYRICS LOCAL AGENT (OFICIAL LouvorFlow Agent) */}
+        <HolyricsAgentCard currentChurch={currentChurch} isAdmin={isAdmin} />
       </div>
 
       {/* MODAL: Configurar / Alterar YouTube API Key */}

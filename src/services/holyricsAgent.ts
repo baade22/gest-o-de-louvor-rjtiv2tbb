@@ -1,0 +1,119 @@
+import pb from '@/lib/pocketbase/client'
+
+export interface HolyricsAgentInfo {
+  id: string
+  name: string
+  machine_name?: string
+  platform?: string
+  version?: string
+  status: 'ONLINE' | 'OFFLINE'
+  last_seen_at?: string
+  paired_at?: string
+  holyrics_detected?: boolean
+  holyrics_version?: string
+  api_port?: number
+  has_pairing_code?: boolean
+  pairing_code?: string
+  pairing_expires_at?: string
+}
+
+export interface PairingCodeResponse {
+  success: boolean
+  agent_id: string
+  pairing_code: string
+  raw_code: string
+  expires_at: string
+  message: string
+}
+
+export interface HolyricsTestResponse {
+  success: boolean
+  agent_online: boolean
+  holyrics_connected: boolean
+  result?: any
+  error?: string
+  error_code?: string
+  message: string
+  pending?: boolean
+}
+
+export interface HolyricsMatchSong {
+  id: string
+  title: string
+  artist?: string
+  key?: string
+  bpm?: number
+}
+
+export interface SendToPlaylistResponse {
+  success: boolean
+  action?: string
+  added?: boolean
+  requires_selection?: boolean
+  song_title?: string
+  matches_count?: number
+  matches?: HolyricsMatchSong[]
+  holyrics_song_id?: string
+  agent_id?: string
+  error?: string
+  error_code?: string
+  message: string
+  pending?: boolean
+}
+
+/**
+ * Gera código temporário de pareamento de 6 dígitos no SaaS
+ */
+export async function generateHolyricsPairingCode(
+  churchId: string,
+  agentName = 'PC Projeção Holyrics',
+): Promise<PairingCodeResponse> {
+  return pb.send<PairingCodeResponse>('/backend/v1/saas/holyrics/pairing-code', {
+    method: 'POST',
+    body: { church_id: churchId, agent_name: agentName },
+  })
+}
+
+/**
+ * Lista agentes registrados para a igreja
+ */
+export async function listHolyricsAgents(churchId: string): Promise<HolyricsAgentInfo[]> {
+  const res = await pb.send<{ success: boolean; agents: HolyricsAgentInfo[] }>(
+    `/backend/v1/saas/holyrics/agents?church_id=${encodeURIComponent(churchId)}`,
+    { method: 'GET' },
+  )
+  return res.agents || []
+}
+
+/**
+ * Testa a conexão real entre SaaS -> Agent -> Holyrics Local API (sem mock)
+ */
+export async function testHolyricsAgent(
+  churchId: string,
+  agentId: string,
+): Promise<HolyricsTestResponse> {
+  return pb.send<HolyricsTestResponse>('/backend/v1/saas/holyrics/test', {
+    method: 'POST',
+    body: { church_id: churchId, agent_id: agentId },
+  })
+}
+
+/**
+ * Envia música para a playlist do Holyrics via LouvorFlow Agent
+ */
+export async function sendSongToHolyricsPlaylist(params: {
+  churchId: string
+  songId: string
+  agentId?: string
+  chosenHolyricsId?: string
+}): Promise<SendToPlaylistResponse> {
+  return pb.send<SendToPlaylistResponse>('/backend/v1/saas/holyrics/send-to-playlist', {
+    method: 'POST',
+    body: {
+      church_id: params.churchId,
+      song_id: params.songId,
+      agent_id: params.agentId,
+      chosen_holyrics_id: params.chosenHolyricsId,
+    },
+  })
+}

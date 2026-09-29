@@ -46,6 +46,15 @@ import {
   removeVideoFromSong,
 } from '@/services/songVideos'
 import { getYouTubeEmbedUrl, extractYouTubeVideoId, YouTubeSearchResult } from '@/services/youtube'
+import { sendSongToHolyricsPlaylist, type HolyricsMatchSong } from '@/services/holyricsAgent'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Radio, Send } from 'lucide-react'
 
 export default function SongDetail() {
   const { id } = useParams<{ id: string }>()
@@ -57,8 +66,13 @@ export default function SongDetail() {
   const [videos, setVideos] = useState<SongVideo[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Modais
+  // Modais e Holyrics
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false)
+  const [isSendingToHolyrics, setIsSendingToHolyrics] = useState(false)
+  const [holyricsCandidatesModal, setHolyricsCandidatesModal] = useState(false)
+  const [holyricsCandidates, setHolyricsCandidates] = useState<HolyricsMatchSong[]>([])
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
+  const [activeHolyricsAgentId, setActiveHolyricsAgentId] = useState<string | undefined>(undefined)
 
   // Controles de visualização em ensaio / mobile
   const [semitones, setSemitones] = useState(0) // de -11 a +11
@@ -216,6 +230,58 @@ export default function SongDetail() {
     }
   }
 
+  // Enviar música para o Holyrics via LouvorFlow Agent
+  const handleSendToHolyrics = async (chosenId?: string) => {
+    if (!song || !currentChurch) return
+    setIsSendingToHolyrics(true)
+
+    try {
+      const res = await sendSongToHolyricsPlaylist({
+        churchId: currentChurch.id,
+        songId: song.id,
+        agentId: activeHolyricsAgentId,
+        chosenHolyricsId: chosenId,
+      })
+
+      if (res.requires_selection && res.matches && res.matches.length > 1) {
+        setHolyricsCandidates(res.matches)
+        setActiveHolyricsAgentId(res.agent_id)
+        setSelectedCandidateId(res.matches[0].id)
+        setHolyricsCandidatesModal(true)
+        toast({
+          title: 'Múltiplas músicas encontradas',
+          description: `Selecione qual das ${res.matches.length} versões deseja enviar à playlist.`,
+        })
+        return
+      }
+
+      if (res.added || res.success) {
+        toast({
+          title: 'Sucesso!',
+          description: res.message,
+        })
+        setHolyricsCandidatesModal(false)
+      } else {
+        toast({
+          title:
+            res.error_code === 'SONG_NOT_FOUND_IN_HOLYRICS'
+              ? 'Música não encontrada'
+              : 'Aviso Holyrics',
+          description: res.message,
+          variant: 'destructive',
+        })
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao enviar para Holyrics',
+        description: err.message || 'Falha na comunicação com o LouvorFlow Agent.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSendingToHolyrics(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-4">
@@ -241,18 +307,36 @@ export default function SongDetail() {
           Voltar ao Repertório
         </Link>
 
-        {canManageContent && (
-          <Link to={`/songs/${song.id}/edit`}>
+        <div className="flex items-center gap-2">
+          {canManageContent && (
             <Button
               variant="outline"
               size="sm"
-              className="rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-semibold gap-1.5"
+              disabled={isSendingToHolyrics}
+              onClick={() => handleSendToHolyrics()}
+              className="rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold gap-1.5"
+              title="Envia a música diretamente para a playlist do Holyrics através do LouvorFlow Agent no computador de projeção"
             >
-              <Edit className="h-3.5 w-3.5" />
-              Editar Música
+              <Radio
+                className={`h-3.5 w-3.5 text-purple-600 ${isSendingToHolyrics ? 'animate-pulse' : ''}`}
+              />
+              {isSendingToHolyrics ? 'Enviando...' : 'Enviar para Holyrics'}
             </Button>
-          </Link>
-        )}
+          )}
+
+          {canManageContent && (
+            <Link to={`/songs/${song.id}/edit`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-semibold gap-1.5"
+              >
+                <Edit className="h-3.5 w-3.5" />
+                Editar Música
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* FEATURE 5: LAYOUT MOBILE-FIRST - Song Header Card */}
@@ -678,6 +762,77 @@ export default function SongDetail() {
         initialQuery={[song.title, song.artist].filter(Boolean).join(' ')}
         onSelectVideo={handleSelectNewVideo}
       />
+
+      {/* Modal de Múltiplos Resultados do Holyrics */}
+      <Dialog open={holyricsCandidatesModal} onOpenChange={setHolyricsCandidatesModal}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Radio className="h-5 w-5 text-purple-700" />
+              Selecionar Versão no Holyrics
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Foram encontradas {holyricsCandidates.length} correspondências para &quot;
+              {song?.title}&quot; no acervo local do Holyrics. Selecione qual versão adicionar à
+              playlist:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-3 max-h-64 overflow-y-auto">
+            {holyricsCandidates.map((candidate) => {
+              const isSelected = selectedCandidateId === candidate.id
+              return (
+                <div
+                  key={candidate.id}
+                  onClick={() => setSelectedCandidateId(candidate.id)}
+                  className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
+                    isSelected
+                      ? 'border-purple-600 bg-purple-50/70 text-purple-950 font-bold'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="truncate font-semibold">{candidate.title}</p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {candidate.artist ? `Artista: ${candidate.artist}` : 'Sem artista'}
+                      {candidate.key ? ` • Tom: ${candidate.key}` : ''}
+                    </p>
+                  </div>
+                  <div
+                    className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      isSelected ? 'border-purple-600 bg-purple-600' : 'border-slate-300'
+                    }`}
+                  >
+                    {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setHolyricsCandidatesModal(false)}
+              className="rounded-xl text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={!selectedCandidateId || isSendingToHolyrics}
+              onClick={() => {
+                if (selectedCandidateId) handleSendToHolyrics(selectedCandidateId)
+              }}
+              className="rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-xs gap-1.5"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {isSendingToHolyrics ? 'Enviando...' : 'Confirmar e Adicionar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
