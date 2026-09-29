@@ -56,6 +56,13 @@ export interface SearchSongDiagnosticResult {
   matches?: HolyricsSongItem[]
   checklist?: DiagnosticStep[]
   technicalCause?: string
+  parsedJson?: any
+  firstMatch?: {
+    id: string
+    title: string
+    artist?: string
+    author?: string
+  }
 }
 
 export interface HolyricsTokenInfo {

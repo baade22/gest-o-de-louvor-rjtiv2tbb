@@ -1,9 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 
 describe('packAgent test verification', () => {
-  it('garante que o LouvorFlow-Agent-0.0.15.zip foi gerado corretamente em public/', () => {    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
+  beforeAll(async () => {
+    await import('../buildZipScript.mjs')
+  })
+
+  it('garante que o LouvorFlow-Agent-0.0.15.zip foi gerado corretamente em public/', () => {
+    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
     expect(fs.existsSync(zipPath)).toBe(true)
     const stat = fs.statSync(zipPath)
     expect(stat.size).toBeGreaterThan(1000)

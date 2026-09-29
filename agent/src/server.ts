@@ -283,6 +283,10 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
           <div><strong style="color: var(--text-muted);">Músicas Encontradas:</strong> <span id="diagCount" style="font-weight: 700;"></span></div>
           <div><strong style="color: var(--text-muted);">Status Interno:</strong> <span id="diagStatus"></span></div>
         </div>
+        <div id="diagFirstMatchContainer" style="display: none; margin-bottom: 8px; padding: 8px 10px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 6px;">
+          <strong style="color: #38bdf8;">Primeiro Resultado:</strong>
+          <div id="diagFirstMatchText" style="font-size: 0.75rem; color: #f8fafc; margin-top: 2px;"></div>
+        </div>
         <div style="margin-top: 6px;">
           <strong style="color: var(--text-muted);">Payload Enviado:</strong>
           <pre id="diagPayload" style="background: #020617; padding: 8px; border-radius: 6px; overflow-x: auto; margin-top: 4px; font-size: 0.75rem; color: #cbd5e1;"></pre>
@@ -429,6 +433,16 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
         document.getElementById('diagCount').innerText = data.count !== undefined ? data.count : 0;
         document.getElementById('diagCount').style.color = data.count > 0 ? 'var(--green)' : 'var(--amber)';
         document.getElementById('diagStatus').innerText = data.status || (data.success ? 'ok' : 'error');
+
+        var firstMatchContainer = document.getElementById('diagFirstMatchContainer');
+        var firstMatchText = document.getElementById('diagFirstMatchText');
+        if (data.firstMatch) {
+          firstMatchContainer.style.display = 'block';
+          firstMatchText.innerText = '#' + data.firstMatch.id + ' — "' + data.firstMatch.title + '"' + (data.firstMatch.artist ? ' • Artista: ' + data.firstMatch.artist : '') + (data.firstMatch.author ? ' • Autor: ' + data.firstMatch.author : '');
+        } else {
+          firstMatchContainer.style.display = 'none';
+        }
+
         document.getElementById('diagPayload').innerText = JSON.stringify(data.payloadSent || {}, null, 2);
         document.getElementById('diagRawResponse').innerText = data.rawResponse || JSON.stringify(data, null, 2);
       } catch (e) {

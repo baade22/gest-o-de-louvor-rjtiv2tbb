@@ -336,11 +336,8 @@ export class LouvorFlowAgent {
             errorCode = 'MISSING_QUERY'
             break
           }
-          const searchRes = await this.holyrics.searchSong(query, {
-            title: true,
-            artist: true,
-            lyrics: false,
-          })
+          // Chamada oficial mínima recomendada pelo Holyrics ({ text: query })
+          const searchRes = await this.holyrics.searchSong(query)
 
           console.log(
             `[Agent] [${new Date().toISOString()}] SEARCH_SONG executado via Holyrics endpoint "${searchRes.endpointUsed || 'SearchSong'}": duração=${searchRes.durationMs}ms, HTTP=${searchRes.httpStatus}, resultados=${searchRes.matches?.length ?? 0}, chaves_json=${JSON.stringify(searchRes.keys || [])}`,

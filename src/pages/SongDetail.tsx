@@ -273,35 +273,45 @@ export default function SongDetail() {
                   message: `✓ Música "${song.title}" adicionada com sucesso à playlist do Holyrics!`,
                 }
               } else if (statusRes.action === 'SEARCH_SONG') {
-                const matches = Array.isArray(cmdResult.matches) ? cmdResult.matches : []
-                if (matches.length === 0) {
+                // Só considera "não encontrada" quando o resultado foi concluído com sucesso (DONE)
+                // sem erro e com contagem de matches comprovadamente 0.
+                if (statusRes.error) {
                   res = {
                     success: false,
-                    error_code: 'SONG_NOT_FOUND_IN_HOLYRICS',
-                    message: `⚠️ Música não encontrada no Holyrics: "${song.title}". Cadastre ou importe a letra no programa Holyrics primeiro.`,
+                    error: statusRes.error,
+                    message: `Erro na busca do Holyrics: ${statusRes.error}`,
                   }
-                } else if (matches.length === 1) {
-                  // Se retornou 1 match no polling, prossegue adicionando automaticamente
-                  const autoAddRes = await sendSongToHolyricsPlaylist({
-                    churchId: currentChurch.id,
-                    songId: song.id,
-                    agentId: activeHolyricsAgentId,
-                    chosenHolyricsId: String(matches[0].id),
-                  })
-                  res = autoAddRes
                 } else {
-                  res = {
-                    success: true,
-                    requires_selection: true,
-                    matches: matches.map((m: any) => ({
-                      id: String(m.id),
-                      title: m.title || 'Sem título',
-                      artist: m.artist || '',
-                      key: m.key || '',
-                      bpm: m.bpm || 0,
-                    })),
-                    matches_count: matches.length,
-                    message: `Encontradas ${matches.length} músicas no Holyrics para "${song.title}". Selecione qual deseja enviar à playlist.`,
+                  const matches = Array.isArray(cmdResult.matches) ? cmdResult.matches : []
+                  if (matches.length === 0) {
+                    res = {
+                      success: false,
+                      error_code: 'SONG_NOT_FOUND_IN_HOLYRICS',
+                      message: `⚠️ Música não encontrada no Holyrics: "${song.title}". Cadastre ou importe a letra no programa Holyrics primeiro.`,
+                    }
+                  } else if (matches.length === 1) {
+                    // Se retornou 1 match no polling, prossegue adicionando automaticamente
+                    const autoAddRes = await sendSongToHolyricsPlaylist({
+                      churchId: currentChurch.id,
+                      songId: song.id,
+                      agentId: activeHolyricsAgentId,
+                      chosenHolyricsId: String(matches[0].id),
+                    })
+                    res = autoAddRes
+                  } else {
+                    res = {
+                      success: true,
+                      requires_selection: true,
+                      matches: matches.map((m: any) => ({
+                        id: String(m.id),
+                        title: m.title || 'Sem título',
+                        artist: m.artist || '',
+                        key: m.key || '',
+                        bpm: m.bpm || 0,
+                      })),
+                      matches_count: matches.length,
+                      message: `Encontradas ${matches.length} músicas no Holyrics para "${song.title}". Selecione qual deseja enviar à playlist.`,
+                    }
                   }
                 }
               }
@@ -311,6 +321,7 @@ export default function SongDetail() {
               res = {
                 success: false,
                 error: statusRes.error,
+                error_code: 'COMMAND_FAILED',
                 message:
                   statusRes.error ||
                   'Comando falhou ao executar no Holyrics. Verifique permissões do API Server.',
@@ -353,12 +364,15 @@ export default function SongDetail() {
         })
         setHolyricsCandidatesModal(false)
       } else {
+        const isSongNotFound = res.error_code === 'SONG_NOT_FOUND_IN_HOLYRICS' && !res.error
         toast({
-          title:
-            res.error_code === 'SONG_NOT_FOUND_IN_HOLYRICS'
-              ? 'Música não encontrada'
-              : 'Aviso Holyrics',
-          description: res.message,
+          title: isSongNotFound ? 'Música não encontrada' : 'Erro na integração com Holyrics',
+          description:
+            res.message ||
+            res.error ||
+            (res.error_code
+              ? `Código do erro: ${res.error_code}`
+              : 'Falha na comunicação com o Holyrics.'),
           variant: 'destructive',
         })
       }

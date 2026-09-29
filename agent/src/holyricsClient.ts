@@ -170,8 +170,10 @@ export class HolyricsClient {
 
   /**
    * SearchSong: Busca músicas no acervo local do Holyrics
+   * Formato oficial mínimo recomendado pela Holyrics API e jslib: { text: query }
    * Timeout por chamada: 3000ms.
-   * Fallback SearchLyrics só executado se o erro indicar ação desconhecida ou endpoint inexistente (NÃO em TIMEOUT_HOLYRICS).
+   * Não envia title/artist/lyrics/fields por padrão para evitar que o Holyrics 2.24+ / 2.30+ filtre indevidamente ou descarte a busca.
+   * Fallback SearchLyrics só é executado se o erro indicar ação desconhecida ou endpoint inexistente (NÃO em TIMEOUT_HOLYRICS ou CONNECTION_REFUSED).
    */
   public async searchSong(
     query: string,
@@ -185,16 +187,16 @@ export class HolyricsClient {
     keys?: string[]
     rawResponse?: string
     endpointUsed?: string
+    payloadSent?: Record<string, any>
   }> {
-    const payload = {
-      text: query,
-      title: options.title ?? true,
-      artist: options.artist ?? true,
-      lyrics: options.lyrics ?? false,
-      fields: 'id,title,artist,author,key,bpm,archived',
-    }
+    // Chamada PRIMÁRIA: payload oficial mínimo { text: query }
+    // Não enviamos fields, title, artist, lyrics por padrão
+    const minimalPayload: Record<string, any> = { text: query }
+    if (options.title !== undefined) minimalPayload.title = options.title
+    if (options.artist !== undefined) minimalPayload.artist = options.artist
+    if (options.lyrics !== undefined) minimalPayload.lyrics = options.lyrics
 
-    const res = await this.request<HolyricsSongItem[]>('SearchSong', payload, 3000)
+    const res = await this.request<HolyricsSongItem[]>('SearchSong', minimalPayload, 3000)
 
     if (res.status === 'ok') {
       const list = Array.isArray(res.data) ? res.data : []
@@ -207,6 +209,7 @@ export class HolyricsClient {
         keys,
         rawResponse: res.rawText,
         endpointUsed: 'SearchSong',
+        payloadSent: minimalPayload,
       }
     }
 
@@ -221,7 +224,12 @@ export class HolyricsClient {
       res.httpStatus === 404
 
     if (isUnknownAction && errStr !== 'TIMEOUT_HOLYRICS') {
-      const fallbackRes = await this.request<HolyricsSongItem[]>('SearchLyrics', payload, 3000)
+      const fallbackPayload: Record<string, any> = { text: query }
+      const fallbackRes = await this.request<HolyricsSongItem[]>(
+        'SearchLyrics',
+        fallbackPayload,
+        3000,
+      )
       if (fallbackRes.status === 'ok') {
         const list = Array.isArray(fallbackRes.data) ? fallbackRes.data : []
         const keys =
@@ -236,6 +244,7 @@ export class HolyricsClient {
           keys,
           rawResponse: fallbackRes.rawText,
           endpointUsed: 'SearchLyrics',
+          payloadSent: fallbackPayload,
         }
       }
 
@@ -251,6 +260,7 @@ export class HolyricsClient {
         httpStatus: fallbackRes.httpStatus,
         rawResponse: fallbackRes.rawText,
         endpointUsed: 'SearchLyrics',
+        payloadSent: fallbackPayload,
       }
     }
 
@@ -262,11 +272,15 @@ export class HolyricsClient {
       httpStatus: res.httpStatus,
       rawResponse: res.rawText,
       endpointUsed: 'SearchSong',
+      payloadSent: minimalPayload,
     }
   }
 
   /**
    * Executa diagnóstico SearchSong para a interface local
+   * Utiliza a chamada oficial mínima { text: query } e retorna detalhes técnicos completos:
+   * endpoint, método, payload, status HTTP, rawText (até 2000 chars), parsedJson, contagem, primeiro item.
+   * Se retornar 0 resultados com status ok, informa causa técnica precisa sem falso positivo.
    */
   public async diagnoseSearchSong(
     query: string,
@@ -354,17 +368,23 @@ export class HolyricsClient {
       })
     }
 
-    // Etapa 4: SearchSong (Busca real)
+    // Etapa 4: SearchSong (Busca real com chamada oficial mínima { text: query })
     const payload = {
       text: query,
-      title: true,
-      artist: true,
-      lyrics: false,
-      fields: 'id,title,artist,author,key,bpm,archived',
     }
 
     const res = await this.request<HolyricsSongItem[]>('SearchSong', payload, 3000)
     const list = Array.isArray(res.data) ? res.data : []
+    const firstMatch = list.length > 0 ? list[0] : undefined
+    const firstMatchSummary = firstMatch
+      ? {
+          id: firstMatch.id,
+          title: firstMatch.title,
+          artist: firstMatch.artist,
+          author: firstMatch.author,
+        }
+      : undefined
+
     const errStr = res.error
       ? typeof res.error === 'string'
         ? res.error
@@ -377,6 +397,10 @@ export class HolyricsClient {
 
     if (res.status === 'ok') {
       searchStepStatus = 'OK'
+      if (list.length === 0 && !technicalCause) {
+        technicalCause =
+          'Resposta válida (status ok) com 0 resultados para payload mínimo {text}. Se a busca nativa do Holyrics encontra a música, verificar se o item está arquivado ou em categoria não pesquisada.'
+      }
     } else if (errStr === 'TIMEOUT_HOLYRICS') {
       searchStepStatus = 'TIMEOUT'
       searchStepCause = 'Tempo limite excedido na chamada SearchSong ao Holyrics (>= 3000ms).'
@@ -399,6 +423,15 @@ export class HolyricsClient {
       technicalCause: searchStepCause,
     })
 
+    let parsedJson: any = null
+    try {
+      if (res.rawText) {
+        parsedJson = JSON.parse(res.rawText)
+      }
+    } catch (_) {
+      parsedJson = null
+    }
+
     return {
       endpoint: `${this.getBaseUrl()}/api/SearchSong`,
       method: 'POST',
@@ -412,6 +445,8 @@ export class HolyricsClient {
       matches: list,
       checklist,
       technicalCause,
+      parsedJson,
+      firstMatch: firstMatchSummary,
     }
   }
 

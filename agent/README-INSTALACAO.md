@@ -68,7 +68,7 @@ Abra o seu navegador de internet (Chrome, Edge, Firefox) e acesse:
 No painel local, utilize a seção **"Diagnóstico de Busca (SearchSong)"**:
 
 - Digite o título de uma música (ex.: `Oceanos` ou `Jesus em tua presença`) e clique em **[Diagnosticar SearchSong]**.
-- O Agent fará uma chamada HTTP real à porta 8091 do Holyrics e mostrará em tempo real:
+- O Agent fará uma chamada HTTP real à porta 8091 do Holyrics utilizando o payload oficial mínimo `{ text: "..." }` e mostrará em tempo real:
   - **Checklist por etapa:**
     - `Agent → OK`
     - `Holyrics API → OK`
@@ -76,11 +76,11 @@ No painel local, utilize a seção **"Diagnóstico de Busca (SearchSong)"**:
     - `Autenticação → OK`
     - `SearchSong → OK / TIMEOUT / ERROR`
   - **Tempo por etapa** e **tempo total** em milissegundos.
-  - **Causa técnica identificada** detalhada quando houver falha (ex.: timeout na API do Holyrics, erro HTTP, token não autorizado).
+  - **Causa técnica identificada** detalhada quando houver falha ou 0 resultados (ex.: timeout na API do Holyrics, erro HTTP, token não autorizado, ou indicação para verificar se o item está arquivado ou em categoria não pesquisada no Holyrics).
   - **Endpoint utilizado** (sem expor o token de acesso).
-  - **Método HTTP** (POST) e payload enviado.
+  - **Método HTTP** (POST) e payload enviado (mínimo `{ text }`).
   - **Status HTTP** retornado (ex: 200).
-  - **Quantidade de resultados** encontrados no banco de dados do Holyrics.
+  - **Quantidade de resultados** encontrados no banco de dados do Holyrics e primeiro resultado sumarizado.
   - **JSON bruto** retornado pelo Holyrics.
 - **Segurança:** O token de acesso NUNCA aparece na interface do diagnóstico nem nos registros de log no console.
 

@@ -21,6 +21,9 @@ describe('Holyrics SearchSong Parser & Respostas (0, 1, N resultados)', () => {
     expect(res.success).toBe(true)
     expect(res.matches).toEqual([])
     expect(res.matches.length).toBe(0)
+    // Confirma payload mínimo enviado { text: 'Musica Inexistente' }
+    expect(res.payloadSent).toEqual({ text: 'Musica Inexistente' })
+    expect(res.payloadSent?.fields).toBeUndefined()
   })
 
   it('Parser com 1 resultado: retorna exatamente 1 match', async () => {
@@ -100,11 +103,42 @@ describe('Holyrics SearchSong Parser & Respostas (0, 1, N resultados)', () => {
     expect(diag.method).toBe('POST')
     expect(diag.httpStatus).toBe(200)
     expect(diag.count).toBe(1)
-    expect(diag.payloadSent.text).toBe('Graça')
+    // Payload mínimo oficial { text: 'Graça' }
+    expect(diag.payloadSent).toEqual({ text: 'Graça' })
+    expect(diag.firstMatch?.id).toBe('999')
+    expect(diag.firstMatch?.title).toBe('Graça')
+    expect(diag.parsedJson).toBeDefined()
     expect(diag.checklist).toBeDefined()
     expect(diag.checklist?.length).toBeGreaterThanOrEqual(4)
     expect(diag.checklist?.some((s) => s.label === 'Agent' && s.status === 'OK')).toBe(true)
     expect(diag.checklist?.some((s) => s.label === 'SearchSong' && s.status === 'OK')).toBe(true)
+  })
+
+  it('Diagnosticar SearchSong com 0 resultados inclui technicalCause explicativo sem falso erro', async () => {
+    const client = new HolyricsClient('127.0.0.1', 8091, 'secret-local-token')
+    globalThis.fetch = vi.fn().mockImplementation((url) => {
+      const u = String(url)
+      if (u.includes('GetTokenInfo')) {
+        return Promise.resolve({
+          status: 200,
+          ok: true,
+          text: async () => JSON.stringify({ status: 'ok', data: { version: '2.30.0' } }),
+        } as any)
+      }
+      return Promise.resolve({
+        status: 200,
+        ok: true,
+        text: async () => JSON.stringify({ status: 'ok', data: [] }),
+      } as any)
+    })
+
+    const diag = await client.diagnoseSearchSong('MusicaQueNaoExiste')
+    expect(diag.status).toBe('ok')
+    expect(diag.count).toBe(0)
+    expect(diag.payloadSent).toEqual({ text: 'MusicaQueNaoExiste' })
+    expect(diag.technicalCause).toContain('Resposta válida (status ok) com 0 resultados')
+    const searchStep = diag.checklist?.find((s) => s.label === 'SearchSong')
+    expect(searchStep?.status).toBe('OK')
   })
 
   it('Diagnosticar SearchSong com TIMEOUT inclui checklist com status TIMEOUT e causa técnica', async () => {
