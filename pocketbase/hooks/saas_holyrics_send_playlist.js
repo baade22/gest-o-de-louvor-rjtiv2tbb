@@ -183,13 +183,13 @@ routerAdd(
 
       $app.save(addCmd)
 
-      // Aguarda resposta do Agent (até 4.5s)
+      // Aguarda resposta do Agent (até 10s)
       const startWait = Date.now()
       let finalStatus = 'PENDING'
       let cmdResult = null
       let cmdError = ''
 
-      while (Date.now() - startWait < 4500) {
+      while (Date.now() - startWait < 10000) {
         try {
           const check = $app.findRecordById('holyrics_commands', addCmd.id)
           const st = check.getString('status')
@@ -203,7 +203,10 @@ routerAdd(
             break
           }
         } catch (_) {}
-        $security.randomString(5)
+        // Loop a cada ~300ms
+        for (let k = 0; k < 60; k++) {
+          $security.randomString(5)
+        }
       }
 
       if (finalStatus === 'DONE') {
@@ -233,7 +236,8 @@ routerAdd(
         success: true,
         pending: true,
         command_id: addCmdId,
-        message: `Comando enviado ao computador. Verifique no Holyrics se "${songTitle}" foi adicionada à playlist.`,
+        poll_url: `/backend/v1/holyrics/commands/${addCmdId}/status`,
+        message: 'Ainda aguardando o computador do Holyrics executar a adição. Verificando...',
       })
     }
 
@@ -256,13 +260,13 @@ routerAdd(
 
     $app.save(searchCmd)
 
-    // Aguarda resposta do Agent (até 4.5s)
+    // Aguarda resposta do Agent (até 10s)
     const startWait = Date.now()
     let searchStatus = 'PENDING'
     let searchResult = null
     let searchError = ''
 
-    while (Date.now() - startWait < 4500) {
+    while (Date.now() - startWait < 10000) {
       try {
         const check = $app.findRecordById('holyrics_commands', searchCmd.id)
         const st = check.getString('status')
@@ -276,7 +280,10 @@ routerAdd(
           break
         }
       } catch (_) {}
-      $security.randomString(5)
+      // Loop a cada ~300ms
+      for (let k = 0; k < 60; k++) {
+        $security.randomString(5)
+      }
     }
 
     if (searchStatus === 'FAILED') {
@@ -295,7 +302,8 @@ routerAdd(
         success: false,
         pending: true,
         command_id: searchCmdId,
-        message: 'Tempo esgotado aguardando busca no Holyrics. Tente novamente.',
+        poll_url: `/backend/v1/holyrics/commands/${searchCmdId}/status`,
+        message: 'Ainda aguardando o computador do Holyrics executar a busca. Verificando...',
       })
     }
 
@@ -335,13 +343,13 @@ routerAdd(
 
       $app.save(autoAddCmd)
 
-      // Aguarda até 4.5s
+      // Aguarda até 10s
       const waitAddStart = Date.now()
       let autoAddStatus = 'PENDING'
       let autoAddResult = null
       let autoAddError = ''
 
-      while (Date.now() - waitAddStart < 4500) {
+      while (Date.now() - waitAddStart < 10000) {
         try {
           const check = $app.findRecordById('holyrics_commands', autoAddCmd.id)
           const st = check.getString('status')
@@ -355,7 +363,9 @@ routerAdd(
             break
           }
         } catch (_) {}
-        $security.randomString(5)
+        for (let k = 0; k < 60; k++) {
+          $security.randomString(5)
+        }
       }
 
       if (autoAddStatus === 'DONE') {
@@ -385,7 +395,8 @@ routerAdd(
         success: true,
         pending: true,
         command_id: autoAddCmdId,
-        message: `Comando enviado. Confirmando adição de "${songTitle}" na playlist do Holyrics...`,
+        poll_url: `/backend/v1/holyrics/commands/${autoAddCmdId}/status`,
+        message: 'Ainda aguardando o computador do Holyrics executar a adição. Verificando...',
       })
     }
 

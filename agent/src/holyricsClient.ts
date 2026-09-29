@@ -32,7 +32,7 @@ export class HolyricsClient {
   public async request<T = any>(
     action: string,
     data: Record<string, any> = {},
-    timeoutMs = 4000,
+    timeoutMs = 3000,
   ): Promise<HolyricsApiResponse<T>> {
     const cleanAction = action.replace(/^\/+/, '')
     const url = new URL(`${this.getBaseUrl()}/api/${cleanAction}`)
@@ -42,6 +42,7 @@ export class HolyricsClient {
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const startReqTime = Date.now()
 
     try {
       const res = await fetch(url.toString(), {
@@ -55,29 +56,46 @@ export class HolyricsClient {
       })
 
       clearTimeout(timer)
+      const durationMs = Date.now() - startReqTime
+      const rawText = await res.text()
 
       let json: any = null
       try {
-        json = await res.json()
+        json = JSON.parse(rawText)
       } catch (_) {
         return {
           status: 'error',
           error: `Resposta não é JSON válido (HTTP ${res.status})`,
+          httpStatus: res.status,
+          durationMs,
+          rawText: rawText.slice(0, 2000),
         }
       }
 
-      return json as HolyricsApiResponse<T>
+      return {
+        ...(json as HolyricsApiResponse<T>),
+        httpStatus: res.status,
+        durationMs,
+        rawText: rawText.slice(0, 2000),
+      }
     } catch (err: any) {
       clearTimeout(timer)
+      const durationMs = Date.now() - startReqTime
       if (err.name === 'AbortError') {
         return {
           status: 'error',
           error: 'TIMEOUT_HOLYRICS',
+          httpStatus: 0,
+          durationMs,
+          rawText: 'Request aborted due to timeout',
         }
       }
       return {
         status: 'error',
         error: err.code || err.message || 'CONNECTION_REFUSED',
+        httpStatus: 0,
+        durationMs,
+        rawText: err.message || String(err),
       }
     }
   }
@@ -152,11 +170,22 @@ export class HolyricsClient {
 
   /**
    * SearchSong: Busca músicas no acervo local do Holyrics
+   * Timeout por chamada: 3000ms.
+   * Fallback SearchLyrics só executado se o erro indicar ação desconhecida ou endpoint inexistente (NÃO em TIMEOUT_HOLYRICS).
    */
   public async searchSong(
     query: string,
     options: { title?: boolean; artist?: boolean; lyrics?: boolean } = {},
-  ): Promise<{ success: boolean; matches: HolyricsSongItem[]; error?: string }> {
+  ): Promise<{
+    success: boolean
+    matches: HolyricsSongItem[]
+    error?: string
+    durationMs?: number
+    httpStatus?: number
+    keys?: string[]
+    rawResponse?: string
+    endpointUsed?: string
+  }> {
     const payload = {
       text: query,
       title: options.title ?? true,
@@ -165,30 +194,110 @@ export class HolyricsClient {
       fields: 'id,title,artist,author,key,bpm,archived',
     }
 
-    const res = await this.request<HolyricsSongItem[]>('SearchSong', payload)
+    const res = await this.request<HolyricsSongItem[]>('SearchSong', payload, 3000)
+
     if (res.status === 'ok') {
       const list = Array.isArray(res.data) ? res.data : []
+      const keys = res.data && typeof res.data === 'object' ? Object.keys(res.data) : []
       return {
         success: true,
         matches: list,
-      }
-    }
-
-    // Fallback: tenta SearchLyrics se SearchSong não existir
-    const fallbackRes = await this.request<HolyricsSongItem[]>('SearchLyrics', payload)
-    if (fallbackRes.status === 'ok') {
-      const list = Array.isArray(fallbackRes.data) ? fallbackRes.data : []
-      return {
-        success: true,
-        matches: list,
+        durationMs: res.durationMs,
+        httpStatus: res.httpStatus,
+        keys,
+        rawResponse: res.rawText,
+        endpointUsed: 'SearchSong',
       }
     }
 
     const errStr = typeof res.error === 'string' ? res.error : res.error?.message || 'Erro na busca'
+
+    // Fallback para SearchLyrics APENAS se erro for de ação desconhecida / endpoint inexistente / 404
+    // NUNCA executar fallback se for TIMEOUT_HOLYRICS ou CONNECTION_REFUSED
+    const isUnknownAction =
+      errStr.toLowerCase().includes('action') ||
+      errStr.toLowerCase().includes('not found') ||
+      errStr.toLowerCase().includes('unknown') ||
+      res.httpStatus === 404
+
+    if (isUnknownAction && errStr !== 'TIMEOUT_HOLYRICS') {
+      const fallbackRes = await this.request<HolyricsSongItem[]>('SearchLyrics', payload, 3000)
+      if (fallbackRes.status === 'ok') {
+        const list = Array.isArray(fallbackRes.data) ? fallbackRes.data : []
+        const keys =
+          fallbackRes.data && typeof fallbackRes.data === 'object'
+            ? Object.keys(fallbackRes.data)
+            : []
+        return {
+          success: true,
+          matches: list,
+          durationMs: (res.durationMs || 0) + (fallbackRes.durationMs || 0),
+          httpStatus: fallbackRes.httpStatus,
+          keys,
+          rawResponse: fallbackRes.rawText,
+          endpointUsed: 'SearchLyrics',
+        }
+      }
+
+      const fallbackErr =
+        typeof fallbackRes.error === 'string'
+          ? fallbackRes.error
+          : fallbackRes.error?.message || errStr
+      return {
+        success: false,
+        matches: [],
+        error: fallbackErr,
+        durationMs: (res.durationMs || 0) + (fallbackRes.durationMs || 0),
+        httpStatus: fallbackRes.httpStatus,
+        rawResponse: fallbackRes.rawText,
+        endpointUsed: 'SearchLyrics',
+      }
+    }
+
     return {
       success: false,
       matches: [],
       error: errStr,
+      durationMs: res.durationMs,
+      httpStatus: res.httpStatus,
+      rawResponse: res.rawText,
+      endpointUsed: 'SearchSong',
+    }
+  }
+
+  /**
+   * Executa diagnóstico SearchSong para a interface local
+   */
+  public async diagnoseSearchSong(
+    query: string,
+  ): Promise<import('./types.js').SearchSongDiagnosticResult> {
+    const payload = {
+      text: query,
+      title: true,
+      artist: true,
+      lyrics: false,
+      fields: 'id,title,artist,author,key,bpm,archived',
+    }
+
+    const res = await this.request<HolyricsSongItem[]>('SearchSong', payload, 3000)
+    const list = Array.isArray(res.data) ? res.data : []
+    const errStr = res.error
+      ? typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Erro'
+      : undefined
+
+    return {
+      endpoint: `${this.getBaseUrl()}/api/SearchSong`,
+      method: 'POST',
+      payloadSent: payload,
+      httpStatus: res.httpStatus || 0,
+      durationMs: res.durationMs || 0,
+      count: list.length,
+      rawResponse: (res.rawText || '').slice(0, 2000),
+      status: res.status,
+      error: errStr,
+      matches: list,
     }
   }
 

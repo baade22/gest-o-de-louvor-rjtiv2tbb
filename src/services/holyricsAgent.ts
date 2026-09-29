@@ -55,10 +55,25 @@ export interface SendToPlaylistResponse {
   matches?: HolyricsMatchSong[]
   holyrics_song_id?: string
   agent_id?: string
+  command_id?: string
+  poll_url?: string
+  result?: any
   error?: string
   error_code?: string
   message: string
   pending?: boolean
+}
+
+export interface HolyricsCommandStatusResponse {
+  success: boolean
+  command_id: string
+  action: string
+  status: 'PENDING' | 'SENT' | 'DONE' | 'FAILED'
+  result?: any
+  error?: string
+  created_at?: string
+  executed_at?: string
+  message?: string
 }
 
 /**
@@ -116,4 +131,18 @@ export async function sendSongToHolyricsPlaylist(params: {
       chosen_holyrics_id: params.chosenHolyricsId,
     },
   })
+}
+
+/**
+ * Consulta o status atual de um comando do Holyrics (polling)
+ */
+export async function getHolyricsCommandStatus(
+  commandId: string,
+): Promise<HolyricsCommandStatusResponse> {
+  return pb.send<HolyricsCommandStatusResponse>(
+    `/backend/v1/holyrics/commands/${encodeURIComponent(commandId)}/status`,
+    {
+      method: 'GET',
+    },
+  )
 }

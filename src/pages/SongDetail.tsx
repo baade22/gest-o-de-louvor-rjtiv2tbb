@@ -46,7 +46,11 @@ import {
   removeVideoFromSong,
 } from '@/services/songVideos'
 import { getYouTubeEmbedUrl, extractYouTubeVideoId, YouTubeSearchResult } from '@/services/youtube'
-import { sendSongToHolyricsPlaylist, type HolyricsMatchSong } from '@/services/holyricsAgent'
+import {
+  sendSongToHolyricsPlaylist,
+  getHolyricsCommandStatus,
+  type HolyricsMatchSong,
+} from '@/services/holyricsAgent'
 import {
   Dialog,
   DialogContent,
@@ -230,22 +234,109 @@ export default function SongDetail() {
     }
   }
 
-  // Enviar música para o Holyrics via LouvorFlow Agent
+  // Enviar música para o Holyrics via LouvorFlow Agent com polling automático
   const handleSendToHolyrics = async (chosenId?: string) => {
     if (!song || !currentChurch) return
     setIsSendingToHolyrics(true)
 
     try {
-      const res = await sendSongToHolyricsPlaylist({
+      let res = await sendSongToHolyricsPlaylist({
         churchId: currentChurch.id,
         songId: song.id,
         agentId: activeHolyricsAgentId,
         chosenHolyricsId: chosenId,
       })
 
+      // Se a resposta retornar pending=true e tiver command_id, faz polling automático a cada 2s até 30s
+      if (res.pending && res.command_id) {
+        toast({
+          title: 'Enviando ao Holyrics...',
+          description: 'Aguardando o computador da projeção executar a solicitação.',
+        })
+
+        const commandId = res.command_id
+        const startTime = Date.now()
+        let pollSuccess = false
+
+        while (Date.now() - startTime < 30000) {
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+
+          try {
+            const statusRes = await getHolyricsCommandStatus(commandId)
+            if (statusRes.status === 'DONE') {
+              pollSuccess = true
+              const cmdResult = statusRes.result || {}
+              if (statusRes.action === 'ADD_TO_PLAYLIST') {
+                res = {
+                  success: true,
+                  added: true,
+                  message: `✓ Música "${song.title}" adicionada com sucesso à playlist do Holyrics!`,
+                }
+              } else if (statusRes.action === 'SEARCH_SONG') {
+                const matches = Array.isArray(cmdResult.matches) ? cmdResult.matches : []
+                if (matches.length === 0) {
+                  res = {
+                    success: false,
+                    error_code: 'SONG_NOT_FOUND_IN_HOLYRICS',
+                    message: `⚠️ Música não encontrada no Holyrics: "${song.title}". Cadastre ou importe a letra no programa Holyrics primeiro.`,
+                  }
+                } else if (matches.length === 1) {
+                  // Se retornou 1 match no polling, prossegue adicionando automaticamente
+                  const autoAddRes = await sendSongToHolyricsPlaylist({
+                    churchId: currentChurch.id,
+                    songId: song.id,
+                    agentId: activeHolyricsAgentId,
+                    chosenHolyricsId: String(matches[0].id),
+                  })
+                  res = autoAddRes
+                } else {
+                  res = {
+                    success: true,
+                    requires_selection: true,
+                    matches: matches.map((m: any) => ({
+                      id: String(m.id),
+                      title: m.title || 'Sem título',
+                      artist: m.artist || '',
+                      key: m.key || '',
+                      bpm: m.bpm || 0,
+                    })),
+                    matches_count: matches.length,
+                    message: `Encontradas ${matches.length} músicas no Holyrics para "${song.title}". Selecione qual deseja enviar à playlist.`,
+                  }
+                }
+              }
+              break
+            } else if (statusRes.status === 'FAILED') {
+              pollSuccess = true
+              res = {
+                success: false,
+                error: statusRes.error,
+                message:
+                  statusRes.error ||
+                  'Comando falhou ao executar no Holyrics. Verifique permissões do API Server.',
+              }
+              break
+            }
+          } catch (_) {
+            // Continua tentando até os 30s
+          }
+        }
+
+        if (!pollSuccess) {
+          toast({
+            title: 'Tempo limite excedido',
+            description:
+              'O LouvorFlow Agent não retornou o resultado em 30s. Abra o painel local (http://localhost:8765) no computador do Holyrics, utilize o botão "Diagnosticar SearchSong" e certifique-se de que o aplicativo está rodando.',
+            variant: 'destructive',
+          })
+          setIsSendingToHolyrics(false)
+          return
+        }
+      }
+
       if (res.requires_selection && res.matches && res.matches.length > 1) {
         setHolyricsCandidates(res.matches)
-        setActiveHolyricsAgentId(res.agent_id)
+        if (res.agent_id) setActiveHolyricsAgentId(res.agent_id)
         setSelectedCandidateId(res.matches[0].id)
         setHolyricsCandidatesModal(true)
         toast({

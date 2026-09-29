@@ -64,6 +64,24 @@ O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no com
 
 ---
 
+## 🔍 Diagnóstico de SearchSong (Novo)
+
+O painel local (`http://localhost:8765`) possui uma ferramenta dedicada para testar a busca de músicas no Holyrics em tempo real:
+
+- **O que é:** Executa uma chamada HTTP **real** (sem mock, sem simulação) do Agent contra o Holyrics local (`http://127.0.0.1:8091/api/SearchSong`) usando o token configurado.
+- **Quando usar:**
+  - Sempre que ao clicar em "Enviar para playlist do Holyrics" no SaaS a música demorar a responder ou o SaaS relatar tempo esgotado.
+  - Para verificar se o Holyrics está ativo, se a permissão `SearchSong` está habilitada no token do Holyrics e se o acervo local contém a canção.
+- **Como interpretar os resultados na tela:**
+  - **Endpoint utilizado:** Exibe `http://127.0.0.1:8091/api/SearchSong` (o token de autenticação **nunca** é exibido na tela nem aparece nos logs locais, preservando a segurança).
+  - **Método HTTP:** `POST`.
+  - **Status HTTP:** Deve ser `200 (OK)`. Se retornar 401 ou erro de token, revise as permissões em Menu Arquivo > Configurações > API Server no Holyrics.
+  - **Tempo de resposta:** Tempo em milissegundos da resposta local (geralmente menor que 100ms).
+  - **Músicas encontradas:** Quantidade de itens correspondentes encontrados no acervo do Holyrics.
+  - **Resposta Retornada:** Trecho do JSON bruto recebido do Holyrics para conferência imediata.
+
+---
+
 ## 🎵 Enviar Músicas para a Playlist
 
 1. No LouvorFlow, abra qualquer música cadastrada.

@@ -8,6 +8,7 @@
     "start": "vite dev",
     "dev": "vite",
     "prebuild": "node -e \"import('./src/buildZipScript.mjs')\"",
+    "build:agent": "tsc -p agent/tsconfig.json",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "oxlint src",

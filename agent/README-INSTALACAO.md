@@ -63,7 +63,21 @@ Abra o seu navegador de internet (Chrome, Edge, Firefox) e acesse:
 4. Clique em **[Salvar Configurações]**.
 5. Clique em **[Testar Conexão Holyrics]**. A caixa de status mudará para **🟢 Conectada (OK)**.
 
-### 2. Parear com o LouvorFlow
+### 2. Diagnóstico de Busca (SearchSong)
+
+No painel local, utilize a seção **"Diagnóstico de Busca (SearchSong)"**:
+
+- Digite o título de uma música (ex.: `Oceanos` ou `Jesus em tua presença`) e clique em **[Diagnosticar SearchSong]**.
+- O Agent fará uma chamada HTTP real à porta 8091 do Holyrics e mostrará em tempo real:
+  - **Endpoint utilizado** (sem expor o token de acesso).
+  - **Método HTTP** (POST) e payload enviado.
+  - **Status HTTP** retornado (ex: 200).
+  - **Tempo de resposta** (em milissegundos).
+  - **Quantidade de resultados** encontrados no banco de dados do Holyrics.
+  - **JSON bruto** retornado pelo Holyrics.
+- **Segurança:** O token de acesso NUNCA aparece na interface do diagnóstico nem nos registros de log no console.
+
+### 3. Parear com o LouvorFlow
 
 1. No navegador, acesse o LouvorFlow SaaS da sua igreja:
    - Vá em **Configurações → Integrações → Holyrics**.

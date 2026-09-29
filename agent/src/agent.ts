@@ -160,6 +160,24 @@ export class LouvorFlowAgent {
   }
 
   /**
+   * Diagnóstico do SearchSong solicitado pelo usuário
+   */
+  public async diagnoseSearchSong(query: string) {
+    const timestamp = new Date().toISOString()
+    console.log(
+      `[Agent Diagnostic] [${timestamp}] Executando diagnóstico real SearchSong para query: "${query}"`,
+    )
+    const result = await this.holyrics.diagnoseSearchSong(query)
+    console.log(
+      `[Agent Diagnostic] Endpoint: ${result.endpoint} | Status HTTP: ${result.httpStatus} | Duração: ${result.durationMs}ms | Resultados: ${result.count}`,
+    )
+    if (result.error) {
+      console.log(`[Agent Diagnostic] Erro retornado: ${result.error}`)
+    }
+    return result
+  }
+
+  /**
    * Inicia loops em background
    */
   public start() {
@@ -259,6 +277,9 @@ export class LouvorFlowAgent {
 
       const commands: AgentCommand[] = data.commands || []
       for (const cmd of commands) {
+        console.log(
+          `[Agent] [${new Date().toISOString()}] Comando recebido via poll: action="${cmd.action}", command_id="${cmd.command_id}"`,
+        )
         await this.executeCommand(cmd)
       }
     } catch (err: any) {
@@ -271,11 +292,21 @@ export class LouvorFlowAgent {
    */
   private async executeCommand(cmd: AgentCommand) {
     const startTime = Date.now()
-    console.log(`[Agent] Executando comando ${cmd.action} (id: ${cmd.command_id})...`)
+    const timestampStart = new Date().toISOString()
+    console.log(
+      JSON.stringify({
+        timestamp: timestampStart,
+        event: 'command_start',
+        command_id: cmd.command_id,
+        operation: cmd.action,
+        status: 'RUNNING',
+      }),
+    )
 
     let status: 'DONE' | 'FAILED' = 'DONE'
     let resultPayload: any = {}
     let errorMsg = ''
+    let errorCode: string | undefined = undefined
 
     try {
       switch (cmd.action) {
@@ -291,6 +322,7 @@ export class LouvorFlowAgent {
           } else {
             status = 'FAILED'
             errorMsg = testRes.error || 'Holyrics indisponível.'
+            errorCode = testRes.code
             resultPayload = { error_code: testRes.code }
           }
           break
@@ -301,6 +333,7 @@ export class LouvorFlowAgent {
           if (!query) {
             status = 'FAILED'
             errorMsg = 'Parâmetro query ausente.'
+            errorCode = 'MISSING_QUERY'
             break
           }
           const searchRes = await this.holyrics.searchSong(query, {
@@ -308,6 +341,11 @@ export class LouvorFlowAgent {
             artist: true,
             lyrics: false,
           })
+
+          console.log(
+            `[Agent] [${new Date().toISOString()}] SEARCH_SONG executado via Holyrics endpoint "${searchRes.endpointUsed || 'SearchSong'}": duração=${searchRes.durationMs}ms, HTTP=${searchRes.httpStatus}, resultados=${searchRes.matches?.length ?? 0}, chaves_json=${JSON.stringify(searchRes.keys || [])}`,
+          )
+
           if (searchRes.success) {
             status = 'DONE'
             resultPayload = {
@@ -317,6 +355,8 @@ export class LouvorFlowAgent {
           } else {
             status = 'FAILED'
             errorMsg = searchRes.error || 'Erro ao buscar no Holyrics.'
+            errorCode =
+              searchRes.error === 'TIMEOUT_HOLYRICS' ? 'TIMEOUT_HOLYRICS' : 'SEARCH_FAILED'
           }
           break
         }
@@ -326,6 +366,7 @@ export class LouvorFlowAgent {
           if (!holyricsSongId) {
             status = 'FAILED'
             errorMsg = 'holyrics_song_id não informado no payload.'
+            errorCode = 'MISSING_SONG_ID'
             break
           }
           const addRes = await this.holyrics.addToPlaylist(holyricsSongId)
@@ -339,6 +380,7 @@ export class LouvorFlowAgent {
           } else {
             status = 'FAILED'
             errorMsg = addRes.error || 'Falha ao adicionar à playlist.'
+            errorCode = 'ADD_PLAYLIST_FAILED'
           }
           break
         }
@@ -346,21 +388,33 @@ export class LouvorFlowAgent {
         default:
           status = 'FAILED'
           errorMsg = `Ação desconhecida: ${cmd.action}`
+          errorCode = 'UNKNOWN_ACTION'
       }
     } catch (err: any) {
       status = 'FAILED'
       errorMsg = err.message || 'Erro inesperado na execução do comando.'
+      errorCode = err.code || 'UNEXPECTED_ERROR'
     }
 
     const duration = Date.now() - startTime
+    const timestampEnd = new Date().toISOString()
+
     console.log(
-      `[Agent] Comando ${cmd.command_id} finalizado em ${duration}ms com status: ${status}`,
+      JSON.stringify({
+        timestamp: timestampEnd,
+        event: 'command_finish',
+        command_id: cmd.command_id,
+        operation: cmd.action,
+        status,
+        duration_ms: duration,
+        error_code: errorCode || null,
+      }),
     )
 
-    // Reporta resultado ao LouvorFlow
+    // Reporta resultado ao LouvorFlow com 1 retry simples (1s) em caso de falha de rede
     const reportUrl = `${this.config.saasUrl.replace(/\/+$/, '')}/backend/v1/agent/commands/${cmd.command_id}/result`
-    try {
-      await fetch(reportUrl, {
+    const sendReport = async (): Promise<boolean> => {
+      const res = await fetch(reportUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -374,8 +428,32 @@ export class LouvorFlowAgent {
           duration_ms: duration,
         }),
       })
+      return res.ok
+    }
+
+    try {
+      const ok = await sendReport()
+      if (!ok) {
+        console.warn(
+          `[Agent] Tentativa 1 de envio do resultado de ${cmd.command_id} retornou não-200. Tentando novamente em 1s...`,
+        )
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await sendReport()
+      }
     } catch (err: any) {
-      console.error(`[Agent] Erro ao enviar resultado do comando ${cmd.command_id}:`, err.message)
+      console.warn(
+        `[Agent] Falha de rede ao enviar resultado do comando ${cmd.command_id}: ${err.message}. Tentando novamente em 1s...`,
+      )
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await sendReport()
+        console.log(`[Agent] Resultado do comando ${cmd.command_id} entregue com sucesso no retry.`)
+      } catch (retryErr: any) {
+        console.error(
+          `[Agent] Falha definitiva no retry ao enviar resultado do comando ${cmd.command_id}:`,
+          retryErr.message,
+        )
+      }
     }
   }
 }

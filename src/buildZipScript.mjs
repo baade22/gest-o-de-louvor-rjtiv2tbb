@@ -1,6 +1,15 @@
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
+
+// Garante compilação do TypeScript do Agent antes de empacotar no ZIP
+try {
+  execSync('npx tsc -p agent/tsconfig.json', { stdio: 'inherit' })
+  console.log('[Agent Build] TypeScript do Agent compilado com sucesso para agent/dist/')
+} catch (err) {
+  console.error('[Agent Build] Erro ao compilar TypeScript do Agent:', err.message)
+}
 
 function createCrc32Table() {
   const table = new Uint32Array(256)

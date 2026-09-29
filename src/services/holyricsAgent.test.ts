@@ -18,6 +18,14 @@ describe('HolyricsClient Local Unit Tests', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       status: 200,
       ok: true,
+      text: async () =>
+        JSON.stringify({
+          status: 'ok',
+          data: {
+            version: '2.26.1',
+            permissions: 'SearchSong,AddLyricsToPlaylist,GetTokenInfo',
+          },
+        }),
       json: async () => ({
         status: 'ok',
         data: {
@@ -40,6 +48,11 @@ describe('HolyricsClient Local Unit Tests', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       status: 200,
       ok: true,
+      text: async () =>
+        JSON.stringify({
+          status: 'error',
+          error: 'invalid token',
+        }),
       json: async () => ({
         status: 'error',
         error: 'invalid token',
@@ -72,6 +85,19 @@ describe('HolyricsClient Local Unit Tests', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       status: 200,
       ok: true,
+      text: async () =>
+        JSON.stringify({
+          status: 'ok',
+          data: [
+            {
+              id: 'hly_101',
+              title: 'Bondade de Deus',
+              artist: 'Isaías Saad',
+              key: 'G',
+              bpm: 70,
+            },
+          ],
+        }),
       json: async () => ({
         status: 'ok',
         data: [
@@ -107,6 +133,11 @@ describe('HolyricsClient Local Unit Tests', () => {
       return Promise.resolve({
         status: 200,
         ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: 'ok',
+            data: { success: true },
+          }),
         json: async () => ({
           status: 'ok',
           data: { success: true },

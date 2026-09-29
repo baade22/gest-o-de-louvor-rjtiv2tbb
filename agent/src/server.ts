@@ -56,6 +56,32 @@ export function startAgentWebServer(agent: LouvorFlowAgent, port = 8765) {
       return
     }
 
+    // 3.1 API: POST /api/holyrics/diagnose-search
+    if (req.method === 'POST' && parsedUrl.pathname === '/api/holyrics/diagnose-search') {
+      let body = ''
+      req.on('data', (chunk) => (body += chunk))
+      req.on('end', async () => {
+        try {
+          const data = JSON.parse(body || '{}')
+          const query = String(data.query || '').trim()
+          if (!query) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(
+              JSON.stringify({ success: false, message: 'Nome da música (query) é obrigatório.' }),
+            )
+            return
+          }
+          const diagRes = await agent.diagnoseSearchSong(query)
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: true, ...diagRes }))
+        } catch (err: any) {
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: false, message: err.message }))
+        }
+      })
+      return
+    }
+
     // 4. API: POST /api/config
     if (req.method === 'POST' && parsedUrl.pathname === '/api/config') {
       let body = ''
@@ -213,6 +239,48 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
       <div id="testAlert" class="alert"></div>
     </div>
 
+    <!-- Diagnóstico de SearchSong no Holyrics -->
+    <div class="card">
+      <div class="card-title">
+        <span>Diagnóstico de Busca (SearchSong)</span>
+        <span class="logo-badge" style="background: #6366f1;">Tempo Real</span>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+        Executa uma chamada <strong>real</strong> contra o Holyrics configurado (sem mock) para verificar a resposta da busca de músicas e identificar permissões ou lentidão.
+      </p>
+
+      <div class="row">
+        <div class="form-group" style="flex: 2;">
+          <label>Nome da Música a Pesquisar</label>
+          <input type="text" id="diagQuery" placeholder="Ex: Oceanos ou Jesus em tua presença">
+        </div>
+        <div style="display: flex; align-items: flex-end; flex: 1;">
+          <button id="btnDiagnoseSearch" class="btn" style="width: 100%; height: 42px; background: #6366f1;">
+            Diagnosticar SearchSong
+          </button>
+        </div>
+      </div>
+
+      <div id="diagResultContainer" style="display: none; background: #0b1120; border: 1px solid var(--card-border); border-radius: 8px; padding: 14px; font-size: 0.8rem; line-height: 1.5;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+          <div><strong style="color: var(--text-muted);">Endpoint:</strong> <span id="diagEndpoint" style="color: #38bdf8;"></span></div>
+          <div><strong style="color: var(--text-muted);">Método HTTP:</strong> <span id="diagMethod">POST</span></div>
+          <div><strong style="color: var(--text-muted);">Status HTTP:</strong> <span id="diagHttpStatus"></span></div>
+          <div><strong style="color: var(--text-muted);">Tempo de Resposta:</strong> <span id="diagDuration"></span></div>
+          <div><strong style="color: var(--text-muted);">Músicas Encontradas:</strong> <span id="diagCount" style="font-weight: 700;"></span></div>
+          <div><strong style="color: var(--text-muted);">Status Interno:</strong> <span id="diagStatus"></span></div>
+        </div>
+        <div style="margin-top: 6px;">
+          <strong style="color: var(--text-muted);">Payload Enviado:</strong>
+          <pre id="diagPayload" style="background: #020617; padding: 8px; border-radius: 6px; overflow-x: auto; margin-top: 4px; font-size: 0.75rem; color: #cbd5e1;"></pre>
+        </div>
+        <div style="margin-top: 8px;">
+          <strong style="color: var(--text-muted);">Resposta Retornada (JSON/Raw):</strong>
+          <pre id="diagRawResponse" style="background: #020617; padding: 8px; border-radius: 6px; overflow-x: auto; margin-top: 4px; font-size: 0.75rem; color: #cbd5e1; max-height: 200px; white-space: pre-wrap; word-break: break-all;"></pre>
+        </div>
+      </div>
+    </div>
+
     <!-- Pareamento com o LouvorFlow -->
     <div class="card">
       <div class="card-title">Conectar ao LouvorFlow (Pareamento)</div>
@@ -274,6 +342,43 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
       el.innerText = msg;
       el.style.display = 'block';
     };
+
+    // Diagnosticar SearchSong
+    document.getElementById('btnDiagnoseSearch').addEventListener('click', async () => {
+      const btn = document.getElementById('btnDiagnoseSearch');
+      const query = document.getElementById('diagQuery').value.trim();
+      const container = document.getElementById('diagResultContainer');
+      if (!query) {
+        alert('Digite o nome da música para testar a busca no Holyrics.');
+        return;
+      }
+      btn.innerText = 'Consultando Holyrics...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/holyrics/diagnose-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        container.style.display = 'block';
+        document.getElementById('diagEndpoint').innerText = data.endpoint || 'http://127.0.0.1:8091/api/SearchSong';
+        document.getElementById('diagHttpStatus').innerText = data.httpStatus + (data.httpStatus === 200 ? ' (OK)' : '');
+        document.getElementById('diagHttpStatus').style.color = data.httpStatus === 200 ? 'var(--green)' : 'var(--red)';
+        document.getElementById('diagDuration').innerText = data.durationMs + ' ms';
+        document.getElementById('diagCount').innerText = data.count !== undefined ? data.count : 0;
+        document.getElementById('diagCount').style.color = data.count > 0 ? 'var(--green)' : 'var(--amber)';
+        document.getElementById('diagStatus').innerText = data.status || (data.success ? 'ok' : 'error');
+        document.getElementById('diagPayload').innerText = JSON.stringify(data.payloadSent || {}, null, 2);
+        document.getElementById('diagRawResponse').innerText = data.rawResponse || JSON.stringify(data, null, 2);
+      } catch (e) {
+        container.style.display = 'block';
+        document.getElementById('diagRawResponse').innerText = 'Erro ao executar diagnóstico: ' + e.message;
+      } finally {
+        btn.innerText = 'Diagnosticar SearchSong';
+        btn.disabled = false;
+      }
+    });
 
     // Testar Holyrics
     document.getElementById('btnTestHolyrics').addEventListener('click', async () => {

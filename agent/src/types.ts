@@ -29,6 +29,22 @@ export interface HolyricsApiResponse<T = any> {
   status: 'ok' | 'error'
   data?: T
   error?: string | { message?: string; [key: string]: any }
+  httpStatus?: number
+  durationMs?: number
+  rawText?: string
+}
+
+export interface SearchSongDiagnosticResult {
+  endpoint: string
+  method: string
+  payloadSent: Record<string, any>
+  httpStatus: number
+  durationMs: number
+  count: number
+  rawResponse: string
+  status: 'ok' | 'error'
+  error?: string
+  matches?: HolyricsSongItem[]
 }
 
 export interface HolyricsTokenInfo {

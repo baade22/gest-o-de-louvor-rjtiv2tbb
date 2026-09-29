@@ -57,6 +57,39 @@ routerAdd('POST', '/backend/v1/agent/commands/poll', (e) => {
     $app.save(agentRecord)
   } catch (_) {}
 
+  // Recuperação de comandos órfãos:
+  // Comandos deste agent com status='SENT', result vazio/nulo e criados há mais de 60 segundos
+  // voltam para PENDING para serem reentregues ao Agent
+  try {
+    const sixtySecsAgo = new Date(Date.now() - 60 * 1000)
+      .toISOString()
+      .replace('T', ' ')
+      .substring(0, 19)
+    const orphanRecords = $app.findRecordsByFilter(
+      'holyrics_commands',
+      'agent_id = {:agentId} && status = "SENT" && created < {:cutoff}',
+      'created',
+      20,
+      0,
+      { agentId: agentId, cutoff: sixtySecsAgo },
+    )
+
+    for (let j = 0; j < orphanRecords.length; j++) {
+      const orphan = orphanRecords[j]
+      const rawRes = orphan.get('result')
+      const hasResult =
+        rawRes !== null && rawRes !== undefined && rawRes !== '' && rawRes !== 'null'
+      if (!hasResult) {
+        orphan.set('status', 'PENDING')
+        try {
+          $app.save(orphan)
+        } catch (_) {}
+      }
+    }
+  } catch (errOrphan) {
+    // Continua para o poll normal mesmo se busca de órfãos falhar
+  }
+
   // Busca comandos PENDING para este agent_id
   let commands = []
   try {
