@@ -5,7 +5,9 @@ import path from 'node:path'
 describe('LouvorFlow Agent ZIP Asset Verification', () => {
   it('confirma existência e integridade do LouvorFlow-Agent-0.0.15.zip em public/', () => {
     const publicZip = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
-    expect(fs.existsSync(publicZip), 'LouvorFlow-Agent-0.0.15.zip deve existir em public/').toBe(true)
+    expect(fs.existsSync(publicZip), 'LouvorFlow-Agent-0.0.15.zip deve existir em public/').toBe(
+      true,
+    )
 
     const stat = fs.statSync(publicZip)
     expect(stat.size).toBeGreaterThan(5000)

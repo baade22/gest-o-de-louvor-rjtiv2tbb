@@ -11,6 +11,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Clock,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -329,7 +330,17 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
             </span>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            <a
+              href="/LouvorFlow-Agent-0.0.15.zip"
+              download="LouvorFlow-Agent-0.0.15.zip"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-purple-700 bg-slate-100 hover:bg-purple-50 rounded-xl transition-colors border border-slate-200"
+              title="Baixar pacote do LouvorFlow Agent para execução no computador local"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Baixar Agent (LouvorFlow-Agent-0.0.15.zip)
+            </a>
+
             {isAdmin && (
               <Button
                 onClick={handleOpenPairModal}
