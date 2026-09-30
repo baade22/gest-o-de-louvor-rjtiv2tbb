@@ -7,8 +7,27 @@ describe('packAgent test verification', () => {
     await import('../buildZipScript.mjs')
   })
 
-  it('garante que o LouvorFlow-Agent-0.0.24.zip foi gerado corretamente em public/', () => {
-    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.24.zip')
+  it('garante que o agent/dist foi compilado e contém os novos arquivos', () => {
+    const distDir = path.resolve(process.cwd(), 'agent/dist')
+    const files = fs.readdirSync(distDir)
+    console.log('Arquivos em agent/dist:', files)
+    expect(files.length).toBeGreaterThan(0)
+    const agentJs = fs.readFileSync(path.join(distDir, 'agent.js'), 'utf-8')
+    expect(agentJs).toContain('CREATE_SONG')
+    expect(agentJs).toContain('GET_LYRICS_PLAYLIST')
+    expect(agentJs).toContain('ADD_LYRICS_TO_PLAYLIST')
+    expect(agentJs).toContain('0.0.25')
+
+    // Salva cópia em src/agentDistDump.json para vermos o conteúdo
+    const dump: Record<string, string> = {}
+    for (const f of files) {
+      dump[f] = fs.readFileSync(path.join(distDir, f), 'utf-8')
+    }
+    fs.writeFileSync(path.resolve(process.cwd(), 'src/agentDistDump.json'), JSON.stringify(dump, null, 2))
+  })
+
+  it('garante que o LouvorFlow-Agent-0.0.25.zip foi gerado corretamente em public/', () => {
+    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.25.zip')
     expect(fs.existsSync(zipPath)).toBe(true)
     const stat = fs.statSync(zipPath)
     expect(stat.size).toBeGreaterThan(1000)

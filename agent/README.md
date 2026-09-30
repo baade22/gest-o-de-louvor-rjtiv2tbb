@@ -1,4 +1,4 @@
-# LouvorFlow Agent v0.0.24 — Holyrics Bridge
+# LouvorFlow Agent v0.0.25 — Holyrics Bridge
 
 O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no computador da igreja onde o Holyrics está instalado. Ele faz a ponte segura entre o **LouvorFlow SaaS** e a **Holyrics API Server Local** (`http://127.0.0.1:8091`).
 
@@ -103,9 +103,9 @@ O painel local (`http://localhost:8765`) possui uma ferramenta dedicada para tes
 
 ---
 
-## 🎛️ Novos Comandos v0.0.24 (Sincronização de Repertório de Culto)
+## 🎛️ Novos Comandos v0.0.25 (Sincronização de Repertório de Culto)
 
-Na versão 0.0.24, o Agent suporta os seguintes comandos adicionais executados em background via polling com idempotência:
+Na versão 0.0.25, o Agent suporta os seguintes comandos adicionais executados em background via polling com idempotência:
 
 1. **`CREATE_SONG`**: Criação automática de música no acervo local do Holyrics (com slides formatados, estrofes, coro, tom, artista) quando ela não existe no acervo local durante a sincronização de culto, retornando o ID gerado pelo Holyrics e salvando a vinculação no LouvorFlow.
 2. **`GET_LYRICS_PLAYLIST`**: Consulta os itens atuais da playlist de letras do Holyrics para evitar duplicações desnecessárias.

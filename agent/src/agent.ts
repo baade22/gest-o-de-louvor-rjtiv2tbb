@@ -88,7 +88,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.24',
+          version: '0.0.25',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -234,7 +234,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.24',
+          version: '0.0.25',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
