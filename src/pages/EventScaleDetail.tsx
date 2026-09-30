@@ -43,7 +43,6 @@ import {
   ListTodo,
   Radio,
   Loader2,
-  Check,
   X,
 } from 'lucide-react'
 import {
@@ -96,6 +95,7 @@ export default function EventScaleDetail() {
     isAdmin,
     isLeader,
     hasOperationalRole,
+    hasPermission,
   } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()

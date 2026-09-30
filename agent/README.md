@@ -1,4 +1,4 @@
-# LouvorFlow Agent v0.0.15 — Holyrics Bridge
+# LouvorFlow Agent v0.0.24 — Holyrics Bridge
 
 O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no computador da igreja onde o Holyrics está instalado. Ele faz a ponte segura entre o **LouvorFlow SaaS** e a **Holyrics API Server Local** (`http://127.0.0.1:8091`).
 
@@ -58,8 +58,9 @@ O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no com
 4. Em **Gerenciar Tokens**, crie um token com permissão para:
    - `SearchSong` (ou `SearchLyrics`)
    - `AddLyricsToPlaylist` (ou `AddToPlaylist`)
-   - `GetTokenInfo`
-5. No painel do Agent (`http://localhost:8765`), cole o token no campo correspondente e clique em **[Salvar Configurações]**.
+   - `GetLyricsPlaylist` (ou `GetPlaylist`)
+   - `CreateSong` (ou `AddSong`)
+   - `GetTokenInfo`5. No painel do Agent (`http://localhost:8765`), cole o token no campo correspondente e clique em **[Salvar Configurações]**.
 6. Clique em **[Testar Conexão Holyrics]** para verificar se o status fica **🟢 Conectado (OK)**.
 
 ---
@@ -99,3 +100,14 @@ O painel local (`http://localhost:8765`) possui uma ferramenta dedicada para tes
    - Se a música for encontrada exatamente uma vez: será **adicionada automaticamente** à playlist do Holyrics!
    - Se houver mais de uma versão correspondente: o LouvorFlow abrirá um diálogo para você **escolher a versão correta**.
    - Se não for encontrada: avisará com mensagem clara para cadastrá-la no Holyrics.
+
+---
+
+## 🎛️ Novos Comandos v0.0.24 (Sincronização de Repertório de Culto)
+
+Na versão 0.0.24, o Agent suporta os seguintes comandos adicionais executados em background via polling com idempotência:
+
+1. **`CREATE_SONG`**: Criação automática de música no acervo local do Holyrics (com slides formatados, estrofes, coro, tom, artista) quando ela não existe no acervo local durante a sincronização de culto, retornando o ID gerado pelo Holyrics e salvando a vinculação no LouvorFlow.
+2. **`GET_LYRICS_PLAYLIST`**: Consulta os itens atuais da playlist de letras do Holyrics para evitar duplicações desnecessárias.
+3. **`ADD_LYRICS_TO_PLAYLIST` / `ADD_TO_PLAYLIST`**: Adiciona música à playlist ativa do Holyrics na ordem exata definida no repertório do evento do LouvorFlow.
+4. **Idempotência por `command_id`**: Comandos repetidos ou reprocessados não causam duplicidade na playlist ou no banco de dados.

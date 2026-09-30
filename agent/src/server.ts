@@ -1,6 +1,7 @@
 import http from 'node:http'
 import { LouvorFlowAgent } from './agent.js'
 import { saveConfig } from './config.js'
+import type { AgentStatusInfo } from './types.js'
 
 /**
  * Servidor Web local leve (http://localhost:8765)

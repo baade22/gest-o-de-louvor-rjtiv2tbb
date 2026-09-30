@@ -1,4 +1,4 @@
-# 🚀 Guia de Instalação e Uso do LouvorFlow Agent v0.0.15
+# 🚀 Guia de Instalação e Uso do LouvorFlow Agent v0.0.24
 
 Este guia passo a passo foi preparado para permitir que qualquer operador de multimídia, som ou projeção instale e execute o **LouvorFlow Agent** no computador da igreja (onde está instalado o Holyrics).
 
@@ -21,6 +21,8 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
    - Em **Gerenciar Tokens**, crie um token de acesso com permissão para:
      - `SearchSong` (ou `SearchLyrics`)
      - `AddLyricsToPlaylist` (ou `AddToPlaylist`)
+     - `GetLyricsPlaylist` (ou `GetPlaylist`)
+     - `CreateSong` (ou `AddSong`)
      - `GetTokenInfo`
    - Copie esse token gerado.
 
@@ -28,7 +30,7 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 
 ## 📥 Como Descompactar e Iniciar o Agent
 
-1. Descompacte o arquivo `LouvorFlow-Agent-0.0.15.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
+1. Descompacte o arquivo `LouvorFlow-Agent-0.0.24.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
 2. Abra o terminal na pasta descompactada:
    - **No Windows:** Abra a pasta, segure `Shift`, clique com o botão direito do mouse em um espaço vazio e escolha **"Abrir na janela do PowerShell"** (ou **"Abrir no Terminal"**).
 3. Como os arquivos compilados já estão na pasta `dist/`, você pode iniciar diretamente com:
@@ -42,7 +44,7 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 4. Ao iniciar, o terminal mostrará:
    ```text
    ====================================================
-         LouvorFlow Agent v0.0.15 — Holyrics Bridge
+         LouvorFlow Agent v0.0.24 — Holyrics Bridge
    ====================================================
    [Agent Web] Painel local disponível em http://localhost:8765
    [Agent] Serviço iniciado.
@@ -105,6 +107,13 @@ Agora você pode enviar músicas diretamente do LouvorFlow para a playlist do Ho
 - Abra qualquer música no LouvorFlow.
 - Clique no botão **[Enviar para Holyrics]**.
 - O LouvorFlow se comunica com o Agent local da igreja e a música é colocada na playlist do Holyrics em segundos!
+
+### 4. Sincronização Completa de Culto / Repertório (v0.0.24)
+
+- Na tela de detalhes de qualquer culto (**Cultos & Escalas → [Culto] → Repertório**), clique em **[Sincronizar com Holyrics]**.
+- O LouvorFlow envia o repertório na ordem exata configurada para o Agent.
+- Se alguma música do repertório não existir no banco do Holyrics, o Agent aciona o comando `CREATE_SONG` para criá-la automaticamente com slides/estrofes formatados e salva o ID retornado no LouvorFlow para sincronizações futuras instantâneas.
+- O comando `GET_LYRICS_PLAYLIST` e `ADD_LYRICS_TO_PLAYLIST` garantem que as músicas entrem na ordem da escala sem duplicar itens já existentes na playlist do dia.
 
 ---
 
