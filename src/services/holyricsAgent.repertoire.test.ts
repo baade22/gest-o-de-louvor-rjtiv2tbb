@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HolyricsClient } from '../../agent/src/holyricsClient.js'
 import { syncEventRepertoireWithHolyrics } from './holyricsAgent.js'
-import { pb } from '../lib/pocketbase/client.js'
+import pb from '../lib/pocketbase/client.js'
 
 describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicação', () => {
   beforeEach(() => {
@@ -11,11 +11,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
   // 1. Música nova: GetSongs não encontra -> CreateSong -> GetSongs confirma -> salva ID -> GetSongPlaylist não encontra -> AddLyricsToPlaylist -> GetSongPlaylist confirma -> CREATED + ADDED_TO_PLAYLIST.
   it('1. Música nova segue fluxo completo com confirmação dupla e marca CREATED + ADDED_TO_PLAYLIST', async () => {
     // Simula chamadas HolyricsClient
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     // Mock fetch
     let getSongsCallCount = 0
@@ -147,11 +143,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
 
   // 2. Repetir sincronização: ID existente, CreateSong NÃO executado, já na playlist, AddLyricsToPlaylist NÃO executado -> ALREADY_IN_PLAYLIST.
   it('2. Repetir sincronização: com holyrics_song_id e já na playlist, CreateSong e AddLyrics NÃO são chamados', async () => {
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('GetSongPlaylist')) {
@@ -186,11 +178,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
 
   // 3. Música existente no Holyrics sem holyrics_song_id: GetSongs encontra, salva ID, CreateSong NÃO executado.
   it('3. Música existente no Holyrics sem holyrics_song_id: correspondência por título seguro evita CreateSong', async () => {
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('GetSongs')) {
@@ -238,11 +226,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
 
   // 4. Música existente fora da playlist: GetSongs encontra, AddLyricsToPlaylist com index do repertório, confirmação.
   it('4. Música existente fora da playlist: adicionada na posição correta e confirmada', async () => {
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     let playlistChecked = false
     const fetchMock = vi.fn().mockImplementation(async (url: string, opts: any) => {
@@ -278,11 +262,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
 
   // 5. CreateSong erro/timeout mas música criada: GetSongs encontra, salva ID, NÃO criar de novo, continuar.
   it('5. CreateSong com timeout mas criada no Holyrics: recuperada via GetSongs sem duplicar', async () => {
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('CreateSong')) {
@@ -310,7 +290,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
     globalThis.fetch = fetchMock
 
     // CreateSong falha
-    const createRes = await client.createSong({ title: 'Grande é o Senhor' })
+    const createRes = await client.createSong({ title: 'Grande é o Senhor', slides: [] })
     expect(createRes.success).toBe(false)
 
     // Regra crítica: consultar GetSongs para ver se foi criada mesmo assim
@@ -323,11 +303,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
 
   // 6. AddLyricsToPlaylist retorna OK mas música não aparece no GetSongPlaylist -> ERROR (não ADDED_TO_PLAYLIST).
   it('6. AddLyricsToPlaylist retorna OK mas não aparece na playlist -> deve acusar ERROR técnico', async () => {
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('AddLyricsToPlaylist')) {
@@ -440,11 +416,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
 
   // 11. Agent offline e Holyrics offline -> erro técnico claro, sem estado falso de sucesso.
   it('11. Agent offline ou Holyrics offline retorna mensagem técnica clara', async () => {
-    const client = new HolyricsClient({
-      serverUrl: 'http://127.0.0.1:8091',
-      token: 'test_token',
-      holyricsPort: 8091,
-    })
+    const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
     globalThis.fetch = vi
       .fn()

@@ -4,7 +4,7 @@ import path from 'node:path'
 
 describe('packAgent test verification', () => {
   beforeAll(async () => {
-    await import('../buildZipScript.mjs')
+    await import('../buildZipScript.mjs?t=' + Date.now())
   })
 
   it('garante que o agent/dist foi compilado e contém os novos arquivos', () => {
