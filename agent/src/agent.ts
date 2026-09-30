@@ -88,7 +88,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.15',
+          version: '0.0.24',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -234,7 +234,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.15',
+          version: '0.0.24',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -358,8 +358,11 @@ export class LouvorFlowAgent {
           break
         }
 
-        case 'ADD_TO_PLAYLIST': {
-          const holyricsSongId = String(cmd.payload?.holyrics_song_id || '').trim()
+        case 'ADD_TO_PLAYLIST':
+        case 'ADD_LYRICS_TO_PLAYLIST': {
+          const holyricsSongId = String(
+            cmd.payload?.holyrics_song_id || cmd.payload?.id || '',
+          ).trim()
           if (!holyricsSongId) {
             status = 'FAILED'
             errorMsg = 'holyrics_song_id não informado no payload.'
@@ -373,11 +376,68 @@ export class LouvorFlowAgent {
               added: true,
               holyrics_song_id: holyricsSongId,
               title: cmd.payload?.title,
+              data: addRes.data,
             }
           } else {
             status = 'FAILED'
             errorMsg = addRes.error || 'Falha ao adicionar à playlist.'
-            errorCode = 'ADD_PLAYLIST_FAILED'
+            errorCode = addRes.error_code || 'ADD_PLAYLIST_FAILED'
+            resultPayload = { error_code: errorCode }
+          }
+          break
+        }
+
+        case 'CREATE_SONG': {
+          const title = String(cmd.payload?.title || '').trim()
+          if (!title) {
+            status = 'FAILED'
+            errorMsg = 'Título da música é obrigatório para CreateSong.'
+            errorCode = 'MISSING_TITLE'
+            break
+          }
+          const createRes = await this.holyrics.createSong({
+            title,
+            artist: cmd.payload?.artist,
+            author: cmd.payload?.author,
+            note: cmd.payload?.note,
+            copyright: cmd.payload?.copyright,
+            slides: cmd.payload?.slides || [],
+            formatting_type: cmd.payload?.formatting_type || 'basic',
+            order: cmd.payload?.order,
+            key: cmd.payload?.key,
+            bpm: cmd.payload?.bpm,
+            time_sig: cmd.payload?.time_sig,
+          })
+
+          if (createRes.success && createRes.id) {
+            status = 'DONE'
+            resultPayload = {
+              created: true,
+              holyrics_song_id: createRes.id,
+              data: createRes.data,
+            }
+          } else {
+            status = 'FAILED'
+            errorMsg = createRes.error || 'Erro ao criar música no Holyrics.'
+            errorCode = createRes.error_code || 'CREATE_SONG_FAILED'
+            resultPayload = { error_code: errorCode }
+          }
+          break
+        }
+
+        case 'GET_LYRICS_PLAYLIST': {
+          const playlistRes = await this.holyrics.getLyricsPlaylist()
+          if (playlistRes.success) {
+            status = 'DONE'
+            resultPayload = {
+              items: playlistRes.items,
+              count: playlistRes.items.length,
+            }
+          } else {
+            status = 'FAILED'
+            errorMsg = playlistRes.error || 'Erro ao consultar playlist do Holyrics.'
+            errorCode = playlistRes.error_code || 'GET_PLAYLIST_FAILED'
+            resultPayload = { error_code: errorCode }
           }
           break
         }

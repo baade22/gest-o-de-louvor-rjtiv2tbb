@@ -73,9 +73,43 @@ export interface HolyricsTokenInfo {
 export interface AgentCommand {
   id: string
   command_id: string
-  action: 'TEST_CONNECTION' | 'SEARCH_SONG' | 'ADD_TO_PLAYLIST'
+  action:
+    | 'TEST_CONNECTION'
+    | 'SEARCH_SONG'
+    | 'ADD_TO_PLAYLIST'
+    | 'CREATE_SONG'
+    | 'GET_LYRICS_PLAYLIST'
+    | 'ADD_LYRICS_TO_PLAYLIST'
   payload: Record<string, any>
   created_at: string
+}
+
+export interface HolyricsSlideInput {
+  text: string
+  slide_description?: string
+}
+
+export interface HolyricsCreateSongPayload {
+  title: string
+  artist?: string
+  author?: string
+  note?: string
+  copyright?: string
+  slides: HolyricsSlideInput[]
+  formatting_type?: string
+  order?: string
+  key?: string
+  bpm?: number
+  time_sig?: string
+}
+
+export interface HolyricsPlaylistItem {
+  id: string
+  title?: string
+  artist?: string
+  type?: string
+  name?: string
+  [key: string]: any
 }
 
 export interface AgentStatusInfo {

@@ -76,6 +76,40 @@ export interface HolyricsCommandStatusResponse {
   message?: string
 }
 
+export interface SyncEventSongItemResult {
+  order: number
+  event_song_id: string
+  song_id: string
+  song_title: string
+  holyrics_song_id?: string | null
+  action: string
+  status: 'SUCCESS' | 'ERROR'
+  error?: string
+  detail: string
+}
+
+export interface SyncEventRepertoireSummary {
+  total: number
+  created: number
+  already_existed: number
+  added: number
+  already_in_playlist: number
+  errors: number
+}
+
+export interface SyncEventRepertoireResponse {
+  success: boolean
+  has_errors?: boolean
+  event_id?: string
+  agent_id?: string
+  items?: SyncEventSongItemResult[]
+  summary?: SyncEventRepertoireSummary
+  error_code?: string
+  agent_online?: boolean
+  holyrics_detected?: boolean
+  message: string
+}
+
 /**
  * Gera código temporário de pareamento de 6 dígitos no SaaS
  */
@@ -145,4 +179,27 @@ export async function getHolyricsCommandStatus(
       method: 'GET',
     },
   )
+}
+
+/**
+ * Sincroniza o repertório de um evento/culto com o Holyrics via LouvorFlow Agent.
+ * Processa as músicas na ordem exata do culto:
+ * 1. Se songs.holyrics_song_id existe -> usa o ID
+ * 2. Se não existe -> executa CreateSong, salva o ID na música do LouvorFlow
+ * 3. Consulta GetLyricsPlaylist para evitar duplicação (idempotência)
+ * 4. Adiciona à playlist (AddLyricsToPlaylist)
+ */
+export async function syncEventRepertoireWithHolyrics(params: {
+  churchId: string
+  eventId: string
+  agentId?: string
+}): Promise<SyncEventRepertoireResponse> {
+  return pb.send<SyncEventRepertoireResponse>('/backend/v1/saas/holyrics/sync-event', {
+    method: 'POST',
+    body: {
+      church_id: params.churchId,
+      event_id: params.eventId,
+      agent_id: params.agentId,
+    },
+  })
 }

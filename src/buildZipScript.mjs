@@ -156,8 +156,11 @@ function collectFiles(dir, baseDir = '') {
 const agentDir = path.resolve(process.cwd(), 'agent')
 const files = collectFiles(agentDir)
 const zipBuf = buildZip(files)
-const outPublic = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
+const outPublic = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.24.zip')
 fs.writeFileSync(outPublic, zipBuf)
+// Manter retrocompatibilidade com link 0.0.15
+const outPublicLegacy = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
+fs.writeFileSync(outPublicLegacy, zipBuf)
 console.log(
-  `[ZIP Prebuild] LouvorFlow-Agent-0.0.15.zip gerado com sucesso em ${outPublic} (${zipBuf.length} bytes, ${files.length} arquivos)`,
+  `[ZIP Prebuild] LouvorFlow-Agent-0.0.24.zip gerado com sucesso em ${outPublic} (${zipBuf.length} bytes, ${files.length} arquivos)`,
 )

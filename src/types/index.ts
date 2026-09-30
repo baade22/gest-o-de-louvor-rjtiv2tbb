@@ -101,6 +101,7 @@ export interface Song {
   cifra_club_url?: string
   source?: 'CIFRA_CLUB' | 'MANUAL' | string
   notes?: string
+  holyrics_song_id?: string
   created: string
   updated: string
 }
@@ -257,6 +258,15 @@ export interface InternalNotification {
   created: string
 }
 
+export type HolyricsSyncStatus =
+  | 'NOT_SYNCED'
+  | 'CREATING'
+  | 'CREATED'
+  | 'ADDING_TO_PLAYLIST'
+  | 'ADDED_TO_PLAYLIST'
+  | 'ALREADY_IN_PLAYLIST'
+  | 'ERROR'
+
 export interface EventSong {
   id: string
   church_id: string
@@ -265,6 +275,10 @@ export interface EventSong {
   order: number
   custom_key?: string
   notes?: string
+  holyrics_status?: HolyricsSyncStatus
+  holyrics_synced_at?: string
+  holyrics_error?: string
+  holyrics_playlist_order?: number
   created: string
   updated: string
   expand?: {

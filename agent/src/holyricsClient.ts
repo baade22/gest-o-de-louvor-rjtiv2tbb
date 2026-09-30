@@ -451,6 +451,131 @@ export class HolyricsClient {
   }
 
   /**
+   * CreateSong: Cria música no Holyrics Local via API oficial
+   * Payload testado e validado no Holyrics 2.30.0:
+   * { action: "CreateSong", title, artist, author, note, copyright, slides: [{text, slide_description}], formatting_type: "basic", order: "1,2,3", key, bpm, time_sig }
+   * Retorna {"status": "ok", "data": {"id": "1790728009858", ...}}
+   */
+  public async createSong(songData: import('./types.js').HolyricsCreateSongPayload): Promise<{
+    success: boolean
+    id?: string
+    data?: any
+    error?: string
+    error_code?: string
+  }> {
+    const payload: Record<string, any> = {
+      title: songData.title,
+      artist: songData.artist || '',
+      author: songData.author || '',
+      note: songData.note || '',
+      copyright: songData.copyright || '',
+      slides: Array.isArray(songData.slides) ? songData.slides : [],
+      formatting_type: songData.formatting_type || 'basic',
+      order: songData.order || '',
+    }
+    if (songData.key) payload.key = songData.key
+    if (songData.bpm !== undefined && songData.bpm !== null) payload.bpm = Number(songData.bpm)
+    if (songData.time_sig) payload.time_sig = songData.time_sig
+
+    const res = await this.request('CreateSong', payload, 5000)
+
+    if (res.status === 'ok') {
+      const returnedId =
+        res.data && typeof res.data === 'object'
+          ? String(res.data.id || res.data.song_id || res.data.songId || '')
+          : typeof res.data === 'string' || typeof res.data === 'number'
+            ? String(res.data)
+            : ''
+      return {
+        success: true,
+        id: returnedId,
+        data: res.data,
+      }
+    }
+
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Erro ao criar música no Holyrics'
+    return {
+      success: false,
+      error: errStr,
+      error_code:
+        errStr === 'TIMEOUT_HOLYRICS'
+          ? 'TIMEOUT_HOLYRICS'
+          : errStr.includes('CONNECTION_REFUSED')
+            ? 'CONNECTION_REFUSED'
+            : 'CREATE_SONG_FAILED',
+    }
+  }
+
+  /**
+   * GetLyricsPlaylist: Obtém os itens atuais da playlist do Holyrics
+   * Utilizado para conferência de estado e garantia de idempotência (não duplicar músicas na playlist)
+   */
+  public async getLyricsPlaylist(): Promise<{
+    success: boolean
+    items: import('./types.js').HolyricsPlaylistItem[]
+    data?: any
+    error?: string
+    error_code?: string
+  }> {
+    // 1. Tenta GetLyricsPlaylist oficial
+    const res = await this.request('GetLyricsPlaylist', {}, 4000)
+    if (res.status === 'ok') {
+      let items: import('./types.js').HolyricsPlaylistItem[] = []
+      if (Array.isArray(res.data)) {
+        items = res.data
+      } else if (res.data && Array.isArray(res.data.items)) {
+        items = res.data.items
+      } else if (res.data && Array.isArray(res.data.list)) {
+        items = res.data.list
+      } else if (res.data && Array.isArray(res.data.playlist)) {
+        items = res.data.playlist
+      }
+      return {
+        success: true,
+        items,
+        data: res.data,
+      }
+    }
+
+    // 2. Fallback GetPlaylist caso GetLyricsPlaylist não exista em versões anteriores
+    const resFallback = await this.request('GetPlaylist', {}, 4000)
+    if (resFallback.status === 'ok') {
+      let items: import('./types.js').HolyricsPlaylistItem[] = []
+      if (Array.isArray(resFallback.data)) {
+        items = resFallback.data
+      } else if (resFallback.data && Array.isArray(resFallback.data.items)) {
+        items = resFallback.data.items
+      } else if (resFallback.data && Array.isArray(resFallback.data.list)) {
+        items = resFallback.data.list
+      }
+      return {
+        success: true,
+        items,
+        data: resFallback.data,
+      }
+    }
+
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Erro ao consultar playlist do Holyrics'
+    return {
+      success: false,
+      items: [],
+      error: errStr,
+      error_code:
+        errStr === 'TIMEOUT_HOLYRICS'
+          ? 'TIMEOUT_HOLYRICS'
+          : errStr.includes('CONNECTION_REFUSED')
+            ? 'CONNECTION_REFUSED'
+            : 'GET_PLAYLIST_FAILED',
+    }
+  }
+
+  /**
    * AddLyricsToPlaylist: Adiciona uma letra identificada pelo ID à playlist do Holyrics
    * Formato oficial Holyrics API Server:
    * POST /api/AddLyricsToPlaylist?token=...
@@ -458,7 +583,7 @@ export class HolyricsClient {
    */
   public async addToPlaylist(
     songId: string,
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+  ): Promise<{ success: boolean; data?: any; error?: string; error_code?: string }> {
     // Tenta formato direto { id: "..." }
     const res = await this.request('AddLyricsToPlaylist', { id: songId })
     if (res.status === 'ok') {
@@ -482,6 +607,12 @@ export class HolyricsClient {
     return {
       success: false,
       error: errStr,
+      error_code:
+        errStr === 'TIMEOUT_HOLYRICS'
+          ? 'TIMEOUT_HOLYRICS'
+          : errStr.includes('CONNECTION_REFUSED')
+            ? 'CONNECTION_REFUSED'
+            : 'ADD_PLAYLIST_FAILED',
     }
   }
 }

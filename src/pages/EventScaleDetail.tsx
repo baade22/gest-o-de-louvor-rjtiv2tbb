@@ -41,7 +41,16 @@ import {
   Layers,
   FileVideo,
   ListTodo,
+  Radio,
+  Loader2,
+  Check,
+  X,
 } from 'lucide-react'
+import {
+  syncEventRepertoireWithHolyrics,
+  type SyncEventSongItemResult,
+  type SyncEventRepertoireSummary,
+} from '@/services/holyricsAgent'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -158,6 +167,16 @@ export default function EventScaleDetail() {
   const [mediaAssignedOperator, setMediaAssignedOperator] = useState('')
   const [isUploadingMedia, setIsUploadingMedia] = useState(false)
 
+  // Estado da Sincronização de Repertório com o Holyrics
+  const [isSyncingRepertoire, setIsSyncingRepertoire] = useState(false)
+  const [syncReportModalOpen, setSyncReportModalOpen] = useState(false)
+  const [syncReportItems, setSyncReportItems] = useState<SyncEventSongItemResult[]>([])
+  const [syncReportSummary, setSyncReportSummary] = useState<SyncEventRepertoireSummary | null>(
+    null,
+  )
+  const [syncReportMessage, setSyncReportMessage] = useState('')
+  const [syncReportHasErrors, setSyncReportHasErrors] = useState(false)
+
   // PERMISSÕES DE ABAS
   // 1. Visão geral: todos com acesso ao evento
   // 2. Repertório: Músicos, Líderes, Admin, Master
@@ -174,6 +193,7 @@ export default function EventScaleDetail() {
     isMaster || isAdmin || hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
   const canSeeLighting = isMaster || isAdmin || hasOperationalRole('ILUMINACAO')
   const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
+  const canSyncHolyrics = isMaster || isAdmin || isLeader || hasPermission('holyrics.sync')
 
   const fetchFullEventData = async () => {
     if (!id || !currentChurch) return
@@ -251,6 +271,72 @@ export default function EventScaleDetail() {
   useEffect(() => {
     fetchFullEventData()
   }, [id, currentChurch])
+
+  // SINCRONIZAÇÃO DO REPERTÓRIO COM O HOLYRICS
+  const handleSyncRepertoireWithHolyrics = async () => {
+    if (!event || !currentChurch) return
+    if (!canSyncHolyrics) {
+      toast({
+        title: 'Permissão negada',
+        description: 'Apenas Administradores e Líderes podem sincronizar com o Holyrics.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (eventSongs.length === 0) {
+      toast({
+        title: 'Repertório vazio',
+        description: 'Adicione músicas ao repertório antes de sincronizar com o Holyrics.',
+      })
+      return
+    }
+
+    setIsSyncingRepertoire(true)
+    toast({
+      title: 'Sincronizando com o Holyrics...',
+      description: `Processando ${eventSongs.length} música(s) na ordem do repertório. Aguarde...`,
+    })
+
+    try {
+      const res = await syncEventRepertoireWithHolyrics({
+        churchId: currentChurch.id,
+        eventId: event.id,
+      })
+
+      if (res.items && res.items.length > 0) {
+        setSyncReportItems(res.items)
+        setSyncReportSummary(res.summary || null)
+        setSyncReportMessage(res.message)
+        setSyncReportHasErrors(Boolean(res.has_errors))
+        setSyncReportModalOpen(true)
+      }
+
+      if (res.success) {
+        toast({
+          title: 'Repertório sincronizado!',
+          description: res.message,
+        })
+      } else {
+        toast({
+          title: res.has_errors ? 'Sincronização com avisos' : 'Falha na sincronização',
+          description: res.message || 'Verifique o status do LouvorFlow Agent e do Holyrics.',
+          variant: res.has_errors ? 'default' : 'destructive',
+        })
+      }
+
+      await fetchFullEventData()
+    } catch (err: any) {
+      console.error('Erro na sincronização:', err)
+      toast({
+        title: 'Erro ao sincronizar com Holyrics',
+        description: err.message || 'Não foi possível conectar ao Holyrics ou ao Agent.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSyncingRepertoire(false)
+    }
+  }
 
   // REPERTÓRIO: Adicionar Música ao Evento
   const handleAddSongToEvent = async () => {
@@ -892,19 +978,42 @@ export default function EventScaleDetail() {
                     Repertório do Culto ({eventSongs.length})
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Músicas, tons e notas litúrgicas
+                    Músicas na ordem litúrgica e sincronização com o Holyrics
                   </CardDescription>
                 </div>
-                {canManageContent && (
-                  <Button
-                    size="sm"
-                    onClick={() => setAddSongModalOpen(true)}
-                    className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs gap-1.5"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Adicionar Música
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canSyncHolyrics && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isSyncingRepertoire || eventSongs.length === 0}
+                      onClick={handleSyncRepertoireWithHolyrics}
+                      className="rounded-xl border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800 text-xs font-semibold gap-1.5 shadow-xs"
+                      title="Sincroniza todas as músicas do repertório na ordem exata com o Holyrics (cria as não existentes e adiciona à playlist sem duplicar)"
+                    >
+                      {isSyncingRepertoire ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600" />
+                      ) : (
+                        <Radio className="h-3.5 w-3.5 text-purple-600" />
+                      )}
+                      <span>
+                        {isSyncingRepertoire
+                          ? 'Sincronizando...'
+                          : '🚀 Sincronizar repertório com Holyrics'}
+                      </span>
+                    </Button>
+                  )}
+                  {canManageContent && (
+                    <Button
+                      size="sm"
+                      onClick={() => setAddSongModalOpen(true)}
+                      className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Adicionar Música
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-4">
                 {eventSongs.length === 0 ? (
@@ -944,6 +1053,42 @@ export default function EventScaleDetail() {
                                 >
                                   Tom: {effectiveKey}
                                 </Badge>
+                                {song.holyrics_song_id && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-semibold bg-purple-50 text-purple-700 border-purple-200 shrink-0"
+                                    title={`ID Holyrics: ${song.holyrics_song_id}`}
+                                  >
+                                    Holyrics #{song.holyrics_song_id}
+                                  </Badge>
+                                )}
+                                {item.holyrics_status && item.holyrics_status !== 'NOT_SYNCED' && (
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[9px] font-medium shrink-0 ${
+                                      item.holyrics_status === 'ADDED_TO_PLAYLIST' ||
+                                      item.holyrics_status === 'ALREADY_IN_PLAYLIST'
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : item.holyrics_status === 'ERROR'
+                                          ? 'bg-red-50 text-red-700 border-red-200'
+                                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                                    }`}
+                                  >
+                                    {item.holyrics_status === 'ADDED_TO_PLAYLIST'
+                                      ? 'Na playlist'
+                                      : item.holyrics_status === 'ALREADY_IN_PLAYLIST'
+                                        ? 'Playlist (já estava)'
+                                        : item.holyrics_status === 'CREATED'
+                                          ? 'Criada no Holyrics'
+                                          : item.holyrics_status === 'CREATING'
+                                            ? 'Criando...'
+                                            : item.holyrics_status === 'ADDING_TO_PLAYLIST'
+                                              ? 'Adicionando...'
+                                              : item.holyrics_status === 'ERROR'
+                                                ? 'Erro'
+                                                : item.holyrics_status}
+                                  </Badge>
+                                )}
                               </div>
                               <p className="text-xs text-slate-500 truncate">
                                 {song.artist}
@@ -953,10 +1098,14 @@ export default function EventScaleDetail() {
                                     • {item.notes}
                                   </span>
                                 )}
+                                {item.holyrics_error && (
+                                  <span className="text-red-600 font-medium block text-[11px] mt-0.5">
+                                    ⚠️ {item.holyrics_error}
+                                  </span>
+                                )}
                               </p>
                             </div>
                           </div>
-
                           <div className="flex items-center gap-1 shrink-0">
                             {canManageContent && (
                               <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5">
@@ -2133,6 +2282,128 @@ export default function EventScaleDetail() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
             >
               {isUploadingMedia ? 'Enviando...' : 'Enviar Mídia'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: Relatório Visual de Sincronização com o Holyrics */}
+      <Dialog open={syncReportModalOpen} onOpenChange={setSyncReportModalOpen}>
+        <DialogContent className="sm:max-w-xl rounded-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-purple-50 text-purple-700">
+                <Radio className="h-5 w-5" />
+              </span>
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900">
+                  Relatório de Sincronização com Holyrics
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">
+                  {event.title} • Ordem litúrgica do culto
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {syncReportSummary && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 pb-1">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Total</span>
+                <span className="text-lg font-extrabold text-slate-900">
+                  {syncReportSummary.total}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-purple-700 block">
+                  Criadas
+                </span>
+                <span className="text-lg font-extrabold text-purple-900">
+                  {syncReportSummary.created}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-emerald-700 block">
+                  Na Playlist
+                </span>
+                <span className="text-lg font-extrabold text-emerald-900">
+                  {syncReportSummary.added + syncReportSummary.already_in_playlist}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-rose-700 block">Erros</span>
+                <span className="text-lg font-extrabold text-rose-900">
+                  {syncReportSummary.errors}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {syncReportMessage && (
+            <div
+              className={`p-3 rounded-xl text-xs font-medium border ${
+                syncReportHasErrors
+                  ? 'bg-amber-50 text-amber-900 border-amber-200'
+                  : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              }`}
+            >
+              {syncReportMessage}
+            </div>
+          )}
+
+          <div className="overflow-y-auto flex-1 my-2 space-y-2 pr-1">
+            {syncReportItems.map((item) => {
+              const isSuccess = item.status === 'SUCCESS'
+              return (
+                <div
+                  key={item.event_song_id || item.order}
+                  className={`p-3 rounded-xl border flex items-start gap-3 transition-colors ${
+                    isSuccess
+                      ? 'bg-white border-slate-200 hover:border-slate-300'
+                      : 'bg-rose-50/50 border-rose-200'
+                  }`}
+                >
+                  <div
+                    className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-xs ${
+                      isSuccess ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                    }`}
+                  >
+                    {isSuccess ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-800">
+                        {item.order}. {item.song_title}
+                      </span>
+                      {item.holyrics_song_id && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 font-semibold"
+                        >
+                          ID: {item.holyrics_song_id}
+                        </Badge>
+                      )}
+                    </div>
+                    <p
+                      className={`text-xs mt-0.5 ${
+                        isSuccess ? 'text-slate-600' : 'text-rose-700 font-medium'
+                      }`}
+                    >
+                      {item.detail || item.error}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <DialogFooter className="pt-2 border-t border-slate-100">
+            <Button
+              className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs"
+              onClick={() => setSyncReportModalOpen(false)}
+            >
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

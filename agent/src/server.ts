@@ -196,7 +196,7 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
     <div class="header">
       <div class="logo">
         <span>LouvorFlow Agent</span>
-        <span class="logo-badge">v0.0.15</span>
+        <span class="logo-badge">v0.0.24</span>
       </div>
       <div style="font-size: 0.8rem; color: var(--text-muted);">
         ${status.machineName}

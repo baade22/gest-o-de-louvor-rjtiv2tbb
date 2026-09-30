@@ -139,27 +139,51 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
     })
   }
 
-  // Se for comando de playlist, registra em holyrics_sync_logs
+  // Se for comando de criação ou playlist, registra em holyrics_sync_logs e atualiza vínculos se necessário
   try {
     const action = cmdRecord.getString('action')
-    if (action === 'ADD_TO_PLAYLIST') {
+    let p = null
+    try {
+      const rawP = cmdRecord.get('payload')
+      p = typeof rawP === 'string' ? JSON.parse(rawP) : rawP
+    } catch (_) {}
+
+    if (action === 'CREATE_SONG' && status === 'DONE') {
+      let createdHolyricsId = ''
+      if (result && typeof result === 'object' && result.holyrics_song_id) {
+        createdHolyricsId = String(result.holyrics_song_id)
+      }
+      if (p && p.song_id && createdHolyricsId) {
+        try {
+          const songRec = $app.findRecordById('songs', p.song_id)
+          if (!songRec.getString('holyrics_song_id')) {
+            songRec.set('holyrics_song_id', createdHolyricsId)
+            $app.save(songRec)
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (
+      action === 'ADD_TO_PLAYLIST' ||
+      action === 'ADD_LYRICS_TO_PLAYLIST' ||
+      action === 'CREATE_SONG'
+    ) {
       const logsCol = $app.findCollectionByNameOrId('holyrics_sync_logs')
       const logRec = new Record(logsCol)
       logRec.set('church_id', cmdRecord.getString('church_id'))
       logRec.set('agent_id', agentId)
-      logRec.set('action', 'ADD_TO_PLAYLIST')
+      logRec.set('action', action)
       logRec.set('status', status === 'FAILED' ? 'ERROR' : 'SUCCESS')
       logRec.set('error', errorMsg)
       logRec.set('created_at', now)
 
-      let p = null
-      try {
-        const rawP = cmdRecord.get('payload')
-        p = typeof rawP === 'string' ? JSON.parse(rawP) : rawP
-      } catch (_) {}
-
       if (p && p.song_id) logRec.set('song_id', p.song_id)
-      if (p && p.holyrics_song_id) logRec.set('holyrics_song_id', String(p.holyrics_song_id))
+      if (p && (p.holyrics_song_id || p.id)) {
+        logRec.set('holyrics_song_id', String(p.holyrics_song_id || p.id))
+      } else if (result && result.holyrics_song_id) {
+        logRec.set('holyrics_song_id', String(result.holyrics_song_id))
+      }
       if (p && p.event_id) logRec.set('event_id', p.event_id)
 
       $app.save(logRec)

@@ -163,18 +163,21 @@ routerAdd(
     const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
 
     // =========================================================================
-    // CASO 1: chosen_holyrics_id já fornecido -> Adicionar diretamente à playlist
+    // CASO 0: Se songs.holyrics_song_id já existe -> usa diretamente o ID existente
     // =========================================================================
-    if (chosenHolyricsId) {
+    const existingHolyricsId = songRecord.getString('holyrics_song_id')
+    const targetHolyricsId = chosenHolyricsId || existingHolyricsId
+
+    if (targetHolyricsId) {
       const addCmd = new Record(cmdCol)
       const addCmdId = 'cmd_add_' + Date.now() + '_' + $security.randomString(8)
       addCmd.set('command_id', addCmdId)
       addCmd.set('church_id', churchId)
       addCmd.set('agent_id', agentId)
-      addCmd.set('action', 'ADD_TO_PLAYLIST')
+      addCmd.set('action', 'ADD_LYRICS_TO_PLAYLIST')
       addCmd.set('payload', {
         song_id: songId,
-        holyrics_song_id: chosenHolyricsId,
+        holyrics_song_id: targetHolyricsId,
         title: songTitle,
         artist: songArtist,
       })

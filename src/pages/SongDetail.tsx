@@ -476,6 +476,17 @@ export default function SongDetail() {
                 {song.bpm} BPM
               </Badge>
             )}
+
+            {song.holyrics_song_id && (
+              <Badge
+                variant="outline"
+                className="bg-purple-50 text-purple-700 border-purple-200 font-semibold px-3 py-1 text-xs rounded-xl flex items-center gap-1.5"
+                title={`Vínculo estabelecido com o Holyrics (ID: ${song.holyrics_song_id})`}
+              >
+                <Radio className="h-3.5 w-3.5 text-purple-600" />
+                Holyrics #{song.holyrics_song_id}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
