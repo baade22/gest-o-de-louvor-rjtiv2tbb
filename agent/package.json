@@ -1,6 +1,6 @@
 {
   "name": "louvorflow-agent",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "LouvorFlow Agent para integração local com Holyrics API Server",
   "main": "dist/index.js",
   "type": "module",

@@ -88,7 +88,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.25',
+          version: '0.0.26',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -234,7 +234,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.25',
+          version: '0.0.26',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -369,19 +369,64 @@ export class LouvorFlowAgent {
             errorCode = 'MISSING_SONG_ID'
             break
           }
-          const addRes = await this.holyrics.addToPlaylist(holyricsSongId)
+          const playlistIndex =
+            cmd.payload?.index !== undefined && cmd.payload?.index !== null
+              ? Number(cmd.payload.index)
+              : undefined
+          const mediaPlaylist = cmd.payload?.media_playlist ?? false
+
+          const addRes = await this.holyrics.addToPlaylist(holyricsSongId, {
+            index: playlistIndex,
+            media_playlist: mediaPlaylist,
+          })
           if (addRes.success) {
             status = 'DONE'
             resultPayload = {
               added: true,
               holyrics_song_id: holyricsSongId,
               title: cmd.payload?.title,
+              index: playlistIndex,
               data: addRes.data,
             }
           } else {
             status = 'FAILED'
             errorMsg = addRes.error || 'Falha ao adicionar à playlist.'
             errorCode = addRes.error_code || 'ADD_PLAYLIST_FAILED'
+            resultPayload = { error_code: errorCode }
+          }
+          break
+        }
+
+        case 'GET_SONGS': {
+          const fields = cmd.payload?.fields ? String(cmd.payload.fields) : undefined
+          const songsRes = await this.holyrics.getSongs(fields)
+          if (songsRes.success) {
+            status = 'DONE'
+            resultPayload = {
+              songs: songsRes.songs,
+              count: songsRes.songs.length,
+            }
+          } else {
+            status = 'FAILED'
+            errorMsg = songsRes.error || 'Erro ao consultar GetSongs no Holyrics.'
+            errorCode = songsRes.error_code || 'GET_SONGS_FAILED'
+            resultPayload = { error_code: errorCode }
+          }
+          break
+        }
+
+        case 'GET_SONG_PLAYLIST': {
+          const playlistRes = await this.holyrics.getSongPlaylist()
+          if (playlistRes.success) {
+            status = 'DONE'
+            resultPayload = {
+              items: playlistRes.items,
+              count: playlistRes.items.length,
+            }
+          } else {
+            status = 'FAILED'
+            errorMsg = playlistRes.error || 'Erro ao consultar GetSongPlaylist no Holyrics.'
+            errorCode = playlistRes.error_code || 'GET_SONG_PLAYLIST_FAILED'
             resultPayload = { error_code: errorCode }
           }
           break

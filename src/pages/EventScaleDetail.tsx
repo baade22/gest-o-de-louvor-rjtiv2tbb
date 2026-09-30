@@ -1081,12 +1081,16 @@ export default function EventScaleDetail() {
                                         : item.holyrics_status === 'CREATED'
                                           ? 'Criada no Holyrics'
                                           : item.holyrics_status === 'CREATING'
-                                            ? 'Criando...'
-                                            : item.holyrics_status === 'ADDING_TO_PLAYLIST'
-                                              ? 'Adicionando...'
-                                              : item.holyrics_status === 'ERROR'
-                                                ? 'Erro'
-                                                : item.holyrics_status}
+                                            ? 'Criando no Holyrics...'
+                                            : item.holyrics_status === 'CHECKING'
+                                              ? 'Consultando acervo...'
+                                              : item.holyrics_status === 'CHECKING_PLAYLIST'
+                                                ? 'Conferindo playlist...'
+                                                : item.holyrics_status === 'ADDING_TO_PLAYLIST'
+                                                  ? 'Adicionando à playlist...'
+                                                  : item.holyrics_status === 'ERROR'
+                                                    ? 'Erro'
+                                                    : item.holyrics_status}
                                   </Badge>
                                 )}
                               </div>

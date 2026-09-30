@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T00:59:12.702Z",
+  "generatedAt": "2026-09-30T01:40:35.624Z",
   "collections": [
     {
       "name": "users",
@@ -547,8 +547,10 @@
           "system": false,
           "selectValues": [
             "NOT_SYNCED",
+            "CHECKING",
             "CREATING",
             "CREATED",
+            "CHECKING_PLAYLIST",
             "ADDING_TO_PLAYLIST",
             "ADDED_TO_PLAYLIST",
             "ALREADY_IN_PLAYLIST",
@@ -1519,6 +1521,8 @@
             "SEARCH_SONG",
             "ADD_TO_PLAYLIST",
             "CREATE_SONG",
+            "GET_SONGS",
+            "GET_SONG_PLAYLIST",
             "GET_LYRICS_PLAYLIST",
             "ADD_LYRICS_TO_PLAYLIST"
           ]

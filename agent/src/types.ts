@@ -78,6 +78,8 @@ export interface AgentCommand {
     | 'SEARCH_SONG'
     | 'ADD_TO_PLAYLIST'
     | 'CREATE_SONG'
+    | 'GET_SONGS'
+    | 'GET_SONG_PLAYLIST'
     | 'GET_LYRICS_PLAYLIST'
     | 'ADD_LYRICS_TO_PLAYLIST'
   payload: Record<string, any>

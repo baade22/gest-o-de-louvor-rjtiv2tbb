@@ -260,8 +260,10 @@ export interface InternalNotification {
 
 export type HolyricsSyncStatus =
   | 'NOT_SYNCED'
+  | 'CHECKING'
   | 'CREATING'
   | 'CREATED'
+  | 'CHECKING_PLAYLIST'
   | 'ADDING_TO_PLAYLIST'
   | 'ADDED_TO_PLAYLIST'
   | 'ALREADY_IN_PLAYLIST'

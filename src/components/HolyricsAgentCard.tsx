@@ -332,13 +332,13 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
 
           <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
             <a
-              href="/LouvorFlow-Agent-0.0.25.zip"
-              download="LouvorFlow-Agent-0.0.25.zip"
+              href="/LouvorFlow-Agent-0.0.26.zip"
+              download="LouvorFlow-Agent-0.0.26.zip"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-purple-700 bg-slate-100 hover:bg-purple-50 rounded-xl transition-colors border border-slate-200"
               title="Baixar pacote do LouvorFlow Agent para execução no computador local"
             >
               <Download className="h-3.5 w-3.5" />
-              Baixar Agent (LouvorFlow-Agent-0.0.25.zip)
+              Baixar Agent (LouvorFlow-Agent-0.0.26.zip)
             </a>
 
             {isAdmin && (

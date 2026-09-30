@@ -510,18 +510,79 @@ export class HolyricsClient {
   }
 
   /**
-   * GetLyricsPlaylist: Obtém os itens atuais da playlist do Holyrics
-   * Utilizado para conferência de estado e garantia de idempotência (não duplicar músicas na playlist)
+   * GetSongs: Obtém a listagem do acervo de músicas do Holyrics
+   * POST /api/GetSongs?token=...
+   * Body: { fields: "id,title,artist,author,key,bpm,time_sig,groups,archived" }
    */
-  public async getLyricsPlaylist(): Promise<{
+  public async getSongs(fields?: string): Promise<{
+    success: boolean
+    songs: HolyricsSongItem[]
+    data?: any
+    error?: string
+    error_code?: string
+    durationMs?: number
+    httpStatus?: number
+  }> {
+    const payload: Record<string, any> = {}
+    if (fields) {
+      payload.fields = fields
+    } else {
+      payload.fields = 'id,title,artist,author,key,bpm,time_sig,groups,archived'
+    }
+
+    const res = await this.request<HolyricsSongItem[]>('GetSongs', payload, 5000)
+
+    if (res.status === 'ok') {
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data && Array.isArray((res.data as any).songs)
+          ? (res.data as any).songs
+          : []
+      return {
+        success: true,
+        songs: list,
+        data: res.data,
+        durationMs: res.durationMs,
+        httpStatus: res.httpStatus,
+      }
+    }
+
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Erro ao consultar GetSongs no Holyrics'
+
+    return {
+      success: false,
+      songs: [],
+      error: errStr,
+      error_code:
+        errStr === 'TIMEOUT_HOLYRICS'
+          ? 'TIMEOUT_HOLYRICS'
+          : errStr.includes('CONNECTION_REFUSED')
+            ? 'CONNECTION_REFUSED'
+            : 'GET_SONGS_FAILED',
+      durationMs: res.durationMs,
+      httpStatus: res.httpStatus,
+    }
+  }
+
+  /**
+   * GetSongPlaylist: Obtém os itens da playlist de músicas do Holyrics
+   * POST /api/GetSongPlaylist?token=...
+   * Fallback para GetLyricsPlaylist / GetPlaylist para compatibilidade com versões antigas.
+   */
+  public async getSongPlaylist(): Promise<{
     success: boolean
     items: import('./types.js').HolyricsPlaylistItem[]
     data?: any
     error?: string
     error_code?: string
+    durationMs?: number
+    httpStatus?: number
   }> {
-    // 1. Tenta GetLyricsPlaylist oficial
-    const res = await this.request('GetLyricsPlaylist', {}, 4000)
+    // 1. Tenta GetSongPlaylist oficial
+    const res = await this.request('GetSongPlaylist', {}, 4000)
     if (res.status === 'ok') {
       let items: import('./types.js').HolyricsPlaylistItem[] = []
       if (Array.isArray(res.data)) {
@@ -537,82 +598,158 @@ export class HolyricsClient {
         success: true,
         items,
         data: res.data,
+        durationMs: res.durationMs,
+        httpStatus: res.httpStatus,
       }
     }
 
-    // 2. Fallback GetPlaylist caso GetLyricsPlaylist não exista em versões anteriores
-    const resFallback = await this.request('GetPlaylist', {}, 4000)
-    if (resFallback.status === 'ok') {
+    const errStr1 = typeof res.error === 'string' ? res.error : res.error?.message || ''
+
+    // Se falha for de conexão ou timeout, não faz fallback e retorna logo
+    if (errStr1 === 'TIMEOUT_HOLYRICS' || errStr1.includes('CONNECTION_REFUSED')) {
+      return {
+        success: false,
+        items: [],
+        error: errStr1,
+        error_code: errStr1 === 'TIMEOUT_HOLYRICS' ? 'TIMEOUT_HOLYRICS' : 'CONNECTION_REFUSED',
+        durationMs: res.durationMs,
+        httpStatus: res.httpStatus,
+      }
+    }
+
+    // 2. Fallback GetLyricsPlaylist
+    const res2 = await this.request('GetLyricsPlaylist', {}, 4000)
+    if (res2.status === 'ok') {
       let items: import('./types.js').HolyricsPlaylistItem[] = []
-      if (Array.isArray(resFallback.data)) {
-        items = resFallback.data
-      } else if (resFallback.data && Array.isArray(resFallback.data.items)) {
-        items = resFallback.data.items
-      } else if (resFallback.data && Array.isArray(resFallback.data.list)) {
-        items = resFallback.data.list
+      if (Array.isArray(res2.data)) {
+        items = res2.data
+      } else if (res2.data && Array.isArray(res2.data.items)) {
+        items = res2.data.items
+      } else if (res2.data && Array.isArray(res2.data.list)) {
+        items = res2.data.list
+      } else if (res2.data && Array.isArray(res2.data.playlist)) {
+        items = res2.data.playlist
       }
       return {
         success: true,
         items,
-        data: resFallback.data,
+        data: res2.data,
+        durationMs: res2.durationMs,
+        httpStatus: res2.httpStatus,
       }
     }
 
-    const errStr =
-      typeof res.error === 'string'
-        ? res.error
-        : res.error?.message || 'Erro ao consultar playlist do Holyrics'
+    // 3. Fallback GetPlaylist
+    const res3 = await this.request('GetPlaylist', {}, 4000)
+    if (res3.status === 'ok') {
+      let items: import('./types.js').HolyricsPlaylistItem[] = []
+      if (Array.isArray(res3.data)) {
+        items = res3.data
+      } else if (res3.data && Array.isArray(res3.data.items)) {
+        items = res3.data.items
+      } else if (res3.data && Array.isArray(res3.data.list)) {
+        items = res3.data.list
+      }
+      return {
+        success: true,
+        items,
+        data: res3.data,
+        durationMs: res3.durationMs,
+        httpStatus: res3.httpStatus,
+      }
+    }
+
+    const errFinal = errStr1 || 'Erro ao consultar GetSongPlaylist no Holyrics'
     return {
       success: false,
       items: [],
-      error: errStr,
-      error_code:
-        errStr === 'TIMEOUT_HOLYRICS'
-          ? 'TIMEOUT_HOLYRICS'
-          : errStr.includes('CONNECTION_REFUSED')
-            ? 'CONNECTION_REFUSED'
-            : 'GET_PLAYLIST_FAILED',
+      error: errFinal,
+      error_code: 'GET_SONG_PLAYLIST_FAILED',
+      durationMs: res.durationMs,
+      httpStatus: res.httpStatus,
+    }
+  }
+
+  /**
+   * GetLyricsPlaylist: alias legado mantido para retrocompatibilidade
+   */
+  public async getLyricsPlaylist(): Promise<{
+    success: boolean
+    items: import('./types.js').HolyricsPlaylistItem[]
+    data?: any
+    error?: string
+    error_code?: string
+  }> {
+    const res = await this.getSongPlaylist()
+    return {
+      success: res.success,
+      items: res.items,
+      data: res.data,
+      error: res.error,
+      error_code: res.error_code,
     }
   }
 
   /**
    * AddLyricsToPlaylist: Adiciona uma letra identificada pelo ID à playlist do Holyrics
-   * Formato oficial Holyrics API Server:
+   * Formato oficial validado:
    * POST /api/AddLyricsToPlaylist?token=...
-   * Body: { id: "123" } ou { item: { id: "123" } }
+   * Body: { id: "<HOLYRICS_SONG_ID>", index: <posição>, media_playlist: false }
    */
   public async addToPlaylist(
     songId: string,
-  ): Promise<{ success: boolean; data?: any; error?: string; error_code?: string }> {
-    // Tenta formato direto { id: "..." }
-    const res = await this.request('AddLyricsToPlaylist', { id: songId })
+    options?: { index?: number; media_playlist?: boolean },
+  ): Promise<{
+    success: boolean
+    data?: any
+    error?: string
+    error_code?: string
+    rawResponse?: any
+  }> {
+    const payload: Record<string, any> = {
+      id: songId,
+      media_playlist: options?.media_playlist ?? false,
+    }
+    if (options?.index !== undefined && options?.index !== null) {
+      payload.index = Number(options.index)
+    }
+
+    // 1. Chamada primária com o payload oficial validado
+    const res = await this.request('AddLyricsToPlaylist', payload, 5000)
     if (res.status === 'ok') {
-      return { success: true, data: res.data }
-    }
-
-    // Fallback secundário documentado no Holyrics { item: { id: "..." } }
-    const resFallback = await this.request('AddLyricsToPlaylist', { item: { id: songId } })
-    if (resFallback.status === 'ok') {
-      return { success: true, data: resFallback.data }
-    }
-
-    // Fallback AddToPlaylist
-    const resGeneric = await this.request('AddToPlaylist', { type: 'song', id: songId })
-    if (resGeneric.status === 'ok') {
-      return { success: true, data: resGeneric.data }
+      return { success: true, data: res.data, rawResponse: res.data }
     }
 
     const errStr =
-      typeof res.error === 'string' ? res.error : res.error?.message || 'Falha ao adicionar'
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Falha ao adicionar à playlist'
+
+    // Se falha for de conexão ou timeout, não faz fallbacks e retorna imediatamente
+    if (errStr === 'TIMEOUT_HOLYRICS' || errStr.includes('CONNECTION_REFUSED')) {
+      return {
+        success: false,
+        error: errStr,
+        error_code: errStr === 'TIMEOUT_HOLYRICS' ? 'TIMEOUT_HOLYRICS' : 'CONNECTION_REFUSED',
+      }
+    }
+
+    // Fallback secundário documentado no Holyrics: { item: { id: "..." } }
+    const resFallback = await this.request('AddLyricsToPlaylist', { item: { id: songId } }, 4000)
+    if (resFallback.status === 'ok') {
+      return { success: true, data: resFallback.data, rawResponse: resFallback.data }
+    }
+
+    // Fallback AddToPlaylist
+    const resGeneric = await this.request('AddToPlaylist', { type: 'song', id: songId }, 4000)
+    if (resGeneric.status === 'ok') {
+      return { success: true, data: resGeneric.data, rawResponse: resGeneric.data }
+    }
+
     return {
       success: false,
       error: errStr,
-      error_code:
-        errStr === 'TIMEOUT_HOLYRICS'
-          ? 'TIMEOUT_HOLYRICS'
-          : errStr.includes('CONNECTION_REFUSED')
-            ? 'CONNECTION_REFUSED'
-            : 'ADD_PLAYLIST_FAILED',
+      error_code: 'ADD_PLAYLIST_FAILED',
     }
   }
 }

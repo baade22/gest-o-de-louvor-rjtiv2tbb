@@ -158,13 +158,20 @@ function collectFiles(dir, baseDir = '') {
 const agentDir = path.resolve(process.cwd(), 'agent')
 const files = collectFiles(agentDir)
 const zipBuf = buildZip(files)
+const outPublic26 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.26.zip')
+fs.writeFileSync(outPublic26, zipBuf)
+
+const outPublicGeneral = path.resolve(process.cwd(), 'public/LouvorFlow-Agent.zip')
+fs.writeFileSync(outPublicGeneral, zipBuf)
+
 const outPublic25 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.25.zip')
 fs.writeFileSync(outPublic25, zipBuf)
-// Manter espelhos legados que já existem (0.0.24 e 0.0.15) apontando para o build novo
+
 const outPublic24 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.24.zip')
 fs.writeFileSync(outPublic24, zipBuf)
 const outPublic15 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
 fs.writeFileSync(outPublic15, zipBuf)
+
 console.log(
-  `[ZIP Prebuild] LouvorFlow-Agent-0.0.25.zip gerado com sucesso em ${outPublic25} (${zipBuf.length} bytes, ${files.length} arquivos)`,
+  `[ZIP Prebuild] LouvorFlow-Agent-0.0.26.zip gerado com sucesso em ${outPublic26} (${zipBuf.length} bytes, ${files.length} arquivos)`,
 )
