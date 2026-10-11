@@ -210,6 +210,64 @@ routerAdd(
     const cmdCol = $app.findCollectionByNameOrId('holyrics_commands')
     const syncLogsCol = $app.findCollectionByNameOrId('holyrics_sync_logs')
 
+    // Helper para decodificar Goja byte arrays UTF-8 multibyte
+    // PocketBase v0.36 (Goja) retorna campos JSON como arrays de bytes numéricos UTF-8.
+    // Bytes com bit 7 ativo (>= 0x80) são sequências multibyte UTF-8 e devem ser
+    // decodificados em pontos de código Unicode completos (sem transformar em Latin-1).
+    const decodeUtf8Bytes = (bytes) => {
+      if (!Array.isArray(bytes) || bytes.length === 0) return ''
+      let out = ''
+      let i = 0
+      const len = bytes.length
+      while (i < len) {
+        const c = bytes[i++] & 0xff
+        if (c <= 0x7f) {
+          // 1 byte: ASCII (0x00 - 0x7F)
+          out += String.fromCharCode(c)
+        } else if ((c & 0xe0) === 0xc0) {
+          // 2 bytes: 110xxxxx 10xxxxxx (U+0080 - U+07FF)
+          if (i < len) {
+            const c2 = bytes[i++] & 0xff
+            const cp = ((c & 0x1f) << 6) | (c2 & 0x3f)
+            out += String.fromCharCode(cp)
+          } else {
+            out += String.fromCharCode(c)
+          }
+        } else if ((c & 0xf0) === 0xe0) {
+          // 3 bytes: 1110xxxx 10xxxxxx 10xxxxxx (U+0800 - U+FFFF)
+          if (i + 1 < len) {
+            const c2 = bytes[i++] & 0xff
+            const c3 = bytes[i++] & 0xff
+            const cp = ((c & 0x0f) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f)
+            out += String.fromCharCode(cp)
+          } else {
+            out += String.fromCharCode(c)
+          }
+        } else if ((c & 0xf8) === 0xf0) {
+          // 4 bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx (U+10000 - U+10FFFF)
+          if (i + 2 < len) {
+            const c2 = bytes[i++] & 0xff
+            const c3 = bytes[i++] & 0xff
+            const c4 = bytes[i++] & 0xff
+            let cp = ((c & 0x07) << 18) | ((c2 & 0x3f) << 12) | ((c3 & 0x3f) << 6) | (c4 & 0x3f)
+            if (cp > 0xffff) {
+              cp -= 0x10000
+              out += String.fromCharCode(0xd800 + (cp >> 10))
+              out += String.fromCharCode(0xdc00 + (cp & 0x3ff))
+            } else {
+              out += String.fromCharCode(cp)
+            }
+          } else {
+            out += String.fromCharCode(c)
+          }
+        } else {
+          // Byte de continuação isolado ou inválido
+          out += String.fromCharCode(c)
+        }
+      }
+      return out
+    }
+
     // Helper interno para executar comando e aguardar resposta até timeout (polling ativo no servidor)
     const runCommandSync = (action, payload, maxWaitMs) => {
       const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
@@ -241,8 +299,7 @@ routerAdd(
               if (typeof r === 'string') {
                 finalResult = JSON.parse(r)
               } else if (Array.isArray(r)) {
-                let s = ''
-                for (let b = 0; b < r.length; b++) s += String.fromCharCode(r[b])
+                const s = decodeUtf8Bytes(r)
                 finalResult = JSON.parse(s)
               } else {
                 finalResult = r
@@ -279,8 +336,7 @@ routerAdd(
       // Se vier como byte-array Goja não decodificado previamente
       if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'number') {
         try {
-          let s = ''
-          for (let b = 0; b < result.length; b++) s += String.fromCharCode(result[b])
+          const s = decodeUtf8Bytes(result)
           result = JSON.parse(s)
         } catch (_) {}
       }
@@ -384,8 +440,7 @@ routerAdd(
           } catch (_) {}
         } else if (Array.isArray(resData) && resData.length > 0 && typeof resData[0] === 'number') {
           try {
-            let s = ''
-            for (let b = 0; b < resData.length; b++) s += String.fromCharCode(resData[b])
+            const s = decodeUtf8Bytes(resData)
             resData = JSON.parse(s)
           } catch (_) {}
         }
@@ -416,8 +471,7 @@ routerAdd(
           } catch (_) {}
         } else if (Array.isArray(resData) && resData.length > 0 && typeof resData[0] === 'number') {
           try {
-            let s = ''
-            for (let b = 0; b < resData.length; b++) s += String.fromCharCode(resData[b])
+            const s = decodeUtf8Bytes(resData)
             resData = JSON.parse(s)
           } catch (_) {}
         }
@@ -454,48 +508,304 @@ routerAdd(
     let countAlreadyInPlaylist = 0
     let countErrors = 0
 
-    // Constante de marcadores de seção para o parser LouvorFlow -> slides Holyrics
-    const sectionMarkersList = [
+    // -------------------------------------------------------------------------
+    // PARSER MUSICAL DETERMINÍSTICO PARA GERAÇÃO DE SLIDES NO HOLYRICS (CreateSong)
+    // Regras A (Somente Letra), B (2 versos por slide) e C (UTF-8 fiel de ponta a ponta)
+    // -------------------------------------------------------------------------
+
+    const SECTION_PATTERNS = [
       'INTRO',
       'INTRODUÇÃO',
       'INTRODUCAO',
-      'VERSO 1',
-      'VERSO 2',
-      'VERSO 3',
       'VERSO',
+      'ESTROFE',
+      'PRIMEIRA PARTE',
+      'SEGUNDA PARTE',
+      'TERCEIRA PARTE',
+      'QUARTA PARTE',
+      'PARTE',
       'PRÉ-REFRÃO',
       'PRE-REFRAO',
       'PRÉ REFRÃO',
       'PRE REFRAO',
+      'PRÉ REFRÃO 1',
+      'PRÉ REFRÃO 2',
       'REFRÃO',
       'REFRAO',
       'CORO',
       'PONTE',
-      'FINAL',
       'INTERLÚDIO',
       'INTERLUDIO',
       'INSTRUMENTAL',
+      'SOLO',
       'TAG',
       'BREAK',
+      'FINAL',
       'OUTRO',
       'FIM',
-      'SOLO',
-      'ESTROFE',
     ]
 
-    const isMarker = (lineText) => {
-      const clean = lineText
-        .replace(/^[[({\s#*=-]+|[\])}\s#*=-]+$/g, '')
-        .replace(/:$/, '')
+    // Detecta se a linha é um cabeçalho/marcador de seção (ex: ##(VERSO 1), [Primeira Parte], [Refrão], CORO:)
+    // Retorna o nome normalizado e limpo da seção (ex: "VERSO 1", "PRIMEIRA PARTE", "REFRÃO") ou null
+    const detectSectionHeader = (line) => {
+      if (!line) return null
+      const raw = String(line).trim()
+      if (!raw) return null
+
+      // Remove hashes múltiplos, colchetes, parênteses, chaves, asteriscos, traços e espaços ao redor
+      let clean = raw
+        .replace(/^[\s#*=\-_\\[\](){}]+|[\s#*=\-_\\[\](){}]+$/g, '')
+        .replace(/^[\s#*=\-_\\[\](){}]+|[\s#*=\-_\\[\](){}]+$/g, '')
+        .replace(/:+$/, '')
         .trim()
         .toUpperCase()
-      if (!clean) return false
-      for (let m = 0; m < sectionMarkersList.length; m++) {
-        if (clean === sectionMarkersList[m] || clean.startsWith(sectionMarkersList[m] + ' ')) {
+
+      // Trata caso onde restou parênteses internos, ex: "(VERSO 1)" -> "VERSO 1"
+      clean = clean.replace(/^[([<{]+|[)\]>}]+$/g, '').trim()
+
+      if (!clean) return null
+
+      // Verifica correspondência exata ou inicial com marcadores conhecidos
+      for (let m = 0; m < SECTION_PATTERNS.length; m++) {
+        const p = SECTION_PATTERNS[m]
+        if (
+          clean === p ||
+          clean.startsWith(p + ' ') ||
+          clean.startsWith(p + ':') ||
+          clean.startsWith(p + '-')
+        ) {
           return clean
         }
       }
+
+      return null
+    }
+
+    // Validação contextual de token de acorde musical
+    const isStrictChordToken = (token) => {
+      if (!token) return false
+      const clean = String(token)
+        .replace(/^[([<{]+|[)\]>},;.:]+$/g, '')
+        .trim()
+      if (!clean) return false
+
+      // Palavras legítimas da língua portuguesa que NUNCA devem ser tratadas como acorde isolado
+      const portugueseWords = {
+        A: true,
+        E: true,
+        O: true,
+        AS: true,
+        OS: true,
+        DO: true,
+        DA: true,
+        DOS: true,
+        DAS: true,
+        NO: true,
+        NA: true,
+        NOS: true,
+        NAS: true,
+        EM: true,
+        DE: true,
+        SE: true,
+        EU: true,
+        TU: true,
+        ELE: true,
+        ELA: true,
+        ME: true,
+        TE: true,
+        AO: true,
+        AOS: true,
+        PRA: true,
+        PRO: true,
+        POR: true,
+        SEM: true,
+        COM: true,
+        SIM: true,
+        NAO: true,
+        NÃO: true,
+        QUE: true,
+        QUEM: true,
+        QUAL: true,
+        FOI: true,
+        SOU: true,
+        ERA: true,
+        SER: true,
+        TER: true,
+        VER: true,
+        VEM: true,
+        VAI: true,
+        PAI: true,
+        MAI: true,
+        REI: true,
+        LEI: true,
+        DÓ: true,
+        RÉ: true,
+        MÍ: true,
+        FÁ: true,
+        SÓL: true,
+        LÁ: true,
+        SÍ: true,
+        DOM: true,
+      }
+
+      if (portugueseWords[clean.toUpperCase()]) {
+        return false
+      }
+
+      // Trata acordes com baixo invertido: C/E, D/F#, G/B
+      if (clean.includes('/')) {
+        const parts = clean.split('/')
+        if (parts.length === 2) {
+          const main = parts[0].trim()
+          const bass = parts[1].trim()
+          return isStrictChordToken(main) && /^[A-G][#b]?$/i.test(bass)
+        }
+      }
+
+      // Regex para padrão de acorde harmônico (ex: C, D, Em, F#m, G7, BbM7, C9, Dsus4, Am7(b5), F#7(11), E/G#)
+      const chordRegex =
+        /^[A-G][#b]?(m|min|maj|M|dim|aug|sus[24]?|add[0-9]+|[0-9]+|b[0-9]+|#[0-9]+|[ø°+*∆])*(?:\([^)]+\))?$/
+      return chordRegex.test(clean)
+    }
+
+    // Linha dedicada de acordes (estilo Cifra Club sobre a letra)
+    const isChordOnlyLine = (line) => {
+      if (!line) return false
+      const trimmed = String(line).trim()
+      if (!trimmed) return false
+
+      // Remove colchetes de acordes inline
+      const cleanLine = trimmed.replace(/\[[^\]]+\]/g, ' ')
+      const tokens = cleanLine.split(/\s+/).filter(Boolean)
+      if (tokens.length === 0) return false
+
+      let chordCount = 0
+      for (let t = 0; t < tokens.length; t++) {
+        if (isStrictChordToken(tokens[t])) {
+          chordCount++
+        }
+      }
+
+      // Se 50% ou mais dos tokens forem acordes, ou se houver pelo menos 1 acorde e nenhum outro caractere for texto alfabético comum longo
+      if (chordCount / tokens.length >= 0.5) return true
+
       return false
+    }
+
+    // Limpeza de acordes inline mantendo letras e pontuação intactas
+    const stripChordsFromLine = (line) => {
+      if (!line) return ''
+      let s = String(line)
+
+      // 1. Remove acordes entre colchetes [C#m], [E/G#], [F#7(11)]
+      s = s.replace(/\[([A-G][#b]?[^\]]*)\]/g, (match, inner) => {
+        if (detectSectionHeader(inner)) {
+          return '' // Seção dentro de colchetes é tratada separadamente
+        }
+        return ''
+      })
+
+      // 2. Remove acordes isolados entre parênteses se forem estritamente acordes: (C#m), (E/G#), (B4)
+      s = s.replace(/\(([A-G][#b]?[^)]*)\)/g, (match, inner) => {
+        if (isStrictChordToken(inner)) {
+          return ''
+        }
+        return match // Mantém texto vocal legítimo entre parênteses ex: "(confiarei)"
+      })
+
+      // 3. Normaliza espaços múltiplos
+      s = s.replace(/[ \t]{2,}/g, ' ').trim()
+      return s
+    }
+
+    // Gera os slides estruturados respeitando seções, 2 versos por slide e formato do Holyrics
+    const generateHolyricsSlides = (songRec, songTitle) => {
+      // Regra A: preferencialmente songs.lyrics limpo
+      const storedLyrics = songRec.getString('lyrics')
+      const storedRawContent = songRec.getString('raw_content')
+      const storedChords = songRec.getString('chords')
+
+      let sourceText = storedLyrics && storedLyrics.trim() ? storedLyrics : ''
+      const isFromCifraSource = !sourceText
+
+      if (!sourceText) {
+        sourceText =
+          (storedRawContent && storedRawContent.trim()) ||
+          (storedChords && storedChords.trim()) ||
+          ''
+      }
+
+      const rawLines = sourceText.split(/\r?\n/)
+      const sections = [] // Array de { name, lines: [] }
+
+      let currentSec = { name: 'VERSO 1', lines: [] }
+      let hasCustomHeader = false
+
+      for (let li = 0; li < rawLines.length; li++) {
+        const line = rawLines[li]
+        const trimmed = line.trim()
+        if (!trimmed) continue
+
+        const headerFound = detectSectionHeader(trimmed)
+        if (headerFound) {
+          if (currentSec.lines.length > 0) {
+            sections.push(currentSec)
+          }
+          currentSec = { name: headerFound, lines: [] }
+          hasCustomHeader = true
+          continue
+        }
+
+        // Se veio de fonte com cifras (raw_content ou chords) ou texto com cifras embutidas:
+        // descarta linha exclusiva de acordes
+        if (isChordOnlyLine(trimmed)) {
+          continue
+        }
+
+        // Limpa acordes inline da linha
+        const cleanedLine = stripChordsFromLine(line)
+        if (cleanedLine) {
+          currentSec.lines.push(cleanedLine)
+        }
+      }
+
+      if (currentSec.lines.length > 0) {
+        sections.push(currentSec)
+      }
+
+      // Regra B: Agrupar de 2 em 2 versos dentro de cada seção
+      const slides = []
+      for (let si = 0; si < sections.length; si++) {
+        const sec = sections[si]
+        const secName = sec.name || 'VERSO 1'
+        const secLines = sec.lines
+
+        for (let l = 0; l < secLines.length; l += 2) {
+          const chunk = secLines.slice(l, l + 2)
+          const slideText = chunk.join('\n').trim()
+          if (slideText) {
+            slides.push({
+              text: slideText,
+              slide_description: secName,
+            })
+          }
+        }
+      }
+
+      // Fallback seguro caso não haja linhas válidas extraídas
+      if (slides.length === 0) {
+        slides.push({
+          text: songTitle,
+          slide_description: 'VERSO 1',
+        })
+      }
+
+      let orderStr = ''
+      for (let sIdx = 0; sIdx < slides.length; sIdx++) {
+        orderStr += (sIdx > 0 ? ',' : '') + (sIdx + 1)
+      }
+
+      return { slides, orderStr }
     }
 
     // Lock de exclusão mútua em memória por congregação + música
@@ -540,60 +850,7 @@ routerAdd(
       const songNotes = songRec.getString('notes')
 
       // Constrói slides determinísticos para CreateSong caso necessário
-      const rawLyrics =
-        songRec.getString('lyrics') ||
-        songRec.getString('raw_content') ||
-        songRec.getString('chords') ||
-        ''
-      const slides = []
-      const sectionLines = rawLyrics.split(/\r?\n/)
-      let currentSectionName = 'VERSO 1'
-      let currentSectionTextLines = []
-
-      const flushSlide = () => {
-        const joined = currentSectionTextLines.join('\n').trim()
-        if (joined) {
-          slides.push({
-            text: joined,
-            slide_description: currentSectionName,
-          })
-        }
-        currentSectionTextLines = []
-      }
-
-      for (let l = 0; l < sectionLines.length; l++) {
-        const line = sectionLines[l]
-        const trimmed = line.trim()
-        if (!trimmed) continue
-
-        const markerMatch = isMarker(trimmed)
-        if (markerMatch) {
-          flushSlide()
-          currentSectionName = markerMatch
-        } else {
-          // Linha de letra: remove acordes inline [G]
-          const cleanLine = line
-            .replace(/\[[A-G][^\]]*\]/g, '')
-            .replace(/[ \t]{2,}/g, ' ')
-            .trim()
-          if (cleanLine) {
-            currentSectionTextLines.push(cleanLine)
-          }
-        }
-      }
-      flushSlide()
-
-      if (slides.length === 0) {
-        slides.push({
-          text: songTitle,
-          slide_description: 'VERSO 1',
-        })
-      }
-
-      let orderStr = ''
-      for (let sIdx = 0; sIdx < slides.length; sIdx++) {
-        orderStr += (sIdx > 0 ? ',' : '') + (sIdx + 1)
-      }
+      const { slides, orderStr } = generateHolyricsSlides(songRec, songTitle)
 
       // Re-lê songRec para pegar estado mais recente de holyrics_song_id
       try {

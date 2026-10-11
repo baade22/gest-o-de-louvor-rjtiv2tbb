@@ -6,6 +6,56 @@ import { describe, it, expect } from 'vitest'
  * de CreateSong e diferentes formatos de transporte.
  */
 describe('Goja Byte-Array & extractHolyricsSongId Parsing (v0.0.31)', () => {
+  // Decodificador UTF-8 multibyte exato presente nos hooks PocketBase / Goja
+  const decodeUtf8Bytes = (bytes: number[]): string => {
+    if (!Array.isArray(bytes) || bytes.length === 0) return ''
+    let out = ''
+    let i = 0
+    const len = bytes.length
+    while (i < len) {
+      const c = bytes[i++] & 0xff
+      if (c <= 0x7f) {
+        out += String.fromCharCode(c)
+      } else if ((c & 0xe0) === 0xc0) {
+        if (i < len) {
+          const c2 = bytes[i++] & 0xff
+          const cp = ((c & 0x1f) << 6) | (c2 & 0x3f)
+          out += String.fromCharCode(cp)
+        } else {
+          out += String.fromCharCode(c)
+        }
+      } else if ((c & 0xf0) === 0xe0) {
+        if (i + 1 < len) {
+          const c2 = bytes[i++] & 0xff
+          const c3 = bytes[i++] & 0xff
+          const cp = ((c & 0x0f) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f)
+          out += String.fromCharCode(cp)
+        } else {
+          out += String.fromCharCode(c)
+        }
+      } else if ((c & 0xf8) === 0xf0) {
+        if (i + 2 < len) {
+          const c2 = bytes[i++] & 0xff
+          const c3 = bytes[i++] & 0xff
+          const c4 = bytes[i++] & 0xff
+          let cp = ((c & 0x07) << 18) | ((c2 & 0x3f) << 12) | ((c3 & 0x3f) << 6) | (c4 & 0x3f)
+          if (cp > 0xffff) {
+            cp -= 0x10000
+            out += String.fromCharCode(0xd800 + (cp >> 10))
+            out += String.fromCharCode(0xdc00 + (cp & 0x3ff))
+          } else {
+            out += String.fromCharCode(cp)
+          }
+        } else {
+          out += String.fromCharCode(c)
+        }
+      } else {
+        out += String.fromCharCode(c)
+      }
+    }
+    return out
+  }
+
   // Implementação exata do extrator e decodificador presente no hook
   const parseGojaResult = (r: any) => {
     let finalResult = null
@@ -13,8 +63,7 @@ describe('Goja Byte-Array & extractHolyricsSongId Parsing (v0.0.31)', () => {
       if (typeof r === 'string') {
         finalResult = JSON.parse(r)
       } else if (Array.isArray(r) && r.length > 0 && typeof r[0] === 'number') {
-        let s = ''
-        for (let b = 0; b < r.length; b++) s += String.fromCharCode(r[b])
+        const s = decodeUtf8Bytes(r)
         finalResult = JSON.parse(s)
       } else {
         finalResult = r
@@ -32,8 +81,7 @@ describe('Goja Byte-Array & extractHolyricsSongId Parsing (v0.0.31)', () => {
     // Se vier como byte-array Goja não decodificado previamente
     if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'number') {
       try {
-        let s = ''
-        for (let b = 0; b < result.length; b++) s += String.fromCharCode(result[b])
+        const s = decodeUtf8Bytes(result)
         result = JSON.parse(s)
       } catch {
         /* intentionally ignored */
@@ -150,6 +198,45 @@ describe('Goja Byte-Array & extractHolyricsSongId Parsing (v0.0.31)', () => {
     const parsedInvalid = parseGojaResult(invalidBytes)
     expect(parsedInvalid).toEqual(invalidBytes)
     expect(extractHolyricsSongId(invalidBytes)).toBe('')
+  })
+
+  it('5b. Validação UTF-8 multibyte: acentos portugueses (ç, á, é, í, ó, ú, ã, õ, ê) preservados sem corrupção Latin-1', () => {
+    const textWithAccents =
+      'Jesus em Tua presença • Reunimo-nos aqui • Trouxe vida a todos nós • Ao coração do Pai • águas • pés'
+    const payloadWithAccents = {
+      title: 'Jesus em Tua presença',
+      verses: [
+        'Jesus em Tua presença',
+        'Reunimo-nos aqui',
+        'Trouxe vida a todos nós',
+        'Ao coração do Pai',
+        'Tua voz me chama sobre as águas',
+        'Onde os meus pés podem falhar',
+      ],
+      description: textWithAccents,
+    }
+
+    // Codifica em buffer UTF-8 como o Goja entrega internamente
+    const utf8Buffer = Buffer.from(JSON.stringify(payloadWithAccents), 'utf-8')
+    const bytes = Array.from(utf8Buffer)
+
+    // O decodificador multibyte deve restaurar perfeitamente os acentos
+    const parsed = parseGojaResult(bytes)
+    expect(parsed.title).toBe('Jesus em Tua presença')
+    expect(parsed.verses[0]).toBe('Jesus em Tua presença')
+    expect(parsed.verses[1]).toBe('Reunimo-nos aqui')
+    expect(parsed.verses[2]).toBe('Trouxe vida a todos nós')
+    expect(parsed.verses[3]).toBe('Ao coração do Pai')
+    expect(parsed.verses[4]).toBe('Tua voz me chama sobre as águas')
+    expect(parsed.verses[5]).toBe('Onde os meus pés podem falhar')
+
+    // Confirma ausência de mojibake (Ã§, Ã¡, Ã³, etc)
+    const jsonDecoded = JSON.stringify(parsed)
+    expect(jsonDecoded).not.toContain('Ã§')
+    expect(jsonDecoded).not.toContain('Ã³')
+    expect(jsonDecoded).not.toContain('Ã¡')
+    expect(jsonDecoded).not.toContain('Ã£')
+    expect(jsonDecoded).not.toContain('Ã©')
   })
 
   it('6. Garante que criação bem-sucedida com ID retornado pula CreateSong em execuções seguintes', () => {
