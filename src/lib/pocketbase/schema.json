@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T01:40:35.624Z",
+  "generatedAt": "2026-10-11T17:26:49.185Z",
   "collections": [
     {
       "name": "users",
@@ -550,8 +550,10 @@
             "CHECKING",
             "CREATING",
             "CREATED",
+            "VERIFYING_CREATED_SONG",
             "CHECKING_PLAYLIST",
             "ADDING_TO_PLAYLIST",
+            "VERIFYING_PLAYLIST",
             "ADDED_TO_PLAYLIST",
             "ALREADY_IN_PLAYLIST",
             "ERROR"

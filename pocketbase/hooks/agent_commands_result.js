@@ -150,9 +150,23 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
 
     if (action === 'CREATE_SONG' && status === 'DONE') {
       let createdHolyricsId = ''
-      if (result && typeof result === 'object' && result.holyrics_song_id) {
-        createdHolyricsId = String(result.holyrics_song_id)
+      if (result && typeof result === 'object') {
+        if (result.holyrics_song_id) {
+          createdHolyricsId = String(result.holyrics_song_id).trim()
+        } else if (result.id) {
+          createdHolyricsId = String(result.id).trim()
+        } else if (result.data && typeof result.data === 'object' && result.data.id) {
+          createdHolyricsId = String(result.data.id).trim()
+        } else if (
+          result.data &&
+          (typeof result.data === 'string' || typeof result.data === 'number')
+        ) {
+          createdHolyricsId = String(result.data).trim()
+        }
+      } else if (typeof result === 'string' || typeof result === 'number') {
+        createdHolyricsId = String(result).trim()
       }
+
       if (p && p.song_id && createdHolyricsId) {
         try {
           const songRec = $app.findRecordById('songs', p.song_id)

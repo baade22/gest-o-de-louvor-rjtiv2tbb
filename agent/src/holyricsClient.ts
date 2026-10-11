@@ -497,6 +497,15 @@ export class HolyricsClient {
       typeof res.error === 'string'
         ? res.error
         : res.error?.message || 'Erro ao criar música no Holyrics'
+
+    const isAuth =
+      res.httpStatus === 401 ||
+      res.httpStatus === 403 ||
+      errStr.toLowerCase().includes('token') ||
+      errStr.toLowerCase().includes('permiss') ||
+      errStr.toLowerCase().includes('unauthorized') ||
+      errStr.toLowerCase().includes('forbidden')
+
     return {
       success: false,
       error: errStr,
@@ -505,7 +514,9 @@ export class HolyricsClient {
           ? 'TIMEOUT_HOLYRICS'
           : errStr.includes('CONNECTION_REFUSED')
             ? 'CONNECTION_REFUSED'
-            : 'CREATE_SONG_FAILED',
+            : isAuth
+              ? 'AUTH_FORBIDDEN'
+              : 'CREATE_SONG_FAILED',
     }
   }
 
@@ -552,6 +563,14 @@ export class HolyricsClient {
         ? res.error
         : res.error?.message || 'Erro ao consultar GetSongs no Holyrics'
 
+    const isAuthSongs =
+      res.httpStatus === 401 ||
+      res.httpStatus === 403 ||
+      errStr.toLowerCase().includes('token') ||
+      errStr.toLowerCase().includes('permiss') ||
+      errStr.toLowerCase().includes('unauthorized') ||
+      errStr.toLowerCase().includes('forbidden')
+
     return {
       success: false,
       songs: [],
@@ -561,7 +580,9 @@ export class HolyricsClient {
           ? 'TIMEOUT_HOLYRICS'
           : errStr.includes('CONNECTION_REFUSED')
             ? 'CONNECTION_REFUSED'
-            : 'GET_SONGS_FAILED',
+            : isAuthSongs
+              ? 'AUTH_FORBIDDEN'
+              : 'GET_SONGS_FAILED',
       durationMs: res.durationMs,
       httpStatus: res.httpStatus,
     }
@@ -660,11 +681,19 @@ export class HolyricsClient {
     }
 
     const errFinal = errStr1 || 'Erro ao consultar GetSongPlaylist no Holyrics'
+    const isAuthError =
+      res.httpStatus === 401 ||
+      res.httpStatus === 403 ||
+      errFinal.toLowerCase().includes('token') ||
+      errFinal.toLowerCase().includes('permiss') ||
+      errFinal.toLowerCase().includes('unauthorized') ||
+      errFinal.toLowerCase().includes('forbidden')
+
     return {
       success: false,
       items: [],
       error: errFinal,
-      error_code: 'GET_SONG_PLAYLIST_FAILED',
+      error_code: isAuthError ? 'AUTH_FORBIDDEN' : 'GET_SONG_PLAYLIST_FAILED',
       durationMs: res.durationMs,
       httpStatus: res.httpStatus,
     }
@@ -746,10 +775,18 @@ export class HolyricsClient {
       return { success: true, data: resGeneric.data, rawResponse: resGeneric.data }
     }
 
+    const isAuthAdd =
+      res.httpStatus === 401 ||
+      res.httpStatus === 403 ||
+      errStr.toLowerCase().includes('token') ||
+      errStr.toLowerCase().includes('permiss') ||
+      errStr.toLowerCase().includes('unauthorized') ||
+      errStr.toLowerCase().includes('forbidden')
+
     return {
       success: false,
       error: errStr,
-      error_code: 'ADD_PLAYLIST_FAILED',
+      error_code: isAuthAdd ? 'AUTH_FORBIDDEN' : 'ADD_PLAYLIST_FAILED',
     }
   }
 }
