@@ -1071,26 +1071,32 @@ export default function EventScaleDetail() {
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                         : item.holyrics_status === 'ERROR'
                                           ? 'bg-red-50 text-red-700 border-red-200'
-                                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                                          : item.holyrics_status === 'VERIFYING_CREATED_SONG'
+                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                            : 'bg-amber-50 text-amber-700 border-amber-200'
                                     }`}
                                   >
                                     {item.holyrics_status === 'ADDED_TO_PLAYLIST'
-                                      ? 'Na playlist'
+                                      ? `Na playlist (${item.holyrics_playlist_order || index + 1}º)`
                                       : item.holyrics_status === 'ALREADY_IN_PLAYLIST'
                                         ? 'Playlist (já estava)'
                                         : item.holyrics_status === 'CREATED'
                                           ? 'Criada no Holyrics'
-                                          : item.holyrics_status === 'CREATING'
-                                            ? 'Criando no Holyrics...'
-                                            : item.holyrics_status === 'CHECKING'
-                                              ? 'Consultando acervo...'
-                                              : item.holyrics_status === 'CHECKING_PLAYLIST'
-                                                ? 'Conferindo playlist...'
-                                                : item.holyrics_status === 'ADDING_TO_PLAYLIST'
-                                                  ? 'Adicionando à playlist...'
-                                                  : item.holyrics_status === 'ERROR'
-                                                    ? 'Erro'
-                                                    : item.holyrics_status}
+                                          : item.holyrics_status === 'VERIFYING_CREATED_SONG'
+                                            ? 'Criada (verificando)'
+                                            : item.holyrics_status === 'CREATING'
+                                              ? 'Criando no Holyrics...'
+                                              : item.holyrics_status === 'CHECKING'
+                                                ? 'Consultando acervo...'
+                                                : item.holyrics_status === 'CHECKING_PLAYLIST'
+                                                  ? 'Conferindo playlist...'
+                                                  : item.holyrics_status === 'ADDING_TO_PLAYLIST'
+                                                    ? 'Adicionando à playlist...'
+                                                    : item.holyrics_status === 'VERIFYING_PLAYLIST'
+                                                      ? 'Confirmando playlist...'
+                                                      : item.holyrics_status === 'ERROR'
+                                                        ? 'Erro técnico'
+                                                        : item.holyrics_status}
                                   </Badge>
                                 )}
                               </div>
@@ -2311,32 +2317,40 @@ export default function EventScaleDetail() {
           </DialogHeader>
 
           {syncReportSummary && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 pb-1">
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 pb-1">
+              <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-center">
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Total</span>
-                <span className="text-lg font-extrabold text-slate-900">
+                <span className="text-base font-extrabold text-slate-900">
                   {syncReportSummary.total}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-center">
+              <div className="p-2 rounded-xl bg-purple-50 border border-purple-200 text-center">
                 <span className="text-[10px] uppercase font-bold text-purple-700 block">
                   Criadas
                 </span>
-                <span className="text-lg font-extrabold text-purple-900">
+                <span className="text-base font-extrabold text-purple-900">
                   {syncReportSummary.created}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+              <div className="p-2 rounded-xl bg-blue-50 border border-blue-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-blue-700 block">
+                  Já no Acervo
+                </span>
+                <span className="text-base font-extrabold text-blue-900">
+                  {syncReportSummary.already_existed}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
                 <span className="text-[10px] uppercase font-bold text-emerald-700 block">
                   Na Playlist
                 </span>
-                <span className="text-lg font-extrabold text-emerald-900">
+                <span className="text-base font-extrabold text-emerald-900">
                   {syncReportSummary.added + syncReportSummary.already_in_playlist}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-center">
+              <div className="p-2 rounded-xl bg-rose-50 border border-rose-200 text-center">
                 <span className="text-[10px] uppercase font-bold text-rose-700 block">Erros</span>
-                <span className="text-lg font-extrabold text-rose-900">
+                <span className="text-base font-extrabold text-rose-900">
                   {syncReportSummary.errors}
                 </span>
               </div>

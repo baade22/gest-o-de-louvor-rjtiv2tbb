@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-11T17:26:49.185Z",
+  "generatedAt": "2026-10-11T17:30:28.466Z",
   "collections": [
     {
       "name": "users",
@@ -1670,6 +1670,42 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "command_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "song_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "duration_ms",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "http_status",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "details",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

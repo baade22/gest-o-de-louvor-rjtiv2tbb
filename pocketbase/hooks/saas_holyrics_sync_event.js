@@ -1,28 +1,27 @@
 // Hook para o fluxo: Sincronizar repertório do evento com Holyrics
 // POST /backend/v1/saas/holyrics/sync-event
-// Versão do produto: 0.0.26
+// Versão do produto: 0.0.30
 // Requer autenticação + perfil com holyrics.sync (MASTER/ADMIN/LIDER; Músico NÃO PODE -> 403)
-// Multi-tenant: church_id validado via autenticação; valida evento e músicas pertencentes à mesma igreja.
+// Multi-tenant: church_id validado via autenticação; valida evento e músicas pertencentes à mesma congregação.
 // Body: { church_id, event_id, agent_id? }
 // Processa as músicas na ordem exata do repertório do evento (order 1,2,3... do event_songs).
 //
-// FLUXO OBRIGATÓRIO POR MÚSICA (ZERO DUPLICAÇÃO):
-// 1. Se songs.holyrics_song_id existe -> usar direto (NUNCA chamar CreateSong, NUNCA decidir por título).
-// 2. Se não existe -> executar GET_SONGS no Agent ({ fields: "id,title,artist,author,key,bpm,time_sig,groups,archived" })
-//    e procurar correspondência segura usando normalizeTitle()/normalizeArtist().
-//    - Se encontrou -> salvar songs.holyrics_song_id = ID encontrado, status ALREADY_EXISTS, NÃO executar CreateSong.
-//    - Se não encontrou -> CREATE_SONG com payload validado (slides com slide_description, basic, order).
-// 3. REGRA CRÍTICA após CreateSong: não confiar só no retorno. Executar GetSongs e confirmar que o ID retornado
-//    aparece na listagem. Só então marcar CREATED. Se CreateSong retornar erro ou timeout -> NÃO reexecutar CreateSong:
-//    primeiro GetSongs; se a música existir, salvar o ID e continuar; só se não existir, erro real.
-// 4. GET_SONG_PLAYLIST -> verificar se holyrics_song_id já está na playlist comparando pelo ID (NUNCA por título).
-//    Se está -> ALREADY_IN_PLAYLIST, não chamar AddLyricsToPlaylist.
-// 5. Se não está -> ADD_LYRICS_TO_PLAYLIST com { id: holyrics_song_id, index: repertorio_index_base_0, media_playlist: false }.
-// 6. REGRA CRÍTICA após AddLyricsToPlaylist: executar GetSongPlaylist novamente; só considerar ADDED_TO_PLAYLIST
-//    se o ID aparecer. Se não aparecer -> ERROR: "AddLyricsToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação."
-// 7. Não limpar playlist existente.
-// 8. Proteção contra cliques simultâneos: lock por church_id + song_id.
-// 9. Log obrigatório: [HOLYRICS_SYNC] Song: ... | LouvorFlow ID: ... | Holyrics ID: ... | Order: ...
+// GARANTIAS CONTRA DUPLICAÇÃO E REGRAS CRÍTICAS:
+// 1. Persistência imediata: quando CreateSong retorna DONE com ID real, salva songs.holyrics_song_id IMEDIATAMENTE
+//    antes de qualquer verificação.
+// 2. Confirmação sem descarte: a verificação GetSongs pós-criação NUNCA descarta o ID retornado pelo CreateSong.
+//    Se a listagem local não mostrar a música imediatamente (cache/latência do Holyrics), registra VERIFYING_CREATED_SONG
+//    e CONTINUA o fluxo para a playlist utilizando o ID recebido. Nunca marca ERROR nem mensagem de permissões nesse caso.
+// 3. Reconciliação em timeout/falha de CreateSong: antes de qualquer nova tentativa, consulta GetSongs com normalização
+//    estrita (normalizeTitle/normalizeArtist). Se a música já existir, salva o ID e continua para a playlist. Se não existir,
+//    reporta erro técnico real da etapa. Nunca repete CreateSong cegamente.
+// 4. Exclusão mútua / Lock por church_id + song_id: impede dois cliques simultâneos de criarem músicas duplicadas.
+// 5. Playlist: GetSongPlaylist compara exclusivamente por ID (nunca por título). Se já estiver -> ALREADY_IN_PLAYLIST.
+//    Se ausente -> AddLyricsToPlaylist com index (posição no repertório do evento, base 0) e payload mínimo.
+//    Depois consulta GetSongPlaylist novamente: só marca ADDED_TO_PLAYLIST se o ID aparecer; se não aparecer -> ERROR
+//    com mensagem técnica real: "AddLyricsToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação."
+// 6. Payloads mínimos à API do Holyrics em tudo (evita bugs de lista vazia no Holyrics).
+// 7. Registro diagnóstico detalhado em holyrics_sync_logs com command_id, duração, http_status, stage, status e details sanitizados.
 
 routerAdd(
   'POST',
@@ -250,33 +249,80 @@ routerAdd(
         }
       }
 
+      const durationMs = Date.now() - start
+
       return {
         command_id: cmdId,
         status: finalStatus,
         result: finalResult,
         error: finalError,
+        duration_ms: durationMs,
+      }
+    }
+
+    // Helper para extração polimórfica e sanitizada do ID do Holyrics retornado
+    const extractHolyricsSongId = (result) => {
+      if (!result) return ''
+      if (typeof result === 'object') {
+        if (result.holyrics_song_id) return String(result.holyrics_song_id).trim()
+        if (result.id) return String(result.id).trim()
+        if (result.data && typeof result.data === 'object' && result.data.id) {
+          return String(result.data.id).trim()
+        }
+        if (result.data && (typeof result.data === 'string' || typeof result.data === 'number')) {
+          return String(result.data).trim()
+        }
+      } else if (typeof result === 'string' || typeof result === 'number') {
+        return String(result).trim()
+      }
+      return ''
+    }
+
+    // Helper para gravar log detalhado de auditoria e diagnóstico em holyrics_sync_logs
+    const recordSyncLog = (logData) => {
+      try {
+        const logRec = new Record(syncLogsCol)
+        const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
+        logRec.set('church_id', churchId)
+        logRec.set('agent_id', agentId)
+        if (logData.event_id) logRec.set('event_id', logData.event_id)
+        if (logData.song_id) logRec.set('song_id', logData.song_id)
+        if (logData.holyrics_song_id)
+          logRec.set('holyrics_song_id', String(logData.holyrics_song_id))
+        logRec.set('action', logData.action || 'SYNC')
+        logRec.set('status', logData.status === 'ERROR' ? 'ERROR' : 'SUCCESS')
+        if (logData.error) logRec.set('error', String(logData.error).substring(0, 2000))
+        logRec.set('created_at', nowIso)
+
+        if (logData.command_id) logRec.set('command_id', logData.command_id)
+        if (logData.song_title) logRec.set('song_title', logData.song_title)
+        if (logData.duration_ms !== undefined) logRec.set('duration_ms', logData.duration_ms)
+        if (logData.http_status !== undefined) logRec.set('http_status', logData.http_status)
+        if (logData.stage) logRec.set('stage', logData.stage)
+        if (logData.details) logRec.set('details', logData.details)
+
+        $app.save(logRec)
+      } catch (err) {
+        console.log('[HOLYRICS_SYNC_LOG_ERR]', err.message)
       }
     }
 
     // Normalização estrita para comparação de títulos e artistas
-    // Remove espaços duplicados, trim, lowercase, remove pontuações, normaliza acentuação
+    // Remove pontuações, acentos, múltiplos espaços, lowercase
     const normalizeString = (str) => {
       if (!str) return ''
       let s = String(str).toLowerCase().trim()
-      // Mapa de remoção de acentos comum em JS
       const from = 'àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ'
       const to = 'aaaaaaeceeeeiiiidnoooooouuuuypy'
       for (let i = 0; i < from.length; i++) {
         s = s.replace(new RegExp(from.charAt(i), 'g'), to.charAt(i))
       }
-      // Remove caracteres especiais/pontuações, mantendo apenas letras e números
       s = s.replace(/[^a-z0-9\s]/g, ' ')
-      // Remove múltiplos espaços
       s = s.replace(/\s+/g, ' ').trim()
       return s
     }
 
-    // Consulta acervo GetSongs do Holyrics uma vez inicialmente se houver alguma música sem holyrics_song_id
+    // Consulta acervo GetSongs do Holyrics
     let holyricsLibraryCache = null
     const fetchHolyricsLibrary = () => {
       const getSongsCmdRes = runCommandSync(
@@ -382,11 +428,16 @@ routerAdd(
       return false
     }
 
+    // Lock de exclusão mútua em memória por congregação + música
+    if (!globalThis.__louvorflow_sync_locks) {
+      globalThis.__louvorflow_sync_locks = {}
+    }
+
     for (let i = 0; i < eventSongRecords.length; i++) {
       const songStartTime = Date.now()
       const eventSongRec = eventSongRecords[i]
       const repertoireOrder = eventSongRec.getInt('order') || i + 1
-      const playlistIndexBase0 = i // Posição base 0 no repertório do evento
+      const playlistIndexBase0 = i // Posição base 0 no repertório do evento para AddLyricsToPlaylist
       const songId = eventSongRec.getString('song_id')
 
       let songRec = null
@@ -450,7 +501,7 @@ routerAdd(
           flushSlide()
           currentSectionName = markerMatch
         } else {
-          // Linha de letra: remove acordes inline [G] se existirem
+          // Linha de letra: remove acordes inline [G]
           const cleanLine = line
             .replace(/\[[A-G][^\]]*\]/g, '')
             .replace(/[ \t]{2,}/g, ' ')
@@ -474,297 +525,437 @@ routerAdd(
         orderStr += (sIdx > 0 ? ',' : '') + (sIdx + 1)
       }
 
+      // Re-lê songRec para pegar estado mais recente de holyrics_song_id
+      try {
+        songRec = $app.findRecordById('songs', songId)
+      } catch (_) {}
+
       let holyricsSongId = songRec.getString('holyrics_song_id')
       let songWasCreatedNow = false
       let songStatusLabel = ''
       let logSteps = []
 
       // -------------------------------------------------------------
-      // ETAPA 1 & 2: Localização segura da música (Zero Duplicação)
+      // EXCLUSÃO MÚTUA / LOCK POR CHURCH_ID + SONG_ID
+      // Garante que dois cliques simultâneos não possam gerar dois CreateSong
       // -------------------------------------------------------------
-      if (holyricsSongId) {
-        // Regra 1: Se songs.holyrics_song_id existe -> usar direto! NUNCA chamar CreateSong
-        songStatusLabel = `✓ Música já existente no Holyrics / Holyrics #${holyricsSongId}`
-        countAlreadyExisted++
-        logSteps.push(`Holyrics ID: ${holyricsSongId} (persisted) | CreateSong → SKIPPED`)
-      } else {
-        // Regra 2: songs.holyrics_song_id NÃO existe -> buscar em GetSongs
-        eventSongRec.set('holyrics_status', 'CHECKING')
+      const songLockKey = churchId + '::' + songId
+      const lockStartTime = Date.now()
+      while (
+        globalThis.__louvorflow_sync_locks[songLockKey] &&
+        Date.now() - lockStartTime < 15000
+      ) {
+        // Aguarda liberação da operação em andamento
+        for (let k = 0; k < 60; k++) {
+          $security.randomString(5)
+        }
+      }
+      globalThis.__louvorflow_sync_locks[songLockKey] = Date.now()
+
+      try {
+        // Atualiza songRec após aguardar lock
         try {
-          $app.save(eventSongRec)
+          songRec = $app.findRecordById('songs', songId)
+          holyricsSongId = songRec.getString('holyrics_song_id')
         } catch (_) {}
 
-        if (!holyricsLibraryCache) {
-          fetchHolyricsLibrary()
-        }
-        const library = holyricsLibraryCache || []
-
-        const normTargetTitle = normalizeString(songTitle)
-        const normTargetArtist = normalizeString(songArtist)
-
-        let matchedItem = null
-
-        // Comparação de correspondência segura
-        for (let mIdx = 0; mIdx < library.length; mIdx++) {
-          const item = library[mIdx]
-          const normItemTitle = normalizeString(item.title)
-          if (normItemTitle === normTargetTitle) {
-            // Título idêntico normalizado!
-            if (normTargetArtist) {
-              const normItemArtist = normalizeString(item.artist || item.author)
-              if (!normItemArtist || normItemArtist === normTargetArtist) {
-                matchedItem = item
-                break
-              }
-            } else {
-              matchedItem = item
-              break
-            }
-          }
-        }
-
-        if (matchedItem && matchedItem.id) {
-          // Encontrada no acervo! Salva ID imediatamente e NÃO chama CreateSong
-          holyricsSongId = String(matchedItem.id)
-          songRec.set('holyrics_song_id', holyricsSongId)
-          try {
-            $app.save(songRec)
-          } catch (_) {}
-          countAlreadyExisted++
+        // -------------------------------------------------------------
+        // ETAPA 1 & 2: Localização segura da música (Zero Duplicação)
+        // -------------------------------------------------------------
+        if (holyricsSongId) {
+          // Regra 1: Se songs.holyrics_song_id existe -> usar direto! NUNCA chamar CreateSong
           songStatusLabel = `✓ Música já existente no Holyrics / Holyrics #${holyricsSongId}`
-          logSteps.push(`GetSongs → FOUND (#${holyricsSongId}) | CreateSong → SKIPPED`)
+          countAlreadyExisted++
+          logSteps.push(`Holyrics ID: ${holyricsSongId} (persisted) | CreateSong → SKIPPED`)
         } else {
-          // Não encontrada no GetSongs -> CREATE_SONG com payload validado
-          logSteps.push(`GetSongs → NOT_FOUND | CreateSong → EXECUTING`)
-
-          // Proteção contra chamadas concorrentes: lock
-          eventSongRec.set('holyrics_status', 'CREATING')
+          // Regra 2: songs.holyrics_song_id NÃO existe -> buscar em GetSongs
+          eventSongRec.set('holyrics_status', 'CHECKING')
           try {
             $app.save(eventSongRec)
           } catch (_) {}
 
-          const createPayload = {
-            song_id: songId,
-            event_id: eventId,
-            title: songTitle,
-            artist: songArtist || 'LouvorFlow',
-            author: songComposer || songArtist || 'LouvorFlow',
-            note: songNotes || 'Criada pela integração LouvorFlow',
-            copyright: '',
-            slides: slides,
-            formatting_type: 'basic',
-            order: orderStr,
+          if (!holyricsLibraryCache) {
+            fetchHolyricsLibrary()
           }
-          if (songKey) createPayload.key = songKey
-          if (songBpm) createPayload.bpm = songBpm
+          const library = holyricsLibraryCache || []
 
-          const createRes = runCommandSync('CREATE_SONG', createPayload, 12000)
+          const normTargetTitle = normalizeString(songTitle)
+          const normTargetArtist = normalizeString(songArtist)
 
-          // REGRA CRÍTICA 3: Não confiar cegamente no retorno. Executar GetSongs para confirmar.
-          const refreshedLibrary = fetchHolyricsLibrary() || []
-          let confirmedId = ''
+          let matchedItem = null
 
-          if (
-            createRes.status === 'DONE' &&
-            createRes.result &&
-            createRes.result.holyrics_song_id
-          ) {
-            const rawReturnedId = String(createRes.result.holyrics_song_id)
-            const appearsInLibrary = refreshedLibrary.some((it) => String(it.id) === rawReturnedId)
-            if (appearsInLibrary) {
-              confirmedId = rawReturnedId
-            }
-          }
-
-          // Se CreateSong deu timeout ou erro, ou ID não conferiu, confere se foi criada mesmo assim
-          if (!confirmedId) {
-            for (let cIdx = 0; cIdx < refreshedLibrary.length; cIdx++) {
-              const it = refreshedLibrary[cIdx]
-              if (normalizeString(it.title) === normTargetTitle) {
-                confirmedId = String(it.id)
+          // Comparação de correspondência segura por título + artista
+          for (let mIdx = 0; mIdx < library.length; mIdx++) {
+            const item = library[mIdx]
+            const normItemTitle = normalizeString(item.title)
+            if (normItemTitle === normTargetTitle) {
+              if (normTargetArtist) {
+                const normItemArtist = normalizeString(item.artist || item.author)
+                if (!normItemArtist || normItemArtist === normTargetArtist) {
+                  matchedItem = item
+                  break
+                }
+              } else {
+                matchedItem = item
                 break
               }
             }
           }
 
-          if (confirmedId) {
-            holyricsSongId = confirmedId
+          if (matchedItem && matchedItem.id) {
+            // Encontrada no acervo! Salva ID imediatamente e NÃO chama CreateSong
+            holyricsSongId = String(matchedItem.id).trim()
             songRec.set('holyrics_song_id', holyricsSongId)
             try {
               $app.save(songRec)
             } catch (_) {}
+            countAlreadyExisted++
+            songStatusLabel = `✓ Música já existente no Holyrics / Holyrics #${holyricsSongId}`
+            logSteps.push(`GetSongs → FOUND (#${holyricsSongId}) | CreateSong → SKIPPED`)
 
-            songWasCreatedNow = true
-            countCreated++
-            songStatusLabel = `✓ Música criada no Holyrics / Holyrics #${holyricsSongId}`
-            eventSongRec.set('holyrics_status', 'CREATED')
-            try {
-              $app.save(eventSongRec)
-            } catch (_) {}
-            logSteps.push(`CreateSong → OK | GetSongs Confirm → CONFIRMED (#${holyricsSongId})`)
-          } else {
-            // Falha real de criação após conferência
-            const errorMsg =
-              createRes.error ||
-              'Não foi possível criar a música no Holyrics. Verifique permissões do API Server.'
-            eventSongRec.set('holyrics_status', 'ERROR')
-            eventSongRec.set('holyrics_error', errorMsg)
-            try {
-              $app.save(eventSongRec)
-            } catch (_) {}
-            countErrors++
-            logSteps.push(`CreateSong → FAILED (${errorMsg}) | GetSongs Confirm → NOT_FOUND`)
-            console.log(
-              `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} | FINAL → ERROR`,
-            )
-            results.push({
-              order: repertoireOrder,
-              event_song_id: eventSongRec.id,
+            recordSyncLog({
+              event_id: eventId,
               song_id: songId,
+              holyrics_song_id: holyricsSongId,
               song_title: songTitle,
-              holyrics_song_id: null,
-              action: 'CREATE_SONG',
-              status: 'ERROR',
-              error: errorMsg,
-              detail: `✕ Falha na sincronização / Etapa: CreateSong / ${errorMsg}`,
+              action: 'GET_SONGS',
+              stage: 'MATCH_EXISTING',
+              status: 'SUCCESS',
+              duration_ms: Date.now() - songStartTime,
+              details: { matched_title: matchedItem.title, holyrics_id: holyricsSongId },
             })
-            continue
+          } else {
+            // Não encontrada no GetSongs -> CREATE_SONG com payload validado
+            logSteps.push(`GetSongs → NOT_FOUND | CreateSong → EXECUTING`)
+
+            eventSongRec.set('holyrics_status', 'CREATING')
+            try {
+              $app.save(eventSongRec)
+            } catch (_) {}
+
+            const createPayload = {
+              song_id: songId,
+              event_id: eventId,
+              title: songTitle,
+              artist: songArtist || 'LouvorFlow',
+              author: songComposer || songArtist || 'LouvorFlow',
+              note: songNotes || 'Criada pela integração LouvorFlow',
+              copyright: '',
+              slides: slides,
+              formatting_type: 'basic',
+              order: orderStr,
+            }
+            if (songKey) createPayload.key = songKey
+            if (songBpm) createPayload.bpm = songBpm
+
+            const createRes = runCommandSync('CREATE_SONG', createPayload, 12000)
+            const rawReturnedId = extractHolyricsSongId(createRes.result)
+
+            // REGRA CRÍTICA (i): Se CreateSong retornou DONE com ID, salvar songs.holyrics_song_id
+            // IMEDIATAMENTE antes de qualquer verificação!
+            if (createRes.status === 'DONE' && rawReturnedId) {
+              holyricsSongId = rawReturnedId
+              songRec.set('holyrics_song_id', holyricsSongId)
+              try {
+                $app.save(songRec)
+              } catch (_) {}
+            }
+
+            // REGRA CRÍTICA (ii): Verificação via GetSongs
+            // A confirmação NUNCA deve descartar um ID retornado com sucesso.
+            const refreshedLibrary = fetchHolyricsLibrary() || []
+            let appearsInLibrary = false
+
+            if (holyricsSongId) {
+              appearsInLibrary = refreshedLibrary.some(
+                (it) => String(it.id).trim() === holyricsSongId,
+              )
+            }
+
+            // Se CreateSong falhou/timeout ou não retornou ID: consulta GetSongs ANTES de qualquer decisão
+            if (!holyricsSongId) {
+              for (let cIdx = 0; cIdx < refreshedLibrary.length; cIdx++) {
+                const it = refreshedLibrary[cIdx]
+                if (normalizeString(it.title) === normTargetTitle) {
+                  holyricsSongId = String(it.id).trim()
+                  appearsInLibrary = true
+                  songRec.set('holyrics_song_id', holyricsSongId)
+                  try {
+                    $app.save(songRec)
+                  } catch (_) {}
+                  break
+                }
+              }
+            }
+
+            if (holyricsSongId) {
+              // Música foi criada ou identificada!
+              songWasCreatedNow = true
+              countCreated++
+
+              if (appearsInLibrary) {
+                eventSongRec.set('holyrics_status', 'CREATED')
+                songStatusLabel = `✓ Música criada no Holyrics / Holyrics #${holyricsSongId}`
+                logSteps.push(`CreateSong → OK | GetSongs Confirm → CONFIRMED (#${holyricsSongId})`)
+              } else {
+                // A música foi criada (tem ID retornado), mas a listagem do Holyrics tem latência
+                // REGRA: registrar VERIFYING_CREATED_SONG e CONTINUAR o fluxo para a playlist usando o ID retornado.
+                // Nunca marcar ERROR nem exibir mensagem de permissões!
+                eventSongRec.set('holyrics_status', 'VERIFYING_CREATED_SONG')
+                songStatusLabel = `✓ Música criada no Holyrics / Holyrics #${holyricsSongId} (verificação local pendente)`
+                logSteps.push(
+                  `CreateSong → OK (#${holyricsSongId}) | GetSongs Confirm → PENDING_VERIFICATION | Proceeding to playlist`,
+                )
+              }
+
+              try {
+                $app.save(eventSongRec)
+              } catch (_) {}
+
+              recordSyncLog({
+                command_id: createRes.command_id,
+                event_id: eventId,
+                song_id: songId,
+                holyrics_song_id: holyricsSongId,
+                song_title: songTitle,
+                action: 'CREATE_SONG',
+                stage: appearsInLibrary ? 'CONFIRMED' : 'PENDING_VERIFICATION',
+                status: 'SUCCESS',
+                duration_ms: createRes.duration_ms,
+                details: { appears_in_library: appearsInLibrary, id: holyricsSongId },
+              })
+            } else {
+              // Falha real comprovada de criação (nem CreateSong deu ID, nem GetSongs encontrou)
+              const technicalErrorMsg =
+                createRes.error ||
+                (createRes.status === 'PENDING'
+                  ? 'Tempo limite de resposta do LouvorFlow Agent esgotado na criação (TIMEOUT).'
+                  : 'Falha na resposta do comando CreateSong no Holyrics.')
+
+              eventSongRec.set('holyrics_status', 'ERROR')
+              eventSongRec.set('holyrics_error', technicalErrorMsg)
+              try {
+                $app.save(eventSongRec)
+              } catch (_) {}
+              countErrors++
+              logSteps.push(
+                `CreateSong → FAILED (${technicalErrorMsg}) | GetSongs Confirm → NOT_FOUND`,
+              )
+              console.log(
+                `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} | FINAL → ERROR`,
+              )
+
+              recordSyncLog({
+                command_id: createRes.command_id,
+                event_id: eventId,
+                song_id: songId,
+                song_title: songTitle,
+                action: 'CREATE_SONG',
+                stage: 'FAILED',
+                status: 'ERROR',
+                error: technicalErrorMsg,
+                duration_ms: createRes.duration_ms,
+              })
+
+              results.push({
+                order: repertoireOrder,
+                event_song_id: eventSongRec.id,
+                song_id: songId,
+                song_title: songTitle,
+                holyrics_song_id: null,
+                action: 'CREATE_SONG',
+                status: 'ERROR',
+                error: technicalErrorMsg,
+                detail: `✕ Falha na sincronização / Etapa: CreateSong / ${technicalErrorMsg}`,
+              })
+              continue
+            }
           }
         }
-      }
 
-      // -------------------------------------------------------------
-      // ETAPA 4: Verificar se holyrics_song_id já está na playlist
-      // -------------------------------------------------------------
-      eventSongRec.set('holyrics_status', 'CHECKING_PLAYLIST')
-      try {
-        $app.save(eventSongRec)
-      } catch (_) {}
-
-      // Verifica no mapa atual
-      const alreadyInPlaylist = Boolean(currentPlaylistMap[holyricsSongId])
-      const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
-
-      if (alreadyInPlaylist) {
-        countAlreadyInPlaylist++
-        eventSongRec.set('holyrics_status', 'ALREADY_IN_PLAYLIST')
-        eventSongRec.set('holyrics_synced_at', nowIso)
-        eventSongRec.set('holyrics_playlist_order', repertoireOrder)
-        eventSongRec.set('holyrics_error', '')
+        // -------------------------------------------------------------
+        // ETAPA 4: Verificar se holyrics_song_id já está na playlist (GetSongPlaylist por ID)
+        // -------------------------------------------------------------
+        eventSongRec.set('holyrics_status', 'CHECKING_PLAYLIST')
         try {
           $app.save(eventSongRec)
         } catch (_) {}
 
+        // Verifica no mapa atual de IDs
+        const alreadyInPlaylist = Boolean(currentPlaylistMap[holyricsSongId])
+        const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
+
+        if (alreadyInPlaylist) {
+          countAlreadyInPlaylist++
+          eventSongRec.set('holyrics_status', 'ALREADY_IN_PLAYLIST')
+          eventSongRec.set('holyrics_synced_at', nowIso)
+          eventSongRec.set('holyrics_playlist_order', repertoireOrder)
+          eventSongRec.set('holyrics_error', '')
+          try {
+            $app.save(eventSongRec)
+          } catch (_) {}
+
+          logSteps.push(
+            `GetSongPlaylist → FOUND (#${holyricsSongId}) | AddLyricsToPlaylist → SKIPPED`,
+          )
+          const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
+          console.log(
+            `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} | FINAL → ALREADY_IN_PLAYLIST (${durationSec}s)`,
+          )
+
+          recordSyncLog({
+            event_id: eventId,
+            song_id: songId,
+            holyrics_song_id: holyricsSongId,
+            song_title: songTitle,
+            action: 'GET_SONG_PLAYLIST',
+            stage: 'ALREADY_IN_PLAYLIST',
+            status: 'SUCCESS',
+            duration_ms: Date.now() - songStartTime,
+            details: { already_in_playlist: true },
+          })
+
+          results.push({
+            order: repertoireOrder,
+            event_song_id: eventSongRec.id,
+            song_id: songId,
+            song_title: songTitle,
+            holyrics_song_id: holyricsSongId,
+            action: songWasCreatedNow ? 'CREATED_AND_ALREADY_IN_PLAYLIST' : 'ALREADY_IN_PLAYLIST',
+            status: 'SUCCESS',
+            detail: `${songStatusLabel} • ✓ Música já estava na playlist`,
+          })
+          continue
+        }
+
+        // -------------------------------------------------------------
+        // ETAPA 5 & 6: ADD_LYRICS_TO_PLAYLIST + Confirmação via GetSongPlaylist
+        // Semântica da API oficial: index (posição base 0), payload mínimo.
+        // -------------------------------------------------------------
         logSteps.push(
-          `GetSongPlaylist → FOUND (#${holyricsSongId}) | AddLyricsToPlaylist → SKIPPED`,
+          `GetSongPlaylist → NOT_FOUND | AddLyricsToPlaylist → EXECUTING (index ${playlistIndexBase0})`,
         )
-        const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
-        console.log(
-          `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} | FINAL → ALREADY_IN_PLAYLIST (${durationSec}s)`,
-        )
-
-        results.push({
-          order: repertoireOrder,
-          event_song_id: eventSongRec.id,
-          song_id: songId,
-          song_title: songTitle,
-          holyrics_song_id: holyricsSongId,
-          action: songWasCreatedNow ? 'CREATED_AND_ALREADY_IN_PLAYLIST' : 'ALREADY_IN_PLAYLIST',
-          status: 'SUCCESS',
-          detail: `${songStatusLabel} • ✓ Música já estava na playlist`,
-        })
-        continue
-      }
-
-      // -------------------------------------------------------------
-      // ETAPA 5 & 6: ADD_LYRICS_TO_PLAYLIST + Confirmação via GetSongPlaylist
-      // -------------------------------------------------------------
-      logSteps.push(
-        `GetSongPlaylist → NOT_FOUND | AddLyricsToPlaylist → EXECUTING (index ${playlistIndexBase0})`,
-      )
-      eventSongRec.set('holyrics_status', 'ADDING_TO_PLAYLIST')
-      try {
-        $app.save(eventSongRec)
-      } catch (_) {}
-
-      const addPayload = {
-        id: holyricsSongId,
-        index: playlistIndexBase0,
-        media_playlist: false,
-        song_id: songId,
-        event_id: eventId,
-        title: songTitle,
-        artist: songArtist,
-      }
-
-      const addRes = runCommandSync('ADD_LYRICS_TO_PLAYLIST', addPayload, 10000)
-
-      // REGRA CRÍTICA 6: Executar GetSongPlaylist novamente para confirmação real
-      const confirmedPlaylist = fetchHolyricsPlaylist() || []
-      const appearsInPlaylist = confirmedPlaylist.some(
-        (it) => String(it.id || it.song_id || it.songId || '') === holyricsSongId,
-      )
-
-      if (appearsInPlaylist) {
-        currentPlaylistMap[holyricsSongId] = true
-        countAdded++
-        eventSongRec.set('holyrics_status', 'ADDED_TO_PLAYLIST')
-        eventSongRec.set('holyrics_synced_at', nowIso)
-        eventSongRec.set('holyrics_playlist_order', repertoireOrder)
-        eventSongRec.set('holyrics_error', '')
+        eventSongRec.set('holyrics_status', 'ADDING_TO_PLAYLIST')
         try {
           $app.save(eventSongRec)
         } catch (_) {}
 
-        logSteps.push(
-          `AddLyricsToPlaylist → OK | GetSongPlaylist Confirm → FOUND | FINAL → ADDED_TO_PLAYLIST`,
-        )
-        const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
-        console.log(
-          `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} (${durationSec}s)`,
-        )
-
-        results.push({
-          order: repertoireOrder,
-          event_song_id: eventSongRec.id,
+        // Payload mínimo para evitar inconsistências no API Server do Holyrics
+        const addPayload = {
+          id: holyricsSongId,
+          index: playlistIndexBase0,
+          media_playlist: false,
           song_id: songId,
-          song_title: songTitle,
-          holyrics_song_id: holyricsSongId,
-          action: songWasCreatedNow ? 'CREATED_AND_ADDED' : 'ADDED_TO_PLAYLIST',
-          status: 'SUCCESS',
-          detail: `${songStatusLabel} • ✓ Música adicionada à playlist / Posição: ${repertoireOrder}`,
-        })
-      } else {
-        const errorMsg =
-          addRes.status === 'DONE'
-            ? 'A API retornou OK, mas a música não apareceu no GetSongPlaylist após a confirmação.'
-            : addRes.error || 'Erro ao adicionar à playlist do Holyrics.'
+          event_id: eventId,
+        }
 
-        eventSongRec.set('holyrics_status', 'ERROR')
-        eventSongRec.set('holyrics_error', errorMsg)
+        const addRes = runCommandSync('ADD_LYRICS_TO_PLAYLIST', addPayload, 10000)
+
+        // REGRA CRÍTICA 6: Executar GetSongPlaylist novamente para confirmação real
+        eventSongRec.set('holyrics_status', 'VERIFYING_PLAYLIST')
         try {
           $app.save(eventSongRec)
         } catch (_) {}
-        countErrors++
 
-        logSteps.push(
-          `AddLyricsToPlaylist → ${addRes.status} | GetSongPlaylist Confirm → NOT_FOUND | FINAL → ERROR`,
-        )
-        console.log(
-          `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')}`,
+        const confirmedPlaylist = fetchHolyricsPlaylist() || []
+        const appearsInPlaylist = confirmedPlaylist.some(
+          (it) => String(it.id || it.song_id || it.songId || '').trim() === holyricsSongId,
         )
 
-        results.push({
-          order: repertoireOrder,
-          event_song_id: eventSongRec.id,
-          song_id: songId,
-          song_title: songTitle,
-          holyrics_song_id: holyricsSongId,
-          action: 'ADD_TO_PLAYLIST',
-          status: 'ERROR',
-          error: errorMsg,
-          detail: `✕ Falha na sincronização / Etapa: AddLyricsToPlaylist / ${errorMsg}`,
-        })
+        if (appearsInPlaylist) {
+          currentPlaylistMap[holyricsSongId] = true
+          countAdded++
+          eventSongRec.set('holyrics_status', 'ADDED_TO_PLAYLIST')
+          eventSongRec.set('holyrics_synced_at', nowIso)
+          eventSongRec.set('holyrics_playlist_order', repertoireOrder)
+          eventSongRec.set('holyrics_error', '')
+          try {
+            $app.save(eventSongRec)
+          } catch (_) {}
+
+          logSteps.push(
+            `AddLyricsToPlaylist → OK | GetSongPlaylist Confirm → FOUND | FINAL → ADDED_TO_PLAYLIST`,
+          )
+          const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
+          console.log(
+            `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} (${durationSec}s)`,
+          )
+
+          recordSyncLog({
+            command_id: addRes.command_id,
+            event_id: eventId,
+            song_id: songId,
+            holyrics_song_id: holyricsSongId,
+            song_title: songTitle,
+            action: 'ADD_LYRICS_TO_PLAYLIST',
+            stage: 'CONFIRMED_IN_PLAYLIST',
+            status: 'SUCCESS',
+            duration_ms: addRes.duration_ms,
+            details: { index: playlistIndexBase0, repertoire_order: repertoireOrder },
+          })
+
+          results.push({
+            order: repertoireOrder,
+            event_song_id: eventSongRec.id,
+            song_id: songId,
+            song_title: songTitle,
+            holyrics_song_id: holyricsSongId,
+            action: songWasCreatedNow ? 'CREATED_AND_ADDED' : 'ADDED_TO_PLAYLIST',
+            status: 'SUCCESS',
+            detail: `${songStatusLabel} • ✓ Música adicionada à playlist (posição ${repertoireOrder})`,
+          })
+        } else {
+          // O {"status":"ok"} nunca é prova suficiente. Mensagem técnica real exata
+          const technicalAddError =
+            addRes.status === 'DONE'
+              ? 'AddLyricsToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação.'
+              : addRes.error ||
+                (addRes.status === 'PENDING'
+                  ? 'Tempo limite de resposta do LouvorFlow Agent esgotado na inserção na playlist (TIMEOUT).'
+                  : 'Falha técnica ao adicionar à playlist do Holyrics.')
+
+          eventSongRec.set('holyrics_status', 'ERROR')
+          eventSongRec.set('holyrics_error', technicalAddError)
+          try {
+            $app.save(eventSongRec)
+          } catch (_) {}
+          countErrors++
+
+          logSteps.push(
+            `AddLyricsToPlaylist → ${addRes.status} | GetSongPlaylist Confirm → NOT_FOUND | FINAL → ERROR`,
+          )
+          console.log(
+            `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')}`,
+          )
+
+          recordSyncLog({
+            command_id: addRes.command_id,
+            event_id: eventId,
+            song_id: songId,
+            holyrics_song_id: holyricsSongId,
+            song_title: songTitle,
+            action: 'ADD_LYRICS_TO_PLAYLIST',
+            stage: 'FAILED_PLAYLIST_CONFIRMATION',
+            status: 'ERROR',
+            error: technicalAddError,
+            duration_ms: addRes.duration_ms,
+          })
+
+          results.push({
+            order: repertoireOrder,
+            event_song_id: eventSongRec.id,
+            song_id: songId,
+            song_title: songTitle,
+            holyrics_song_id: holyricsSongId,
+            action: 'ADD_LYRICS_TO_PLAYLIST',
+            status: 'ERROR',
+            error: technicalAddError,
+            detail: `${songStatusLabel} • ✕ Etapa: AddLyricsToPlaylist — ${technicalAddError}`,
+          })
+        }
+      } finally {
+        // Libera lock da música
+        delete globalThis.__louvorflow_sync_locks[songLockKey]
       }
     }
 
