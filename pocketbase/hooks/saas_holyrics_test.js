@@ -123,8 +123,18 @@ routerAdd(
           finalStatus = st
           try {
             const rawRes = check.get('result')
-            cmdResult = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes
-          } catch (_) {}
+            if (typeof rawRes === 'string') {
+              cmdResult = JSON.parse(rawRes)
+            } else if (Array.isArray(rawRes)) {
+              let s = ''
+              for (let b = 0; b < rawRes.length; b++) s += String.fromCharCode(rawRes[b])
+              cmdResult = JSON.parse(s)
+            } else {
+              cmdResult = rawRes
+            }
+          } catch (_) {
+            cmdResult = check.get('result')
+          }
           cmdError = check.getString('error')
           break
         }

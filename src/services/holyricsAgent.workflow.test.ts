@@ -4,10 +4,10 @@ import { syncEventRepertoireWithHolyrics } from './holyricsAgent.js'
 import pb from '../lib/pocketbase/client.js'
 
 /**
- * Suite completa de testes para a máquina de sincronização LouvorFlow × Holyrics (v0.0.30)
+ * Suite completa de testes para a máquina de sincronização LouvorFlow × Holyrics (v0.0.31)
  * Todas as chamadas externas de rede utilizam MOCKS claramente identificados.
  */
-describe('Holyrics Repertoire Sync v0.0.30 - Auditoria Completa e Máquina de Estados Segura', () => {
+describe('Holyrics Repertoire Sync v0.0.31 - Auditoria Completa e Máquina de Estados Segura', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     if (globalThis.__louvorflow_sync_locks) {

@@ -1,6 +1,6 @@
 // Hook para o fluxo: Sincronizar repertório do evento com Holyrics
 // POST /backend/v1/saas/holyrics/sync-event
-// Versão do produto: 0.0.30
+// Versão do produto: 0.0.31
 // Requer autenticação + perfil com holyrics.sync (MASTER/ADMIN/LIDER; Músico NÃO PODE -> 403)
 // Multi-tenant: church_id validado via autenticação; valida evento e músicas pertencentes à mesma congregação.
 // Body: { church_id, event_id, agent_id? }
@@ -238,8 +238,19 @@ routerAdd(
             finalStatus = st
             try {
               const r = check.get('result')
-              finalResult = typeof r === 'string' ? JSON.parse(r) : r
-            } catch (_) {}
+              if (typeof r === 'string') {
+                finalResult = JSON.parse(r)
+              } else if (Array.isArray(r)) {
+                let s = ''
+                for (let b = 0; b < r.length; b++) s += String.fromCharCode(r[b])
+                finalResult = JSON.parse(s)
+              } else {
+                finalResult = r
+              }
+            } catch (_) {
+              // Em caso de falha de parsing, mantém o valor original ou null sem quebrar a execução
+              finalResult = check.get('result')
+            }
             finalError = check.getString('error')
             break
           }
@@ -261,19 +272,52 @@ routerAdd(
     }
 
     // Helper para extração polimórfica e sanitizada do ID do Holyrics retornado
-    const extractHolyricsSongId = (result) => {
-      if (!result) return ''
-      if (typeof result === 'object') {
+    const extractHolyricsSongId = (rawResult) => {
+      if (!rawResult) return ''
+      let result = rawResult
+
+      // Se vier como byte-array Goja não decodificado previamente
+      if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'number') {
+        try {
+          let s = ''
+          for (let b = 0; b < result.length; b++) s += String.fromCharCode(result[b])
+          result = JSON.parse(s)
+        } catch (_) {}
+      }
+
+      // Se vier como string JSON crua ou duplamente serializada
+      if (typeof result === 'string') {
+        const trimmed = result.trim()
+        if (
+          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))
+        ) {
+          try {
+            result = JSON.parse(trimmed)
+          } catch (_) {}
+        }
+      }
+
+      // Caso ainda seja string após tentar parse, pode ser o próprio ID cru
+      if (typeof result === 'object' && result !== null) {
         if (result.holyrics_song_id) return String(result.holyrics_song_id).trim()
         if (result.id) return String(result.id).trim()
         if (result.data && typeof result.data === 'object' && result.data.id) {
           return String(result.data.id).trim()
         }
         if (result.data && (typeof result.data === 'string' || typeof result.data === 'number')) {
-          return String(result.data).trim()
+          const dStr = String(result.data).trim()
+          if (dStr) return dStr
+        }
+        if (result.result) {
+          const nested = extractHolyricsSongId(result.result)
+          if (nested) return nested
         }
       } else if (typeof result === 'string' || typeof result === 'number') {
-        return String(result).trim()
+        const idStr = String(result).trim()
+        if (idStr && idStr !== 'null' && idStr !== 'undefined') {
+          return idStr
+        }
       }
       return ''
     }
@@ -333,10 +377,23 @@ routerAdd(
         10000,
       )
       if (getSongsCmdRes.status === 'DONE' && getSongsCmdRes.result) {
-        const list = Array.isArray(getSongsCmdRes.result.songs)
-          ? getSongsCmdRes.result.songs
-          : Array.isArray(getSongsCmdRes.result)
-            ? getSongsCmdRes.result
+        let resData = getSongsCmdRes.result
+        if (typeof resData === 'string') {
+          try {
+            resData = JSON.parse(resData)
+          } catch (_) {}
+        } else if (Array.isArray(resData) && resData.length > 0 && typeof resData[0] === 'number') {
+          try {
+            let s = ''
+            for (let b = 0; b < resData.length; b++) s += String.fromCharCode(resData[b])
+            resData = JSON.parse(s)
+          } catch (_) {}
+        }
+
+        const list = Array.isArray(resData?.songs)
+          ? resData.songs
+          : Array.isArray(resData)
+            ? resData
             : []
         holyricsLibraryCache = list
         return list
@@ -352,10 +409,23 @@ routerAdd(
         8000,
       )
       if (playlistCmdRes.status === 'DONE' && playlistCmdRes.result) {
-        const pItems = Array.isArray(playlistCmdRes.result.items)
-          ? playlistCmdRes.result.items
-          : Array.isArray(playlistCmdRes.result)
-            ? playlistCmdRes.result
+        let resData = playlistCmdRes.result
+        if (typeof resData === 'string') {
+          try {
+            resData = JSON.parse(resData)
+          } catch (_) {}
+        } else if (Array.isArray(resData) && resData.length > 0 && typeof resData[0] === 'number') {
+          try {
+            let s = ''
+            for (let b = 0; b < resData.length; b++) s += String.fromCharCode(resData[b])
+            resData = JSON.parse(s)
+          } catch (_) {}
+        }
+
+        const pItems = Array.isArray(resData?.items)
+          ? resData.items
+          : Array.isArray(resData)
+            ? resData
             : []
         return pItems
       }

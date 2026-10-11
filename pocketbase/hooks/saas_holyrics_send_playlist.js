@@ -200,8 +200,18 @@ routerAdd(
             finalStatus = st
             try {
               const rawRes = check.get('result')
-              cmdResult = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes
-            } catch (_) {}
+              if (typeof rawRes === 'string') {
+                cmdResult = JSON.parse(rawRes)
+              } else if (Array.isArray(rawRes)) {
+                let s = ''
+                for (let b = 0; b < rawRes.length; b++) s += String.fromCharCode(rawRes[b])
+                cmdResult = JSON.parse(s)
+              } else {
+                cmdResult = rawRes
+              }
+            } catch (_) {
+              cmdResult = check.get('result')
+            }
             cmdError = check.getString('error')
             break
           }
@@ -277,8 +287,18 @@ routerAdd(
           searchStatus = st
           try {
             const rawRes = check.get('result')
-            searchResult = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes
-          } catch (_) {}
+            if (typeof rawRes === 'string') {
+              searchResult = JSON.parse(rawRes)
+            } else if (Array.isArray(rawRes)) {
+              let s = ''
+              for (let b = 0; b < rawRes.length; b++) s += String.fromCharCode(rawRes[b])
+              searchResult = JSON.parse(s)
+            } else {
+              searchResult = rawRes
+            }
+          } catch (_) {
+            searchResult = check.get('result')
+          }
           searchError = check.getString('error')
           break
         }
@@ -360,8 +380,18 @@ routerAdd(
             autoAddStatus = st
             try {
               const rawRes = check.get('result')
-              autoAddResult = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes
-            } catch (_) {}
+              if (typeof rawRes === 'string') {
+                autoAddResult = JSON.parse(rawRes)
+              } else if (Array.isArray(rawRes)) {
+                let s = ''
+                for (let b = 0; b < rawRes.length; b++) s += String.fromCharCode(rawRes[b])
+                autoAddResult = JSON.parse(s)
+              } else {
+                autoAddResult = rawRes
+              }
+            } catch (_) {
+              autoAddResult = check.get('result')
+            }
             autoAddError = check.getString('error')
             break
           }
