@@ -103,6 +103,8 @@ export interface SyncMediaPlaylistResponse {
   command_id?: string
   agent_online?: boolean
   total_items?: number
+  pending_skipped?: number
+  warning?: string
   message?: string
   error_code?: string
 }

@@ -43,13 +43,31 @@ import type { MediaAsset, EventItem, ChurchMember } from '@/types'
 import {
   listAllChurchMedia,
   uploadMediaAsset,
-  updateMediaStatus,
   getMediaFileUrl,
   deleteMediaAsset,
-  transferMediaToHolyricsAgent,
 } from '@/services/media'
-import { listHolyricsAgents, type HolyricsAgentInfo } from '@/services/holyricsAgent'
 import { generateHolyricsFileName } from '@/lib/mediaNaming'
+
+const ALLOWED_EXTENSIONS_BY_TYPE: Record<string, string[]> = {
+  IMAGEM: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+  VIDEO: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'm4v'],
+  AUDIO: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'wma', 'flac'],
+  DOCUMENTO: ['pdf', 'pptx', 'ppt', 'ppsx', 'pps'],
+}
+
+function detectMediaTypeFromExtension(
+  fileName: string,
+): 'VIDEO' | 'IMAGEM' | 'AUDIO' | 'DOCUMENTO' | null {
+  const extMatch = fileName.match(/\.([a-zA-Z0-9]+)$/)
+  if (!extMatch) return null
+  const ext = extMatch[1].toLowerCase()
+  for (const [type, exts] of Object.entries(ALLOWED_EXTENSIONS_BY_TYPE)) {
+    if (exts.includes(ext)) {
+      return type as 'VIDEO' | 'IMAGEM' | 'AUDIO' | 'DOCUMENTO'
+    }
+  }
+  return null
+}
 
 export default function MediaModule() {
   const { currentChurch, currentMember, isAdmin, isMaster } = useAuth()
@@ -61,8 +79,6 @@ export default function MediaModule() {
   const [events, setEvents] = useState<EventItem[]>([])
   const [members, setMembers] = useState<ChurchMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [transferringIds, setTransferringIds] = useState<Record<string, boolean>>({})
-  const [agents, setAgents] = useState<HolyricsAgentInfo[]>([])
 
   // Upload Modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -70,6 +86,7 @@ export default function MediaModule() {
   const [mediaName, setMediaName] = useState('')
   const [selectedEventId, setSelectedEventId] = useState('')
   const [mediaType, setMediaType] = useState<'VIDEO' | 'IMAGEM' | 'AUDIO' | 'DOCUMENTO'>('VIDEO')
+  const [typeValidationWarning, setTypeValidationWarning] = useState<string | null>(null)
   const [mediaCategory, setMediaCategory] = useState<
     'AGENDA' | 'ANIVERSARIANTES' | 'AVISOS' | 'CULTOS' | 'EVENTOS' | 'VIDEO_ESPECIAL' | 'OUTROS'
   >('AVISOS')
@@ -104,50 +121,10 @@ export default function MediaModule() {
         expand: 'user_id',
       })
       setMembers(membs)
-
-      try {
-        const ags = await listHolyricsAgents(currentChurch.id)
-        setAgents(ags)
-      } catch {
-        /* intentionally ignored */
-      }
     } catch (err: any) {
       console.error(err)
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleTransferToAgent = async (item: MediaAsset) => {
-    if (!currentChurch) return
-    setTransferringIds((prev) => ({ ...prev, [item.id]: true }))
-    try {
-      const res = await transferMediaToHolyricsAgent({
-        mediaId: item.id,
-        churchId: currentChurch.id,
-      })
-
-      if (res.success) {
-        toast({
-          title: res.agent_online ? 'Transferência iniciada!' : 'Transferência agendada',
-          description: res.message,
-        })
-        loadData()
-      } else {
-        toast({
-          title: 'Não foi possível transferir',
-          description: res.message || 'Verifique se o LouvorFlow Agent está pareado.',
-          variant: 'destructive',
-        })
-      }
-    } catch (err: any) {
-      toast({
-        title: 'Erro no envio da mídia',
-        description: err.message || 'Falha ao comunicar com o servidor.',
-        variant: 'destructive',
-      })
-    } finally {
-      setTransferringIds((prev) => ({ ...prev, [item.id]: false }))
     }
   }
 
@@ -184,11 +161,65 @@ export default function MediaModule() {
     )
   }
 
+  // Validação cruzada estrita entre extensão do arquivo e o media_type selecionado
+  const validateFileAndType = (
+    file: File | null,
+    type: string,
+  ): { valid: boolean; message?: string } => {
+    if (!file) return { valid: true }
+    const extMatch = file.name.match(/\.([a-zA-Z0-9]+)$/)
+    const ext = extMatch ? extMatch[1].toLowerCase() : ''
+    const allowed = ALLOWED_EXTENSIONS_BY_TYPE[type] || []
+
+    if (ext && !allowed.includes(ext)) {
+      const detected = detectMediaTypeFromExtension(file.name)
+      let suggestion = ''
+      if (detected) {
+        suggestion = ` Sugestão: altere o tipo para ${detected}.`
+      }
+      return {
+        valid: false,
+        message: `Extensão .${ext} não é permitida para o tipo ${type}. Extensões aceitas: ${allowed.join(', ')}.${suggestion}`,
+      }
+    }
+    return { valid: true }
+  }
+
+  const handleFileSelection = (f: File) => {
+    setMediaFile(f)
+    if (!mediaName) setMediaName(f.name)
+    const detected = detectMediaTypeFromExtension(f.name)
+    const effectiveType = detected || mediaType
+    if (detected) {
+      setMediaType(detected)
+    }
+    const val = validateFileAndType(f, effectiveType)
+    setTypeValidationWarning(val.valid ? null : val.message || null)
+  }
+
+  const handleMediaTypeChange = (newType: 'VIDEO' | 'IMAGEM' | 'AUDIO' | 'DOCUMENTO') => {
+    setMediaType(newType)
+    if (mediaFile) {
+      const val = validateFileAndType(mediaFile, newType)
+      setTypeValidationWarning(val.valid ? null : val.message || null)
+    }
+  }
+
   const handleUploadSubmit = async () => {
     if (!mediaFile || !selectedEventId || !currentChurch) {
       toast({
         title: 'Campos incompletos',
         description: 'Selecione o arquivo e o evento.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const validation = validateFileAndType(mediaFile, mediaType)
+    if (!validation.valid) {
+      toast({
+        title: 'Incompatibilidade de formato',
+        description: validation.message,
         variant: 'destructive',
       })
       return
@@ -240,32 +271,6 @@ export default function MediaModule() {
     const url = getMediaFileUrl(item)
     if (!url) return
     window.open(url, '_blank')
-    toast({
-      title: 'Download iniciado',
-      description: 'Após conferir o arquivo, clique em [Marcar como baixada].',
-    })
-  }
-
-  const handleMarkDownloaded = async (id: string) => {
-    try {
-      await updateMediaStatus(id, 'BAIXADA')
-      toast({ title: 'Mídia marcada como BAIXADA!' })
-      loadData()
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
-
-  const handleMarkImported = async (id: string) => {
-    try {
-      await updateMediaStatus(id, 'IMPORTADA_HOLYRICS', 'IMPORTADO_MANUALMENTE')
-      toast({
-        title: 'Mídia confirmada como importada no Holyrics!',
-      })
-      loadData()
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
   }
 
   const handleDelete = async (id: string) => {
@@ -360,23 +365,35 @@ export default function MediaModule() {
                           {item.name}
                         </span>
                         {item.holyrics_filename && (
-                          <span className="text-xs text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-xs">
+                          <span
+                            className="text-xs text-slate-600 font-mono bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded truncate max-w-xs"
+                            title={`Nome físico padronizado: ${item.holyrics_filename}`}
+                          >
                             {item.holyrics_filename}
                           </span>
                         )}
                         <Badge variant="outline" className="text-[10px] font-semibold">
                           {item.category}
                         </Badge>
+                        {/* Estado real da mídia */}
                         <Badge
                           className={`text-[10px] ${
                             item.status === 'IMPORTADA_HOLYRICS'
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                               : item.status === 'BAIXADA'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-amber-100 text-amber-800'
+                                ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                : item.status === 'ENVIADA'
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-slate-100 text-slate-800 border-slate-300'
                           }`}
                         >
-                          {item.status}
+                          {item.status === 'IMPORTADA_HOLYRICS'
+                            ? 'Reconhecida pelo Holyrics'
+                            : item.status === 'BAIXADA'
+                              ? 'Transferida para o computador'
+                              : item.status === 'ENVIADA'
+                                ? 'Cadastrada no SaaS (Aguardando transferência)'
+                                : item.status}
                         </Badge>
                         {item.holyrics_status && (
                           <Badge
@@ -386,10 +403,12 @@ export default function MediaModule() {
                                 ? 'bg-red-50 text-red-700 border-red-200'
                                 : item.holyrics_status.startsWith('RECONHECIDO_')
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : item.holyrics_status.startsWith('GRAVADO_')
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : 'bg-purple-50 text-purple-700 border-purple-200'
                             }`}
                           >
-                            Holyrics: {item.holyrics_status}
+                            Status Agent: {item.holyrics_status}
                           </Badge>
                         )}
                       </div>
@@ -415,56 +434,16 @@ export default function MediaModule() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      {/* Botão de Transferência Direta para o PC Local / Holyrics Agent */}
-                      <Button
-                        size="sm"
-                        variant="default"
-                        disabled={transferringIds[item.id]}
-                        onClick={() => handleTransferToAgent(item)}
-                        className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-semibold"
-                        title="Transfere diretamente para o computador pareado da igreja via LouvorFlow Agent"
-                      >
-                        {transferringIds[item.id] ? (
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                        {item.status === 'IMPORTADA_HOLYRICS' || item.status === 'BAIXADA'
-                          ? 'Reenviar ao Holyrics'
-                          : 'Enviar ao Holyrics'}
-                      </Button>
-
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleDownload(item)}
                         className="text-xs rounded-xl gap-1.5"
-                        title="Baixar arquivo manualmente pelo navegador"
+                        title="Visualizar/baixar cópia do arquivo"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Baixar Manual
+                        Baixar Cópia
                       </Button>
-
-                      {item.status === 'ENVIADA' || item.status === 'RECEBIDA' ? (
-                        <Button
-                          size="sm"
-                          onClick={() => handleMarkDownloaded(item.id)}
-                          className="text-xs rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          Marcar Baixada
-                        </Button>
-                      ) : null}
-
-                      {item.status === 'BAIXADA' ? (
-                        <Button
-                          size="sm"
-                          onClick={() => handleMarkImported(item.id)}
-                          className="text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          Importado no Holyrics
-                        </Button>
-                      ) : null}
 
                       {(isAdmin || isMaster) && (
                         <Button
@@ -472,6 +451,7 @@ export default function MediaModule() {
                           size="icon"
                           onClick={() => handleDelete(item.id)}
                           className="h-8 w-8 text-slate-400 hover:text-red-600"
+                          title="Excluir mídia cadastrada"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -505,8 +485,7 @@ export default function MediaModule() {
                 onChange={(e) => {
                   const f = e.target.files?.[0]
                   if (f) {
-                    setMediaFile(f)
-                    if (!mediaName) setMediaName(f.name)
+                    handleFileSelection(f)
                   }
                 }}
                 className="rounded-xl"
@@ -542,15 +521,18 @@ export default function MediaModule() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Tipo</Label>
-                <Select value={mediaType} onValueChange={(val) => setMediaType(val as any)}>
+                <Select
+                  value={mediaType}
+                  onValueChange={(val) => handleMediaTypeChange(val as any)}
+                >
                   <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="VIDEO">VÍDEO</SelectItem>
-                    <SelectItem value="IMAGEM">IMAGEM</SelectItem>
-                    <SelectItem value="AUDIO">ÁUDIO</SelectItem>
-                    <SelectItem value="DOCUMENTO">DOCUMENTO</SelectItem>
+                    <SelectItem value="VIDEO">VÍDEO (mp4, mov, avi...)</SelectItem>
+                    <SelectItem value="IMAGEM">IMAGEM (jpg, png, gif...)</SelectItem>
+                    <SelectItem value="AUDIO">ÁUDIO (mp3, wav, m4a...)</SelectItem>
+                    <SelectItem value="DOCUMENTO">DOCUMENTO (pdf, pptx...)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -596,6 +578,17 @@ export default function MediaModule() {
               </Select>
             </div>
 
+            {/* Aviso de Incompatibilidade de Formato */}
+            {typeValidationWarning && (
+              <div className="rounded-xl bg-red-50 border border-red-200 p-3 flex items-start gap-2.5 text-red-800 text-xs">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                <div>
+                  <strong className="block font-semibold">Incompatibilidade detectada:</strong>
+                  <span>{typeValidationWarning}</span>
+                </div>
+              </div>
+            )}
+
             {/* Preview do Nome Físico no Holyrics */}
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1">
               <span className="text-[11px] font-bold text-slate-700 block">
@@ -616,10 +609,12 @@ export default function MediaModule() {
             </Button>
             <Button
               onClick={handleUploadSubmit}
-              disabled={!mediaFile || !selectedEventId || isUploading}
+              disabled={
+                !mediaFile || !selectedEventId || isUploading || Boolean(typeValidationWarning)
+              }
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
             >
-              {isUploading ? 'Enviando...' : 'Enviar Mídia'}
+              {isUploading ? 'Enviando...' : 'Cadastrar Mídia'}
             </Button>
           </DialogFooter>
         </DialogContent>

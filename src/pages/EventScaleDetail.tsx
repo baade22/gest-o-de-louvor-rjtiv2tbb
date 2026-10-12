@@ -188,13 +188,13 @@ export default function EventScaleDetail() {
   const [syncReportMessage, setSyncReportMessage] = useState('')
   const [syncReportHasErrors, setSyncReportHasErrors] = useState(false)
 
-  // PERMISSÕES DE ABAS
+  // PERMISSÕES DE ABAS E OPERAÇÃO
   // 1. Visão geral: todos com acesso ao evento
   // 2. Repertório: Músicos, Líderes, Admin, Master
   // 3. Escala: todos com acesso ao evento (equipes gerais)
   // 4. Som: MASTER, ADMIN ou perfil operacional SOM
   // 5. Projeção: MASTER, ADMIN ou perfil operacional PROJECAO
-  // 6. Mídia: MASTER, ADMIN, MIDIA ou PROJECAO
+  // 6. Mídia: MASTER, ADMIN, MIDIA ou PROJECAO (visualização/upload)
   // 7. Iluminação: MASTER, ADMIN ou perfil operacional ILUMINACAO
   // 8. Tarefas: MASTER, ADMIN, LIDER, MIDIA ou quem tem tarefas atribuídas
   const canSeeRepertoire = isMaster || isAdmin || isLeader || hasOperationalRole('MUSICO')
@@ -202,6 +202,9 @@ export default function EventScaleDetail() {
   const canSeeProjection = isMaster || isAdmin || hasOperationalRole('PROJECAO')
   const canSeeMedia =
     isMaster || isAdmin || hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
+  // Ações operacionais de Mídia (Enviar ao computador, reordenar e sincronizar com a playlist):
+  // estritamente restritas a MASTER/ADMIN ou perfil operacional PROJECAO
+  const canOperateMedia = isMaster || isAdmin || hasOperationalRole('PROJECAO')
   const canSeeLighting = isMaster || isAdmin || hasOperationalRole('ILUMINACAO')
   const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const canSyncHolyrics = isMaster || isAdmin || isLeader || hasPermission('holyrics.sync')
@@ -557,6 +560,26 @@ export default function EventScaleDetail() {
   // MÍDIAS: Upload
   const handleUploadMedia = async () => {
     if (!mediaFile || !event || !currentChurch) return
+
+    // Validação de correspondência MIME/extensão com mediaType
+    const extMatch = mediaFile.name.match(/\.([a-zA-Z0-9]+)$/)
+    const ext = extMatch ? extMatch[1].toLowerCase() : ''
+    const allowedMap: Record<string, string[]> = {
+      IMAGEM: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+      VIDEO: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'm4v'],
+      AUDIO: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'wma', 'flac'],
+      DOCUMENTO: ['pdf', 'pptx', 'ppt', 'ppsx', 'pps'],
+    }
+    const allowed = allowedMap[mediaType] || []
+    if (ext && !allowed.includes(ext)) {
+      toast({
+        title: 'Extensão de arquivo incompatível',
+        description: `O arquivo .${ext} não é compatível com o tipo ${mediaType}. Extensões aceitas: ${allowed.join(', ')}.`,
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsUploadingMedia(true)
     try {
       const generatedPhysicalName = generateHolyricsFileName({
@@ -588,8 +611,9 @@ export default function EventScaleDetail() {
 
       await uploadMediaAsset(formData)
       toast({
-        title: 'Mídia enviada com sucesso!',
-        description: 'O arquivo foi associado ao culto e a notificação disparada.',
+        title: 'Mídia cadastrada com sucesso!',
+        description:
+          'O arquivo foi associado ao culto. A equipe de Projeção poderá enviá-lo ao computador do Holyrics.',
       })
       setMediaModalOpen(false)
       setMediaFile(null)
@@ -607,23 +631,20 @@ export default function EventScaleDetail() {
     }
   }
 
-  // MÍDIAS: Download e Confirmação
+  // MÍDIAS: Visualizar Cópia
   const handleDownloadMedia = (media: MediaAsset) => {
     const url = getMediaFileUrl(media)
     if (!url) return
     window.open(url, '_blank')
-    toast({
-      title: 'Download iniciado',
-      description: 'Lembre-se de clicar em [Marcar como baixada] após conferir o arquivo.',
-    })
   }
 
   const handleSyncMediaPlaylistWithHolyrics = async () => {
     if (!event || !currentChurch) return
-    if (!canSyncHolyrics) {
+    if (!canOperateMedia) {
       toast({
         title: 'Permissão negada',
-        description: 'Apenas Administradores e Líderes podem sincronizar com o Holyrics.',
+        description:
+          'Apenas Administradores ou membros com a função PROJEÇÃO podem sincronizar a playlist de mídias.',
         variant: 'destructive',
       })
       return
@@ -632,7 +653,21 @@ export default function EventScaleDetail() {
     if (mediaList.length === 0) {
       toast({
         title: 'Nenhuma mídia vinculada',
-        description: 'Envie mídias para este evento antes de sincronizar com a playlist.',
+        description: 'Cadastre mídias neste evento antes de sincronizar com a playlist.',
+      })
+      return
+    }
+
+    // Valida se há pelo menos uma mídia transferida para o computador
+    const readyMedias = mediaList.filter(
+      (m) => m.status === 'BAIXADA' || m.status === 'IMPORTADA_HOLYRICS',
+    )
+    if (readyMedias.length === 0) {
+      toast({
+        title: 'Mídias ainda não transferidas',
+        description:
+          'Nenhuma mídia deste culto foi transferida para o computador local ainda. Clique em "Enviar ao Computador" nas mídias desejadas antes de incluí-las na playlist.',
+        variant: 'destructive',
       })
       return
     }
@@ -640,7 +675,7 @@ export default function EventScaleDetail() {
     setIsSyncingMediaPlaylist(true)
     toast({
       title: 'Sincronizando mídias...',
-      description: `Enviando comando para incluir ${mediaList.length} mídia(s) na playlist do Holyrics.`,
+      description: `Enviando comando para incluir ${readyMedias.length} mídia(s) pronta(s) na playlist do Holyrics.`,
     })
 
     try {
@@ -648,7 +683,7 @@ export default function EventScaleDetail() {
       if (res.success) {
         toast({
           title: 'Sincronização de mídias disparada!',
-          description: res.message,
+          description: res.warning ? `${res.message} (${res.warning})` : res.message,
         })
       } else {
         toast({
@@ -669,6 +704,16 @@ export default function EventScaleDetail() {
   }
 
   const handleMoveMediaOrder = async (currentIndex: number, direction: 'up' | 'down') => {
+    if (!canOperateMedia) {
+      toast({
+        title: 'Permissão negada',
+        description:
+          'Apenas a equipe de Projeção ou Administradores podem ordenar a playlist de mídias.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
     if (targetIndex < 0 || targetIndex >= mediaList.length) return
 
@@ -693,6 +738,16 @@ export default function EventScaleDetail() {
 
   const handleTransferMediaToAgent = async (media: MediaAsset) => {
     if (!currentChurch) return
+    if (!canOperateMedia) {
+      toast({
+        title: 'Permissão negada',
+        description:
+          'Apenas Administradores ou a equipe de Projeção podem transferir mídias para o computador do Holyrics.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setTransferringMediaIds((prev) => ({ ...prev, [media.id]: true }))
     try {
       const res = await transferMediaToHolyricsAgent({
@@ -720,33 +775,6 @@ export default function EventScaleDetail() {
       })
     } finally {
       setTransferringMediaIds((prev) => ({ ...prev, [media.id]: false }))
-    }
-  }
-
-  const handleMarkAsDownloaded = async (mediaId: string) => {
-    try {
-      await updateMediaStatus(mediaId, 'BAIXADA')
-      toast({ title: 'Mídia marcada como BAIXADA!' })
-      fetchFullEventData()
-    } catch (err: any) {
-      toast({
-        title: 'Erro',
-        description: err.message || 'Não foi possível atualizar status.',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  const handleMarkAsImportedHolyrics = async (mediaId: string) => {
-    try {
-      await updateMediaStatus(mediaId, 'IMPORTADA_HOLYRICS', 'IMPORTADO_MANUALMENTE')
-      toast({
-        title: 'Mídia marcada como importada no Holyrics!',
-        description: 'Status atualizado com sucesso.',
-      })
-      fetchFullEventData()
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     }
   }
 
@@ -1639,54 +1667,37 @@ export default function EventScaleDetail() {
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                            <Button
-                              size="sm"
-                              variant="default"
-                              disabled={transferringMediaIds[media.id]}
-                              onClick={() => handleTransferMediaToAgent(media)}
-                              className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
-                              title="Transfere para o Holyrics local via LouvorFlow Agent"
-                            >
-                              {transferringMediaIds[media.id] ? (
-                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Send className="h-3.5 w-3.5" />
-                              )}
-                              {media.status === 'IMPORTADA_HOLYRICS' || media.status === 'BAIXADA'
-                                ? 'Reenviar Holyrics'
-                                : 'Enviar Holyrics'}
-                            </Button>
+                            {/* Ação Operacional: Enviar ao Computador Local (apenas PROJECAO ou Admin) */}
+                            {canOperateMedia && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                disabled={transferringMediaIds[media.id]}
+                                onClick={() => handleTransferMediaToAgent(media)}
+                                className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-semibold"
+                                title="Transfere para o Holyrics local via LouvorFlow Agent"
+                              >
+                                {transferringMediaIds[media.id] ? (
+                                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Send className="h-3.5 w-3.5" />
+                                )}
+                                {media.status === 'IMPORTADA_HOLYRICS' || media.status === 'BAIXADA'
+                                  ? 'Reenviar ao Computador'
+                                  : 'Enviar ao Computador'}
+                              </Button>
+                            )}
 
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleDownloadMedia(media)}
                               className="text-xs rounded-xl gap-1.5"
+                              title="Visualizar ou baixar cópia"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              Baixar Manual
+                              Baixar Cópia
                             </Button>
-
-                            {media.status === 'ENVIADA' || media.status === 'RECEBIDA' ? (
-                              <Button
-                                size="sm"
-                                onClick={() => handleMarkAsDownloaded(media.id)}
-                                className="text-xs rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                              >
-                                Marcar como Baixada
-                              </Button>
-                            ) : null}
-
-                            {media.status === 'BAIXADA' ? (
-                              <Button
-                                size="sm"
-                                onClick={() => handleMarkAsImportedHolyrics(media.id)}
-                                className="text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                                Importado no Holyrics
-                              </Button>
-                            ) : null}
                           </div>
                         </div>
                       ))
@@ -1714,14 +1725,15 @@ export default function EventScaleDetail() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {canSyncHolyrics && mediaList.length > 0 && (
+                  {/* Sincronização com a Playlist: exclusivo de PROJECAO ou MASTER/ADMIN */}
+                  {canOperateMedia && mediaList.length > 0 && (
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={isSyncingMediaPlaylist}
                       onClick={handleSyncMediaPlaylistWithHolyrics}
-                      className="rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs gap-1.5"
-                      title="Envia todas as mídias na ordem para a playlist do Holyrics"
+                      className="rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs gap-1.5 font-semibold"
+                      title="Adiciona as mídias transferidas na ordem da playlist do Holyrics"
                     >
                       {isSyncingMediaPlaylist ? (
                         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1758,15 +1770,15 @@ export default function EventScaleDetail() {
                         className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3"
                       >
                         <div className="flex items-start gap-3 min-w-0">
-                          {/* Controles de ordenação litúrgica de mídia */}
-                          {canManageContent && (
+                          {/* Controles de ordenação litúrgica de mídia: PROJECAO ou Admin */}
+                          {canOperateMedia && (
                             <div className="flex flex-col gap-0.5 shrink-0 pt-0.5">
                               <button
                                 type="button"
                                 disabled={idx === 0}
                                 onClick={() => handleMoveMediaOrder(idx, 'up')}
                                 className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors"
-                                title="Mover para cima na playlist"
+                                title="Subir ordem de apresentação na playlist"
                               >
                                 <ChevronUp className="h-3.5 w-3.5" />
                               </button>
@@ -1775,7 +1787,7 @@ export default function EventScaleDetail() {
                                 disabled={idx === mediaList.length - 1}
                                 onClick={() => handleMoveMediaOrder(idx, 'down')}
                                 className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors"
-                                title="Mover para baixo na playlist"
+                                title="Descer ordem de apresentação na playlist"
                               >
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </button>
@@ -1804,74 +1816,86 @@ export default function EventScaleDetail() {
                               <Badge
                                 className={`text-[10px] ${
                                   media.status === 'IMPORTADA_HOLYRICS'
-                                    ? 'bg-emerald-100 text-emerald-800'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                     : media.status === 'BAIXADA'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-amber-100 text-amber-800'
+                                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                      : 'bg-amber-100 text-amber-800 border-amber-300'
                                 }`}
                               >
-                                {media.status}
+                                {media.status === 'IMPORTADA_HOLYRICS'
+                                  ? 'Reconhecida pelo Holyrics'
+                                  : media.status === 'BAIXADA'
+                                    ? 'Transferida para o computador'
+                                    : 'Aguardando transferência'}
                               </Badge>
+                              {media.holyrics_status && (
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[10px] ${
+                                    media.holyrics_status.startsWith('ERRO_')
+                                      ? 'bg-red-50 text-red-700 border-red-200'
+                                      : media.holyrics_status.startsWith('RECONHECIDO_')
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : media.holyrics_status.startsWith('GRAVADO_')
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                          : 'bg-purple-50 text-purple-700 border-purple-200'
+                                  }`}
+                                >
+                                  {media.holyrics_status}
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-xs text-slate-500 mt-1">
-                              Tipo: {media.media_type} • Operador atribuído:{' '}
+                              Tipo: {media.media_type} • Categoria: {media.category} • Operador:{' '}
                               <strong className="text-slate-700">
                                 {media.expand?.assigned_operator?.expand?.user_id?.name ||
                                   'A definir'}
                               </strong>
+                              {media.downloaded_at && (
+                                <span className="ml-2 text-slate-400">
+                                  • Baixada em{' '}
+                                  {new Date(media.downloaded_at).toLocaleTimeString('pt-BR', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            disabled={transferringMediaIds[media.id]}
-                            onClick={() => handleTransferMediaToAgent(media)}
-                            className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
-                            title="Transfere para o Holyrics local via LouvorFlow Agent"
-                          >
-                            {transferringMediaIds[media.id] ? (
-                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Send className="h-3.5 w-3.5" />
-                            )}
-                            {media.status === 'IMPORTADA_HOLYRICS' || media.status === 'BAIXADA'
-                              ? 'Reenviar Holyrics'
-                              : 'Enviar Holyrics'}
-                          </Button>
+                          {/* Ações Operacionais Exclusivas de PROJECAO ou Admin */}
+                          {canOperateMedia && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={transferringMediaIds[media.id]}
+                              onClick={() => handleTransferMediaToAgent(media)}
+                              className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-semibold"
+                              title="Transfere para o computador local pareado via LouvorFlow Agent"
+                            >
+                              {transferringMediaIds[media.id] ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Send className="h-3.5 w-3.5" />
+                              )}
+                              {media.status === 'IMPORTADA_HOLYRICS' || media.status === 'BAIXADA'
+                                ? 'Reenviar ao Computador'
+                                : 'Enviar ao Computador'}
+                            </Button>
+                          )}
 
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleDownloadMedia(media)}
                             className="text-xs rounded-xl gap-1.5"
+                            title="Visualizar ou baixar cópia"
                           >
                             <Download className="h-3.5 w-3.5" />
-                            Baixar Manual
+                            Baixar Cópia
                           </Button>
-
-                          {media.status === 'ENVIADA' || media.status === 'RECEBIDA' ? (
-                            <Button
-                              size="sm"
-                              onClick={() => handleMarkAsDownloaded(media.id)}
-                              className="text-xs rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                              Marcar como Baixada
-                            </Button>
-                          ) : null}
-
-                          {media.status === 'BAIXADA' ? (
-                            <Button
-                              size="sm"
-                              onClick={() => handleMarkAsImportedHolyrics(media.id)}
-                              className="text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              Marcar Importado no Holyrics
-                            </Button>
-                          ) : null}
 
                           {canManageContent && (
                             <Button

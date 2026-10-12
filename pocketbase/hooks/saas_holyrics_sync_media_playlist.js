@@ -31,12 +31,12 @@ routerAdd(
       })
     }
 
-    // Valida se o usuário pertence à igreja
+    // Valida vínculo ativo do usuário na igreja
     let member = null
     try {
       member = $app.findFirstRecordByFilter(
         'church_members',
-        'church_id = {:churchId} && user_id = {:userId} && status = "ACTIVE"',
+        'church_id = {:churchId} && user_id = {:userId} && is_active = true',
         { churchId: churchId, userId: auth.id },
       )
     } catch (_) {}
@@ -46,6 +46,38 @@ routerAdd(
         success: false,
         error_code: 'FORBIDDEN_MEMBER',
         message: 'Você não tem permissão ativa nesta congregação.',
+      })
+    }
+
+    // Validação de autorização: apenas MASTER, ADMIN ou membros com função operacional PROJECAO
+    const appRole = member.getString('role') || ''
+    const isMaster = appRole === 'MASTER'
+    const isAdmin = appRole === 'ADMIN' || isMaster
+
+    let opRoles = []
+    try {
+      const raw = member.get('operational_roles')
+      if (typeof raw === 'string' && raw) {
+        opRoles = JSON.parse(raw)
+      } else if (Array.isArray(raw)) {
+        if (raw.length > 0 && typeof raw[0] === 'number') {
+          let str = ''
+          for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
+          opRoles = JSON.parse(str)
+        } else {
+          opRoles = raw
+        }
+      }
+    } catch (_) {}
+    if (!Array.isArray(opRoles)) opRoles = []
+
+    const hasProjectionRole = opRoles.includes('PROJECAO')
+    if (!isAdmin && !hasProjectionRole) {
+      return e.json(403, {
+        success: false,
+        error_code: 'FORBIDDEN_PROJECTION_ROLE',
+        message:
+          'Apenas Administradores ou membros com a função de PROJEÇÃO podem sincronizar mídias com a playlist do Holyrics.',
       })
     }
 
@@ -126,10 +158,15 @@ routerAdd(
       })
     }
 
-    // Prepara itens com o nome físico padronizado
+    // Filtra e prepara itens: apenas mídias já transferidas para o computador local
+    // (BAIXADA) ou reconhecidas pelo Holyrics (IMPORTADA_HOLYRICS)
     const items = []
+    let pendingCount = 0
+    const pendingNames = []
+
     for (let i = 0; i < mediaRecords.length; i++) {
       const m = mediaRecords[i]
+      const mStatus = m.getString('status')
       const originalFile = m.getString('file')
       let holyricsFilename = m.getString('holyrics_filename')
 
@@ -138,14 +175,33 @@ routerAdd(
         holyricsFilename = m.getString('name') || originalFile
       }
 
+      const mediaName = m.getString('name') || originalFile
+
+      if (mStatus !== 'BAIXADA' && mStatus !== 'IMPORTADA_HOLYRICS') {
+        pendingCount++
+        pendingNames.push(mediaName)
+        continue
+      }
+
       items.push({
         id: m.id,
-        name: m.getString('name'),
+        name: mediaName,
         file_name: originalFile,
         holyrics_filename: holyricsFilename,
         media_type: m.getString('media_type'),
         category: m.getString('category'),
+        status: mStatus,
         presentation_order: m.getInt('presentation_order') || i + 1,
+      })
+    }
+
+    if (items.length === 0) {
+      return e.json(400, {
+        success: false,
+        error_code: 'NO_DOWNLOADED_MEDIA',
+        pending_count: pendingCount,
+        message:
+          'Nenhuma mídia deste culto está pronta no computador local (status BAIXADA ou IMPORTADA_HOLYRICS). Envie as mídias ao computador antes de sincronizar com a playlist.',
       })
     }
 
@@ -181,13 +237,22 @@ routerAdd(
       })
     }
 
+    let warningMsg = ''
+    if (pendingCount > 0) {
+      warningMsg = `Aviso: ${pendingCount} mídia(s) ainda não foram transferidas para o computador (${pendingNames.slice(0, 3).join(', ')}${pendingNames.length > 3 ? '...' : ''}) e não foram incluídas na playlist.`
+    }
+
     return e.json(200, {
       success: true,
       command_id: commandId,
       agent_online: isOnline,
       total_items: items.length,
+      pending_skipped: pendingCount,
+      warning: warningMsg || undefined,
       message: isOnline
-        ? 'Sincronização de mídias enviada para o computador do Holyrics.'
+        ? warningMsg
+          ? `Sincronização de ${items.length} mídia(s) enviada. ${warningMsg}`
+          : 'Sincronização de mídias enviada para o computador do Holyrics.'
         : 'Comando registrado. As mídias serão inseridas na playlist assim que o computador do Holyrics conectar.',
     })
   },

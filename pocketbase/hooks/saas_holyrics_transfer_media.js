@@ -75,6 +75,78 @@ routerAdd(
       })
     }
 
+    // Validação de autorização: apenas MASTER, ADMIN ou membros com função operacional PROJECAO
+    const appRole = member.getString('role') || ''
+    const isMaster = appRole === 'MASTER'
+    const isAdmin = appRole === 'ADMIN' || isMaster
+
+    let opRoles = []
+    try {
+      const raw = member.get('operational_roles')
+      if (typeof raw === 'string' && raw) {
+        opRoles = JSON.parse(raw)
+      } else if (Array.isArray(raw)) {
+        if (raw.length > 0 && typeof raw[0] === 'number') {
+          let str = ''
+          for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
+          opRoles = JSON.parse(str)
+        } else {
+          opRoles = raw
+        }
+      }
+    } catch (_) {}
+    if (!Array.isArray(opRoles)) opRoles = []
+
+    const hasProjectionRole = opRoles.includes('PROJECAO')
+    if (!isAdmin && !hasProjectionRole) {
+      return e.json(403, {
+        success: false,
+        error_code: 'FORBIDDEN_PROJECTION_ROLE',
+        message:
+          'Apenas Administradores ou membros com a função de PROJEÇÃO podem transferir mídias para o computador do Holyrics.',
+      })
+    }
+
+    // Validação cruzada estrita entre media_type e extensão do arquivo antes de enfileirar comando
+    const mediaType = (media.getString('media_type') || 'VIDEO').toUpperCase()
+    const rawFileForValidation = media.getString('file') || media.getString('name') || ''
+    const extMatchVal = rawFileForValidation.match(/\.([a-zA-Z0-9]+)$/)
+    const fileExt = extMatchVal ? extMatchVal[1].toLowerCase() : ''
+
+    const allowedExtsByMediaType = {
+      IMAGEM: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+      VIDEO: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'm4v'],
+      AUDIO: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'wma', 'flac'],
+      DOCUMENTO: ['pdf', 'pptx', 'ppt', 'ppsx', 'pps'],
+    }
+
+    if (fileExt && allowedExtsByMediaType[mediaType]) {
+      const allowed = allowedExtsByMediaType[mediaType]
+      if (!allowed.includes(fileExt)) {
+        let suggestion = ''
+        if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'm4v'].includes(fileExt)) {
+          suggestion = ' O arquivo selecionado é um vídeo. Ajuste o tipo para VÍDEO.'
+        } else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'wma', 'flac'].includes(fileExt)) {
+          suggestion = ' O arquivo selecionado é um áudio. Ajuste o tipo para ÁUDIO.'
+        } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt)) {
+          suggestion = ' O arquivo selecionado é uma imagem. Ajuste o tipo para IMAGEM.'
+        }
+        return e.json(400, {
+          success: false,
+          error_code: 'INVALID_FILE_EXTENSION',
+          message:
+            'Extensão .' +
+            fileExt +
+            ' incompatível com o tipo ' +
+            mediaType +
+            '. Extensões permitidas: ' +
+            allowed.join(', ') +
+            '.' +
+            suggestion,
+        })
+      }
+    }
+
     // 3. Localiza o Agent da igreja
     let agentRecord = null
     const requestedAgentId = String(body.agent_id || '').trim()
@@ -116,7 +188,6 @@ routerAdd(
     const isOnline = agentRecord.getString('status') === 'ONLINE'
 
     // 4. Prepara mapeamento de subpasta com base no tipo da mídia
-    const mediaType = media.getString('media_type') || 'VIDEO'
     let subfolder = 'video'
     if (mediaType === 'IMAGEM') {
       subfolder = 'image'

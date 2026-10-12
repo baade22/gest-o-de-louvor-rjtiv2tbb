@@ -110,7 +110,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.33',
+          version: '0.0.34',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -256,7 +256,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.33',
+          version: '0.0.34',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -658,7 +658,14 @@ export class LouvorFlowAgent {
       }
     }
 
-    // Consulta playlist atual para verificar existência prévia
+    // Ordena itens pela ordem litúrgica informada (presentation_order)
+    const sortedItems = [...itemsRaw].sort((a, b) => {
+      const orderA = Number(a.presentation_order) || 0
+      const orderB = Number(b.presentation_order) || 0
+      return orderA - orderB
+    })
+
+    // Consulta playlist atual para verificar existência prévia e não duplicar músicas/versículos/mídias existentes
     let existingItemNames = new Set<string>()
     try {
       const currentPlaylist = await this.holyrics.getPlaylist({
@@ -681,11 +688,12 @@ export class LouvorFlowAgent {
     const detailedResults: Array<{
       id?: string
       name: string
-      status: 'ADDED' | 'ALREADY_PRESENT' | 'FAILED'
+      status: 'ADDED' | 'ALREADY_PRESENT' | 'FAILED' | 'PENDING_LOCAL_FILE'
       error?: string
     }> = []
 
-    for (const item of itemsRaw) {
+    for (const item of sortedItems) {
+      // Usa o nome físico exato com extensão (holyrics_filename)
       const fileName = String(item.holyrics_filename || item.name || '').trim()
       const mediaType = String(item.media_type || '').toUpperCase()
 
@@ -694,7 +702,42 @@ export class LouvorFlowAgent {
           id: item.id,
           name: 'Desconhecido',
           status: 'FAILED',
-          error: 'Nome do arquivo de mídia ausente.',
+          error:
+            'Nome do arquivo de mídia ausente. Ação recomendada: recadastre a mídia com nome válido.',
+        })
+        continue
+      }
+
+      // Validação local prévia: verifica se o arquivo físico existe na biblioteca local antes de chamar o Holyrics
+      let holyricsType: 'video' | 'image' | 'audio' | 'file' = 'file'
+      let subfolder = 'video'
+      if (mediaType === 'VIDEO') {
+        holyricsType = 'video'
+        subfolder = 'video'
+      } else if (mediaType === 'IMAGEM') {
+        holyricsType = 'image'
+        subfolder = 'image'
+      } else if (mediaType === 'AUDIO') {
+        holyricsType = 'audio'
+        subfolder = 'audio'
+      } else if (mediaType === 'DOCUMENTO') {
+        holyricsType = 'file'
+        subfolder = 'automaticPresentations'
+      }
+
+      const expectedLocalPath = path.join(
+        path.resolve(this.config.holyricsMediaPath),
+        subfolder,
+        fileName,
+      )
+      const fileExistsOnDisk = fs.existsSync(expectedLocalPath)
+
+      if (!fileExistsOnDisk) {
+        detailedResults.push({
+          id: item.id,
+          name: fileName,
+          status: 'PENDING_LOCAL_FILE',
+          error: `Arquivo "${fileName}" não encontrado na biblioteca local (${subfolder}). Ação recomendada: execute a transferência do arquivo para o computador antes de sincronizar com a playlist.`,
         })
         continue
       }
@@ -708,11 +751,6 @@ export class LouvorFlowAgent {
         })
         continue
       }
-
-      let holyricsType: 'video' | 'image' | 'audio' | 'file' = 'file'
-      if (mediaType === 'VIDEO') holyricsType = 'video'
-      else if (mediaType === 'IMAGEM') holyricsType = 'image'
-      else if (mediaType === 'AUDIO') holyricsType = 'audio'
 
       itemsToAdd.push({
         type: holyricsType,
@@ -731,19 +769,47 @@ export class LouvorFlowAgent {
       })
 
       if (addRes.success) {
-        for (const added of itemsToAdd) {
-          detailedResults.push({
-            name: added.name,
-            status: 'ADDED',
+        // Verificação pós-operação via GetPlaylist para comprovar que os itens foram realmente inseridos na ordem
+        let verifiedNames = new Set<string>()
+        try {
+          const postPlaylist = await this.holyrics.getPlaylist({
+            type: 'all',
+            event_id: eventId,
           })
-          addedCount++
+          if (postPlaylist.success && Array.isArray(postPlaylist.items)) {
+            for (const item of postPlaylist.items) {
+              const name = String(item.name || item.title || '')
+                .trim()
+                .toLowerCase()
+              if (name) verifiedNames.add(name)
+            }
+          }
+        } catch (_) {}
+
+        for (const added of itemsToAdd) {
+          const isVerified = verifiedNames.size === 0 || verifiedNames.has(added.name.toLowerCase())
+          if (isVerified) {
+            detailedResults.push({
+              name: added.name,
+              status: 'ADDED',
+            })
+            addedCount++
+          } else {
+            detailedResults.push({
+              name: added.name,
+              status: 'FAILED',
+              error:
+                'Holyrics retornou sucesso mas o arquivo não consta na playlist verificada. Ação recomendada: verifique se o arquivo foi indexado pelo Holyrics.',
+            })
+            failedCount++
+          }
         }
       } else {
         for (const added of itemsToAdd) {
           detailedResults.push({
             name: added.name,
             status: 'FAILED',
-            error: addRes.error || 'Erro na API Holyrics AddToPlaylist',
+            error: `${addRes.error || 'Erro na API Holyrics AddToPlaylist'}. Ação recomendada: verifique se a API do Holyrics está habilitada com permissão de playlist.`,
           })
           failedCount++
         }
@@ -751,12 +817,17 @@ export class LouvorFlowAgent {
     }
 
     const alreadyPresentCount = detailedResults.filter((r) => r.status === 'ALREADY_PRESENT').length
+    const pendingLocalCount = detailedResults.filter(
+      (r) => r.status === 'PENDING_LOCAL_FILE',
+    ).length
 
     return {
-      success: failedCount === 0 || addedCount > 0 || alreadyPresentCount > 0,
+      success:
+        (failedCount === 0 && pendingLocalCount === 0) || addedCount > 0 || alreadyPresentCount > 0,
       result: {
         synced_count: addedCount,
         already_present_count: alreadyPresentCount,
+        pending_local_count: pendingLocalCount,
         failed_count: failedCount,
         items: detailedResults,
       },

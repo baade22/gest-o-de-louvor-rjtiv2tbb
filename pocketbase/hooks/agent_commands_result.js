@@ -322,6 +322,28 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
 
       $app.save(logRec)
     }
+    if (action === 'SYNC_MEDIA_PLAYLIST') {
+      const logsCol = $app.findCollectionByNameOrId('holyrics_sync_logs')
+      const logRec = new Record(logsCol)
+      logRec.set('church_id', cmdRecord.getString('church_id'))
+      logRec.set('agent_id', agentId)
+      logRec.set('action', 'SYNC_MEDIA_PLAYLIST')
+      logRec.set('status', status === 'FAILED' ? 'ERROR' : 'SUCCESS')
+      logRec.set('error', errorMsg)
+      logRec.set('created_at', now)
+      logRec.set('command_id', cmdRecord.getString('command_id'))
+      logRec.set('stage', status === 'DONE' ? 'PLAYLIST_SYNCED' : 'PLAYLIST_FAILED')
+      if (p && p.event_id) logRec.set('event_id', p.event_id)
+      if (p && p.event_title) logRec.set('song_title', p.event_title)
+      logRec.set('details', {
+        event_id: (p && p.event_id) || '',
+        result: result,
+        error: errorMsg,
+      })
+      try {
+        $app.save(logRec)
+      } catch (_) {}
+    }
   } catch (_) {}
 
   return e.json(200, {

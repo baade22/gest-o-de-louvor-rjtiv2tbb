@@ -281,6 +281,11 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       items: [],
     })
 
+    // Cria os arquivos físicos locais para a validação em disco
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Culto - Video.mp4'), 'vid')
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'image', 'Culto - Imagem.png'), 'img')
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'audio', 'Culto - Audio.mp3'), 'aud')
+
     const cmd: AgentCommand = {
       id: 'cmd_sync',
       command_id: 'cmd_sync',
@@ -288,9 +293,9 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       payload: {
         event_id: 'evt_123',
         items: [
-          { holyrics_filename: 'Culto - Video.mp4', media_type: 'VIDEO' },
-          { holyrics_filename: 'Culto - Imagem.png', media_type: 'IMAGEM' },
-          { holyrics_filename: 'Culto - Audio.mp3', media_type: 'AUDIO' },
+          { holyrics_filename: 'Culto - Video.mp4', media_type: 'VIDEO', presentation_order: 1 },
+          { holyrics_filename: 'Culto - Imagem.png', media_type: 'IMAGEM', presentation_order: 2 },
+          { holyrics_filename: 'Culto - Audio.mp3', media_type: 'AUDIO', presentation_order: 3 },
         ],
       },
       created_at: new Date().toISOString(),
@@ -323,6 +328,11 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         return { success: true }
       },
     )
+
+    // Cria os arquivos no disco
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Abertura.mp4'), 'vid1')
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Avisos.mp4'), 'vid2')
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'image', 'Ofertas.png'), 'img1')
 
     const items = [
       { holyrics_filename: 'Abertura.mp4', media_type: 'VIDEO', presentation_order: 1 },
@@ -358,6 +368,9 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockResolvedValue({
       success: true,
     })
+
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Abertura.mp4'), 'vid1')
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Avisos.mp4'), 'vid2')
 
     const items = [
       { holyrics_filename: 'Abertura.mp4', media_type: 'VIDEO' },
@@ -400,6 +413,8 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockResolvedValue({
       success: true,
     })
+
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Novo_Video.mp4'), 'vid')
 
     await agent.handleSyncMediaPlaylist({
       id: 'cmd_preserve',
