@@ -1,7 +1,7 @@
-import { execSync } from 'node:child_process'
-import fs from 'node:fs'
-import path from 'node:path'
-import zlib from 'node:zlib'
+import { execSync } from 'child_process'
+import fs from 'fs'
+import path from 'path'
+import zlib from 'zlib'
 
 // Garante compilação do TypeScript do Agent antes de empacotar no ZIP
 try {

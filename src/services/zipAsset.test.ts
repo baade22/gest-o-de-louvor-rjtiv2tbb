@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
+import fs from 'fs'
+import path from 'path'
 
 describe('LouvorFlow Agent ZIP Asset Verification', () => {
   beforeAll(async () => {
     // Executa buildZipScript para garantir compilação do Agent e regeneração do ZIP antes dos testes
     await import('../buildZipScript.mjs')
   })
-  it('confirma existência e integridade do LouvorFlow-Agent-0.0.31.zip em public/', () => {
-    const publicZip = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.31.zip')
-    expect(fs.existsSync(publicZip), 'LouvorFlow-Agent-0.0.31.zip deve existir em public/').toBe(
+  it('confirma existência e integridade do LouvorFlow-Agent-0.0.32.zip em public/', () => {
+    const publicZip = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.32.zip')
+    expect(fs.existsSync(publicZip), 'LouvorFlow-Agent-0.0.32.zip deve existir em public/').toBe(
       true,
     )
 

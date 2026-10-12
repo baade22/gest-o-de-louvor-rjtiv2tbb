@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
+import fs from 'fs'
+import path from 'path'
 
 describe('packAgent test verification', () => {
   beforeAll(async () => {
@@ -16,7 +16,7 @@ describe('packAgent test verification', () => {
     expect(agentJs).toContain('CREATE_SONG')
     expect(agentJs).toContain('GET_LYRICS_PLAYLIST')
     expect(agentJs).toContain('ADD_LYRICS_TO_PLAYLIST')
-    expect(agentJs).toContain('0.0.31')
+    expect(agentJs).toContain('0.0.32')
 
     // Salva cópia em src/agentDistDump.json para vermos o conteúdo
     const dump: Record<string, string> = {}
@@ -29,8 +29,8 @@ describe('packAgent test verification', () => {
     )
   })
 
-  it('garante que o LouvorFlow-Agent-0.0.31.zip foi gerado corretamente em public/', () => {
-    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.31.zip')
+  it('garante que o LouvorFlow-Agent-0.0.32.zip foi gerado corretamente em public/', () => {
+    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.32.zip')
     expect(fs.existsSync(zipPath)).toBe(true)
     const stat = fs.statSync(zipPath)
     expect(stat.size).toBeGreaterThan(1000)
