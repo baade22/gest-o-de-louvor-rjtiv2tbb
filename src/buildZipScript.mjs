@@ -158,6 +158,9 @@ function collectFiles(dir, baseDir = '') {
 const agentDir = path.resolve(process.cwd(), 'agent')
 const files = collectFiles(agentDir)
 const zipBuf = buildZip(files)
+const outPublic35 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.35.zip')
+fs.writeFileSync(outPublic35, zipBuf)
+
 const outPublic34 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.34.zip')
 fs.writeFileSync(outPublic34, zipBuf)
 
@@ -186,5 +189,5 @@ const outPublic15 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.
 fs.writeFileSync(outPublic15, zipBuf)
 
 console.log(
-  `[ZIP Prebuild] LouvorFlow-Agent-0.0.34.zip gerado com sucesso em ${outPublic34} (${zipBuf.length} bytes, ${files.length} arquivos)`,
+  `[ZIP Prebuild] LouvorFlow-Agent-0.0.35.zip gerado com sucesso em ${outPublic35} (${zipBuf.length} bytes, ${files.length} arquivos)`,
 )

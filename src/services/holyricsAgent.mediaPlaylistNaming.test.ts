@@ -311,7 +311,6 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         { type: 'audio', name: 'Culto - Audio.mp3' },
       ],
       ignoreDuplicates: true,
-      eventId: 'evt_123',
     })
   })
 
@@ -530,5 +529,314 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       },
       5000,
     )
+  })
+
+  // 16. Nomes com extensão única, múltiplos pontos e sem extensão
+  describe('16. Desduplicação de extensão e preservação de múltiplos pontos', () => {
+    it('16.1. Extensão .mp3 única sem duplicação quando title e originalFileName contêm a extensão', () => {
+      const fn = generateHolyricsFileName({
+        eventName: 'Culto de Domingo',
+        category: 'AVISOS',
+        eventDate: '2025-10-15',
+        title: 'Áudio dos Avisos.mp3',
+        originalFileName: 'gravacao.mp3',
+      })
+      expect(fn).toBe('Culto de Domingo - Avisos - 15-10 - Audio dos Avisos.mp3')
+      expect((fn.match(/\.mp3/gi) || []).length).toBe(1)
+    })
+
+    it('16.2. Extensão .wav única sem duplicação', () => {
+      const fn = generateHolyricsFileName({
+        eventName: 'Culto Especial',
+        category: 'AGENDA',
+        eventDate: '2025-05-20',
+        title: 'Efeito Especial.wav',
+        originalFileName: 'sound_fx.wav',
+      })
+      expect(fn).toBe('Culto Especial - Agenda - 20-05 - Efeito Especial.wav')
+      expect((fn.match(/\.wav/gi) || []).length).toBe(1)
+    })
+
+    it('16.3. Extensão .mp4 única quando title não tem extensão mas originalFileName sim', () => {
+      const fn = generateHolyricsFileName({
+        eventName: 'Culto Jovem',
+        category: 'VIDEO_ESPECIAL',
+        eventDate: '2025-08-01',
+        title: 'Abertura Jovens',
+        originalFileName: 'video_final.mp4',
+      })
+      expect(fn).toBe('Culto Jovem - Video Especial - 01-08 - Abertura Jovens.mp4')
+      expect((fn.match(/\.mp4/gi) || []).length).toBe(1)
+    })
+
+    it('16.4. Nome com múltiplos pontos legítimos como .mpeg.mp4 preserva prefixo e extensão final única', () => {
+      const fn = generateHolyricsFileName({
+        eventName: 'Culto Quarta',
+        category: 'AVISOS',
+        eventDate: '2025-09-03',
+        title: 'video.promo.v1.mpeg.mp4',
+        originalFileName: 'video.promo.v1.mpeg.mp4',
+      })
+      expect(fn).toBe('Culto Quarta - Avisos - 03-09 - video promo v1 mpeg.mp4')
+      expect((fn.match(/\.mp4/gi) || []).length).toBe(1)
+    })
+
+    it('16.5. Mídia sem extensão conhecida gera nome consistente sem ponto solto', () => {
+      const fn = generateHolyricsFileName({
+        eventName: 'Culto',
+        category: 'OUTROS',
+        eventDate: '2025-01-01',
+        title: 'Arquivo Sem Extensao',
+        originalFileName: 'sem_extensao',
+      })
+      expect(fn).toBe('Culto - Outros - 01-01 - Arquivo Sem Extensao')
+      expect(fn.endsWith('.')).toBe(false)
+    })
+  })
+
+  // 17. Payload de AddToPlaylist sem event_id do SaaS e com { items, ignore_duplicates: true } usando nome físico
+  it('17. Payload de AddToPlaylist usa exatamente { items, ignore_duplicates: true } sem event_id do SaaS', async () => {
+    const agent = new LouvorFlowAgent(agentConfig)
+    let capturedPayload: any = null
+
+    vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+    vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
+
+    // Intercepta a chamada de rede ou método addMediaToPlaylist
+    const addMediaSpy = vi
+      .spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+      .mockImplementation(async (params: any) => {
+        capturedPayload = params
+        return { success: true }
+      })
+
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Culto - Video.mp4'), 'test')
+
+    const cmd: AgentCommand = {
+      id: 'cmd_payload_check',
+      command_id: 'cmd_payload_check',
+      action: 'SYNC_MEDIA_PLAYLIST',
+      payload: {
+        event_id: 'saas_event_never_sent_to_holyrics',
+        items: [
+          {
+            holyrics_filename: 'Culto - Video.mp4',
+            name: 'Nome Logico',
+            media_type: 'VIDEO',
+            presentation_order: 1,
+          },
+        ],
+      },
+      created_at: new Date().toISOString(),
+    }
+
+    const res = await agent.handleSyncMediaPlaylist(cmd)
+    expect(res.success).toBe(true)
+    expect(capturedPayload).toEqual({
+      items: [{ type: 'video', name: 'Culto - Video.mp4' }],
+      ignoreDuplicates: true,
+    })
+    // Garante que event_id do SaaS não vazou no parâmetro
+    expect(capturedPayload.event_id).toBeUndefined()
+    expect(capturedPayload.eventId).toBeUndefined()
+  })
+
+  // 18. Mídia não reconhecida retornando estado explícito MEDIA_NOT_RECOGNIZED
+  it('18. Retorna estado explícito MEDIA_NOT_RECOGNIZED quando o arquivo existe em disco mas GetFile não reconhece', async () => {
+    const agent = new LouvorFlowAgent(agentConfig)
+
+    vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+
+    // getFile retorna detected = false
+    vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({
+      detected: false,
+      error: 'Arquivo não indexado na biblioteca de vídeos',
+      httpStatus: 404,
+    })
+
+    const fileName = 'Culto - NaoReconhecido.mp4'
+    fs.writeFileSync(
+      path.join(agentConfig.holyricsMediaPath, 'video', fileName),
+      'dummy_video_bytes',
+    )
+
+    const cmd: AgentCommand = {
+      id: 'cmd_not_recog',
+      command_id: 'cmd_not_recog',
+      action: 'SYNC_MEDIA_PLAYLIST',
+      payload: {
+        event_id: 'evt_1',
+        items: [{ holyrics_filename: fileName, media_type: 'VIDEO', presentation_order: 1 }],
+      },
+      created_at: new Date().toISOString(),
+    }
+
+    const res = await agent.handleSyncMediaPlaylist(cmd)
+    expect(res.result?.not_recognized_count).toBe(1)
+    expect(res.result?.items[0].status).toBe('MEDIA_NOT_RECOGNIZED')
+    expect(res.result?.items[0].error_code).toBe('MEDIA_NOT_RECOGNIZED')
+    expect(res.result?.items[0].stage).toBe('VERIFY_HOLYRICS_RECOGNITION')
+    expect(res.error_code).toBe('MEDIA_NOT_RECOGNIZED')
+  })
+
+  // 19. Arquivo inexistente no destino retorna estado PENDING_LOCAL_FILE
+  it('19. Arquivo inexistente no disco de destino retorna estado explícito PENDING_LOCAL_FILE', async () => {
+    const agent = new LouvorFlowAgent(agentConfig)
+
+    vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+
+    // Não criamos o arquivo no disco
+    const fileName = 'Culto - ArquivoNaoTransferido.mp4'
+
+    const cmd: AgentCommand = {
+      id: 'cmd_pending_file',
+      command_id: 'cmd_pending_file',
+      action: 'SYNC_MEDIA_PLAYLIST',
+      payload: {
+        event_id: 'evt_1',
+        items: [{ holyrics_filename: fileName, media_type: 'VIDEO', presentation_order: 1 }],
+      },
+      created_at: new Date().toISOString(),
+    }
+
+    const res = await agent.handleSyncMediaPlaylist(cmd)
+    expect(res.result?.pending_local_count).toBe(1)
+    expect(res.result?.items[0].status).toBe('PENDING_LOCAL_FILE')
+    expect(res.result?.items[0].error_code).toBe('PENDING_LOCAL_FILE')
+    expect(res.result?.items[0].stage).toBe('CHECK_LOCAL_DISK')
+    expect(res.error_code).toBe('PENDING_LOCAL_FILE')
+  })
+
+  // 20. Erros da API com logging estruturado sem tokens nem credenciais
+  it('20. Erros na API geram log estruturado contendo command_id, stage, media_type, file_name, api_method, http_status, error_code estável sem vazar tokens', async () => {
+    const agent = new LouvorFlowAgent(agentConfig)
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+    vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
+
+    // Simula erro HTTP 500 em AddToPlaylist
+    vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockResolvedValue({
+      success: false,
+      error: 'Internal Server Error na API Holyrics',
+      error_code: 'ADD_TO_PLAYLIST_API_ERROR',
+      httpStatus: 500,
+    })
+
+    const fileName = 'Culto - VideoComErro.mp4'
+    fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', fileName), 'content')
+
+    const cmd: AgentCommand = {
+      id: 'cmd_log_test_999',
+      command_id: 'cmd_log_test_999',
+      action: 'SYNC_MEDIA_PLAYLIST',
+      payload: {
+        event_id: 'evt_log',
+        items: [{ holyrics_filename: fileName, media_type: 'VIDEO', presentation_order: 1 }],
+      },
+      created_at: new Date().toISOString(),
+    }
+
+    const res = await agent.handleSyncMediaPlaylist(cmd)
+    expect(res.result?.failed_count).toBe(1)
+
+    // Encontra a chamada de console.error estruturada
+    const errorLogCall = consoleErrorSpy.mock.calls.find((call) => {
+      try {
+        const parsed = JSON.parse(call[0])
+        return parsed.event === 'sync_media_error' && parsed.command_id === 'cmd_log_test_999'
+      } catch {
+        return false
+      }
+    })
+
+    expect(errorLogCall).toBeDefined()
+    const logObj = JSON.parse(errorLogCall![0])
+    expect(logObj.command_id).toBe('cmd_log_test_999')
+    expect(logObj.stage).toBe('ADD_TO_PLAYLIST')
+    expect(logObj.media_type).toBe('multiple')
+    expect(logObj.file_name).toContain(fileName)
+    expect(logObj.api_method).toBe('AddToPlaylist')
+    expect(logObj.http_status).toBe(500)
+    expect(logObj.error_code).toBe('ADD_TO_PLAYLIST_API_ERROR')
+
+    // Confirma que NÃO há tokens nem senhas nem credenciais no log
+    const serialized = JSON.stringify(logObj)
+    expect(serialized).not.toContain(agentConfig.agentToken)
+    expect(serialized).not.toContain(agentConfig.holyricsToken)
+    expect(serialized).not.toContain('password')
+    expect(serialized).not.toContain('token_secret')
+  })
+
+  // 21. Regressão da transferência de mídias e integridade física
+  it('21. Regressão: Transferência de mídias para image, video e audio permanece 100% funcional com stream e magic bytes', async () => {
+    const agent = new LouvorFlowAgent(agentConfig)
+    vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
+
+    // Cria mock para download de imagem PNG válida com assinatura PNG (\x89PNG\r\n\x1a\n)
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'content-length': String(pngHeader.length) }),
+      body: {
+        getReader() {
+          let done = false
+          return {
+            async read() {
+              if (done) return { done: true, value: undefined }
+              done = true
+              return { done: false, value: pngHeader }
+            },
+          }
+        },
+      },
+    } as any)
+
+    const cmd: AgentCommand = {
+      id: 'cmd_transfer_png',
+      command_id: 'cmd_transfer_png',
+      action: 'TRANSFER_MEDIA',
+      payload: {
+        media_id: 'm_png_1',
+        holyrics_filename: 'Culto - Agenda - Banner.png',
+        media_type: 'IMAGEM',
+        file_size: pngHeader.length,
+      },
+      created_at: new Date().toISOString(),
+    }
+
+    const res = await agent.handleTransferMedia(cmd)
+    expect(res.success).toBe(true)
+    const destPath = path.join(
+      agentConfig.holyricsMediaPath,
+      'image',
+      'Culto - Agenda - Banner.png',
+    )
+    expect(fs.existsSync(destPath)).toBe(true)
+  })
+
+  // 22. Regressão da sincronização musical homologada
+  it('22. Regressão: Sincronização musical de SearchSong e GetSongs permanece íntegra e com payload mínimo', async () => {
+    const client = new HolyricsClient(
+      agentConfig.holyricsHost,
+      agentConfig.holyricsPort,
+      agentConfig.holyricsToken,
+    )
+
+    const requestSpy = vi.spyOn(client as any, 'request').mockResolvedValue({
+      status: 'ok',
+      data: [{ id: '1', title: 'Grandes Coisas' }],
+    })
+
+    const searchRes = await client.searchSong('Grandes Coisas')
+    expect(searchRes.success).toBe(true)
+    expect(searchRes.matches.length).toBe(1)
+    // Regra estrita de memória do projeto: SearchSong só com { text: query }
+    expect(requestSpy).toHaveBeenCalledWith('SearchSong', { text: 'Grandes Coisas' }, 3000)
   })
 })
