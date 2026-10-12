@@ -44,6 +44,8 @@ import {
   Radio,
   Loader2,
   X,
+  RefreshCw,
+  Send,
 } from 'lucide-react'
 import {
   syncEventRepertoireWithHolyrics,
