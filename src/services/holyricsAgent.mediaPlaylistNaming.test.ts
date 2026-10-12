@@ -492,7 +492,7 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
 
   // 15. Compatibilidade com a sincronização musical existente
   it('15. Preserva integralmente o método e comportamento AddLyricsToPlaylist para músicas', async () => {
-    const client = new HolyricsApiClient(
+    const client = new HolyricsClient(
       agentConfig.holyricsHost,
       agentConfig.holyricsPort,
       agentConfig.holyricsToken,

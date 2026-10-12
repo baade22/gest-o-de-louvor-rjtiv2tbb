@@ -16,7 +16,7 @@ describe('packAgent test verification', () => {
     expect(agentJs).toContain('CREATE_SONG')
     expect(agentJs).toContain('GET_LYRICS_PLAYLIST')
     expect(agentJs).toContain('ADD_LYRICS_TO_PLAYLIST')
-    expect(agentJs).toContain('0.0.32')
+    expect(agentJs).toContain('0.0.33')
 
     // Salva cópia em src/agentDistDump.json para vermos o conteúdo
     const dump: Record<string, string> = {}
