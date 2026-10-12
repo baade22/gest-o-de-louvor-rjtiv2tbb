@@ -888,14 +888,13 @@ routerAdd(
 
         // -------------------------------------------------------------
         // ETAPA 1 & 2: Localização segura da música (Zero Duplicação)
+        // Validação ativa do acervo: se holyrics_song_id existe, confirma via GetSongs.
+        // Se ausente no acervo, o vínculo é considerado obsoleto e a música é recriada.
         // -------------------------------------------------------------
+        let isIdValidInLibrary = false
+        let isRecreatedObsolete = false
+
         if (holyricsSongId) {
-          // Regra 1: Se songs.holyrics_song_id existe -> usar direto! NUNCA chamar CreateSong
-          songStatusLabel = `✓ Música já existente no Holyrics / Holyrics #${holyricsSongId}`
-          countAlreadyExisted++
-          logSteps.push(`Holyrics ID: ${holyricsSongId} (persisted) | CreateSong → SKIPPED`)
-        } else {
-          // Regra 2: songs.holyrics_song_id NÃO existe -> buscar em GetSongs
           eventSongRec.set('holyrics_status', 'CHECKING')
           try {
             $app.save(eventSongRec)
@@ -904,6 +903,117 @@ routerAdd(
           if (!holyricsLibraryCache) {
             fetchHolyricsLibrary()
           }
+
+          // Se a consulta GetSongs falhar (timeout, agent offline, erro de rede):
+          // NUNCA apagar o vínculo e NUNCA criar outra música com base em consulta inconclusiva!
+          if (holyricsLibraryCache === null) {
+            const getSongsErrorMsg =
+              'Falha ao consultar o acervo do Holyrics (GetSongs). Verifique se o LouvorFlow Agent está conectado e se o Holyrics está aberto com o API Server ativo.'
+            eventSongRec.set('holyrics_status', 'ERROR')
+            eventSongRec.set('holyrics_error', getSongsErrorMsg)
+            try {
+              $app.save(eventSongRec)
+            } catch (_) {}
+            countErrors++
+
+            logSteps.push(`GetSongs → FAILED_INCONCLUSIVE | Kept persisted ID #${holyricsSongId}`)
+            recordSyncLog({
+              event_id: eventId,
+              song_id: songId,
+              holyrics_song_id: holyricsSongId,
+              song_title: songTitle,
+              action: 'GET_SONGS',
+              stage: 'VERIFY_EXISTING_ID_FAILED',
+              status: 'ERROR',
+              error: getSongsErrorMsg,
+              duration_ms: Date.now() - songStartTime,
+            })
+
+            results.push({
+              order: repertoireOrder,
+              event_song_id: eventSongRec.id,
+              song_id: songId,
+              song_title: songTitle,
+              holyrics_song_id: holyricsSongId,
+              action: 'CHECK_LIBRARY',
+              status: 'ERROR',
+              error: getSongsErrorMsg,
+              detail: `✕ Falha ao consultar o acervo do Holyrics / Etapa: GetSongs / ${getSongsErrorMsg}`,
+            })
+            continue
+          }
+
+          // Consulta GetSongs bem-sucedida: procura correspondência EXATA pelo ID salvo
+          const library = holyricsLibraryCache || []
+          const exactMatch = library.find((it) => String(it.id).trim() === holyricsSongId)
+
+          if (exactMatch) {
+            // ID confirmado no acervo! Reutiliza com segurança total sem recriar
+            isIdValidInLibrary = true
+            songStatusLabel = `✓ Música já existente no Holyrics / Holyrics #${holyricsSongId}`
+            countAlreadyExisted++
+            logSteps.push(
+              `Holyrics ID: ${holyricsSongId} (verified in GetSongs) | CreateSong → SKIPPED`,
+            )
+          } else {
+            // ID salvo AUSENTE no acervo do Holyrics (música foi excluída manualmente do Holyrics)
+            // Considera vínculo obsoleto e inicia fluxo de recriação
+            isRecreatedObsolete = true
+            logSteps.push(
+              `Holyrics ID: ${holyricsSongId} (OBSOLETE - not found in GetSongs) | Recreating song`,
+            )
+            holyricsSongId = ''
+          }
+        }
+
+        if (!isIdValidInLibrary) {
+          // songs.holyrics_song_id não existia ou vínculo estava obsoleto
+          eventSongRec.set('holyrics_status', 'CHECKING')
+          try {
+            $app.save(eventSongRec)
+          } catch (_) {}
+
+          if (!holyricsLibraryCache) {
+            fetchHolyricsLibrary()
+          }
+
+          // Se a biblioteca não pôde ser consultada de forma conclusiva
+          if (holyricsLibraryCache === null) {
+            const getSongsErrorMsg =
+              'Falha ao consultar o acervo do Holyrics (GetSongs). Verifique se o LouvorFlow Agent está conectado e se o Holyrics está aberto com o API Server ativo.'
+            eventSongRec.set('holyrics_status', 'ERROR')
+            eventSongRec.set('holyrics_error', getSongsErrorMsg)
+            try {
+              $app.save(eventSongRec)
+            } catch (_) {}
+            countErrors++
+
+            logSteps.push(`GetSongs → FAILED_INCONCLUSIVE | CreateSong → ABORTED`)
+            recordSyncLog({
+              event_id: eventId,
+              song_id: songId,
+              song_title: songTitle,
+              action: 'GET_SONGS',
+              stage: 'LIBRARY_INCONCLUSIVE',
+              status: 'ERROR',
+              error: getSongsErrorMsg,
+              duration_ms: Date.now() - songStartTime,
+            })
+
+            results.push({
+              order: repertoireOrder,
+              event_song_id: eventSongRec.id,
+              song_id: songId,
+              song_title: songTitle,
+              holyrics_song_id: null,
+              action: 'CHECK_LIBRARY',
+              status: 'ERROR',
+              error: getSongsErrorMsg,
+              detail: `✕ Falha ao consultar o acervo do Holyrics / Etapa: GetSongs / ${getSongsErrorMsg}`,
+            })
+            continue
+          }
+
           const library = holyricsLibraryCache || []
 
           const normTargetTitle = normalizeString(songTitle)
@@ -1022,16 +1132,22 @@ routerAdd(
 
               if (appearsInLibrary) {
                 eventSongRec.set('holyrics_status', 'CREATED')
-                songStatusLabel = `✓ Música criada no Holyrics / Holyrics #${holyricsSongId}`
-                logSteps.push(`CreateSong → OK | GetSongs Confirm → CONFIRMED (#${holyricsSongId})`)
+                songStatusLabel = isRecreatedObsolete
+                  ? `✓ Música recriada no Holyrics porque o vínculo anterior estava obsoleto / Holyrics #${holyricsSongId}`
+                  : `✓ Música criada no Holyrics / Holyrics #${holyricsSongId}`
+                logSteps.push(
+                  `CreateSong → OK | GetSongs Confirm → CONFIRMED (#${holyricsSongId})${isRecreatedObsolete ? ' (recreated obsolete)' : ''}`,
+                )
               } else {
                 // A música foi criada (tem ID retornado), mas a listagem do Holyrics tem latência
                 // REGRA: registrar VERIFYING_CREATED_SONG e CONTINUAR o fluxo para a playlist usando o ID retornado.
                 // Nunca marcar ERROR nem exibir mensagem de permissões!
                 eventSongRec.set('holyrics_status', 'VERIFYING_CREATED_SONG')
-                songStatusLabel = `✓ Música criada no Holyrics / Holyrics #${holyricsSongId} (verificação local pendente)`
+                songStatusLabel = isRecreatedObsolete
+                  ? `✓ Música recriada no Holyrics porque o vínculo anterior estava obsoleto / Holyrics #${holyricsSongId} (verificação local pendente)`
+                  : `✓ Música criada no Holyrics / Holyrics #${holyricsSongId} (verificação local pendente)`
                 logSteps.push(
-                  `CreateSong → OK (#${holyricsSongId}) | GetSongs Confirm → PENDING_VERIFICATION | Proceeding to playlist`,
+                  `CreateSong → OK (#${holyricsSongId}) | GetSongs Confirm → PENDING_VERIFICATION | Proceeding to playlist${isRecreatedObsolete ? ' (recreated obsolete)' : ''}`,
                 )
               }
 
@@ -1148,7 +1264,11 @@ routerAdd(
             song_id: songId,
             song_title: songTitle,
             holyrics_song_id: holyricsSongId,
-            action: songWasCreatedNow ? 'CREATED_AND_ALREADY_IN_PLAYLIST' : 'ALREADY_IN_PLAYLIST',
+            action: isRecreatedObsolete
+              ? 'RECREATED_AND_ALREADY_IN_PLAYLIST'
+              : songWasCreatedNow
+                ? 'CREATED_AND_ALREADY_IN_PLAYLIST'
+                : 'ALREADY_IN_PLAYLIST',
             status: 'SUCCESS',
             detail: `${songStatusLabel} • ✓ Música já estava na playlist`,
           })
@@ -1227,7 +1347,11 @@ routerAdd(
             song_id: songId,
             song_title: songTitle,
             holyrics_song_id: holyricsSongId,
-            action: songWasCreatedNow ? 'CREATED_AND_ADDED' : 'ADDED_TO_PLAYLIST',
+            action: isRecreatedObsolete
+              ? 'RECREATED_AND_ADDED'
+              : songWasCreatedNow
+                ? 'CREATED_AND_ADDED'
+                : 'ADDED_TO_PLAYLIST',
             status: 'SUCCESS',
             detail: `${songStatusLabel} • ✓ Música adicionada à playlist (posição ${repertoireOrder})`,
           })
