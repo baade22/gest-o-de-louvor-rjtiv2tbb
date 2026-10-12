@@ -110,7 +110,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.35',
+          version: '0.0.36',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -256,7 +256,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.35',
+          version: '0.0.36',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -696,8 +696,9 @@ export class LouvorFlowAgent {
     }> = []
 
     for (const item of sortedItems) {
-      // Usa o nome físico exato com extensão (holyrics_filename)
-      const fileName = String(item.holyrics_filename || item.name || '').trim()
+      // Usa o nome físico exato com extensão (holyrics_filename) desduplicando extensões repetidas
+      const rawFileName = String(item.holyrics_filename || item.name || '').trim()
+      const fileName = this.cleanRepeatedExtension(rawFileName)
       const mediaType = String(item.media_type || '').toUpperCase()
 
       if (!fileName) {
@@ -1025,7 +1026,9 @@ export class LouvorFlowAgent {
     let rawFileName = fileNameParam || `media_${mediaId}`
     // Normaliza barras para prevenir path traversal
     rawFileName = path.basename(rawFileName.replace(/\\/g, '/'))
-    let sanitizedFileName = rawFileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim()
+    let sanitizedFileName = this.cleanRepeatedExtension(
+      rawFileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim(),
+    )
     if (!sanitizedFileName || sanitizedFileName === '.' || sanitizedFileName === '..') {
       sanitizedFileName = `media_${mediaId}`
     }
@@ -1315,6 +1318,22 @@ export class LouvorFlowAgent {
         error_code: err.name === 'AbortError' ? 'DOWNLOAD_TIMEOUT' : 'TRANSFER_FAILED',
       }
     }
+  }
+
+  /**
+   * Colapsa extensões repetidas sucessivas ancoradas ao final da string para apenas uma ocorrência.
+   * Exemplo: "audio.mp3.mp3" -> "audio.mp3"
+   */
+  public cleanRepeatedExtension(fileName: string): string {
+    if (!fileName) return ''
+    const trimmed = String(fileName).trim()
+    const match = trimmed.match(/\.([a-zA-Z0-9]+)$/)
+    if (!match) return trimmed
+    const ext = match[1]
+    const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const repeatedRegex = new RegExp(`(?:\\.${escapedExt})+$`, 'i')
+    const base = trimmed.replace(repeatedRegex, '')
+    return `${base}.${ext}`
   }
 
   /**

@@ -9,6 +9,7 @@ import {
   formatEventDayMonth,
   extractFileExtension,
   removeAccents,
+  cleanRepeatedExtension,
 } from '../lib/mediaNaming'
 import { LouvorFlowAgent } from '../../agent/src/agent'
 import { HolyricsClient } from '../../agent/src/holyricsClient'
@@ -838,5 +839,178 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     expect(searchRes.matches.length).toBe(1)
     // Regra estrita de memória do projeto: SearchSong só com { text: query }
     expect(requestSpy).toHaveBeenCalledWith('SearchSong', { text: 'Grandes Coisas' }, 3000)
+  })
+
+  // 23. Casos Obrigatórios: Desduplicação de extensão ancorada ao final
+  describe('23. Casos Obrigatórios de Desduplicação de Extensão', () => {
+    it('desduplica extensão repetida simples: audio.mp3 -> audio.mp3', () => {
+      expect(cleanRepeatedExtension('audio.mp3')).toBe('audio.mp3')
+    })
+
+    it('desduplica extensão repetida dupla: audio.mp3.mp3 -> audio.mp3', () => {
+      expect(cleanRepeatedExtension('audio.mp3.mp3')).toBe('audio.mp3')
+    })
+
+    it('caso real de produção: WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3 -> WhatsApp Audio 2026-08-02 at 15.52.41.mp3', () => {
+      expect(cleanRepeatedExtension('WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3')).toBe(
+        'WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
+      )
+    })
+
+    it('mantém inalterado nome com pontos antes da extensão: audio 15.52.41.mp3 -> audio 15.52.41.mp3', () => {
+      expect(cleanRepeatedExtension('audio 15.52.41.mp3')).toBe('audio 15.52.41.mp3')
+    })
+
+    it('mantém inalterado vídeo com múltiplos pontos distintos: video.v2.final.mp4 -> video.v2.final.mp4', () => {
+      expect(cleanRepeatedExtension('video.v2.final.mp4')).toBe('video.v2.final.mp4')
+    })
+
+    it('desduplica extensão repetida de vídeo: video.mp4.mp4 -> video.mp4', () => {
+      expect(cleanRepeatedExtension('video.mp4.mp4')).toBe('video.mp4')
+    })
+
+    it('mantém inalterado quando extensões são distintas (.mpeg é parte legítima): audio.mpeg.mp4 -> audio.mpeg.mp4', () => {
+      expect(cleanRepeatedExtension('audio.mpeg.mp4')).toBe('audio.mpeg.mp4')
+    })
+
+    it('preserva espaços e acentos conforme sanitização existente', () => {
+      const sanitized = sanitizeWindowsSegment('Áudio Especial de Oração - 10h.mp3')
+      expect(sanitized).toBe('Audio Especial de Oracao - 10h.mp3')
+      expect(cleanRepeatedExtension('Áudio Especial de Oração.mp3.mp3')).toBe(
+        'Áudio Especial de Oração.mp3',
+      )
+    })
+
+    it('nome sem extensão não recebe extensão inventada', () => {
+      expect(cleanRepeatedExtension('arquivo_sem_extensao')).toBe('arquivo_sem_extensao')
+      const fileNameSemExt = generateHolyricsFileName({
+        eventName: 'Culto',
+        category: 'AVISOS',
+        eventDate: '2026-10-12',
+        title: 'Aviso Sem Extensao',
+        originalFileName: 'arquivo_sem_extensao',
+      })
+      expect(fileNameSemExt).toBe('Culto - Avisos - 12-10 - Aviso Sem Extensao')
+      expect(extractFileExtension(fileNameSemExt)).toBe('')
+    })
+
+    it('caso de produção completo no generateHolyricsFileName: não gera .mp3.mp3', () => {
+      const generated = generateHolyricsFileName({
+        eventName: 'teste',
+        category: 'AVISOS',
+        eventDate: '2026-10-12',
+        title: 'WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3',
+        originalFileName: 'WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3',
+      })
+      expect(generated).toBe('teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3')
+      expect(generated).not.toContain('.mp3.mp3')
+    })
+
+    it('consistência total: SaaS == Agent gravação == Agent verificação local', async () => {
+      const agent = new LouvorFlowAgent(agentConfig)
+
+      const saasGeneratedName = generateHolyricsFileName({
+        eventName: 'teste',
+        category: 'AVISOS',
+        eventDate: '2026-10-12',
+        title: 'WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3',
+        originalFileName: 'WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3',
+      })
+
+      // Simula gravação com transferência pelo Agent
+      const audioBytes = Buffer.from('AUDIO_TEST_PAYLOAD')
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-length': String(audioBytes.length) }),
+        body: {
+          getReader() {
+            let done = false
+            return {
+              async read() {
+                if (done) return { done: true, value: undefined }
+                done = true
+                return { done: false, value: audioBytes }
+              },
+            }
+          },
+        },
+      } as any)
+
+      vi.spyOn(agent as any, 'validateFileContent').mockReturnValue({ valid: true })
+      vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({
+        detected: true,
+        fileInfo: {},
+      })
+
+      // Caso com holyrics_filename duplicado recebido por legado ou montagem
+      const cmdTransfer: AgentCommand = {
+        id: 'cmd_transfer_consist',
+        command_id: 'cmd_transfer_consist',
+        action: 'TRANSFER_MEDIA',
+        payload: {
+          media_id: 'm_audio_consist',
+          holyrics_filename:
+            'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3',
+          media_type: 'AUDIO',
+          file_size: audioBytes.length,
+        },
+        created_at: new Date().toISOString(),
+      }
+
+      const resTransfer = await agent.handleTransferMedia(cmdTransfer)
+      expect(resTransfer.success).toBe(true)
+
+      const recordedFileName = resTransfer.result?.file_name
+      // Confirma que o Agent gravou o nome desduplicado
+      expect(recordedFileName).toBe(
+        'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
+      )
+      expect(recordedFileName).toBe(saasGeneratedName)
+
+      // Agora simula o SYNC_MEDIA_PLAYLIST procurando o arquivo em disco
+      vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+      vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({
+        success: true,
+        items: [],
+      })
+      const addMediaSpy = vi
+        .spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+        .mockResolvedValue({
+          success: true,
+        })
+
+      const cmdSync: AgentCommand = {
+        id: 'cmd_sync_consist',
+        command_id: 'cmd_sync_consist',
+        action: 'SYNC_MEDIA_PLAYLIST',
+        payload: {
+          event_id: 'evt_consist',
+          items: [
+            {
+              // Mesmo se vier duplicado no payload do sync
+              holyrics_filename:
+                'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3.mp3',
+              media_type: 'AUDIO',
+              presentation_order: 1,
+            },
+          ],
+        },
+        created_at: new Date().toISOString(),
+      }
+
+      const resSync = await agent.handleSyncMediaPlaylist(cmdSync)
+      expect(resSync.success).toBe(true)
+      expect(resSync.result?.pending_local_count).toBe(0)
+      expect(resSync.result?.synced_count).toBe(1)
+      expect(addMediaSpy).toHaveBeenCalledWith({
+        items: [
+          {
+            type: 'audio',
+            name: 'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
+          },
+        ],
+        ignoreDuplicates: true,
+      })
+    })
   })
 })

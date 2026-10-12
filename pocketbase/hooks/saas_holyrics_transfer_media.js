@@ -241,7 +241,22 @@ routerAdd(
 
     // 6. Nomenclatura física padronizada:
     // Padrão: Evento - Categoria - DD-MM - Título.extensão
+    function cleanRepeatedExtension(fileName) {
+      if (!fileName) return ''
+      var trimmed = String(fileName).trim()
+      var match = trimmed.match(/\.([a-zA-Z0-9]+)$/)
+      if (!match) return trimmed
+      var ext = match[1]
+      var escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      var repeatedRegex = new RegExp('(?:\\.' + escapedExt + ')+$', 'i')
+      var base = trimmed.replace(repeatedRegex, '')
+      return base + '.' + ext
+    }
+
     let holyricsFilename = media.getString('holyrics_filename')
+    if (holyricsFilename) {
+      holyricsFilename = cleanRepeatedExtension(holyricsFilename)
+    }
     const originalFile = media.getString('file')
     const originalName = media.getString('name') || originalFile
 
@@ -291,21 +306,28 @@ routerAdd(
         return map[c] || (c ? sanitizeSegment(c) : 'Geral')
       }
 
-      var extMatch = originalFile.match(/\.([a-zA-Z0-9]+)$/)
+      var cleanedOriginalFile = originalFile ? cleanRepeatedExtension(originalFile) : ''
+      var cleanedOriginalName = originalName ? cleanRepeatedExtension(originalName) : ''
+
+      var extMatch = cleanedOriginalFile.match(/\.([a-zA-Z0-9]+)$/)
       var ext = extMatch ? extMatch[1].toLowerCase() : ''
-      if (!ext && originalName) {
-        var matchTitleExt = originalName.match(/\.([a-zA-Z0-9]+)$/)
+      if (!ext && cleanedOriginalName) {
+        var matchTitleExt = cleanedOriginalName.match(/\.([a-zA-Z0-9]+)$/)
         if (matchTitleExt) ext = matchTitleExt[1].toLowerCase()
       }
 
-      var titleRaw = (originalName || 'Midia').trim()
-      if (ext && titleRaw.toLowerCase().endsWith('.' + ext)) {
-        titleRaw = titleRaw.slice(0, -(ext.length + 1)).trim()
+      var titleRaw = (cleanedOriginalName || cleanedOriginalFile || 'Midia').trim()
+      if (ext) {
+        var escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        var repRegex = new RegExp('(?:\\.' + escapedExt + ')+$', 'i')
+        titleRaw = titleRaw.replace(repRegex, '').trim()
       } else {
         var matchExt = titleRaw.match(/\.([a-zA-Z0-9]+)$/)
-        if (matchExt && (!ext || matchExt[1].toLowerCase() === ext)) {
-          if (!ext) ext = matchExt[1].toLowerCase()
-          titleRaw = titleRaw.slice(0, -matchExt[0].length).trim()
+        if (matchExt) {
+          ext = matchExt[1].toLowerCase()
+          var escapedExt2 = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          var repRegex2 = new RegExp('(?:\\.' + escapedExt2 + ')+$', 'i')
+          titleRaw = titleRaw.replace(repRegex2, '').trim()
         }
       }
 
@@ -318,8 +340,14 @@ routerAdd(
         .replace(/\s*-\s*-\s*/g, ' - ')
         .replace(/\s+/g, ' ')
         .trim()
-      if (ext && !holyricsFilename.toLowerCase().endsWith('.' + ext)) {
-        holyricsFilename += '.' + ext
+      if (ext) {
+        var escapedExtFinal = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        var repAtEnd = new RegExp('(?:\\.' + escapedExtFinal + ')+$', 'i')
+        if (repAtEnd.test(holyricsFilename)) {
+          holyricsFilename = holyricsFilename.replace(repAtEnd, '.' + ext)
+        } else {
+          holyricsFilename += '.' + ext
+        }
       }
 
       try {

@@ -4,7 +4,7 @@ import { startAgentWebServer } from './server.js'
 
 async function main() {
   console.log('====================================================')
-  console.log('      LouvorFlow Agent v0.0.35 — Holyrics Bridge    ')
+  console.log('      LouvorFlow Agent v0.0.36 — Holyrics Bridge    ')
   console.log('====================================================')
 
   const config = loadConfig()

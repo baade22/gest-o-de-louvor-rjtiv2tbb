@@ -158,6 +158,18 @@ routerAdd(
       })
     }
 
+    function cleanRepeatedExtension(fileName) {
+      if (!fileName) return ''
+      var trimmed = String(fileName).trim()
+      var match = trimmed.match(/\.([a-zA-Z0-9]+)$/)
+      if (!match) return trimmed
+      var ext = match[1]
+      var escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      var repeatedRegex = new RegExp('(?:\\.' + escapedExt + ')+$', 'i')
+      var base = trimmed.replace(repeatedRegex, '')
+      return base + '.' + ext
+    }
+
     // Filtra e prepara itens: apenas mídias já transferidas para o computador local
     // (BAIXADA) ou reconhecidas pelo Holyrics (IMPORTADA_HOLYRICS)
     const items = []
@@ -172,7 +184,9 @@ routerAdd(
 
       if (!holyricsFilename) {
         // Fallback para gerar nome se não preenchido
-        holyricsFilename = m.getString('name') || originalFile
+        holyricsFilename = cleanRepeatedExtension(m.getString('name') || originalFile)
+      } else {
+        holyricsFilename = cleanRepeatedExtension(holyricsFilename)
       }
 
       const mediaName = m.getString('name') || originalFile

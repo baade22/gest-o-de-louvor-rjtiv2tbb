@@ -19,6 +19,27 @@ export interface MediaNamingParams {
 }
 
 /**
+ * Colapsa extensões repetidas sucessivas ancoradas ao final da string para apenas uma ocorrência.
+ * Exemplo:
+ * - "audio.mp3.mp3" -> "audio.mp3"
+ * - "WhatsApp Audio.mp3.mp3" -> "WhatsApp Audio.mp3"
+ * - "video.mp4.mp4.mp4" -> "video.mp4"
+ * - "audio.mpeg.mp4" -> inalterado (.mpeg é parte legítima do nome)
+ * - "audio 15.52.41.mp3" -> inalterado
+ */
+export function cleanRepeatedExtension(fileName: string): string {
+  if (!fileName) return ''
+  const trimmed = String(fileName).trim()
+  const match = trimmed.match(/\.([a-zA-Z0-9]+)$/)
+  if (!match) return trimmed
+  const ext = match[1]
+  const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const repeatedRegex = new RegExp(`(?:\\.${escapedExt})+$`, 'i')
+  const base = trimmed.replace(repeatedRegex, '')
+  return `${base}.${ext}`
+}
+
+/**
  * Remove acentos de uma string, mantendo caracteres alfanuméricos seguros
  */
 export function removeAccents(str: string): string {
@@ -122,29 +143,39 @@ export function generateHolyricsFileName(params: MediaNamingParams): string {
   const categoryPart = formatCategoryLabel(params.category)
   const datePart = formatEventDayMonth(params.eventDate)
 
-  // Determina a extensão original válida (prioriza originalFileName, fallback para title)
-  let ext = extractFileExtension(params.originalFileName)
-  if (!ext && params.title) {
-    ext = extractFileExtension(params.title)
+  // Aplica limpeza de extensões duplicadas nas entradas brutas antes de extrair a extensão final
+  const cleanedOriginalFile = params.originalFileName
+    ? cleanRepeatedExtension(params.originalFileName.trim())
+    : ''
+  const cleanedTitleInput = params.title ? cleanRepeatedExtension(params.title.trim()) : ''
+
+  // Determina a extensão original válida (prioriza cleanedOriginalFile, fallback para cleanedTitleInput)
+  let ext = extractFileExtension(cleanedOriginalFile)
+  if (!ext && cleanedTitleInput) {
+    ext = extractFileExtension(cleanedTitleInput)
   }
 
-  // Se o título não foi informado, usa o nome do arquivo original
-  let titleRaw = params.title?.trim()
-  if (!titleRaw && params.originalFileName) {
-    titleRaw = params.originalFileName.trim()
+  // Se o título não foi informado, usa o nome do arquivo original limpo
+  let titleRaw = cleanedTitleInput
+  if (!titleRaw && cleanedOriginalFile) {
+    titleRaw = cleanedOriginalFile
   }
 
-  // Remove a extensão final de titleRaw se ele já terminar com .ext (ou com qualquer extensão válida conhecida)
+  // Remove repetições da extensão final de titleRaw se ele terminar com ela,
   // garantindo que não haja duplicação de extensão (ex: WhatsApp Audio.mp3 -> WhatsApp Audio)
   // e tratando corretamente nomes com múltiplos pontos legítimos como audio.mpeg.mp3 -> audio.mpeg
   if (titleRaw) {
-    if (ext && titleRaw.toLowerCase().endsWith(`.${ext}`)) {
-      titleRaw = titleRaw.slice(0, -(ext.length + 1)).trim()
+    if (ext) {
+      const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const repeatedRegex = new RegExp(`(?:\\.${escapedExt})+$`, 'i')
+      titleRaw = titleRaw.replace(repeatedRegex, '').trim()
     } else {
       const matchExt = titleRaw.match(/\.([a-zA-Z0-9]+)$/)
-      if (matchExt && (!ext || matchExt[1].toLowerCase() === ext)) {
-        if (!ext) ext = matchExt[1].toLowerCase()
-        titleRaw = titleRaw.slice(0, -matchExt[0].length).trim()
+      if (matchExt) {
+        ext = matchExt[1].toLowerCase()
+        const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const repeatedRegex = new RegExp(`(?:\\.${escapedExt})+$`, 'i')
+        titleRaw = titleRaw.replace(repeatedRegex, '').trim()
       }
     }
   }
@@ -159,10 +190,12 @@ export function generateHolyricsFileName(params: MediaNamingParams): string {
     .replace(/\s+/g, ' ')
     .trim()
 
-  // Se o cleanedBase já terminar com .${ext} (por exemplo, se o sanitize preservou ponto final), não duplica
   if (ext) {
-    if (cleanedBase.toLowerCase().endsWith(`.${ext}`)) {
-      return cleanedBase
+    // Se o cleanedBase já terminar com a extensão (ou repetições dela), normaliza para uma única
+    const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const repeatedAtEnd = new RegExp(`(?:\\.${escapedExt})+$`, 'i')
+    if (repeatedAtEnd.test(cleanedBase)) {
+      return cleanedBase.replace(repeatedAtEnd, `.${ext}`)
     }
     return `${cleanedBase}.${ext}`
   }
