@@ -1,4 +1,9 @@
 import os from 'node:os'
+import fs from 'node:fs'
+import path from 'node:path'
+import crypto from 'node:crypto'
+import { pipeline } from 'node:stream/promises'
+import { Readable } from 'node:stream'
 import type { AgentConfig, AgentCommand, AgentStatusInfo } from './types.js'
 import { HolyricsClient } from './holyricsClient.js'
 import { saveConfig } from './config.js'
@@ -47,6 +52,20 @@ export class LouvorFlowAgent {
       agentStatus = this.lastHeartbeat ? 'CONNECTED' : 'DISCONNECTED'
     }
 
+    // Valida permissão do caminho da biblioteca local
+    let mediaPathValid = false
+    let mediaPathError: string | undefined = undefined
+    try {
+      if (fs.existsSync(this.config.holyricsMediaPath)) {
+        fs.accessSync(this.config.holyricsMediaPath, fs.constants.R_OK | fs.constants.W_OK)
+        mediaPathValid = true
+      } else {
+        mediaPathError = 'Diretório da biblioteca não encontrado no disco local.'
+      }
+    } catch (err: any) {
+      mediaPathError = `Sem permissão de leitura/escrita na pasta: ${err.message}`
+    }
+
     return {
       agentStatus,
       holyricsStatus: this.holyricsDetected
@@ -64,6 +83,9 @@ export class LouvorFlowAgent {
       lastHeartbeat: this.lastHeartbeat,
       lastPoll: this.lastPoll,
       lastError: this.lastError,
+      holyricsMediaPath: this.config.holyricsMediaPath,
+      mediaPathValid,
+      mediaPathError,
     }
   }
 
@@ -88,7 +110,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.31',
+          version: '0.0.32',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -234,7 +256,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.31',
+          version: '0.0.32',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -487,6 +509,20 @@ export class LouvorFlowAgent {
           break
         }
 
+        case 'TRANSFER_MEDIA': {
+          const transferRes = await this.handleTransferMedia(cmd)
+          if (transferRes.success) {
+            status = 'DONE'
+            resultPayload = transferRes.result
+          } else {
+            status = 'FAILED'
+            errorMsg = transferRes.error || 'Erro na transferência da mídia.'
+            errorCode = transferRes.error_code || 'TRANSFER_MEDIA_FAILED'
+            resultPayload = { error_code: errorCode, ...transferRes.result }
+          }
+          break
+        }
+
         default:
           status = 'FAILED'
           errorMsg = `Ação desconhecida: ${cmd.action}`
@@ -556,6 +592,417 @@ export class LouvorFlowAgent {
           retryErr.message,
         )
       }
+    }
+  }
+
+  /**
+   * Executa transferência segura de mídia para o disco local do Holyrics:
+   * 1. Valida biblioteca base autorizada no Agent (NUNCA vinda do SaaS)
+   * 2. Mapeia subpasta estrita controlada pelo Agent (image, video, audio, automaticPresentations)
+   * 3. Baixa em arquivo temporário .tmp com stream
+   * 4. Valida tamanho, extensão permitida e conteúdo real (magic bytes)
+   * 5. Aplica política anti-duplicação e anti-sobrescrita atômica
+   * 6. Move atomicamente para o destino final
+   * 7. Consulta GetFile no Holyrics para testar indexação/reconhecimento
+   */
+  public async handleTransferMedia(cmd: AgentCommand): Promise<{
+    success: boolean
+    result?: Record<string, any>
+    error?: string
+    error_code?: string
+  }> {
+    const payload = cmd.payload || {}
+    const mediaId = String(payload.media_id || '').trim()
+    const fileNameParam = String(payload.file_name || payload.name || '').trim()
+    const mediaType = String(payload.media_type || '').toUpperCase()
+    const expectedSize = Number(payload.file_size) || 0
+    const downloadEndpoint = String(
+      payload.download_endpoint || `/backend/v1/agent/media/${mediaId}/download`,
+    ).trim()
+
+    if (!mediaId) {
+      return {
+        success: false,
+        error: 'media_id ausente no payload de transferência.',
+        error_code: 'MISSING_MEDIA_ID',
+      }
+    }
+
+    // 1. Sanitiza nome do arquivo para gravação no SO local
+    // Preserva acentos, espaços e caracteres portugueses (ex: "Avisos Domingo Culto 10h.mp4", "Ação de Graças.jpeg")
+    // Remove apenas caracteres ilegais em caminhos de arquivos Windows/Linux (< > : " / \ | ? *) e controles ASCII
+    let rawFileName = fileNameParam || `media_${mediaId}`
+    // Normaliza barras para prevenir path traversal
+    rawFileName = path.basename(rawFileName.replace(/\\/g, '/'))
+    let sanitizedFileName = rawFileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim()
+    if (!sanitizedFileName || sanitizedFileName === '.' || sanitizedFileName === '..') {
+      sanitizedFileName = `media_${mediaId}`
+    }
+
+    // Extrai extensão
+    const extMatch = sanitizedFileName.match(/\.([a-zA-Z0-9]+)$/)
+    const ext = extMatch ? extMatch[1].toLowerCase() : ''
+
+    // 2. Mapeamento de subpasta CONTROLADO ESTRITAMENTE PELO AGENT
+    // NUNCA aceita caminhos absolutos do SaaS.
+    // Pastas oficiais do Holyrics: media\image, media\video, media\audio, media\automaticPresentations
+    const subfolderMap: Record<
+      string,
+      { folder: string; type: 'video' | 'image' | 'audio' | 'file'; allowedExts: string[] }
+    > = {
+      IMAGEM: {
+        folder: 'image',
+        type: 'image',
+        allowedExts: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+      },
+      VIDEO: {
+        folder: 'video',
+        type: 'video',
+        allowedExts: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'm4v'],
+      },
+      AUDIO: {
+        folder: 'audio',
+        type: 'audio',
+        allowedExts: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'wma', 'flac'],
+      },
+      DOCUMENTO: {
+        folder: 'automaticPresentations',
+        type: 'file',
+        allowedExts: ['pdf', 'pptx', 'ppt', 'ppsx', 'pps'],
+      },
+    }
+
+    const typeConfig = subfolderMap[mediaType] || {
+      folder: 'video',
+      type: 'video',
+      allowedExts: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'mp3', 'wav'],
+    }
+
+    // Valida extensão permitida para o tipo
+    if (ext && !typeConfig.allowedExts.includes(ext)) {
+      return {
+        success: false,
+        error: `Extensão .${ext} não permitida para o tipo de mídia ${mediaType}. Extensões aceitas: ${typeConfig.allowedExts.join(', ')}`,
+        error_code: 'INVALID_FILE_EXTENSION',
+      }
+    }
+
+    // 3. Valida diretório raiz da biblioteca local
+    const baseLibrary = path.resolve(this.config.holyricsMediaPath)
+    if (!fs.existsSync(baseLibrary)) {
+      return {
+        success: false,
+        error: `O diretório da biblioteca do Holyrics não existe: "${baseLibrary}". Configure o caminho correto no painel local (http://localhost:${this.config.agentWebPort}).`,
+        error_code: 'LIBRARY_PATH_NOT_FOUND',
+      }
+    }
+
+    // Testa permissão de escrita
+    try {
+      fs.accessSync(baseLibrary, fs.constants.W_OK | fs.constants.R_OK)
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `Sem permissão de gravação no diretório da biblioteca: "${baseLibrary}". Detalhes: ${err.message}`,
+        error_code: 'LIBRARY_PATH_NO_PERMISSION',
+      }
+    }
+
+    // Subpasta de destino
+    const targetDir = path.join(baseLibrary, typeConfig.folder)
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true })
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `Não foi possível criar a subpasta "${typeConfig.folder}" na biblioteca: ${err.message}`,
+        error_code: 'CANNOT_CREATE_SUBFOLDER',
+      }
+    }
+
+    // 4. Cria diretório temporário para download seguro
+    const tempDir = path.join(process.cwd(), 'agent_temp')
+    try {
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+    } catch (_) {}
+
+    const tempFileName = `.tmp_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`
+    const tempFilePath = path.join(tempDir, tempFileName)
+
+    // 5. Download via endpoint dedicado do backend
+    // Header x-agent-token obrigatório
+    const saasUrl = this.config.saasUrl.replace(/\/+$/, '')
+    const downloadUrl = `${saasUrl}${downloadEndpoint.startsWith('/') ? '' : '/'}${downloadEndpoint}`
+
+    console.log(
+      `[Agent Media] Iniciando download da mídia "${sanitizedFileName}" (ID: ${mediaId}) via endpoint seguro...`,
+    )
+
+    const controller = new AbortController()
+    const timeoutMs = this.config.downloadTimeoutMs || 300000 // 5 minutos
+    const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs)
+
+    let bytesReceived = 0
+    let tempFileCreated = false
+
+    try {
+      const res = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'x-agent-token': this.config.agentToken,
+          Accept: '*/*',
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutTimer)
+
+      if (!res.ok) {
+        let errBody = ''
+        try {
+          errBody = await res.text()
+        } catch (_) {}
+        return {
+          success: false,
+          error: `Falha ao baixar mídia do LouvorFlow (HTTP ${res.status}): ${errBody.slice(0, 300)}`,
+          error_code: `DOWNLOAD_HTTP_${res.status}`,
+        }
+      }
+
+      // Valida Content-Length se informado
+      const contentLengthHeader = res.headers.get('content-length')
+      const declaredLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0
+      const maxSize = this.config.maxDownloadSizeBytes || 150 * 1024 * 1024
+      if (declaredLength > maxSize) {
+        return {
+          success: false,
+          error: `Tamanho do arquivo (${(declaredLength / (1024 * 1024)).toFixed(1)}MB) excede o limite configurado de ${(maxSize / (1024 * 1024)).toFixed(0)}MB.`,
+          error_code: 'FILE_TOO_LARGE',
+        }
+      }
+
+      // Gravação com streaming no arquivo temporário
+      const writeStream = fs.createWriteStream(tempFilePath)
+      tempFileCreated = true
+
+      if (!res.body) {
+        writeStream.close()
+        throw new Error('Corpo da resposta HTTP de download vazio.')
+      }
+
+      // Converte Web ReadableStream para Node.js Readable
+      const nodeReadable = Readable.fromWeb(res.body as any)
+
+      nodeReadable.on('data', (chunk) => {
+        bytesReceived += chunk.length
+        if (bytesReceived > maxSize) {
+          controller.abort()
+          throw new Error(
+            `Arquivo excedeu o limite máximo durante o download (${(maxSize / (1024 * 1024)).toFixed(0)}MB).`,
+          )
+        }
+      })
+
+      await pipeline(nodeReadable, writeStream)
+
+      // Validação pós-download: tamanho
+      const stat = fs.statSync(tempFilePath)
+      if (stat.size === 0) {
+        throw new Error('Arquivo baixado tem tamanho 0 bytes (vazio).')
+      }
+
+      // Validação de conteúdo real (magic bytes para tipos comuns)
+      const isContentValid = this.validateFileContent(tempFilePath, ext, mediaType)
+      if (!isContentValid.valid) {
+        throw new Error(
+          isContentValid.error || 'Conteúdo do arquivo não corresponde ao formato esperado.',
+        )
+      }
+
+      // 6. Política Anti-Duplicação e Anti-Sobrescrita
+      // Calcula hash do arquivo baixado para conferência
+      const downloadedHash = this.computeFileSha256(tempFilePath)
+      let finalTargetFilePath = path.join(targetDir, sanitizedFileName)
+      let alreadyExistedWithSameContent = false
+
+      if (fs.existsSync(finalTargetFilePath)) {
+        const existingStat = fs.statSync(finalTargetFilePath)
+        const existingHash = this.computeFileSha256(finalTargetFilePath)
+
+        if (existingStat.size === stat.size && existingHash === downloadedHash) {
+          // Arquivo já existe identicamente no destino! Não sobrescreve, apenas aproveita.
+          alreadyExistedWithSameContent = true
+          console.log(
+            `[Agent Media] Arquivo "${sanitizedFileName}" já existe no destino com mesmo tamanho e hash. Transferência considerada concluída.`,
+          )
+        } else {
+          // Arquivo já existe mas tem conteúdo ou tamanho diferente!
+          // Política explícita anti-sobrescrita: salva com sufixo (1), (2), etc.
+          finalTargetFilePath = this.generateUniqueFilePath(targetDir, sanitizedFileName)
+          console.log(
+            `[Agent Media] Arquivo com mesmo nome já existia no destino com conteúdo diferente. Salvo com nome seguro: "${path.basename(finalTargetFilePath)}"`,
+          )
+        }
+      }
+
+      // Move de forma atômica se não era cópia idêntica
+      if (!alreadyExistedWithSameContent) {
+        try {
+          fs.renameSync(tempFilePath, finalTargetFilePath)
+          tempFileCreated = false
+        } catch (renameErr) {
+          // Fallback para cross-device rename: copia e remove
+          fs.copyFileSync(tempFilePath, finalTargetFilePath)
+          fs.unlinkSync(tempFilePath)
+          tempFileCreated = false
+        }
+      } else {
+        // Remove temporário pois o arquivo final já existia
+        try {
+          fs.unlinkSync(tempFilePath)
+          tempFileCreated = false
+        } catch (_) {}
+      }
+
+      const finalStat = fs.statSync(finalTargetFilePath)
+      const finalFileName = path.basename(finalTargetFilePath)
+
+      // 7. Confirmação no Holyrics via API local GetFile
+      let holyricsDetected = false
+      let holyricsFileInfo: any = null
+      try {
+        const checkRes = await this.holyrics.getFile(typeConfig.type, finalFileName)
+        if (checkRes.detected) {
+          holyricsDetected = true
+          holyricsFileInfo = checkRes.fileInfo
+        }
+      } catch (_) {
+        // Se API do Holyrics não responder ou der timeout, apenas mantém detected=false
+      }
+
+      console.log(
+        `[Agent Media] Transferência concluída com sucesso: "${finalFileName}" em ${finalTargetFilePath} (${finalStat.size} bytes). Holyrics detected: ${holyricsDetected}`,
+      )
+
+      return {
+        success: true,
+        result: {
+          media_id: mediaId,
+          file_name: finalFileName,
+          target_path: finalTargetFilePath,
+          bytes_written: finalStat.size,
+          category: payload.category || '',
+          media_type: mediaType,
+          target_subfolder: typeConfig.folder,
+          holyrics_detected: holyricsDetected,
+          holyrics_file_info: holyricsFileInfo,
+          already_existed: alreadyExistedWithSameContent,
+        },
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutTimer)
+      // Limpeza de arquivo temporário após falha para não deixar lixo em disco
+      if (tempFileCreated && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath)
+        } catch (_) {}
+      }
+
+      const errMsg =
+        err.name === 'AbortError'
+          ? 'Tempo limite de download excedido (timeout).'
+          : err.message || 'Erro inesperado no download.'
+      console.error(`[Agent Media] Falha na transferência da mídia ${mediaId}:`, errMsg)
+
+      return {
+        success: false,
+        error: errMsg,
+        error_code: err.name === 'AbortError' ? 'DOWNLOAD_TIMEOUT' : 'TRANSFER_FAILED',
+      }
+    }
+  }
+
+  /**
+   * Calcula SHA-256 de um arquivo local
+   */
+  private computeFileSha256(filePath: string): string {
+    const hash = crypto.createHash('sha256')
+    const buffer = fs.readFileSync(filePath)
+    hash.update(buffer)
+    return hash.digest('hex')
+  }
+
+  /**
+   * Gera nome de arquivo único para prevenir sobrescrita de arquivos com mesmo nome e conteúdo diferente
+   * Exemplo: "video.mp4" -> "video (1).mp4" -> "video (2).mp4"
+   */
+  private generateUniqueFilePath(dir: string, originalName: string): string {
+    const ext = path.extname(originalName)
+    const base = path.basename(originalName, ext)
+    let counter = 1
+    let candidate = path.join(dir, `${base} (${counter})${ext}`)
+    while (fs.existsSync(candidate)) {
+      counter++
+      candidate = path.join(dir, `${base} (${counter})${ext}`)
+    }
+    return candidate
+  }
+
+  /**
+   * Valida magic bytes de formatos de arquivos comuns para evitar arquivos executáveis ou corrompidos disfarçados
+   */
+  private validateFileContent(
+    filePath: string,
+    ext: string,
+    mediaType: string,
+  ): { valid: boolean; error?: string } {
+    try {
+      const fd = fs.openSync(filePath, 'r')
+      const buffer = Buffer.alloc(16)
+      fs.readSync(fd, buffer, 0, 16, 0)
+      fs.closeSync(fd)
+
+      // Rejeita executáveis do Windows (MZ header)
+      if (buffer[0] === 0x4d && buffer[1] === 0x5a) {
+        return {
+          valid: false,
+          error: 'Arquivo executável (.exe/.dll) detectado. Rejeitado por segurança.',
+        }
+      }
+
+      // Rejeita scripts ELF ou shell Linux
+      if (buffer[0] === 0x7f && buffer[1] === 0x45 && buffer[2] === 0x4c && buffer[3] === 0x46) {
+        return { valid: false, error: 'Binário executável ELF detectado. Rejeitado por segurança.' }
+      }
+
+      // Validação por extensão quando conhecida
+      if (ext === 'jpg' || ext === 'jpeg') {
+        if (buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+          return { valid: false, error: 'Arquivo JPG não possui cabeçalho JPEG válido.' }
+        }
+      } else if (ext === 'png') {
+        if (buffer[0] !== 0x89 || buffer[1] !== 0x50 || buffer[2] !== 0x4e || buffer[3] !== 0x47) {
+          return { valid: false, error: 'Arquivo PNG não possui cabeçalho válido.' }
+        }
+      } else if (ext === 'gif') {
+        const magic = buffer.toString('utf-8', 0, 3)
+        if (magic !== 'GIF') {
+          return { valid: false, error: 'Arquivo GIF não possui assinatura válida.' }
+        }
+      } else if (ext === 'pdf') {
+        const magic = buffer.toString('utf-8', 0, 4)
+        if (magic !== '%PDF') {
+          return { valid: false, error: 'Documento PDF não possui assinatura válida (%PDF).' }
+        }
+      }
+
+      return { valid: true }
+    } catch (err: any) {
+      return { valid: false, error: 'Erro ao validar cabeçalho do arquivo: ' + err.message }
     }
   }
 }

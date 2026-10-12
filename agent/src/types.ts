@@ -11,6 +11,9 @@ export interface AgentConfig {
   agentWebPort: number
   pollIntervalMs: number
   heartbeatIntervalMs: number
+  holyricsMediaPath: string
+  maxDownloadSizeBytes?: number
+  downloadTimeoutMs?: number
 }
 
 export interface HolyricsSongItem {
@@ -82,6 +85,7 @@ export interface AgentCommand {
     | 'GET_SONG_PLAYLIST'
     | 'GET_LYRICS_PLAYLIST'
     | 'ADD_LYRICS_TO_PLAYLIST'
+    | 'TRANSFER_MEDIA'
   payload: Record<string, any>
   created_at: string
 }
@@ -127,4 +131,7 @@ export interface AgentStatusInfo {
   lastHeartbeat?: string
   lastPoll?: string
   lastError?: string
+  holyricsMediaPath: string
+  mediaPathValid?: boolean
+  mediaPathError?: string
 }

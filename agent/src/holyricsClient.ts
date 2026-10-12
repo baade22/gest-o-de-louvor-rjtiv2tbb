@@ -789,4 +789,75 @@ export class HolyricsClient {
       error_code: isAuthAdd ? 'AUTH_FORBIDDEN' : 'ADD_PLAYLIST_FAILED',
     }
   }
+
+  /**
+   * GetFile: Consulta se um arquivo específico foi detectado/indexado pelo Holyrics
+   * POST /api/GetFile?token=...
+   * Body: { type: "video" | "image" | "audio" | "file", name: "nome_do_arquivo.ext", folder?: "subpasta" }
+   * Conforme documentação oficial do Holyrics API Server.
+   */
+  public async getFile(
+    type: 'video' | 'image' | 'audio' | 'file',
+    fileName: string,
+    folder?: string,
+  ): Promise<{
+    detected: boolean
+    fileInfo?: any
+    error?: string
+    httpStatus?: number
+  }> {
+    const payload: Record<string, any> = {
+      type,
+      name: fileName,
+    }
+    if (folder) payload.folder = folder
+
+    const res = await this.request('GetFile', payload, 3000)
+    if (res.status === 'ok') {
+      return {
+        detected: true,
+        fileInfo: res.data,
+        httpStatus: res.httpStatus,
+      }
+    }
+
+    return {
+      detected: false,
+      error: typeof res.error === 'string' ? res.error : res.error?.message,
+      httpStatus: res.httpStatus,
+    }
+  }
+
+  /**
+   * GetFiles: Lista arquivos conhecidos de uma aba do Holyrics
+   * POST /api/GetFiles?token=...
+   * Body: { type: "video" | "image" | "audio" | "file", folder?: string }
+   */
+  public async getFiles(
+    type: 'video' | 'image' | 'audio' | 'file',
+    folder?: string,
+  ): Promise<{
+    success: boolean
+    files: any[]
+    error?: string
+  }> {
+    const payload: Record<string, any> = { type }
+    if (folder) payload.folder = folder
+
+    const res = await this.request('GetFiles', payload, 3000)
+    if (res.status === 'ok') {
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data && Array.isArray((res.data as any).files)
+          ? (res.data as any).files
+          : []
+      return { success: true, files: list }
+    }
+
+    return {
+      success: false,
+      files: [],
+      error: typeof res.error === 'string' ? res.error : res.error?.message,
+    }
+  }
 }

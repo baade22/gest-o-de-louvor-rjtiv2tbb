@@ -82,6 +82,7 @@ import {
   updateMediaStatus,
   getMediaFileUrl,
   deleteMediaAsset,
+  transferMediaToHolyricsAgent,
 } from '@/services/media'
 
 export default function EventScaleDetail() {
@@ -111,6 +112,8 @@ export default function EventScaleDetail() {
   const [tasks, setTasks] = useState<EventTask[]>([])
   const [mediaList, setMediaList] = useState<MediaAsset[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  const [transferringMediaIds, setTransferringMediaIds] = useState<Record<string, boolean>>({})
 
   // Aba ativa vinda da URL ou default 'overview'
   const initialTab = searchParams.get('tab') || 'overview'
@@ -594,6 +597,38 @@ export default function EventScaleDetail() {
       title: 'Download iniciado',
       description: 'Lembre-se de clicar em [Marcar como baixada] após conferir o arquivo.',
     })
+  }
+
+  const handleTransferMediaToAgent = async (media: MediaAsset) => {
+    if (!currentChurch) return
+    setTransferringMediaIds((prev) => ({ ...prev, [media.id]: true }))
+    try {
+      const res = await transferMediaToHolyricsAgent({
+        mediaId: media.id,
+        churchId: currentChurch.id,
+      })
+      if (res.success) {
+        toast({
+          title: res.agent_online ? 'Transferência iniciada!' : 'Transferência agendada',
+          description: res.message,
+        })
+        fetchFullEventData()
+      } else {
+        toast({
+          title: 'Não foi possível transferir',
+          description: res.message || 'Verifique se o LouvorFlow Agent está pareado.',
+          variant: 'destructive',
+        })
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro no envio da mídia',
+        description: err.message || 'Falha na comunicação com o servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setTransferringMediaIds((prev) => ({ ...prev, [media.id]: false }))
+    }
   }
 
   const handleMarkAsDownloaded = async (mediaId: string) => {
@@ -1511,7 +1546,25 @@ export default function EventScaleDetail() {
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={transferringMediaIds[media.id]}
+                              onClick={() => handleTransferMediaToAgent(media)}
+                              className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                              title="Transfere para o Holyrics local via LouvorFlow Agent"
+                            >
+                              {transferringMediaIds[media.id] ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Send className="h-3.5 w-3.5" />
+                              )}
+                              {media.status === 'IMPORTADA_HOLYRICS' || media.status === 'BAIXADA'
+                                ? 'Reenviar Holyrics'
+                                : 'Enviar Holyrics'}
+                            </Button>
+
                             <Button
                               size="sm"
                               variant="outline"
@@ -1519,7 +1572,7 @@ export default function EventScaleDetail() {
                               className="text-xs rounded-xl gap-1.5"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              Baixar Mídia
+                              Baixar Manual
                             </Button>
 
                             {media.status === 'ENVIADA' || media.status === 'RECEBIDA' ? (
@@ -1621,7 +1674,25 @@ export default function EventScaleDetail() {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={transferringMediaIds[media.id]}
+                            onClick={() => handleTransferMediaToAgent(media)}
+                            className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                            title="Transfere para o Holyrics local via LouvorFlow Agent"
+                          >
+                            {transferringMediaIds[media.id] ? (
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                            {media.status === 'IMPORTADA_HOLYRICS' || media.status === 'BAIXADA'
+                              ? 'Reenviar Holyrics'
+                              : 'Enviar Holyrics'}
+                          </Button>
+
                           <Button
                             size="sm"
                             variant="outline"
@@ -1629,7 +1700,7 @@ export default function EventScaleDetail() {
                             className="text-xs rounded-xl gap-1.5"
                           >
                             <Download className="h-3.5 w-3.5" />
-                            Baixar Mídia
+                            Baixar Manual
                           </Button>
 
                           {media.status === 'ENVIADA' || media.status === 'RECEBIDA' ? (

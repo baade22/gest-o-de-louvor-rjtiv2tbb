@@ -57,3 +57,34 @@ export async function deleteMediaAsset(mediaId: string): Promise<boolean> {
   await pb.collection('media_assets').delete(mediaId)
   return true
 }
+
+export interface TransferMediaResponse {
+  success: boolean
+  command_id?: string
+  agent_online?: boolean
+  target_subfolder?: string
+  pending?: boolean
+  already_enqueued?: boolean
+  message: string
+  error_code?: string
+}
+
+/**
+ * Dispara comando TRANSFER_MEDIA na fila do LouvorFlow Agent para o computador local
+ */
+export async function transferMediaToHolyricsAgent(params: {
+  mediaId: string
+  churchId?: string
+  agentId?: string
+  targetSubfolder?: 'image' | 'video' | 'audio' | 'automaticPresentations'
+}): Promise<TransferMediaResponse> {
+  return pb.send<TransferMediaResponse>('/backend/v1/saas/holyrics/transfer-media', {
+    method: 'POST',
+    body: {
+      media_id: params.mediaId,
+      church_id: params.churchId,
+      agent_id: params.agentId,
+      target_subfolder: params.targetSubfolder,
+    },
+  })
+}

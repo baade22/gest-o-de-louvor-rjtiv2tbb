@@ -96,6 +96,10 @@ export function startAgentWebServer(agent: LouvorFlowAgent, port = 8765) {
           if (typeof data.holyrics_token === 'string')
             updates.holyricsToken = data.holyrics_token.trim()
           if (data.saas_url) updates.saasUrl = String(data.saas_url).trim()
+          if (data.holyrics_media_path) {
+            const cleanPath = String(data.holyrics_media_path).trim()
+            updates.holyricsMediaPath = cleanPath
+          }
 
           saveConfig(updates)
           agent.updateConfig(updates)
@@ -103,7 +107,12 @@ export function startAgentWebServer(agent: LouvorFlowAgent, port = 8765) {
 
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(
-            JSON.stringify({ success: true, message: 'Configurações salvas.', holyrics: testRes }),
+            JSON.stringify({
+              success: true,
+              message: 'Configurações salvas.',
+              holyrics: testRes,
+              status: agent.getStatusInfo(),
+            }),
           )
         } catch (err: any) {
           res.writeHead(500, { 'Content-Type': 'application/json' })
@@ -197,7 +206,7 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
     <div class="header">
       <div class="logo">
         <span>LouvorFlow Agent</span>
-        <span class="logo-badge">v0.0.31</span>
+        <span class="logo-badge">v0.0.32</span>
       </div>
       <div style="font-size: 0.8rem; color: var(--text-muted);">
         ${status.machineName}
@@ -342,6 +351,19 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
         <input type="password" id="holyricsToken" placeholder="${status.holyricsHasToken ? '••••••••••••••••' : 'Cole aqui o token criado no Holyrics'}" autocomplete="off">
         <span style="font-size: 0.7rem; color: var(--text-muted);">
           No Holyrics: Menu Arquivo &gt; Configurações &gt; API Server &gt; Ativar e Gerenciar permissões.
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label>Diretório Raiz da Biblioteca de Mídias do Holyrics (files\\media)</label>
+        <input type="text" id="holyricsMediaPath" value="${status.holyricsMediaPath || ''}">
+        <span style="font-size: 0.72rem; color: ${status.mediaPathValid ? 'var(--green)' : 'var(--amber)'};">
+          ${
+            status.mediaPathValid
+              ? '✓ Diretório acessível com permissão de escrita local.'
+              : status.mediaPathError ||
+                '⚠️ Diretório padrão (C:\\Holyrics\\Holyrics\\files\\media). Certifique-se de que a pasta existe no Windows.'
+          }
         </span>
       </div>
 
@@ -512,6 +534,7 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
       const host = document.getElementById('holyricsHost').value.trim();
       const port = Number(document.getElementById('holyricsPort').value) || 8091;
       const token = document.getElementById('holyricsToken').value.trim();
+      const mediaPath = document.getElementById('holyricsMediaPath').value.trim();
 
       btn.innerText = 'Salvando...';
       btn.disabled = true;
@@ -519,7 +542,12 @@ function renderHtmlDashboard(status: AgentStatusInfo): string {
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ holyrics_host: host, holyrics_port: port, holyrics_token: token })
+          body: JSON.stringify({
+            holyrics_host: host,
+            holyrics_port: port,
+            holyrics_token: token,
+            holyrics_media_path: mediaPath
+          })
         });
         const data = await res.json();
         if (data.success) {

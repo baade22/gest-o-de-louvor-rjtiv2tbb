@@ -234,6 +234,70 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
       }
     }
 
+    if (action === 'TRANSFER_MEDIA') {
+      const mediaId = (p && p.media_id) || (result && result.media_id) || ''
+      if (mediaId) {
+        try {
+          const mediaRecord = $app.findRecordById('media_assets', mediaId)
+          if (status === 'DONE') {
+            // Regra estrita: nunca marcar CONCLUIDA antes da confirmação da gravação local.
+            // Se o Holyrics já detectou formalmente via GetFile, marca IMPORTADA_HOLYRICS.
+            // Se apenas baixou e gravou no diretório físico da biblioteca local, marca BAIXADA com nota clara.
+            const holyricsDetected = Boolean(result && result.holyrics_detected)
+            const targetPath = (result && result.target_path) || ''
+            const bytesWritten = (result && result.bytes_written) || 0
+
+            mediaRecord.set('downloaded_at', now)
+
+            if (holyricsDetected) {
+              mediaRecord.set('status', 'IMPORTADA_HOLYRICS')
+              mediaRecord.set('imported_at', now)
+              mediaRecord.set(
+                'holyrics_status',
+                'RECONHECIDO_HOLYRICS (GetFile confirmado)' +
+                  (targetPath ? ' em ' + targetPath : ''),
+              )
+            } else {
+              mediaRecord.set('status', 'BAIXADA')
+              mediaRecord.set(
+                'holyrics_status',
+                'GRAVADO_BIBLIOTECA_LOCAL' + (targetPath ? ' (' + targetPath + ')' : ''),
+              )
+            }
+          } else {
+            // Falha reportada pelo Agent
+            mediaRecord.set(
+              'holyrics_status',
+              'ERRO_TRANSFERENCIA: ' + (errorMsg || 'Falha no download/gravação local'),
+            )
+          }
+          $app.save(mediaRecord)
+        } catch (_) {}
+      }
+
+      // Log em holyrics_sync_logs para auditoria da transferência
+      try {
+        const logsCol = $app.findCollectionByNameOrId('holyrics_sync_logs')
+        const logRec = new Record(logsCol)
+        logRec.set('church_id', cmdRecord.getString('church_id'))
+        logRec.set('agent_id', agentId)
+        logRec.set('action', 'TRANSFER_MEDIA')
+        logRec.set('status', status === 'FAILED' ? 'ERROR' : 'SUCCESS')
+        logRec.set('error', errorMsg)
+        logRec.set('created_at', now)
+        logRec.set('command_id', cmdRecord.getString('command_id'))
+        logRec.set('stage', status === 'DONE' ? 'LOCAL_SAVED' : 'TRANSFER_FAILED')
+        if (p && p.event_id) logRec.set('event_id', p.event_id)
+        if (p && p.name) logRec.set('song_title', p.name)
+        logRec.set('details', {
+          media_id: (p && p.media_id) || '',
+          result: result,
+          error: errorMsg,
+        })
+        $app.save(logRec)
+      } catch (_) {}
+    }
+
     if (
       action === 'ADD_TO_PLAYLIST' ||
       action === 'ADD_LYRICS_TO_PLAYLIST' ||

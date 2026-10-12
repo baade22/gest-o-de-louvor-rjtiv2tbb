@@ -19,6 +19,12 @@ export const DEFAULT_CONFIG: AgentConfig = {
   agentWebPort: 8765,
   pollIntervalMs: 2500,
   heartbeatIntervalMs: 15000,
+  holyricsMediaPath:
+    process.platform === 'win32'
+      ? 'C:\\Holyrics\\Holyrics\\files\\media'
+      : path.join(os.homedir(), 'Holyrics', 'files', 'media'),
+  maxDownloadSizeBytes: 150 * 1024 * 1024, // 150MB padrão
+  downloadTimeoutMs: 300000, // 5 minutos
 }
 
 export function loadConfig(): AgentConfig {

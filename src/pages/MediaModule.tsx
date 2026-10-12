@@ -10,6 +10,11 @@ import {
   FileVideo,
   Trash2,
   ExternalLink,
+  Send,
+  RefreshCw,
+  Monitor,
+  AlertCircle,
+  FolderCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +46,9 @@ import {
   updateMediaStatus,
   getMediaFileUrl,
   deleteMediaAsset,
+  transferMediaToHolyricsAgent,
 } from '@/services/media'
+import { listHolyricsAgents, type HolyricsAgentInfo } from '@/services/holyricsAgent'
 
 export default function MediaModule() {
   const { currentChurch, currentMember, isAdmin, isMaster } = useAuth()
@@ -53,6 +60,8 @@ export default function MediaModule() {
   const [events, setEvents] = useState<EventItem[]>([])
   const [members, setMembers] = useState<ChurchMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [transferringIds, setTransferringIds] = useState<Record<string, boolean>>({})
+  const [agents, setAgents] = useState<HolyricsAgentInfo[]>([])
 
   // Upload Modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -84,10 +93,50 @@ export default function MediaModule() {
         expand: 'user_id',
       })
       setMembers(membs)
+
+      try {
+        const ags = await listHolyricsAgents(currentChurch.id)
+        setAgents(ags)
+      } catch {
+        /* intentionally ignored */
+      }
     } catch (err: any) {
       console.error(err)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleTransferToAgent = async (item: MediaAsset) => {
+    if (!currentChurch) return
+    setTransferringIds((prev) => ({ ...prev, [item.id]: true }))
+    try {
+      const res = await transferMediaToHolyricsAgent({
+        mediaId: item.id,
+        churchId: currentChurch.id,
+      })
+
+      if (res.success) {
+        toast({
+          title: res.agent_online ? 'Transferência iniciada!' : 'Transferência agendada',
+          description: res.message,
+        })
+        loadData()
+      } else {
+        toast({
+          title: 'Não foi possível transferir',
+          description: res.message || 'Verifique se o LouvorFlow Agent está pareado.',
+          variant: 'destructive',
+        })
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro no envio da mídia',
+        description: err.message || 'Falha ao comunicar com o servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setTransferringIds((prev) => ({ ...prev, [item.id]: false }))
     }
   }
 
@@ -314,12 +363,26 @@ export default function MediaModule() {
                         {item.holyrics_status && (
                           <Badge
                             variant="secondary"
-                            className="text-[10px] bg-purple-50 text-purple-700 border-purple-200"
+                            className={`text-[10px] ${
+                              item.holyrics_status.startsWith('ERRO_')
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : item.holyrics_status.startsWith('RECONHECIDO_')
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-purple-50 text-purple-700 border-purple-200'
+                            }`}
                           >
                             Holyrics: {item.holyrics_status}
                           </Badge>
                         )}
                       </div>
+
+                      {item.downloaded_at && (
+                        <p className="text-[11px] text-slate-400 mb-1 flex items-center gap-1.5">
+                          <FolderCheck className="h-3 w-3 text-slate-500" />
+                          Última sincronização/download:{' '}
+                          {new Date(item.downloaded_at).toLocaleString('pt-BR')}
+                        </p>
+                      )}
 
                       <p className="text-xs text-slate-500 flex flex-wrap items-center gap-3">
                         {eventInfo && (
@@ -333,15 +396,35 @@ export default function MediaModule() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {/* Botão de Transferência Direta para o PC Local / Holyrics Agent */}
+                      <Button
+                        size="sm"
+                        variant="default"
+                        disabled={transferringIds[item.id]}
+                        onClick={() => handleTransferToAgent(item)}
+                        className="text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-semibold"
+                        title="Transfere diretamente para o computador pareado da igreja via LouvorFlow Agent"
+                      >
+                        {transferringIds[item.id] ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        {item.status === 'IMPORTADA_HOLYRICS' || item.status === 'BAIXADA'
+                          ? 'Reenviar ao Holyrics'
+                          : 'Enviar ao Holyrics'}
+                      </Button>
+
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleDownload(item)}
                         className="text-xs rounded-xl gap-1.5"
+                        title="Baixar arquivo manualmente pelo navegador"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Baixar Mídia
+                        Baixar Manual
                       </Button>
 
                       {item.status === 'ENVIADA' || item.status === 'RECEBIDA' ? (
@@ -350,7 +433,7 @@ export default function MediaModule() {
                           onClick={() => handleMarkDownloaded(item.id)}
                           className="text-xs rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                          Marcar como Baixada
+                          Marcar Baixada
                         </Button>
                       ) : null}
 
