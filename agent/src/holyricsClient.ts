@@ -805,13 +805,16 @@ export class HolyricsClient {
     items: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }>
     index?: number
     ignoreDuplicates?: boolean
-    eventId?: string
   }): Promise<{
     success: boolean
     data?: any
     error?: string
     error_code?: string
+    httpStatus?: number
+    payloadSent?: Record<string, any>
   }> {
+    // Payload oficial suportado pelo Holyrics AddToPlaylist para mídias:
+    // NUNCA envia event_id do SaaS. Envia apenas items e ignore_duplicates (e index se fornecido).
     const payload: Record<string, any> = {
       items: params.items,
       ignore_duplicates: params.ignoreDuplicates ?? true,
@@ -819,15 +822,14 @@ export class HolyricsClient {
     if (params.index !== undefined && params.index !== null) {
       payload.index = Number(params.index)
     }
-    if (params.eventId) {
-      payload.event_id = String(params.eventId)
-    }
 
     const res = await this.request('AddToPlaylist', payload, 6000)
     if (res.status === 'ok') {
       return {
         success: true,
         data: res.data,
+        httpStatus: res.httpStatus,
+        payloadSent: payload,
       }
     }
 
@@ -839,6 +841,8 @@ export class HolyricsClient {
     return {
       success: false,
       error: errStr,
+      httpStatus: res.httpStatus,
+      payloadSent: payload,
       error_code:
         errStr === 'TIMEOUT_HOLYRICS'
           ? 'TIMEOUT_HOLYRICS'

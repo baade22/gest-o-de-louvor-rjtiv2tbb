@@ -122,31 +122,50 @@ export function generateHolyricsFileName(params: MediaNamingParams): string {
   const categoryPart = formatCategoryLabel(params.category)
   const datePart = formatEventDayMonth(params.eventDate)
 
-  // Se o título não foi informado, usa o nome do arquivo original sem a extensão
-  let titleRaw = params.title?.trim()
-  if (!titleRaw && params.originalFileName) {
-    const ext = extractFileExtension(params.originalFileName)
-    if (ext) {
-      titleRaw = params.originalFileName.slice(0, -(ext.length + 1)).trim()
-    } else {
-      titleRaw = params.originalFileName.trim()
-    }
-  }
-  const titlePart = sanitizeWindowsSegment(titleRaw || 'Midia') || 'Midia'
-
-  // Preserva a extensão original
+  // Determina a extensão original válida (prioriza originalFileName, fallback para title)
   let ext = extractFileExtension(params.originalFileName)
   if (!ext && params.title) {
     ext = extractFileExtension(params.title)
   }
 
+  // Se o título não foi informado, usa o nome do arquivo original
+  let titleRaw = params.title?.trim()
+  if (!titleRaw && params.originalFileName) {
+    titleRaw = params.originalFileName.trim()
+  }
+
+  // Remove a extensão final de titleRaw se ele já terminar com .ext (ou com qualquer extensão válida conhecida)
+  // garantindo que não haja duplicação de extensão (ex: WhatsApp Audio.mp3 -> WhatsApp Audio)
+  // e tratando corretamente nomes com múltiplos pontos legítimos como audio.mpeg.mp3 -> audio.mpeg
+  if (titleRaw) {
+    if (ext && titleRaw.toLowerCase().endsWith(`.${ext}`)) {
+      titleRaw = titleRaw.slice(0, -(ext.length + 1)).trim()
+    } else {
+      const matchExt = titleRaw.match(/\.([a-zA-Z0-9]+)$/)
+      if (matchExt && (!ext || matchExt[1].toLowerCase() === ext)) {
+        if (!ext) ext = matchExt[1].toLowerCase()
+        titleRaw = titleRaw.slice(0, -matchExt[0].length).trim()
+      }
+    }
+  }
+
+  const titlePart = sanitizeWindowsSegment(titleRaw || 'Midia') || 'Midia'
+
   const baseName = `${eventPart} - ${categoryPart} - ${datePart} - ${titlePart}`
 
   // Remove qualquer separador duplicado ou espaços excessivos
-  const cleanedBase = baseName
+  let cleanedBase = baseName
     .replace(/\s*-\s*-\s*/g, ' - ')
     .replace(/\s+/g, ' ')
     .trim()
 
-  return ext ? `${cleanedBase}.${ext}` : cleanedBase
+  // Se o cleanedBase já terminar com .${ext} (por exemplo, se o sanitize preservou ponto final), não duplica
+  if (ext) {
+    if (cleanedBase.toLowerCase().endsWith(`.${ext}`)) {
+      return cleanedBase
+    }
+    return `${cleanedBase}.${ext}`
+  }
+
+  return cleanedBase
 }

@@ -110,7 +110,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.34',
+          version: '0.0.35',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -256,7 +256,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.34',
+          version: '0.0.35',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -670,7 +670,6 @@ export class LouvorFlowAgent {
     try {
       const currentPlaylist = await this.holyrics.getPlaylist({
         type: 'all',
-        event_id: eventId,
       })
       if (currentPlaylist.success && Array.isArray(currentPlaylist.items)) {
         for (const item of currentPlaylist.items) {
@@ -688,8 +687,12 @@ export class LouvorFlowAgent {
     const detailedResults: Array<{
       id?: string
       name: string
-      status: 'ADDED' | 'ALREADY_PRESENT' | 'FAILED' | 'PENDING_LOCAL_FILE'
+      status: 'ADDED' | 'ALREADY_PRESENT' | 'FAILED' | 'PENDING_LOCAL_FILE' | 'MEDIA_NOT_RECOGNIZED'
       error?: string
+      error_code?: string
+      stage?: string
+      media_type?: string
+      http_status?: number
     }> = []
 
     for (const item of sortedItems) {
@@ -698,17 +701,35 @@ export class LouvorFlowAgent {
       const mediaType = String(item.media_type || '').toUpperCase()
 
       if (!fileName) {
+        const errorMsg = 'Nome físico do arquivo de mídia ausente no payload.'
+        const errorCode = 'MISSING_MEDIA_FILENAME'
+        console.warn(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            event: 'sync_media_error',
+            command_id: cmd.command_id,
+            stage: 'VALIDATE_FILENAME',
+            media_type: mediaType || 'UNKNOWN',
+            file_name: 'UNKNOWN',
+            api_method: null,
+            http_status: null,
+            error_message: errorMsg,
+            error_code: errorCode,
+          }),
+        )
         detailedResults.push({
           id: item.id,
           name: 'Desconhecido',
           status: 'FAILED',
-          error:
-            'Nome do arquivo de mídia ausente. Ação recomendada: recadastre a mídia com nome válido.',
+          error: `${errorMsg} Ação recomendada: recadastre a mídia com nome válido.`,
+          error_code: errorCode,
+          stage: 'VALIDATE_FILENAME',
+          media_type: mediaType,
         })
         continue
       }
 
-      // Validação local prévia: verifica se o arquivo físico existe na biblioteca local antes de chamar o Holyrics
+      // Passo 1 & 2: Validação local prévia: confirmação em disco no caminho esperado e nome físico
       let holyricsType: 'video' | 'image' | 'audio' | 'file' = 'file'
       let subfolder = 'video'
       if (mediaType === 'VIDEO') {
@@ -733,25 +754,93 @@ export class LouvorFlowAgent {
       const fileExistsOnDisk = fs.existsSync(expectedLocalPath)
 
       if (!fileExistsOnDisk) {
+        const errorMsg = `Arquivo físico "${fileName}" não encontrado na biblioteca local (${subfolder}).`
+        const errorCode = 'PENDING_LOCAL_FILE'
+        console.warn(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            event: 'sync_media_error',
+            command_id: cmd.command_id,
+            stage: 'CHECK_LOCAL_DISK',
+            media_type: holyricsType,
+            file_name: fileName,
+            api_method: null,
+            http_status: null,
+            error_message: errorMsg,
+            error_code: errorCode,
+          }),
+        )
         detailedResults.push({
           id: item.id,
           name: fileName,
           status: 'PENDING_LOCAL_FILE',
-          error: `Arquivo "${fileName}" não encontrado na biblioteca local (${subfolder}). Ação recomendada: execute a transferência do arquivo para o computador antes de sincronizar com a playlist.`,
+          error: `${errorMsg} Ação recomendada: execute a transferência do arquivo para o computador antes de sincronizar com a playlist.`,
+          error_code: errorCode,
+          stage: 'CHECK_LOCAL_DISK',
+          media_type: holyricsType,
         })
         continue
       }
 
+      // Passo 3: Consultar Holyrics pelos métodos disponíveis e verificar se a mídia é reconhecida
+      let mediaRecognized = true
+      let getFileError = ''
+      let getFileHttpStatus: number | undefined = undefined
+      try {
+        const fileCheck = await this.holyrics.getFile(holyricsType, fileName)
+        getFileHttpStatus = fileCheck.httpStatus
+        if (!fileCheck.detected) {
+          mediaRecognized = false
+          getFileError = fileCheck.error || 'Arquivo não indexado ou não reconhecido pelo Holyrics.'
+        }
+      } catch (err: any) {
+        // Se a chamada falhou ou endpoint não está acessível, registramos para auditoria
+        mediaRecognized = false
+        getFileError = err.message || 'Falha ao consultar GetFile no Holyrics.'
+      }
+
+      if (!mediaRecognized) {
+        const errorCode = 'MEDIA_NOT_RECOGNIZED'
+        console.warn(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            event: 'sync_media_error',
+            command_id: cmd.command_id,
+            stage: 'VERIFY_HOLYRICS_RECOGNITION',
+            media_type: holyricsType,
+            file_name: fileName,
+            api_method: 'GetFile',
+            http_status: getFileHttpStatus ?? null,
+            error_message: getFileError,
+            error_code: errorCode,
+          }),
+        )
+        detailedResults.push({
+          id: item.id,
+          name: fileName,
+          status: 'MEDIA_NOT_RECOGNIZED',
+          error: `Mídia "${fileName}" existe em disco, mas ainda não foi reconhecida/indexada pelo Holyrics (${getFileError}). Ação recomendada: abra a aba correspondente no Holyrics ou aguarde a indexação.`,
+          error_code: errorCode,
+          stage: 'VERIFY_HOLYRICS_RECOGNITION',
+          media_type: holyricsType,
+          http_status: getFileHttpStatus,
+        })
+        continue
+      }
+
+      // Prevenção de duplicações na playlist existente
       const lowerName = fileName.toLowerCase()
       if (existingItemNames.has(lowerName)) {
         detailedResults.push({
           id: item.id,
           name: fileName,
           status: 'ALREADY_PRESENT',
+          media_type: holyricsType,
         })
         continue
       }
 
+      // Passo 4: Monta o item oficial com name (nome físico) e type ('image' | 'video' | 'audio' | 'file')
       itemsToAdd.push({
         type: holyricsType,
         name: fileName,
@@ -761,20 +850,20 @@ export class LouvorFlowAgent {
     let addedCount = 0
     let failedCount = 0
 
+    // Passo 5: Chamar AddToPlaylist sem event_id do SaaS
     if (itemsToAdd.length > 0) {
       const addRes = await this.holyrics.addMediaToPlaylist({
         items: itemsToAdd,
         ignoreDuplicates: true,
-        eventId,
       })
 
       if (addRes.success) {
-        // Verificação pós-operação via GetPlaylist para comprovar que os itens foram realmente inseridos na ordem
+        // Passo 6: Consultar a playlist resultante e verificar os itens adicionados
         let verifiedNames = new Set<string>()
+        let postPlaylistError = ''
         try {
           const postPlaylist = await this.holyrics.getPlaylist({
             type: 'all',
-            event_id: eventId,
           })
           if (postPlaylist.success && Array.isArray(postPlaylist.items)) {
             for (const item of postPlaylist.items) {
@@ -783,33 +872,79 @@ export class LouvorFlowAgent {
                 .toLowerCase()
               if (name) verifiedNames.add(name)
             }
+          } else {
+            postPlaylistError = postPlaylist.error || 'Falha ao consultar GetPlaylist pós-inserção'
           }
-        } catch (_) {}
+        } catch (err: any) {
+          postPlaylistError = err.message || 'Exceção ao consultar GetPlaylist pós-inserção'
+        }
 
         for (const added of itemsToAdd) {
-          const isVerified = verifiedNames.size === 0 || verifiedNames.has(added.name.toLowerCase())
-          if (isVerified) {
+          const isVerified = verifiedNames.size > 0 && verifiedNames.has(added.name.toLowerCase())
+          if (isVerified || (verifiedNames.size === 0 && !postPlaylistError)) {
             detailedResults.push({
               name: added.name,
               status: 'ADDED',
+              media_type: added.type,
             })
             addedCount++
           } else {
+            const errorCode = 'PLAYLIST_VERIFICATION_FAILED'
+            const errorMsg = postPlaylistError
+              ? `Holyrics aceitou AddToPlaylist mas a verificação falhou: ${postPlaylistError}`
+              : `Holyrics respondeu sucesso em AddToPlaylist, mas o arquivo "${added.name}" não foi encontrado na playlist consultada.`
+            console.error(
+              JSON.stringify({
+                timestamp: new Date().toISOString(),
+                event: 'sync_media_error',
+                command_id: cmd.command_id,
+                stage: 'VERIFY_RESULTING_PLAYLIST',
+                media_type: added.type,
+                file_name: added.name,
+                api_method: 'GetPlaylist',
+                http_status: 200,
+                error_message: errorMsg,
+                error_code: errorCode,
+              }),
+            )
             detailedResults.push({
               name: added.name,
               status: 'FAILED',
-              error:
-                'Holyrics retornou sucesso mas o arquivo não consta na playlist verificada. Ação recomendada: verifique se o arquivo foi indexado pelo Holyrics.',
+              error: `${errorMsg} Ação recomendada: verifique se o Holyrics está com a playlist aberta.`,
+              error_code: errorCode,
+              stage: 'VERIFY_RESULTING_PLAYLIST',
+              media_type: added.type,
             })
             failedCount++
           }
         }
       } else {
+        const errorCode = addRes.error_code || 'ADD_TO_PLAYLIST_API_ERROR'
+        const errorMsg = addRes.error || 'Erro na API Holyrics AddToPlaylist'
+        console.error(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            event: 'sync_media_error',
+            command_id: cmd.command_id,
+            stage: 'ADD_TO_PLAYLIST',
+            media_type: 'multiple',
+            file_name: itemsToAdd.map((it) => it.name).join(', '),
+            api_method: 'AddToPlaylist',
+            http_status: addRes.httpStatus ?? null,
+            error_message: errorMsg,
+            error_code: errorCode,
+          }),
+        )
+
         for (const added of itemsToAdd) {
           detailedResults.push({
             name: added.name,
             status: 'FAILED',
-            error: `${addRes.error || 'Erro na API Holyrics AddToPlaylist'}. Ação recomendada: verifique se a API do Holyrics está habilitada com permissão de playlist.`,
+            error: `${errorMsg}. Ação recomendada: verifique se a API do Holyrics está habilitada com permissão de playlist.`,
+            error_code: errorCode,
+            stage: 'ADD_TO_PLAYLIST',
+            media_type: added.type,
+            http_status: addRes.httpStatus,
           })
           failedCount++
         }
@@ -820,21 +955,41 @@ export class LouvorFlowAgent {
     const pendingLocalCount = detailedResults.filter(
       (r) => r.status === 'PENDING_LOCAL_FILE',
     ).length
+    const notRecognizedCount = detailedResults.filter(
+      (r) => r.status === 'MEDIA_NOT_RECOGNIZED',
+    ).length
+
+    // Determina erro estável para o SaaS se todos falharam ou nenhum foi adicionado
+    let summaryError: string | undefined = undefined
+    let summaryErrorCode: string | undefined = undefined
+
+    if (failedCount > 0 && addedCount === 0 && alreadyPresentCount === 0) {
+      const firstFailure = detailedResults.find((r) => r.status === 'FAILED')
+      summaryError = firstFailure?.error || 'Falha ao incluir mídias na playlist'
+      summaryErrorCode = firstFailure?.error_code || 'SYNC_MEDIA_PLAYLIST_FAILED'
+    } else if (notRecognizedCount > 0 && addedCount === 0 && alreadyPresentCount === 0) {
+      summaryError = 'Mídia física presente no disco, mas ainda não reconhecida pelo Holyrics.'
+      summaryErrorCode = 'MEDIA_NOT_RECOGNIZED'
+    } else if (pendingLocalCount > 0 && addedCount === 0 && alreadyPresentCount === 0) {
+      summaryError = 'Arquivos de mídia ainda não foram encontrados no disco local.'
+      summaryErrorCode = 'PENDING_LOCAL_FILE'
+    }
 
     return {
       success:
-        (failedCount === 0 && pendingLocalCount === 0) || addedCount > 0 || alreadyPresentCount > 0,
+        (failedCount === 0 && pendingLocalCount === 0 && notRecognizedCount === 0) ||
+        addedCount > 0 ||
+        alreadyPresentCount > 0,
       result: {
         synced_count: addedCount,
         already_present_count: alreadyPresentCount,
         pending_local_count: pendingLocalCount,
+        not_recognized_count: notRecognizedCount,
         failed_count: failedCount,
         items: detailedResults,
       },
-      error:
-        failedCount > 0 && addedCount === 0 && alreadyPresentCount === 0
-          ? 'Falha ao incluir mídias na playlist'
-          : undefined,
+      error: summaryError,
+      error_code: summaryErrorCode,
     }
   }
 

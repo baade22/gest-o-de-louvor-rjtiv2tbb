@@ -293,17 +293,32 @@ routerAdd(
 
       var extMatch = originalFile.match(/\.([a-zA-Z0-9]+)$/)
       var ext = extMatch ? extMatch[1].toLowerCase() : ''
+      if (!ext && originalName) {
+        var matchTitleExt = originalName.match(/\.([a-zA-Z0-9]+)$/)
+        if (matchTitleExt) ext = matchTitleExt[1].toLowerCase()
+      }
+
+      var titleRaw = (originalName || 'Midia').trim()
+      if (ext && titleRaw.toLowerCase().endsWith('.' + ext)) {
+        titleRaw = titleRaw.slice(0, -(ext.length + 1)).trim()
+      } else {
+        var matchExt = titleRaw.match(/\.([a-zA-Z0-9]+)$/)
+        if (matchExt && (!ext || matchExt[1].toLowerCase() === ext)) {
+          if (!ext) ext = matchExt[1].toLowerCase()
+          titleRaw = titleRaw.slice(0, -matchExt[0].length).trim()
+        }
+      }
 
       var eventClean = sanitizeSegment(eventTitle) || 'Evento'
       var catClean = getCategoryLabel(media.getString('category'))
-      var titleClean = sanitizeSegment(originalName.replace(/\.[a-zA-Z0-9]+$/, '')) || 'Midia'
+      var titleClean = sanitizeSegment(titleRaw || 'Midia') || 'Midia'
 
       holyricsFilename = eventClean + ' - ' + catClean + ' - ' + eventDayMonth + ' - ' + titleClean
       holyricsFilename = holyricsFilename
         .replace(/\s*-\s*-\s*/g, ' - ')
         .replace(/\s+/g, ' ')
         .trim()
-      if (ext) {
+      if (ext && !holyricsFilename.toLowerCase().endsWith('.' + ext)) {
         holyricsFilename += '.' + ext
       }
 
