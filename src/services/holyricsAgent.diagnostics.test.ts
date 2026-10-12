@@ -189,17 +189,17 @@ describe('Endpoint de Status do Comando (SaaS Frontend Service)', () => {
 describe('Retry de Reporte de Resultado do Agent', () => {
   it('LouvorFlowAgent reenvia resultado com retry caso o primeiro POST falhe', async () => {
     const agent = new LouvorFlowAgent({
-      saasUrl: 'https://saas.example.com',
-      agentId: 'ag_test',
-      agentToken: 'token_test',
+      saasUrl: 'http://localhost:8090',
+      agentId: 'agent_diag',
+      agentToken: 'token_diag',
       holyricsHost: '127.0.0.1',
       holyricsPort: 8091,
-      holyricsToken: 'h_tok',
+      holyricsToken: 'token123',
       agentWebPort: 8765,
-      pollIntervalMs: 5000,
-      heartbeatIntervalMs: 15000,
+      pollIntervalMs: 2000,
+      heartbeatIntervalMs: 10000,
+      holyricsMediaPath: 'C:\\Holyrics\\Holyrics\\files\\media',
     })
-
     let reportAttempts = 0
     globalThis.fetch = vi.fn().mockImplementation((url, init) => {
       const urlStr = String(url)
