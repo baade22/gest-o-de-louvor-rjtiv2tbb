@@ -48,6 +48,15 @@ export async function updateMediaStatus(
   return res.media
 }
 
+export async function updateMediaOrder(
+  mediaId: string,
+  presentationOrder: number,
+): Promise<MediaAsset> {
+  return pb.collection('media_assets').update<MediaAsset>(mediaId, {
+    presentation_order: presentationOrder,
+  })
+}
+
 export function getMediaFileUrl(record: MediaAsset): string {
   if (!record || !record.file) return ''
   return pb.files.getURL(record, record.file)
@@ -85,6 +94,30 @@ export async function transferMediaToHolyricsAgent(params: {
       church_id: params.churchId,
       agent_id: params.agentId,
       target_subfolder: params.targetSubfolder,
+    },
+  })
+}
+
+export interface SyncMediaPlaylistResponse {
+  success: boolean
+  command_id?: string
+  agent_online?: boolean
+  total_items?: number
+  message?: string
+  error_code?: string
+}
+
+export async function syncEventMediaPlaylistWithHolyrics(
+  eventId: string,
+  churchId: string,
+  agentId?: string,
+): Promise<SyncMediaPlaylistResponse> {
+  return pb.send<SyncMediaPlaylistResponse>('/backend/v1/saas/holyrics/sync-media-playlist', {
+    method: 'POST',
+    body: {
+      event_id: eventId,
+      church_id: churchId,
+      agent_id: agentId,
     },
   })
 }

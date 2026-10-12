@@ -110,7 +110,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.32',
+          version: '0.0.33',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -256,7 +256,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.32',
+          version: '0.0.33',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -523,6 +523,20 @@ export class LouvorFlowAgent {
           break
         }
 
+        case 'SYNC_MEDIA_PLAYLIST': {
+          const syncMediaRes = await this.handleSyncMediaPlaylist(cmd)
+          if (syncMediaRes.success) {
+            status = 'DONE'
+            resultPayload = syncMediaRes.result
+          } else {
+            status = 'FAILED'
+            errorMsg = syncMediaRes.error || 'Erro na sincronização de mídias com a playlist.'
+            errorCode = syncMediaRes.error_code || 'SYNC_MEDIA_PLAYLIST_FAILED'
+            resultPayload = { error_code: errorCode, ...syncMediaRes.result }
+          }
+          break
+        }
+
         default:
           status = 'FAILED'
           errorMsg = `Ação desconhecida: ${cmd.action}`
@@ -605,6 +619,154 @@ export class LouvorFlowAgent {
    * 6. Move atomicamente para o destino final
    * 7. Consulta GetFile no Holyrics para testar indexação/reconhecimento
    */
+  /**
+   * handleSyncMediaPlaylist:
+   * Processa o comando SYNC_MEDIA_PLAYLIST
+   * Adiciona mídias do evento à playlist do Holyrics respeitando ordem e unicidade
+   */
+  public async handleSyncMediaPlaylist(cmd: AgentCommand): Promise<{
+    success: boolean
+    result?: any
+    error?: string
+    error_code?: string
+  }> {
+    const payload = cmd.payload || {}
+    const eventId = payload.event_id ? String(payload.event_id) : undefined
+    const itemsRaw = Array.isArray(payload.items) ? payload.items : []
+
+    if (itemsRaw.length === 0) {
+      return {
+        success: true,
+        result: {
+          synced_count: 0,
+          already_present_count: 0,
+          failed_count: 0,
+          items: [],
+          message: 'Nenhuma mídia para sincronizar na playlist.',
+        },
+      }
+    }
+
+    // Valida se o Holyrics está respondendo
+    const ping = await this.holyrics.testConnection()
+    if (!ping.connected) {
+      return {
+        success: false,
+        error: ping.error || 'Holyrics API offline ou inacessível no momento da sincronização.',
+        error_code: 'HOLYRICS_OFFLINE',
+        result: { synced_count: 0, failed_count: itemsRaw.length },
+      }
+    }
+
+    // Consulta playlist atual para verificar existência prévia
+    let existingItemNames = new Set<string>()
+    try {
+      const currentPlaylist = await this.holyrics.getPlaylist({
+        type: 'all',
+        event_id: eventId,
+      })
+      if (currentPlaylist.success && Array.isArray(currentPlaylist.items)) {
+        for (const item of currentPlaylist.items) {
+          const name = String(item.name || item.title || '')
+            .trim()
+            .toLowerCase()
+          if (name) existingItemNames.add(name)
+        }
+      }
+    } catch (_) {
+      // Falha não impeditiva na leitura prévia
+    }
+
+    const itemsToAdd: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }> = []
+    const detailedResults: Array<{
+      id?: string
+      name: string
+      status: 'ADDED' | 'ALREADY_PRESENT' | 'FAILED'
+      error?: string
+    }> = []
+
+    for (const item of itemsRaw) {
+      const fileName = String(item.holyrics_filename || item.name || '').trim()
+      const mediaType = String(item.media_type || '').toUpperCase()
+
+      if (!fileName) {
+        detailedResults.push({
+          id: item.id,
+          name: 'Desconhecido',
+          status: 'FAILED',
+          error: 'Nome do arquivo de mídia ausente.',
+        })
+        continue
+      }
+
+      const lowerName = fileName.toLowerCase()
+      if (existingItemNames.has(lowerName)) {
+        detailedResults.push({
+          id: item.id,
+          name: fileName,
+          status: 'ALREADY_PRESENT',
+        })
+        continue
+      }
+
+      let holyricsType: 'video' | 'image' | 'audio' | 'file' = 'file'
+      if (mediaType === 'VIDEO') holyricsType = 'video'
+      else if (mediaType === 'IMAGEM') holyricsType = 'image'
+      else if (mediaType === 'AUDIO') holyricsType = 'audio'
+
+      itemsToAdd.push({
+        type: holyricsType,
+        name: fileName,
+      })
+    }
+
+    let addedCount = 0
+    let failedCount = 0
+
+    if (itemsToAdd.length > 0) {
+      const addRes = await this.holyrics.addMediaToPlaylist({
+        items: itemsToAdd,
+        ignoreDuplicates: true,
+        eventId,
+      })
+
+      if (addRes.success) {
+        for (const added of itemsToAdd) {
+          detailedResults.push({
+            name: added.name,
+            status: 'ADDED',
+          })
+          addedCount++
+        }
+      } else {
+        for (const added of itemsToAdd) {
+          detailedResults.push({
+            name: added.name,
+            status: 'FAILED',
+            error: addRes.error || 'Erro na API Holyrics AddToPlaylist',
+          })
+          failedCount++
+        }
+      }
+    }
+
+    const alreadyPresentCount = detailedResults.filter((r) => r.status === 'ALREADY_PRESENT').length
+
+    return {
+      success: failedCount === 0 || addedCount > 0 || alreadyPresentCount > 0,
+      result: {
+        synced_count: addedCount,
+        already_present_count: alreadyPresentCount,
+        failed_count: failedCount,
+        items: detailedResults,
+      },
+      error:
+        failedCount > 0 && addedCount === 0 && alreadyPresentCount === 0
+          ? 'Falha ao incluir mídias na playlist'
+          : undefined,
+    }
+  }
+
   public async handleTransferMedia(cmd: AgentCommand): Promise<{
     success: boolean
     result?: Record<string, any>
@@ -613,7 +775,10 @@ export class LouvorFlowAgent {
   }> {
     const payload = cmd.payload || {}
     const mediaId = String(payload.media_id || '').trim()
-    const fileNameParam = String(payload.file_name || payload.name || '').trim()
+    // Prioriza o nome físico padronizado gerado pelo SaaS (holyrics_filename)
+    const fileNameParam = String(
+      payload.holyrics_filename || payload.file_name || payload.name || '',
+    ).trim()
     const mediaType = String(payload.media_type || '').toUpperCase()
     const expectedSize = Number(payload.file_size) || 0
     const downloadEndpoint = String(

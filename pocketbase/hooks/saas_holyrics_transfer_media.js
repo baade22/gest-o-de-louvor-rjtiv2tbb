@@ -168,7 +168,84 @@ routerAdd(
       }
     } catch (_) {}
 
-    // 6. Monta comando TRANSFER_MEDIA
+    // 6. Nomenclatura física padronizada:
+    // Padrão: Evento - Categoria - DD-MM - Título.extensão
+    let holyricsFilename = media.getString('holyrics_filename')
+    const originalFile = media.getString('file')
+    const originalName = media.getString('name') || originalFile
+
+    if (!holyricsFilename) {
+      let eventTitle = 'Evento'
+      let eventDayMonth = 'Sem Data'
+      const eventId = media.getString('event_id')
+      if (eventId) {
+        try {
+          const evRec = $app.findRecordById('events', eventId)
+          if (evRec) {
+            eventTitle = evRec.getString('title') || 'Evento'
+            const evDate = evRec.getString('date')
+            if (evDate) {
+              const dtMatch = evDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+              if (dtMatch) {
+                eventDayMonth = dtMatch[3] + '-' + dtMatch[2]
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      function sanitizeSegment(str) {
+        if (!str) return ''
+        var s = String(str)
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+        s = s.replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
+        s = s.replace(/\s+/g, ' ').trim()
+        return s.replace(/^[.\s\-_]+|[.\s\-_]+$/g, '').trim()
+      }
+
+      function getCategoryLabel(cat) {
+        var c = String(cat || '')
+          .toUpperCase()
+          .trim()
+        var map = {
+          AVISOS: 'Avisos',
+          ANIVERSARIANTES: 'Aniversariantes',
+          AGENDA: 'Agenda',
+          CULTOS: 'Cultos',
+          EVENTOS: 'Eventos',
+          VIDEO_ESPECIAL: 'Video Especial',
+          OUTROS: 'Outros',
+        }
+        return map[c] || (c ? sanitizeSegment(c) : 'Geral')
+      }
+
+      var extMatch = originalFile.match(/\.([a-zA-Z0-9]+)$/)
+      var ext = extMatch ? extMatch[1].toLowerCase() : ''
+
+      var eventClean = sanitizeSegment(eventTitle) || 'Evento'
+      var catClean = getCategoryLabel(media.getString('category'))
+      var titleClean = sanitizeSegment(originalName.replace(/\.[a-zA-Z0-9]+$/, '')) || 'Midia'
+
+      holyricsFilename = eventClean + ' - ' + catClean + ' - ' + eventDayMonth + ' - ' + titleClean
+      holyricsFilename = holyricsFilename
+        .replace(/\s*-\s*-\s*/g, ' - ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (ext) {
+        holyricsFilename += '.' + ext
+      }
+
+      try {
+        media.set('holyrics_filename', holyricsFilename)
+        if (!media.getString('original_filename')) {
+          media.set('original_filename', originalFile)
+        }
+        $app.save(media)
+      } catch (_) {}
+    }
+
+    // 7. Monta comando TRANSFER_MEDIA
     const commandId = 'cmd_media_' + Date.now() + '_' + $security.randomString(8)
     const cmdCol = $app.findCollectionByNameOrId('holyrics_commands')
     const cmdRec = new Record(cmdCol)
@@ -187,6 +264,7 @@ routerAdd(
       event_id: media.getString('event_id'),
       name: media.getString('name'),
       file_name: media.getString('file'),
+      holyrics_filename: holyricsFilename,
       media_type: mediaType,
       category: media.getString('category'),
       file_size: media.getInt('size'),

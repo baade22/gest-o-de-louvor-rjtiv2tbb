@@ -219,6 +219,9 @@ export interface MediaAsset {
   church_id: string
   event_id: string
   name: string
+  original_filename?: string
+  holyrics_filename?: string
+  presentation_order?: number
   file: string
   media_type: MediaType
   category: MediaCategory

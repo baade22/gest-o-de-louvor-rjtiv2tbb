@@ -46,6 +46,8 @@ import {
   X,
   RefreshCw,
   Send,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react'
 import {
   syncEventRepertoireWithHolyrics,
@@ -82,10 +84,13 @@ import {
   listEventMedia,
   uploadMediaAsset,
   updateMediaStatus,
+  updateMediaOrder,
   getMediaFileUrl,
   deleteMediaAsset,
   transferMediaToHolyricsAgent,
+  syncEventMediaPlaylistWithHolyrics,
 } from '@/services/media'
+import { generateHolyricsFileName } from '@/lib/mediaNaming'
 
 export default function EventScaleDetail() {
   const { id } = useParams<{ id: string }>()
@@ -116,6 +121,7 @@ export default function EventScaleDetail() {
   const [isLoading, setIsLoading] = useState(true)
 
   const [transferringMediaIds, setTransferringMediaIds] = useState<Record<string, boolean>>({})
+  const [isSyncingMediaPlaylist, setIsSyncingMediaPlaylist] = useState(false)
 
   // Aba ativa vinda da URL ou default 'overview'
   const initialTab = searchParams.get('tab') || 'overview'
@@ -553,11 +559,22 @@ export default function EventScaleDetail() {
     if (!mediaFile || !event || !currentChurch) return
     setIsUploadingMedia(true)
     try {
+      const generatedPhysicalName = generateHolyricsFileName({
+        eventName: event.title,
+        category: mediaCategory,
+        eventDate: event.date,
+        title: mediaName || mediaFile.name,
+        originalFileName: mediaFile.name,
+      })
+
       const formData = new FormData()
       formData.append('church_id', currentChurch.id)
       formData.append('event_id', event.id)
       formData.append('name', mediaName || mediaFile.name)
       formData.append('file', mediaFile)
+      formData.append('original_filename', mediaFile.name)
+      formData.append('holyrics_filename', generatedPhysicalName)
+      formData.append('presentation_order', String(mediaList.length + 1))
       formData.append('media_type', mediaType)
       formData.append('category', mediaCategory)
       formData.append('size', String(mediaFile.size))
@@ -599,6 +616,79 @@ export default function EventScaleDetail() {
       title: 'Download iniciado',
       description: 'Lembre-se de clicar em [Marcar como baixada] após conferir o arquivo.',
     })
+  }
+
+  const handleSyncMediaPlaylistWithHolyrics = async () => {
+    if (!event || !currentChurch) return
+    if (!canSyncHolyrics) {
+      toast({
+        title: 'Permissão negada',
+        description: 'Apenas Administradores e Líderes podem sincronizar com o Holyrics.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (mediaList.length === 0) {
+      toast({
+        title: 'Nenhuma mídia vinculada',
+        description: 'Envie mídias para este evento antes de sincronizar com a playlist.',
+      })
+      return
+    }
+
+    setIsSyncingMediaPlaylist(true)
+    toast({
+      title: 'Sincronizando mídias...',
+      description: `Enviando comando para incluir ${mediaList.length} mídia(s) na playlist do Holyrics.`,
+    })
+
+    try {
+      const res = await syncEventMediaPlaylistWithHolyrics(event.id, currentChurch.id)
+      if (res.success) {
+        toast({
+          title: 'Sincronização de mídias disparada!',
+          description: res.message,
+        })
+      } else {
+        toast({
+          title: 'Falha na sincronização de mídias',
+          description: res.message || 'Verifique o status do LouvorFlow Agent.',
+          variant: 'destructive',
+        })
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao sincronizar playlist de mídias',
+        description: err.message || 'Falha na comunicação com o backend.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSyncingMediaPlaylist(false)
+    }
+  }
+
+  const handleMoveMediaOrder = async (currentIndex: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= mediaList.length) return
+
+    const newMedias = [...mediaList]
+    const temp = newMedias[currentIndex]
+    newMedias[currentIndex] = newMedias[targetIndex]
+    newMedias[targetIndex] = temp
+
+    setMediaList(newMedias)
+
+    try {
+      await Promise.all([
+        updateMediaOrder(newMedias[currentIndex].id, currentIndex + 1),
+        updateMediaOrder(newMedias[targetIndex].id, targetIndex + 1),
+      ])
+      toast({ title: 'Ordem das mídias atualizada!' })
+    } catch (err) {
+      console.error('Erro ao salvar ordem das mídias:', err)
+      fetchFullEventData()
+    }
   }
 
   const handleTransferMediaToAgent = async (media: MediaAsset) => {
@@ -1612,24 +1702,44 @@ export default function EventScaleDetail() {
         {canSeeMedia && (
           <TabsContent value="midia" className="mt-4 space-y-4">
             <Card className="rounded-2xl border-slate-200">
-              <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
                 <div>
                   <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
                     <ImageIcon className="h-5 w-5 text-emerald-600" />
                     Mídias do Evento ({mediaList.length})
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Vídeos de avisos, aniversariantes, artes de abertura e transmissão
+                    Vídeos de avisos, aniversariantes, artes de abertura e transmissão com ordenação
+                    para playlist
                   </CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => setMediaModalOpen(true)}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5"
-                >
-                  <UploadCloud className="h-3.5 w-3.5" />
-                  Enviar Mídia
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {canSyncHolyrics && mediaList.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isSyncingMediaPlaylist}
+                      onClick={handleSyncMediaPlaylistWithHolyrics}
+                      className="rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs gap-1.5"
+                      title="Envia todas as mídias na ordem para a playlist do Holyrics"
+                    >
+                      {isSyncingMediaPlaylist ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Radio className="h-3.5 w-3.5" />
+                      )}
+                      Sincronizar Mídias com Playlist
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => setMediaModalOpen(true)}
+                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5"
+                  >
+                    <UploadCloud className="h-3.5 w-3.5" />
+                    Enviar Mídia
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-4">
                 {mediaList.length === 0 ? (
@@ -1642,38 +1752,75 @@ export default function EventScaleDetail() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {mediaList.map((media) => (
+                    {mediaList.map((media, idx) => (
                       <div
                         key={media.id}
                         className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3"
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-900 truncate">
-                              {media.name}
-                            </span>
-                            <Badge variant="outline" className="text-[10px] font-semibold">
-                              {media.category}
-                            </Badge>
-                            <Badge
-                              className={`text-[10px] ${
-                                media.status === 'IMPORTADA_HOLYRICS'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : media.status === 'BAIXADA'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-amber-100 text-amber-800'
-                              }`}
-                            >
-                              {media.status}
-                            </Badge>
+                        <div className="flex items-start gap-3 min-w-0">
+                          {/* Controles de ordenação litúrgica de mídia */}
+                          {canManageContent && (
+                            <div className="flex flex-col gap-0.5 shrink-0 pt-0.5">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveMediaOrder(idx, 'up')}
+                                className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors"
+                                title="Mover para cima na playlist"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === mediaList.length - 1}
+                                onClick={() => handleMoveMediaOrder(idx, 'down')}
+                                className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 transition-colors"
+                                title="Mover para baixo na playlist"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                #{idx + 1}
+                              </span>
+                              <span className="text-sm font-bold text-slate-900 truncate">
+                                {media.name}
+                              </span>
+                              {media.holyrics_filename && (
+                                <span
+                                  className="text-xs text-slate-500 font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 truncate max-w-xs"
+                                  title={media.holyrics_filename}
+                                >
+                                  {media.holyrics_filename}
+                                </span>
+                              )}
+                              <Badge variant="outline" className="text-[10px] font-semibold">
+                                {media.category}
+                              </Badge>
+                              <Badge
+                                className={`text-[10px] ${
+                                  media.status === 'IMPORTADA_HOLYRICS'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : media.status === 'BAIXADA'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {media.status}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Tipo: {media.media_type} • Operador atribuído:{' '}
+                              <strong className="text-slate-700">
+                                {media.expand?.assigned_operator?.expand?.user_id?.name ||
+                                  'A definir'}
+                              </strong>
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Tipo: {media.media_type} • Operador atribuído:{' '}
-                            <strong className="text-slate-700">
-                              {media.expand?.assigned_operator?.expand?.user_id?.name ||
-                                'A definir'}
-                            </strong>
-                          </p>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -2353,6 +2500,25 @@ export default function EventScaleDetail() {
                   })}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Preview do Nome Físico no Holyrics */}
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1">
+              <span className="text-[11px] font-bold text-slate-700 block">
+                Nome físico no Holyrics (gerado automaticamente):
+              </span>
+              <code className="text-xs text-emerald-700 bg-white px-2 py-1 rounded border border-slate-200 block truncate font-mono">
+                {generateHolyricsFileName({
+                  eventName: event.title,
+                  category: mediaCategory,
+                  eventDate: event.date,
+                  title: mediaName || mediaFile?.name || '',
+                  originalFileName: mediaFile?.name || '',
+                })}
+              </code>
+              <span className="text-[10px] text-slate-400 block">
+                Padrão: Evento - Categoria - DD-MM - Título.extensão
+              </span>
             </div>
           </div>
           <DialogFooter>

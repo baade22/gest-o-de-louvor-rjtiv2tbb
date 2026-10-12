@@ -49,6 +49,7 @@ import {
   transferMediaToHolyricsAgent,
 } from '@/services/media'
 import { listHolyricsAgents, type HolyricsAgentInfo } from '@/services/holyricsAgent'
+import { generateHolyricsFileName } from '@/lib/mediaNaming'
 
 export default function MediaModule() {
   const { currentChurch, currentMember, isAdmin, isMaster } = useAuth()
@@ -74,6 +75,16 @@ export default function MediaModule() {
   >('AVISOS')
   const [assignedOperator, setAssignedOperator] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+
+  // Cálculo reativo do nome físico final do arquivo
+  const selectedEvent = events.find((e) => e.id === selectedEventId)
+  const computedHolyricsFileName = generateHolyricsFileName({
+    eventName: selectedEvent?.title || 'Culto',
+    category: mediaCategory,
+    eventDate: selectedEvent?.date,
+    title: mediaName || mediaFile?.name || '',
+    originalFileName: mediaFile?.name || '',
+  })
 
   const loadData = async () => {
     if (!currentChurch) return
@@ -190,6 +201,8 @@ export default function MediaModule() {
       formData.append('event_id', selectedEventId)
       formData.append('name', mediaName || mediaFile.name)
       formData.append('file', mediaFile)
+      formData.append('original_filename', mediaFile.name)
+      formData.append('holyrics_filename', computedHolyricsFileName)
       formData.append('media_type', mediaType)
       formData.append('category', mediaCategory)
       formData.append('size', String(mediaFile.size))
@@ -346,6 +359,11 @@ export default function MediaModule() {
                         <span className="text-sm font-bold text-slate-900 truncate">
                           {item.name}
                         </span>
+                        {item.holyrics_filename && (
+                          <span className="text-xs text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-xs">
+                            {item.holyrics_filename}
+                          </span>
+                        )}
                         <Badge variant="outline" className="text-[10px] font-semibold">
                           {item.category}
                         </Badge>
@@ -576,6 +594,19 @@ export default function MediaModule() {
                   })}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Preview do Nome Físico no Holyrics */}
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1">
+              <span className="text-[11px] font-bold text-slate-700 block">
+                Nome físico no Holyrics (gerado automaticamente):
+              </span>
+              <code className="text-xs text-emerald-700 bg-white px-2 py-1 rounded border border-slate-200 block truncate font-mono">
+                {computedHolyricsFileName}
+              </code>
+              <span className="text-[10px] text-slate-400 block">
+                Padrão: Evento - Categoria - DD-MM - Título.extensão
+              </span>
             </div>
           </div>
 

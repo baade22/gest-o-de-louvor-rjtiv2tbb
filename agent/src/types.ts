@@ -86,6 +86,7 @@ export interface AgentCommand {
     | 'GET_LYRICS_PLAYLIST'
     | 'ADD_LYRICS_TO_PLAYLIST'
     | 'TRANSFER_MEDIA'
+    | 'SYNC_MEDIA_PLAYLIST'
   payload: Record<string, any>
   created_at: string
 }

@@ -791,6 +791,104 @@ export class HolyricsClient {
   }
 
   /**
+   * AddMediaToPlaylist: Adiciona mídias à playlist do Holyrics via AddToPlaylist oficial
+   * POST /api/AddToPlaylist?token=...
+   * Payload mínimo oficial:
+   * {
+   *   items: [{ type: "video" | "image" | "audio", name: "Nome Fisico.mp4" }],
+   *   index: number (opcional, base 0),
+   *   ignore_duplicates: true (evitar duplicar),
+   *   event_id?: string (opcional para Holyrics 2.26+)
+   * }
+   */
+  public async addMediaToPlaylist(params: {
+    items: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }>
+    index?: number
+    ignoreDuplicates?: boolean
+    eventId?: string
+  }): Promise<{
+    success: boolean
+    data?: any
+    error?: string
+    error_code?: string
+  }> {
+    const payload: Record<string, any> = {
+      items: params.items,
+      ignore_duplicates: params.ignoreDuplicates ?? true,
+    }
+    if (params.index !== undefined && params.index !== null) {
+      payload.index = Number(params.index)
+    }
+    if (params.eventId) {
+      payload.event_id = String(params.eventId)
+    }
+
+    const res = await this.request('AddToPlaylist', payload, 6000)
+    if (res.status === 'ok') {
+      return {
+        success: true,
+        data: res.data,
+      }
+    }
+
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Falha ao adicionar mídia à playlist'
+
+    return {
+      success: false,
+      error: errStr,
+      error_code:
+        errStr === 'TIMEOUT_HOLYRICS'
+          ? 'TIMEOUT_HOLYRICS'
+          : errStr.includes('CONNECTION_REFUSED')
+            ? 'CONNECTION_REFUSED'
+            : 'ADD_MEDIA_PLAYLIST_FAILED',
+    }
+  }
+
+  /**
+   * GetPlaylist: Obtém os itens da playlist ativa ou de mídias do Holyrics
+   * POST /api/GetPlaylist?token=...
+   */
+  public async getPlaylist(options?: {
+    type?: 'all' | 'media' | 'song'
+    event_id?: string
+  }): Promise<{
+    success: boolean
+    items: import('./types.js').HolyricsPlaylistItem[]
+    data?: any
+    error?: string
+  }> {
+    const payload: Record<string, any> = {}
+    if (options?.type) payload.type = options.type
+    if (options?.event_id) payload.event_id = options.event_id
+
+    const res = await this.request('GetPlaylist', payload, 4000)
+    if (res.status === 'ok') {
+      let items: import('./types.js').HolyricsPlaylistItem[] = []
+      if (Array.isArray(res.data)) {
+        items = res.data
+      } else if (res.data && Array.isArray(res.data.items)) {
+        items = res.data.items
+      } else if (res.data && Array.isArray(res.data.list)) {
+        items = res.data.list
+      } else if (res.data && Array.isArray(res.data.playlist)) {
+        items = res.data.playlist
+      }
+      return { success: true, items, data: res.data }
+    }
+
+    return {
+      success: false,
+      items: [],
+      error:
+        typeof res.error === 'string' ? res.error : res.error?.message || 'Erro ao ler playlist',
+    }
+  }
+
+  /**
    * GetFile: Consulta se um arquivo específico foi detectado/indexado pelo Holyrics
    * POST /api/GetFile?token=...
    * Body: { type: "video" | "image" | "audio" | "file", name: "nome_do_arquivo.ext", folder?: "subpasta" }

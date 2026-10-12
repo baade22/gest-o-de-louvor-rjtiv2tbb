@@ -29,8 +29,8 @@ describe('packAgent test verification', () => {
     )
   })
 
-  it('garante que o LouvorFlow-Agent-0.0.32.zip foi gerado corretamente em public/', () => {
-    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.32.zip')
+  it('garante que o LouvorFlow-Agent-0.0.33.zip foi gerado corretamente em public/', () => {
+    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.33.zip')
     expect(fs.existsSync(zipPath)).toBe(true)
     const stat = fs.statSync(zipPath)
     expect(stat.size).toBeGreaterThan(1000)
