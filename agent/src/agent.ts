@@ -437,6 +437,48 @@ export class LouvorFlowAgent {
           break
         }
 
+        case 'GET_SCHEDULES': {
+          // Payload mínimo esperado pelo Holyrics: { month, year } (1-12, ano de 4 dígitos)
+          const monthNum = Number(cmd.payload?.month)
+          const yearNum = Number(cmd.payload?.year)
+          if (
+            !Number.isFinite(monthNum) ||
+            !Number.isFinite(yearNum) ||
+            monthNum < 1 ||
+            monthNum > 12 ||
+            yearNum < 1900 ||
+            yearNum > 2999
+          ) {
+            status = 'FAILED'
+            errorMsg = 'Parâmetros month (1-12) e year são obrigatórios para GetSchedules.'
+            errorCode = 'MISSING_SCHEDULE_PARAMS'
+            resultPayload = { error_code: errorCode }
+            break
+          }
+
+          const schedulesRes = await this.holyrics.getSchedules(monthNum, yearNum)
+
+          console.log(
+            `[Agent] [${new Date().toISOString()}] GET_SCHEDULES executado: duração=${schedulesRes.durationMs}ms, HTTP=${schedulesRes.httpStatus}, agendamentos=${schedulesRes.schedules.length}`,
+          )
+
+          if (schedulesRes.success) {
+            status = 'DONE'
+            resultPayload = {
+              schedules: schedulesRes.schedules,
+              count: schedulesRes.schedules.length,
+              month: monthNum,
+              year: yearNum,
+            }
+          } else {
+            status = 'FAILED'
+            errorMsg = schedulesRes.error || 'Erro ao consultar GetSchedules no Holyrics.'
+            errorCode = schedulesRes.error_code || 'GET_SCHEDULES_FAILED'
+            resultPayload = { error_code: errorCode }
+          }
+          break
+        }
+
         case 'GET_SONG_PLAYLIST': {
           const playlistRes = await this.holyrics.getSongPlaylist()
           if (playlistRes.success) {

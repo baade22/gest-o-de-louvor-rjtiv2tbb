@@ -137,6 +137,39 @@ routerAdd(
     const agentId = agentRecord.id
     const isOnline = agentRecord.getString('status') === 'ONLINE'
 
+    // ETAPA 3A (Auditoria): SYNC_MEDIA_PLAYLIST exige culto vinculado a um evento do Holyrics.
+    // O payload enviado ao Agent carrega holyrics_event_id para rastreabilidade — nunca o ID do SaaS.
+    const holyricsEventId = eventRecord.getString('holyrics_event_id') || ''
+    if (!holyricsEventId) {
+      try {
+        const syncLogsCol = $app.findCollectionByNameOrId('holyrics_sync_logs')
+        const logRec = new Record(syncLogsCol)
+        logRec.set('church_id', churchId)
+        logRec.set('agent_id', '')
+        logRec.set('event_id', eventId)
+        logRec.set('action', 'SYNC_MEDIA_PLAYLIST')
+        logRec.set('status', 'ERROR')
+        logRec.set(
+          'error',
+          'Culto não vinculado a um evento do Holyrics (holyrics_event_id vazio). Use a vinculação de eventos antes de sincronizar a playlist de mídias.',
+        )
+        logRec.set('created_at', new Date().toISOString().replace('T', ' ').substring(0, 19))
+        logRec.set('stage', 'HOLYRICS_EVENT_NOT_LINKED')
+        logRec.set('details', { event_id: eventId })
+        $app.save(logRec)
+      } catch (logErr) {
+        console.log('[HOLYRICS_MEDIA_SYNC_LOG_ERR]', logErr.message)
+      }
+
+      return e.json(200, {
+        success: false,
+        error_code: 'HOLYRICS_EVENT_NOT_LINKED',
+        holyrics_event_id: '',
+        message:
+          'Este culto ainda não está vinculado a um evento do Holyrics. Use "Vincular evento do Holyrics" antes de sincronizar a playlist de mídias.',
+      })
+    }
+
     // Busca todas as mídias associadas ao evento, ordenadas por presentation_order asc, created asc
     let mediaRecords = []
     try {
@@ -233,7 +266,7 @@ routerAdd(
     cmdRec.set('created_at', nowIso)
 
     const payload = {
-      event_id: eventId,
+      event_id: holyricsEventId,
       church_id: churchId,
       event_title: eventRecord.getString('title'),
       items: items,

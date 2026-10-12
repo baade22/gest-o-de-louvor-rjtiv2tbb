@@ -87,8 +87,22 @@ export interface AgentCommand {
     | 'ADD_LYRICS_TO_PLAYLIST'
     | 'TRANSFER_MEDIA'
     | 'SYNC_MEDIA_PLAYLIST'
+    | 'GET_SCHEDULES'
   payload: Record<string, any>
   created_at: string
+}
+
+/**
+ * Item retornado pela ação GetSchedules do Holyrics (agendas/eventos).
+ * Formato de resposta ainda não observado em campo: extração tolerante.
+ */
+export interface HolyricsScheduleItem {
+  id: string
+  type?: 'event' | 'service'
+  datetime_millis?: number
+  name?: string
+  metadata?: { event?: { id?: string } }
+  [key: string]: any
 }
 
 export interface HolyricsSlideInput {

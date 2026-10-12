@@ -167,6 +167,30 @@ export interface EventItem {
   updated: string
 }
 
+export type HolyricsEventLinkStatus =
+  | 'LINKED'
+  | 'EVENT_NOT_FOUND'
+  | 'AMBIGUOUS_MATCH'
+  | 'SYNC_PENDING'
+  | 'INVALID_EVENT_DATE'
+  | 'GET_SCHEDULES_FAILED'
+
+export interface ResolveHolyricsEventResponse {
+  success: boolean
+  status: HolyricsEventLinkStatus | string
+  linked: boolean
+  holyrics_event_id: string
+  event_id?: string
+  matched_count?: number
+  candidates_found?: number
+  candidate_ids?: string[]
+  schedule_name?: string
+  error_code?: string
+  agent_online?: boolean
+  holyrics_detected?: boolean
+  message: string
+}
+
 export type TeamArea = 'LOUVOR' | 'SOM' | 'PROJECAO' | 'MIDIA' | 'ILUMINACAO'
 
 export type TaskStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA'

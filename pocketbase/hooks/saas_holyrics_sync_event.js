@@ -98,6 +98,42 @@ routerAdd(
       })
     }
 
+    // 2.1 VERIFICAÇÃO DO VÍNCULO DO CULTO COM O HOLYRICS (Etapa 3A da auditoria)
+    // O payload do AddLyricsToPlaylist enviado ao Holyrics Local API DEVE conter o event_id
+    // REAL do Holyrics (holyrics_event_id), nunca o ID interno do PocketBase.
+    // Sem vínculo persistido, o fluxo é interrompido com HOLYRICS_EVENT_NOT_LINKED —
+    // NUNCA usar o ID do SaaS como event_id do Holyrics e NUNCA criar eventos no Holyrics.
+    const holyricsEventId = eventRecord.getString('holyrics_event_id') || ''
+    if (!holyricsEventId) {
+      try {
+        const syncLogsColEarly = $app.findCollectionByNameOrId('holyrics_sync_logs')
+        const logRecEarly = new Record(syncLogsColEarly)
+        logRecEarly.set('church_id', churchId)
+        logRecEarly.set('agent_id', '')
+        logRecEarly.set('event_id', eventId)
+        logRecEarly.set('action', 'RESOLVE_EVENT_LINK')
+        logRecEarly.set('status', 'ERROR')
+        logRecEarly.set(
+          'error',
+          'Culto não vinculado a um evento do Holyrics (holyrics_event_id vazio). Use a vinculação de eventos antes de sincronizar o repertório.',
+        )
+        logRecEarly.set('created_at', new Date().toISOString().replace('T', ' ').substring(0, 19))
+        logRecEarly.set('stage', 'HOLYRICS_EVENT_NOT_LINKED')
+        logRecEarly.set('details', { event_id: eventId })
+        $app.save(logRecEarly)
+      } catch (logErr) {
+        console.log('[HOLYRICS_SYNC_LOG_ERR]', logErr.message)
+      }
+
+      return e.json(200, {
+        success: false,
+        error_code: 'HOLYRICS_EVENT_NOT_LINKED',
+        holyrics_event_id: '',
+        message:
+          'Este culto ainda não está vinculado a um evento do Holyrics. Use "Vincular evento do Holyrics" antes de sincronizar o repertório.',
+      })
+    }
+
     // 3. Validação do Agent do Holyrics
     const nowTime = new Date().getTime()
     if (!agentId) {
@@ -1287,13 +1323,15 @@ routerAdd(
           $app.save(eventSongRec)
         } catch (_) {}
 
-        // Payload mínimo para evitar inconsistências no API Server do Holyrics
+        // Payload mínimo para o Holyrics: event_id DEVE ser o ID REAL do evento no Holyrics
+        // (persistido em events.holyrics_event_id pela vinculação), NUNCA o ID interno do SaaS.
+        // Os demais campos (song_id/event_id SaaS) são metadados internos de rastreio do SaaS.
         const addPayload = {
           id: holyricsSongId,
           index: playlistIndexBase0,
           media_playlist: false,
           song_id: songId,
-          event_id: eventId,
+          event_id: holyricsEventId,
         }
 
         const addRes = runCommandSync('ADD_LYRICS_TO_PLAYLIST', addPayload, 10000)

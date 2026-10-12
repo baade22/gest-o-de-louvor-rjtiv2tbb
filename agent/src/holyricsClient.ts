@@ -589,6 +589,86 @@ export class HolyricsClient {
   }
 
   /**
+   * GetSchedules: Obtém as agendas/eventos cadastrados no Holyrics
+   * POST /api/GetSchedules?token=...
+   * Payload ESTRITAMENTE mínimo: { month, year } — Holyrics 2.30.0 rejeita campos extras.
+   * Extração tolerante da lista: res.data array | res.data.items | res.data.schedules.
+   */
+  public async getSchedules(
+    month: number,
+    year: number,
+  ): Promise<{
+    success: boolean
+    schedules: import('./types.js').HolyricsScheduleItem[]
+    data?: any
+    error?: string
+    error_code?: string
+    durationMs?: number
+    httpStatus?: number
+    payloadSent?: Record<string, any>
+  }> {
+    // Payload mínimo estrito: nada além de month/year (regra do Holyrics 2.30.0)
+    const payload: Record<string, any> = { month: Number(month), year: Number(year) }
+
+    const res = await this.request<import('./types.js').HolyricsScheduleItem[]>(
+      'GetSchedules',
+      payload,
+      5000,
+    )
+
+    if (res.status === 'ok') {
+      let list: import('./types.js').HolyricsScheduleItem[] = []
+      if (Array.isArray(res.data)) {
+        list = res.data
+      } else if (res.data && Array.isArray((res.data as any).items)) {
+        list = (res.data as any).items
+      } else if (res.data && Array.isArray((res.data as any).schedules)) {
+        list = (res.data as any).schedules
+      } else if (res.data && Array.isArray((res.data as any).data)) {
+        list = (res.data as any).data
+      }
+      return {
+        success: true,
+        schedules: list,
+        data: res.data,
+        durationMs: res.durationMs,
+        httpStatus: res.httpStatus,
+        payloadSent: payload,
+      }
+    }
+
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Erro ao consultar GetSchedules no Holyrics'
+
+    const isAuthSchedules =
+      res.httpStatus === 401 ||
+      res.httpStatus === 403 ||
+      errStr.toLowerCase().includes('token') ||
+      errStr.toLowerCase().includes('permiss') ||
+      errStr.toLowerCase().includes('unauthorized') ||
+      errStr.toLowerCase().includes('forbidden')
+
+    return {
+      success: false,
+      schedules: [],
+      error: errStr,
+      error_code:
+        errStr === 'TIMEOUT_HOLYRICS'
+          ? 'TIMEOUT_HOLYRICS'
+          : errStr.includes('CONNECTION_REFUSED')
+            ? 'CONNECTION_REFUSED'
+            : isAuthSchedules
+              ? 'AUTH_FORBIDDEN'
+              : 'GET_SCHEDULES_FAILED',
+      durationMs: res.durationMs,
+      httpStatus: res.httpStatus,
+      payloadSent: payload,
+    }
+  }
+
+  /**
    * GetSongPlaylist: Obtém os itens da playlist de músicas do Holyrics
    * POST /api/GetSongPlaylist?token=...
    * Fallback para GetLyricsPlaylist / GetPlaylist para compatibilidade com versões antigas.

@@ -189,6 +189,51 @@ export async function getHolyricsCommandStatus(
  * 3. Consulta GetLyricsPlaylist para evitar duplicação (idempotência)
  * 4. Adiciona à playlist (AddLyricsToPlaylist)
  */
+export type HolyricsEventLinkStatus =
+  | 'LINKED'
+  | 'EVENT_NOT_FOUND'
+  | 'AMBIGUOUS_MATCH'
+  | 'SYNC_PENDING'
+  | 'INVALID_EVENT_DATE'
+  | 'GET_SCHEDULES_FAILED'
+
+export interface ResolveHolyricsEventResponse {
+  success: boolean
+  status: HolyricsEventLinkStatus | string
+  linked: boolean
+  holyrics_event_id: string
+  event_id?: string
+  matched_count?: number
+  candidates_found?: number
+  candidate_ids?: string[]
+  schedule_name?: string
+  error_code?: string
+  agent_online?: boolean
+  holyrics_detected?: boolean
+  message: string
+}
+
+/**
+ * Etapa 3A: vincula o culto do SaaS a um evento JÁ EXISTENTE no Holyrics.
+ * O backend enfileira GET_SCHEDULES ({month, year} estritos) no Agent local,
+ * casa a data/hora do culto com eventos (type='event') do Holyrics e persiste
+ * events.holyrics_event_id quando há exatamente 1 candidato. Nunca cria eventos.
+ */
+export async function resolveHolyricsEvent(params: {
+  churchId: string
+  eventId: string
+  agentId?: string
+}): Promise<ResolveHolyricsEventResponse> {
+  return pb.send<ResolveHolyricsEventResponse>('/backend/v1/saas/holyrics/resolve-event', {
+    method: 'POST',
+    body: {
+      church_id: params.churchId,
+      event_id: params.eventId,
+      agent_id: params.agentId,
+    },
+  })
+}
+
 export async function syncEventRepertoireWithHolyrics(params: {
   churchId: string
   eventId: string

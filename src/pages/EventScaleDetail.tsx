@@ -48,9 +48,12 @@ import {
   Send,
   ChevronUp,
   ChevronDown,
+  Link2,
 } from 'lucide-react'
 import {
   syncEventRepertoireWithHolyrics,
+  resolveHolyricsEvent,
+  type ResolveHolyricsEventResponse,
   type SyncEventSongItemResult,
   type SyncEventRepertoireSummary,
 } from '@/services/holyricsAgent'
@@ -180,6 +183,10 @@ export default function EventScaleDetail() {
 
   // Estado da Sincronização de Repertório com o Holyrics
   const [isSyncingRepertoire, setIsSyncingRepertoire] = useState(false)
+  const [isResolvingEventLink, setIsResolvingEventLink] = useState(false)
+  const [eventLinkStatus, setEventLinkStatus] = useState<
+    ResolveHolyricsEventResponse | null | undefined
+  >(undefined)
   const [syncReportModalOpen, setSyncReportModalOpen] = useState(false)
   const [syncReportItems, setSyncReportItems] = useState<SyncEventSongItemResult[]>([])
   const [syncReportSummary, setSyncReportSummary] = useState<SyncEventRepertoireSummary | null>(
@@ -285,6 +292,50 @@ export default function EventScaleDetail() {
   useEffect(() => {
     fetchFullEventData()
   }, [id, currentChurch])
+
+  // ETAPA 3A: VINCULAÇÃO DO CULTO A UM EVENTO EXISTENTE NO HOLYRICS (GetSchedules)
+  const handleResolveEventLink = async () => {
+    if (!event || !currentChurch || isResolvingEventLink) return
+    setIsResolvingEventLink(true)
+    try {
+      const res = await resolveHolyricsEvent({
+        churchId: currentChurch.id,
+        eventId: event.id,
+      })
+      setEventLinkStatus(res)
+      if (res.linked) {
+        toast({
+          title: 'Culto vinculado ao Holyrics',
+          description: res.message,
+        })
+      } else {
+        toast({
+          title:
+            res.status === 'EVENT_NOT_FOUND'
+              ? 'Evento não encontrado'
+              : res.status === 'AMBIGUOUS_MATCH'
+                ? 'Associação ambígua'
+                : 'Vinculação pendente',
+          description: res.message,
+          variant:
+            res.status === 'SYNC_PENDING' || res.status === 'EVENT_NOT_FOUND'
+              ? 'destructive'
+              : 'default',
+        })
+      }
+      await fetchFullEventData()
+    } catch (err: any) {
+      console.error('Erro ao vincular evento do Holyrics:', err)
+      setEventLinkStatus(null)
+      toast({
+        title: 'Erro ao vincular evento',
+        description: err?.message || 'Não foi possível consultar as agendas do Holyrics.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsResolvingEventLink(false)
+    }
+  }
 
   // SINCRONIZAÇÃO DO REPERTÓRIO COM O HOLYRICS
   const handleSyncRepertoireWithHolyrics = async () => {
@@ -824,6 +875,73 @@ export default function EventScaleDetail() {
     })
   }
 
+  // ---- ETAPA 3A: indicador de associação do culto ao Holyrics (apenas evidência real) ----
+  // Estados derivados de: holyrics_event_id persistido + resultado da última tentativa de vinculação.
+  // Nada aqui é simulado: enquanto não há evidência (campo vazio e nenhuma verificação feita),
+  // o estado é "Aguardando vinculação" sem alegar sucesso ou falha.
+  const isEventLinked = Boolean(event.holyrics_event_id)
+  let eventLinkBadge: {
+    label: string
+    title: string
+    className: string
+    showVerifyButton: boolean
+  } = {
+    label: 'Aguardando vinculação',
+    title:
+      'Este culto ainda não foi vinculado a um evento do Holyrics. Clique em "Vincular evento" para localizar o evento na agenda do Holyrics (nada é criado lá).',
+    className: 'text-[11px] bg-amber-50 text-amber-700 border-amber-200',
+    showVerifyButton: true,
+  }
+
+  if (isEventLinked) {
+    eventLinkBadge = {
+      label: 'Vinculado ao Holyrics',
+      title: `Evento do Holyrics #${event.holyrics_event_id} associado a este culto (vínculo persistido).`,
+      className: 'text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200',
+      showVerifyButton: false,
+    }
+  } else if (eventLinkStatus) {
+    if (eventLinkStatus.status === 'EVENT_NOT_FOUND') {
+      eventLinkBadge = {
+        label: 'Evento não encontrado',
+        title: eventLinkStatus.message,
+        className: 'text-[11px] bg-red-50 text-red-700 border-red-200',
+        showVerifyButton: true,
+      }
+    } else if (eventLinkStatus.status === 'AMBIGUOUS_MATCH') {
+      eventLinkBadge = {
+        label: 'Associação ambígua',
+        title: eventLinkStatus.message,
+        className: 'text-[11px] bg-red-50 text-red-700 border-red-200',
+        showVerifyButton: true,
+      }
+    } else if (
+      eventLinkStatus.status === 'GET_SCHEDULES_FAILED' ||
+      eventLinkStatus.status === 'INVALID_EVENT_DATE'
+    ) {
+      eventLinkBadge = {
+        label: 'Falha na sincronização',
+        title: eventLinkStatus.message,
+        className: 'text-[11px] bg-red-50 text-red-700 border-red-200',
+        showVerifyButton: true,
+      }
+    } else if (eventLinkStatus.status === 'SYNC_PENDING') {
+      eventLinkBadge = {
+        label: 'Sincronização pendente',
+        title: eventLinkStatus.message,
+        className: 'text-[11px] bg-purple-50 text-purple-700 border-purple-200',
+        showVerifyButton: true,
+      }
+    } else if (eventLinkStatus.linked) {
+      eventLinkBadge = {
+        label: 'Sincronização confirmada',
+        title: eventLinkStatus.message,
+        className: 'text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200',
+        showVerifyButton: false,
+      }
+    }
+  }
+
   return (
     <div className="space-y-6 pb-16">
       {/* Header Topo */}
@@ -867,6 +985,51 @@ export default function EventScaleDetail() {
               >
                 Holyrics ID: {event.holyrics_event_id}
               </Badge>
+            )}
+            {/* ETAPA 3A: Indicador compacto de associação do culto ao Holyrics (estados por evidência) */}
+            {canSyncHolyrics ? (
+              <Badge
+                variant="outline"
+                className={`gap-1 font-semibold cursor-default ${eventLinkBadge.className}`}
+                title={eventLinkBadge.title}
+              >
+                {eventLinkBadge.label === 'Vinculado ao Holyrics' ? (
+                  <Link2 className="h-3 w-3" />
+                ) : eventLinkBadge.label.startsWith('Aguardando') ? (
+                  <Link2 className="h-3 w-3 opacity-60" />
+                ) : eventLinkBadge.label === 'Sincronização pendente' ? (
+                  <Clock className="h-3 w-3" />
+                ) : (
+                  <AlertCircle className="h-3 w-3" />
+                )}
+                {eventLinkBadge.label}
+              </Badge>
+            ) : isEventLinked ? (
+              <Badge
+                variant="outline"
+                className={`gap-1 font-semibold cursor-default ${eventLinkBadge.className}`}
+                title={eventLinkBadge.title}
+              >
+                <Link2 className="h-3 w-3" />
+                {eventLinkBadge.label}
+              </Badge>
+            ) : null}
+            {canSyncHolyrics && eventLinkBadge.showVerifyButton && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isResolvingEventLink}
+                onClick={handleResolveEventLink}
+                className="h-6 rounded-full border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800 text-[10px] font-bold px-2.5 gap-1"
+                title="Consulta as agendas (GetSchedules) do Holyrics e associa o evento existente a este culto. Nada é criado no Holyrics."
+              >
+                {isResolvingEventLink ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Link2 className="h-3 w-3" />
+                )}
+                {isResolvingEventLink ? 'Buscando...' : 'Vincular evento'}
+              </Button>
             )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
