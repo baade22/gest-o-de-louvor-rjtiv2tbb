@@ -895,8 +895,10 @@ export class HolyricsClient {
   /**
    * GetFile: Consulta se um arquivo específico foi detectado/indexado pelo Holyrics
    * POST /api/GetFile?token=...
-   * Body: { type: "video" | "image" | "audio" | "file", name: "nome_do_arquivo.ext", folder?: "subpasta" }
-   * Conforme documentação oficial do Holyrics API Server.
+   * Documentação oficial Holyrics API Server:
+   * Body mínimo: { name: fileName } (na aba respectiva)
+   * Algumas versões aceitam { type, name, folder?: "subpasta" }.
+   * Retorna { detected, fileInfo, error, httpStatus, rawResponse }.
    */
   public async getFile(
     type: 'video' | 'image' | 'audio' | 'file',
@@ -907,59 +909,215 @@ export class HolyricsClient {
     fileInfo?: any
     error?: string
     httpStatus?: number
+    rawResponse?: string
+    payloadSent?: Record<string, any>
   }> {
-    const payload: Record<string, any> = {
-      type,
-      name: fileName,
-    }
-    if (folder) payload.folder = folder
+    // 1. Tenta payload oficial mínimo { name: fileName }
+    // A documentação oficial do Holyrics (GetFile v2.24.0+) especifica name como parâmetro primário.
+    const minimalPayload: Record<string, any> = { name: fileName }
+    if (folder) minimalPayload.folder = folder
 
-    const res = await this.request('GetFile', payload, 3000)
-    if (res.status === 'ok') {
+    const resMin = await this.request('GetFile', minimalPayload, 3000)
+    if (resMin.status === 'ok' && resMin.data) {
       return {
         detected: true,
-        fileInfo: res.data,
-        httpStatus: res.httpStatus,
+        fileInfo: resMin.data,
+        httpStatus: resMin.httpStatus,
+        rawResponse: resMin.rawText,
+        payloadSent: minimalPayload,
       }
     }
 
+    const errMin =
+      typeof resMin.error === 'string'
+        ? resMin.error
+        : resMin.error?.message || 'Arquivo não indexado ou não encontrado.'
+
+    // Se a falha for de conexão/timeout/auth, não adianta tentar outro formato
+    if (
+      errMin === 'TIMEOUT_HOLYRICS' ||
+      errMin.includes('CONNECTION_REFUSED') ||
+      resMin.httpStatus === 401 ||
+      resMin.httpStatus === 403
+    ) {
+      return {
+        detected: false,
+        error: errMin,
+        httpStatus: resMin.httpStatus,
+        rawResponse: resMin.rawText,
+        payloadSent: minimalPayload,
+      }
+    }
+
+    // 2. Fallback: payload com type explícito { type, name }
+    const typedPayload: Record<string, any> = { type, name: fileName }
+    if (folder) typedPayload.folder = folder
+
+    const resTyped = await this.request('GetFile', typedPayload, 3000)
+    if (resTyped.status === 'ok' && resTyped.data) {
+      return {
+        detected: true,
+        fileInfo: resTyped.data,
+        httpStatus: resTyped.httpStatus,
+        rawResponse: resTyped.rawText,
+        payloadSent: typedPayload,
+      }
+    }
+
+    const errTyped =
+      typeof resTyped.error === 'string' ? resTyped.error : resTyped.error?.message || errMin
+
     return {
       detected: false,
-      error: typeof res.error === 'string' ? res.error : res.error?.message,
-      httpStatus: res.httpStatus,
+      error: errTyped,
+      httpStatus: resTyped.httpStatus || resMin.httpStatus,
+      rawResponse: resTyped.rawText || resMin.rawText,
+      payloadSent: typedPayload,
     }
   }
 
   /**
    * GetFiles: Lista arquivos conhecidos de uma aba do Holyrics
    * POST /api/GetFiles?token=...
-   * Body: { type: "video" | "image" | "audio" | "file", folder?: string }
+   * Documentação oficial Holyrics API Server:
+   * Suporta filtro por nome: { filter: "...", folder?: string } ou { type, filter }
    */
   public async getFiles(
     type: 'video' | 'image' | 'audio' | 'file',
-    folder?: string,
+    options?: { folder?: string; filter?: string },
   ): Promise<{
     success: boolean
     files: any[]
     error?: string
+    httpStatus?: number
+    rawResponse?: string
   }> {
-    const payload: Record<string, any> = { type }
-    if (folder) payload.folder = folder
+    // Tenta primeiro com payload mínimo/filtrado
+    const payload: Record<string, any> = {}
+    if (options?.filter) payload.filter = options.filter
+    if (options?.folder) payload.folder = options.folder
 
-    const res = await this.request('GetFiles', payload, 3000)
+    let res = await this.request('GetFiles', payload, 3000)
+    // Se não encontrou ou deu erro de tipo, tenta adicionando type
+    if (res.status !== 'ok') {
+      const typedPayload: Record<string, any> = { type, ...payload }
+      const resTyped = await this.request('GetFiles', typedPayload, 3000)
+      if (resTyped.status === 'ok') {
+        res = resTyped
+      }
+    }
+
     if (res.status === 'ok') {
       const list = Array.isArray(res.data)
         ? res.data
         : res.data && Array.isArray((res.data as any).files)
           ? (res.data as any).files
           : []
-      return { success: true, files: list }
+      return {
+        success: true,
+        files: list,
+        httpStatus: res.httpStatus,
+        rawResponse: res.rawText,
+      }
     }
 
     return {
       success: false,
       files: [],
       error: typeof res.error === 'string' ? res.error : res.error?.message,
+      httpStatus: res.httpStatus,
+      rawResponse: res.rawText,
+    }
+  }
+
+  /**
+   * verifyMediaRecognition: Método resiliente que combina GetFile (payload mínimo e tipado)
+   * e GetFiles (busca por lista/filtro na biblioteca) para determinar se o arquivo
+   * físico é reconhecido pela API do Holyrics.
+   */
+  public async verifyMediaRecognition(
+    type: 'video' | 'image' | 'audio' | 'file',
+    fileName: string,
+    folder?: string,
+  ): Promise<{
+    recognized: boolean
+    methodUsed: 'GetFile' | 'GetFiles' | 'none'
+    fileInfo?: any
+    error?: string
+    httpStatus?: number
+    rawResponse?: string
+  }> {
+    const cleanName = fileName.trim()
+
+    // 1. Consulta GetFile
+    const getFileRes = await this.getFile(type, cleanName, folder)
+    if (getFileRes.detected) {
+      return {
+        recognized: true,
+        methodUsed: 'GetFile',
+        fileInfo: getFileRes.fileInfo,
+        httpStatus: getFileRes.httpStatus,
+        rawResponse: getFileRes.rawResponse,
+      }
+    }
+
+    // Se houve erro de rede/timeout/conexão recusada, não tenta GetFiles
+    const fatalErr = (getFileRes.error || '').toUpperCase()
+    if (
+      fatalErr.includes('TIMEOUT_HOLYRICS') ||
+      fatalErr.includes('CONNECTION_REFUSED') ||
+      getFileRes.httpStatus === 401 ||
+      getFileRes.httpStatus === 403
+    ) {
+      return {
+        recognized: false,
+        methodUsed: 'GetFile',
+        error: getFileRes.error,
+        httpStatus: getFileRes.httpStatus,
+        rawResponse: getFileRes.rawResponse,
+      }
+    }
+
+    // 2. Consulta complementar via GetFiles (lista da biblioteca com filtro pelo nome exato)
+    try {
+      const getFilesRes = await this.getFiles(type, {
+        folder,
+        filter: cleanName,
+      })
+
+      if (getFilesRes.success && Array.isArray(getFilesRes.files)) {
+        const lowerName = cleanName.toLowerCase()
+        const match = getFilesRes.files.find((f: any) => {
+          const itemText = String(f.name || f.file || f.title || '')
+            .trim()
+            .toLowerCase()
+          return (
+            itemText === lowerName ||
+            itemText.endsWith('/' + lowerName) ||
+            itemText.endsWith('\\' + lowerName)
+          )
+        })
+
+        if (match) {
+          return {
+            recognized: true,
+            methodUsed: 'GetFiles',
+            fileInfo: match,
+            httpStatus: getFilesRes.httpStatus,
+            rawResponse: getFilesRes.rawResponse,
+          }
+        }
+      }
+    } catch (_) {
+      // Se GetFiles falhar, mantém a resposta detalhada de GetFile
+    }
+
+    return {
+      recognized: false,
+      methodUsed: 'none',
+      error: getFileRes.error || 'File not found',
+      httpStatus: getFileRes.httpStatus,
+      rawResponse: getFileRes.rawResponse,
     }
   }
 }

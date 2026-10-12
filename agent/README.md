@@ -1,4 +1,4 @@
-# LouvorFlow Agent v0.0.36 — Holyrics Bridge
+# LouvorFlow Agent v0.0.37 — Holyrics Bridge
 
 O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no computador da igreja onde o Holyrics está instalado. Ele faz a ponte segura entre o **LouvorFlow SaaS** e a **Holyrics API Server Local** (`http://127.0.0.1:8091`).
 
@@ -103,9 +103,9 @@ O painel local (`http://localhost:8765`) possui uma ferramenta dedicada para tes
 
 ---
 
-## 🎛️ Comandos, Transferência de Mídias e Playlist (v0.0.36)
+## 🎛️ Comandos, Transferência de Mídias e Playlist (v0.0.37)
 
-Na versão 0.0.36, o Agent suporta comandos de repertório, transferência atômica de mídias e sincronização de playlist de mídias via polling com idempotência e robustez contra duplicação:
+Na versão 0.0.37, o Agent suporta comandos de repertório, transferência atômica de mídias e sincronização de playlist de mídias via polling com idempotência, robustez contra duplicação e reconhecimento resiliente de mídias (GetFile com payload mínimo e fallback GetFiles com retries espaçados):
 
 1. **`TRANSFER_MEDIA`**: Download seguro e gravação atômica na biblioteca do Holyrics (`files/media/image`, `video`, `audio`, `automaticPresentations`), com validação de magic bytes, anti-sobrescrita e verificação via `GetFile`.
 

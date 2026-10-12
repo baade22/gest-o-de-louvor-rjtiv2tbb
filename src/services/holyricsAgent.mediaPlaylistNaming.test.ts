@@ -821,6 +821,248 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     expect(fs.existsSync(destPath)).toBe(true)
   })
 
+  // 21b. Suíte completa de cenários de reconhecimento de mídias (Holyrics 2.30.0 v0.0.37)
+  describe('21b. Cenários de Reconhecimento de Mídia (Holyrics 2.30.0 / Agent 0.0.37)', () => {
+    it('Cenário 1: Mídia reconhecida imediatamente via GetFile (payload mínimo)', async () => {
+      const client = new HolyricsClient(
+        agentConfig.holyricsHost,
+        agentConfig.holyricsPort,
+        agentConfig.holyricsToken,
+      )
+
+      const requestSpy = vi.spyOn(client as any, 'request').mockResolvedValue({
+        status: 'ok',
+        httpStatus: 200,
+        data: { name: 'teste - Eventos - 12-10 - Teste.mp3', size: 5392941 },
+      })
+
+      const res = await client.verifyMediaRecognition(
+        'audio',
+        'teste - Eventos - 12-10 - Teste.mp3',
+      )
+
+      expect(res.recognized).toBe(true)
+      expect(res.methodUsed).toBe('GetFile')
+      expect(res.fileInfo?.size).toBe(5392941)
+      expect(requestSpy).toHaveBeenCalledWith(
+        'GetFile',
+        { name: 'teste - Eventos - 12-10 - Teste.mp3' },
+        3000,
+      )
+    })
+
+    it('Cenário 2: Mídia reconhecida após retries (1ª tentativa falha, 2ª tentativa reconhece)', async () => {
+      const agent = new LouvorFlowAgent(agentConfig)
+      vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+      vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({
+        success: true,
+        items: [],
+      })
+      const addMediaSpy = vi
+        .spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+        .mockResolvedValue({
+          success: true,
+        })
+
+      const fileName = 'teste - Eventos - 12-10 - Teste.mp3'
+      fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'audio', fileName), 'audio_bytes')
+
+      let callCount = 0
+      vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockImplementation(async () => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            recognized: false,
+            methodUsed: 'none',
+            error: 'File not found',
+            httpStatus: 200,
+          }
+        }
+        return {
+          recognized: true,
+          methodUsed: 'GetFile',
+          fileInfo: { name: fileName },
+          httpStatus: 200,
+        }
+      })
+
+      const cmd: AgentCommand = {
+        id: 'cmd_retry_success',
+        command_id: 'cmd_retry_success',
+        action: 'SYNC_MEDIA_PLAYLIST',
+        payload: {
+          event_id: 'evt_1',
+          items: [{ holyrics_filename: fileName, media_type: 'AUDIO', presentation_order: 1 }],
+        },
+        created_at: new Date().toISOString(),
+      }
+
+      const res = await agent.handleSyncMediaPlaylist(cmd)
+      expect(callCount).toBe(2)
+      expect(res.success).toBe(true)
+      expect(res.result?.synced_count).toBe(1)
+      expect(res.result?.not_recognized_count).toBe(0)
+      expect(addMediaSpy).toHaveBeenCalledWith({
+        items: [{ type: 'audio', name: fileName }],
+        ignoreDuplicates: true,
+      })
+    })
+
+    it('Cenário 3: Mídia visível na biblioteca mas GetFile responde erro -> reconhecida via fallback GetFiles', async () => {
+      const client = new HolyricsClient(
+        agentConfig.holyricsHost,
+        agentConfig.holyricsPort,
+        agentConfig.holyricsToken,
+      )
+
+      const fileName = 'teste - Eventos - 12-10 - Teste.mp3'
+
+      // Simula GetFile retornando {"status":"error","error":"File not found"}
+      // e GetFiles retornando a lista com o arquivo visível na biblioteca
+      vi.spyOn(client as any, 'request').mockImplementation(async (action: string) => {
+        if (action === 'GetFile') {
+          return {
+            status: 'error',
+            error: 'File not found',
+            httpStatus: 200,
+            rawText: '{"status":"error","error":"File not found"}',
+          }
+        }
+        if (action === 'GetFiles') {
+          return {
+            status: 'ok',
+            httpStatus: 200,
+            data: [{ name: 'outro_arquivo.mp3' }, { name: 'teste - Eventos - 12-10 - Teste.mp3' }],
+          }
+        }
+        return { status: 'error', error: 'Unknown action' }
+      })
+
+      const res = await client.verifyMediaRecognition('audio', fileName)
+      expect(res.recognized).toBe(true)
+      expect(res.methodUsed).toBe('GetFiles')
+      expect(res.fileInfo?.name).toBe(fileName)
+    })
+
+    it('Cenário 4: HTTP 200 com "File not found" tanto em GetFile quanto em GetFiles -> não reconhece', async () => {
+      const client = new HolyricsClient(
+        agentConfig.holyricsHost,
+        agentConfig.holyricsPort,
+        agentConfig.holyricsToken,
+      )
+
+      vi.spyOn(client as any, 'request').mockResolvedValue({
+        status: 'error',
+        error: 'File not found',
+        httpStatus: 200,
+        rawText: '{"status":"error","error":"File not found"}',
+      })
+
+      const res = await client.verifyMediaRecognition('audio', 'inexistente.mp3')
+      expect(res.recognized).toBe(false)
+      expect(res.methodUsed).toBe('none')
+      expect(res.error).toBe('File not found')
+      expect(res.httpStatus).toBe(200)
+    })
+
+    it('Cenário 5: Erro de comunicação com a API (CONNECTION_REFUSED / TIMEOUT)', async () => {
+      const client = new HolyricsClient(
+        agentConfig.holyricsHost,
+        agentConfig.holyricsPort,
+        agentConfig.holyricsToken,
+      )
+
+      vi.spyOn(client as any, 'request').mockResolvedValue({
+        status: 'error',
+        error: 'CONNECTION_REFUSED: Conexao recusada pelo Holyrics em 127.0.0.1:8091',
+        httpStatus: 0,
+      })
+
+      const res = await client.verifyMediaRecognition('audio', 'teste.mp3')
+      expect(res.recognized).toBe(false)
+      expect(res.error).toContain('CONNECTION_REFUSED')
+    })
+
+    it('Cenário 6: Timeout e esgotamento de todas as tentativas -> estado explícito MEDIA_NOT_RECOGNIZED sem travar o Agent', async () => {
+      const agent = new LouvorFlowAgent(agentConfig)
+      vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+      vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({
+        success: true,
+        items: [],
+      })
+      const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+
+      const fileName = 'arquivo_timeout.mp3'
+      fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'audio', fileName), 'bytes')
+
+      let callCount = 0
+      vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockImplementation(async () => {
+        callCount++
+        return {
+          recognized: false,
+          methodUsed: 'none',
+          error: 'TIMEOUT_HOLYRICS',
+          httpStatus: 408,
+        }
+      })
+
+      const cmd: AgentCommand = {
+        id: 'cmd_timeout_exhaust',
+        command_id: 'cmd_timeout_exhaust',
+        action: 'SYNC_MEDIA_PLAYLIST',
+        payload: {
+          event_id: 'evt_1',
+          items: [{ holyrics_filename: fileName, media_type: 'AUDIO', presentation_order: 1 }],
+        },
+        created_at: new Date().toISOString(),
+      }
+
+      const res = await agent.handleSyncMediaPlaylist(cmd)
+      expect(callCount).toBe(3) // 3 tentativas executadas
+      expect(res.result?.not_recognized_count).toBe(1)
+      expect(res.result?.items[0].status).toBe('MEDIA_NOT_RECOGNIZED')
+      expect(res.result?.items[0].error_code).toBe('MEDIA_NOT_RECOGNIZED')
+      // SEGURANÇA CRÍTICA: addMediaToPlaylist NUNCA deve ter sido chamado!
+      expect(addMediaSpy).not.toHaveBeenCalled()
+    })
+
+    it('Cenário 7: Segurança absoluta: mídia não reconhecida NUNCA é enviada para AddToPlaylist', async () => {
+      const agent = new LouvorFlowAgent(agentConfig)
+      vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+      vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({
+        success: true,
+        items: [],
+      })
+      const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+
+      const fileName = 'nao_reconhecida_seguranca.mp4'
+      fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', fileName), 'bytes')
+
+      vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
+        recognized: false,
+        methodUsed: 'none',
+        error: 'File not found',
+        httpStatus: 200,
+      })
+
+      const cmd: AgentCommand = {
+        id: 'cmd_security_check',
+        command_id: 'cmd_security_check',
+        action: 'SYNC_MEDIA_PLAYLIST',
+        payload: {
+          event_id: 'evt_sec',
+          items: [{ holyrics_filename: fileName, media_type: 'VIDEO', presentation_order: 1 }],
+        },
+        created_at: new Date().toISOString(),
+      }
+
+      const res = await agent.handleSyncMediaPlaylist(cmd)
+      expect(res.result?.synced_count).toBe(0)
+      expect(res.result?.not_recognized_count).toBe(1)
+      expect(addMediaSpy).not.toHaveBeenCalled()
+    })
+  })
+
   // 22. Regressão da sincronização musical homologada
   it('22. Regressão: Sincronização musical de SearchSong e GetSongs permanece íntegra e com payload mínimo', async () => {
     const client = new HolyricsClient(

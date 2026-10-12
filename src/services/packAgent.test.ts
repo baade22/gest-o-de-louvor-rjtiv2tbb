@@ -16,7 +16,7 @@ describe('packAgent test verification', () => {
     expect(agentJs).toContain('CREATE_SONG')
     expect(agentJs).toContain('GET_LYRICS_PLAYLIST')
     expect(agentJs).toContain('ADD_LYRICS_TO_PLAYLIST')
-    expect(agentJs).toContain('0.0.36')
+    expect(agentJs).toContain('0.0.37')
 
     // Salva cópia em src/agentDistDump.json para vermos o conteúdo
     const dump: Record<string, string> = {}
@@ -29,8 +29,8 @@ describe('packAgent test verification', () => {
     )
   })
 
-  it('garante que o LouvorFlow-Agent-0.0.36.zip foi gerado corretamente em public/', () => {
-    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.36.zip')
+  it('garante que o LouvorFlow-Agent-0.0.37.zip foi gerado corretamente em public/', () => {
+    const zipPath = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.37.zip')
     expect(fs.existsSync(zipPath)).toBe(true)
     const stat = fs.statSync(zipPath)
     expect(stat.size).toBeGreaterThan(1000)

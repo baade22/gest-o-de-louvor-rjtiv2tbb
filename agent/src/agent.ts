@@ -110,7 +110,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.36',
+          version: '0.0.37',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -256,7 +256,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.36',
+          version: '0.0.37',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -783,21 +783,34 @@ export class LouvorFlowAgent {
         continue
       }
 
-      // Passo 3: Consultar Holyrics pelos métodos disponíveis e verificar se a mídia é reconhecida
-      let mediaRecognized = true
-      let getFileError = ''
-      let getFileHttpStatus: number | undefined = undefined
-      try {
-        const fileCheck = await this.holyrics.getFile(holyricsType, fileName)
-        getFileHttpStatus = fileCheck.httpStatus
-        if (!fileCheck.detected) {
-          mediaRecognized = false
-          getFileError = fileCheck.error || 'Arquivo não indexado ou não reconhecido pelo Holyrics.'
+      // Passo 3: Consultar Holyrics pelos métodos disponíveis (GetFile mínimo + tipado, GetFiles)
+      // com retries espaçados e limitados para permitir indexação assíncrona da biblioteca.
+      let mediaRecognized = false
+      let recognitionMethodUsed = 'none'
+      let lastRecognitionError = ''
+      let lastRecognitionHttpStatus: number | undefined = undefined
+      const maxRetries = 3
+      const retryDelayMs = 500
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const checkRes = await this.holyrics.verifyMediaRecognition(holyricsType, fileName)
+          lastRecognitionHttpStatus = checkRes.httpStatus
+          if (checkRes.recognized) {
+            mediaRecognized = true
+            recognitionMethodUsed = checkRes.methodUsed
+            break
+          }
+          lastRecognitionError =
+            checkRes.error || 'Arquivo não indexado ou não reconhecido pelo Holyrics.'
+        } catch (err: any) {
+          lastRecognitionError = err.message || 'Falha ao consultar reconhecimento no Holyrics.'
         }
-      } catch (err: any) {
-        // Se a chamada falhou ou endpoint não está acessível, registramos para auditoria
-        mediaRecognized = false
-        getFileError = err.message || 'Falha ao consultar GetFile no Holyrics.'
+
+        // Se ainda não reconhecido e restam tentativas, aguarda intervalo não-bloqueante
+        if (!mediaRecognized && attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+        }
       }
 
       if (!mediaRecognized) {
@@ -811,20 +824,21 @@ export class LouvorFlowAgent {
             media_type: holyricsType,
             file_name: fileName,
             api_method: 'GetFile',
-            http_status: getFileHttpStatus ?? null,
-            error_message: getFileError,
+            http_status: lastRecognitionHttpStatus ?? null,
+            error_message: lastRecognitionError,
             error_code: errorCode,
+            attempts: maxRetries,
           }),
         )
         detailedResults.push({
           id: item.id,
           name: fileName,
           status: 'MEDIA_NOT_RECOGNIZED',
-          error: `Mídia "${fileName}" existe em disco, mas ainda não foi reconhecida/indexada pelo Holyrics (${getFileError}). Ação recomendada: abra a aba correspondente no Holyrics ou aguarde a indexação.`,
+          error: `Mídia "${fileName}" existe em disco, mas ainda não foi reconhecida/indexada pelo Holyrics (${lastRecognitionError}). Ação recomendada: abra a aba correspondente no Holyrics ou aguarde a indexação.`,
           error_code: errorCode,
           stage: 'VERIFY_HOLYRICS_RECOGNITION',
           media_type: holyricsType,
-          http_status: getFileHttpStatus,
+          http_status: lastRecognitionHttpStatus,
         })
         continue
       }
@@ -1265,17 +1279,30 @@ export class LouvorFlowAgent {
       const finalStat = fs.statSync(finalTargetFilePath)
       const finalFileName = path.basename(finalTargetFilePath)
 
-      // 7. Confirmação no Holyrics via API local GetFile
+      // 7. Confirmação no Holyrics via API local (GetFile e GetFiles com retries espaçados e limitados)
       let holyricsDetected = false
       let holyricsFileInfo: any = null
-      try {
-        const checkRes = await this.holyrics.getFile(typeConfig.type, finalFileName)
-        if (checkRes.detected) {
-          holyricsDetected = true
-          holyricsFileInfo = checkRes.fileInfo
+      const maxTransferRetries = 3
+      const transferRetryDelayMs = 400
+
+      for (let attempt = 1; attempt <= maxTransferRetries; attempt++) {
+        try {
+          const checkRes = await this.holyrics.verifyMediaRecognition(
+            typeConfig.type,
+            finalFileName,
+          )
+          if (checkRes.recognized) {
+            holyricsDetected = true
+            holyricsFileInfo = checkRes.fileInfo
+            break
+          }
+        } catch (_) {
+          // Se API do Holyrics não responder ou der timeout, tenta próxima tentativa
         }
-      } catch (_) {
-        // Se API do Holyrics não responder ou der timeout, apenas mantém detected=false
+
+        if (!holyricsDetected && attempt < maxTransferRetries) {
+          await new Promise((resolve) => setTimeout(resolve, transferRetryDelayMs))
+        }
       }
 
       console.log(
