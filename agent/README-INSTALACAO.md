@@ -33,13 +33,11 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 1. Descompacte o arquivo `LouvorFlow-Agent-0.0.37.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
 2. Abra o terminal na pasta descompactada:
    - **No Windows:** Abra a pasta, segure `Shift`, clique com o botão direito do mouse em um espaço vazio e escolha **"Abrir na janela do PowerShell"** (ou **"Abrir no Terminal"**).
-3. Como os arquivos compilados já estão na pasta `dist/`, você pode iniciar diretamente com:
+3. Como os arquivos compilados já estão na pasta `dist/`, você pode iniciar com um duplo clique no script ou via terminal:
+   - **No Windows:** Dê um duplo clique no arquivo `start.bat` (ou execute `npm start` no PowerShell).
+   - **No Linux/macOS:** Execute `./start.sh` (ou execute `npm start` no terminal).
 
-   ```bash
-   npm start
-   ```
-
-   _(Caso queira compilar a partir do código-fonte TypeScript em `src/`, basta rodar `npm install`, depois `npm run build` e em seguida `npm start`)._
+   _(Caso queira recompilar a partir do código-fonte TypeScript em `src/`, basta rodar `npm install`, depois `npm run build` e em seguida `npm start`)._
 
 4. Ao iniciar, o terminal mostrará:
    ```text

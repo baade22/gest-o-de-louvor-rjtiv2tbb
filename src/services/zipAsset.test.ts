@@ -67,6 +67,8 @@ describe('LouvorFlow Agent ZIP Asset Verification', () => {
     expect(entries).toContain('dist/config.js')
     expect(entries).toContain('dist/holyricsClient.js')
     expect(entries).toContain('dist/server.js')
+    expect(entries).toContain('start.bat')
+    expect(entries).toContain('start.sh')
 
     // Valida que NÃO contém node_modules nem agent.config.json com tokens reais
     expect(entries.some((e) => e.includes('node_modules'))).toBe(false)

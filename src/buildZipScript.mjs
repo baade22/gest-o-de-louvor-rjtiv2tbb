@@ -145,7 +145,13 @@ function collectFiles(dir, baseDir = '') {
       if (item === 'node_modules' || item === '.git') continue
       results.push(...collectFiles(fullPath, relPath))
     } else {
-      if (item === 'agent.config.json' || item.endsWith('.log')) continue
+      if (
+        item === 'agent.config.json' ||
+        item.endsWith('.log') ||
+        item.startsWith('.env') ||
+        item.endsWith('.token')
+      )
+        continue
       results.push({
         path: relPath.replace(/\\/g, '/'),
         data: fs.readFileSync(fullPath),

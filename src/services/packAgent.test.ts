@@ -86,6 +86,8 @@ describe('packAgent test verification', () => {
     expect(entries).toContain('agent.config.example.json')
     expect(entries).toContain('README.md')
     expect(entries).toContain('README-INSTALACAO.md')
+    expect(entries).toContain('start.bat')
+    expect(entries).toContain('start.sh')
 
     // Garantir que NÃO há arquivos indesejados
     expect(entries.some((e) => e.includes('node_modules'))).toBe(false)
