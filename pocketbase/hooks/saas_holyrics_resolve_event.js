@@ -268,6 +268,29 @@ routerAdd(
       return out
     }
 
+    // Helper para desempacotar recursivamente strings JSON ou bytes Goja
+    const unwrapJsonPayload = (raw) => {
+      if (!raw) return raw
+      let current = raw
+      if (Array.isArray(current) && current.length > 0 && typeof current[0] === 'number') {
+        try {
+          current = JSON.parse(decodeUtf8Bytes(current))
+        } catch (_) {}
+      }
+      if (typeof current === 'string') {
+        const trimmed = current.trim()
+        if (
+          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))
+        ) {
+          try {
+            current = JSON.parse(trimmed)
+          } catch (_) {}
+        }
+      }
+      return current
+    }
+
     // Executa comando via fila existente (pollCommands -> executeCommand -> result)
     const runCommandSync = (action, payload, maxWaitMs) => {
       const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
@@ -337,51 +360,48 @@ routerAdd(
     }
 
     // Extração polimórfica da lista de schedules a partir do resultado do Agent
+    // Tolera objetos aninhados, strings JSON (compostas ou dentro de propriedades como result/data/response)
     const extractScheduleList = (rawResult) => {
       if (!rawResult) return []
-      let res = rawResult
+      let res = unwrapJsonPayload(rawResult)
 
-      if (Array.isArray(res) && res.length > 0 && typeof res[0] === 'number') {
-        try {
-          res = JSON.parse(decodeUtf8Bytes(res))
-        } catch (_) {}
-      }
-
-      if (typeof res === 'string') {
-        const trimmed = res.trim()
-        if (
-          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-          (trimmed.startsWith('[') && trimmed.endsWith(']'))
-        ) {
-          try {
-            res = JSON.parse(trimmed)
-          } catch (_) {}
+      // Se veio embrulhado em propriedade aninhada (ex: { result: "..." } ou { data: "..." })
+      if (res && typeof res === 'object' && !Array.isArray(res)) {
+        if (res.result) {
+          const unwrapped = unwrapJsonPayload(res.result)
+          if (Array.isArray(unwrapped)) return unwrapped
+          if (unwrapped && Array.isArray(unwrapped.schedules)) return unwrapped.schedules
+          if (unwrapped && Array.isArray(unwrapped.items)) return unwrapped.items
+        }
+        if (res.response) {
+          const unwrapped = unwrapJsonPayload(res.response)
+          if (Array.isArray(unwrapped)) return unwrapped
+          if (unwrapped && Array.isArray(unwrapped.schedules)) return unwrapped.schedules
+          if (unwrapped && Array.isArray(unwrapped.items)) return unwrapped.items
         }
       }
 
-      // Formato do Agent: { schedules: [...], count, month, year }
+      // Formato oficial do Agent: { schedules: [...], count, month, year }
       if (res && Array.isArray(res.schedules)) return res.schedules
       if (Array.isArray(res)) return res
-      if (res && res.data && Array.isArray(res.data)) return res.data
-      if (res && res.data && Array.isArray(res.data.items)) return res.data.items
-      if (res && res.data && Array.isArray(res.data.schedules)) return res.data.schedules
+      if (res && res.data) {
+        const unwrappedData = unwrapJsonPayload(res.data)
+        if (Array.isArray(unwrappedData)) return unwrappedData
+        if (unwrappedData && Array.isArray(unwrappedData.items)) return unwrappedData.items
+        if (unwrappedData && Array.isArray(unwrappedData.schedules)) return unwrappedData.schedules
+      }
       if (res && Array.isArray(res.items)) return res.items
       return []
     }
 
-    // Parse tolerante de datetime do schedule: epoch millis, string ISO ou "dd/MM/yyyy HH:mm"
+    // Parse de data civil (YYYY-MM-DD) e horário a partir de item de agendamento do Holyrics
+    // REGRA CRÍTICA: Prioridade 1 é o campo "datetime" (string com data local da igreja, ex: "2026-10-25 17:00").
+    // O parsing é estritamente civil por split / regex de componentes (sem new Date() que dependa do fuso do servidor).
+    // O campo "datetime_millis" (seja number ou string de epoch UTC) é usado apenas como fallback com guarda Number()/parseInt.
     const parseScheduleDate = (item) => {
-      if (!item) return null
-      // datetime_millis / timestamp em epoch millis (padrão do Holyrics para agendas)
-      const millisCandidates = [item.datetime_millis, item.datetimeMillis, item.timestamp]
-      for (let i = 0; i < millisCandidates.length; i++) {
-        const v = Number(millisCandidates[i])
-        if (Number.isFinite(v) && v > 0) {
-          // Se vier em segundos, converte para millis
-          const ms = v < 1e11 ? v * 1000 : v
-          return new Date(ms)
-        }
-      }
+      if (!item || typeof item !== 'object') return null
+
+      // Candidatos de string local da igreja (prioridade máxima)
       const strCandidates = [
         item.datetime,
         item.date,
@@ -389,41 +409,88 @@ routerAdd(
         item.start,
         item.start_time,
         item.time,
+        // Também busca se estiver aninhado em item.metadata.event.datetime
+        item.metadata && item.metadata.event ? item.metadata.event.datetime : null,
       ]
+
       for (let i = 0; i < strCandidates.length; i++) {
         const s = strCandidates[i]
         if (!s) continue
         const str = String(s).trim()
         if (!str) continue
-        // ISO (com ou sem Z) — tratado como horário local da igreja (sem conversão de fuso)
-        const isoLike = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/
-        if (isoLike.test(str)) {
-          const m = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-          if (m) {
-            // Constrói data na linha: os componentes são LIDOS como estão (hora local da igreja)
-            return {
-              y: Number(m[1]),
-              mo: Number(m[2]),
-              d: Number(m[3]),
-              h: Number(m[4]),
-              mi: Number(m[5]),
-            }
-          }
-        }
-        // dd/MM/yyyy HH:mm ou dd/MM/yyyy
-        const br = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/)
-        if (br) {
+
+        // Padrão ISO / Local: "YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DD"
+        const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?/)
+        if (isoMatch) {
           return {
-            y: Number(br[3]),
-            mo: Number(br[2]),
-            d: Number(br[1]),
-            h: br[4] !== undefined ? Number(br[4]) : -1,
-            mi: br[5] !== undefined ? Number(br[5]) : -1,
+            source: 'datetime_string',
+            raw: str,
+            ymd: isoMatch[1] + '-' + isoMatch[2] + '-' + isoMatch[3],
+            y: Number(isoMatch[1]),
+            mo: Number(isoMatch[2]),
+            d: Number(isoMatch[3]),
+            h: isoMatch[4] !== undefined ? Number(isoMatch[4]) : -1,
+            mi: isoMatch[5] !== undefined ? Number(isoMatch[5]) : -1,
           }
         }
-        const parsed = new Date(str)
-        if (!isNaN(parsed.getTime())) return parsed
+
+        // Padrão brasileiro: "DD/MM/YYYY HH:mm" ou "DD/MM/YYYY"
+        const brMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/)
+        if (brMatch) {
+          const dStr = String(brMatch[1]).padStart(2, '0')
+          const moStr = String(brMatch[2]).padStart(2, '0')
+          const yStr = brMatch[3]
+          return {
+            source: 'datetime_br',
+            raw: str,
+            ymd: yStr + '-' + moStr + '-' + dStr,
+            y: Number(yStr),
+            mo: Number(moStr),
+            d: Number(dStr),
+            h: brMatch[4] !== undefined ? Number(brMatch[4]) : -1,
+            mi: brMatch[5] !== undefined ? Number(brMatch[5]) : -1,
+          }
+        }
       }
+
+      // Fallback: datetime_millis como number ou string de epoch UTC (ex: "1792958400000")
+      const millisCandidates = [
+        item.datetime_millis,
+        item.datetimeMillis,
+        item.timestamp,
+        item.metadata && item.metadata.event ? item.metadata.event.datetime_millis : null,
+      ]
+      for (let i = 0; i < millisCandidates.length; i++) {
+        const rawM = millisCandidates[i]
+        if (rawM === undefined || rawM === null || rawM === '') continue
+        let v = typeof rawM === 'number' ? rawM : Number(String(rawM).trim())
+        if (Number.isFinite(v) && v > 0) {
+          const ms = v < 1e11 ? v * 1000 : v
+          // No Holyrics para o Brasil (UTC-3), datetime_millis representa o epoch UTC do momento local.
+          // Aplicamos o deslocamento padrão de -3h (10800000ms) para obter a data civil local da igreja,
+          // evitando que horários noturnos em UTC desloquem a data civil para o dia anterior/posterior.
+          const localEpoch = ms - 3 * 3600 * 1000
+          const dt = new Date(localEpoch)
+          const y = dt.getUTCFullYear()
+          const mo = dt.getUTCMonth() + 1
+          const d = dt.getUTCDate()
+          const h = dt.getUTCHours()
+          const mi = dt.getUTCMinutes()
+          const ymd =
+            String(y) + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+          return {
+            source: 'datetime_millis',
+            raw: String(rawM),
+            ymd: ymd,
+            y: y,
+            mo: mo,
+            d: d,
+            h: h,
+            mi: mi,
+          }
+        }
+      }
+
       return null
     }
 
@@ -439,38 +506,49 @@ routerAdd(
     const eventStartTime = eventRecord.getString('start_time') || ''
 
     // Componentes da data do culto (preservando o valor de calendário YYYY-MM-DD)
-    // O campo date do PocketBase sempre armazena "YYYY-MM-DD HH:mm:ss.SSSZ".
-    // Extraímos prioritariamente a data de calendário dos dígitos "YYYY-MM-DD",
-    // imune a qualquer interpretação de fuso.
+    // O campo date do PocketBase armazena "YYYY-MM-DD HH:mm:ss.SSSZ" ou "YYYY-MM-DD".
+    // Extraímos a data civil estritamente dos dígitos "YYYY-MM-DD", imune a fuso horário.
+    let targetYmd = ''
     let evParts = null
     const datePatternMatch = String(eventDateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
     if (datePatternMatch) {
+      targetYmd = datePatternMatch[1] + '-' + datePatternMatch[2] + '-' + datePatternMatch[3]
       evParts = {
         y: Number(datePatternMatch[1]),
         mo: Number(datePatternMatch[2]),
         d: Number(datePatternMatch[3]),
-        h: -1,
-        mi: -1,
+        ymd: targetYmd,
       }
     } else {
       try {
         const parsedDate = new Date(eventDateStr)
         if (!isNaN(parsedDate.getTime())) {
-          evParts = partsFromRecord(parsedDate)
+          const p = partsFromRecord(parsedDate)
+          targetYmd =
+            String(p.y) + '-' + String(p.mo).padStart(2, '0') + '-' + String(p.d).padStart(2, '0')
+          evParts = {
+            y: p.y,
+            mo: p.mo,
+            d: p.d,
+            ymd: targetYmd,
+          }
         }
       } catch (_) {}
     }
 
-    // Horário do culto vira do campo start_time ("HH:mm" ou "HH:mm:ss") quando presente
+    // REGRA DE HORÁRIO:
+    // O horário do culto só é considerado quando start_time estiver preenchido com "HH:mm".
+    // NUNCA derivar horário do campo date (meia-noite UTC não é horário de culto!).
+    // Se start_time estiver ausente/em branco, hasTargetTime = false e a comparação de horário é PULADA.
     let evHour = -1
     let evMinute = -1
-    const startTimeMatch = eventStartTime.match(/^(\d{1,2}):(\d{2})/)
+    let hasTargetTime = false
+    const trimmedStartTime = String(eventStartTime || '').trim()
+    const startTimeMatch = trimmedStartTime.match(/^(\d{1,2}):(\d{2})/)
     if (startTimeMatch) {
       evHour = Number(startTimeMatch[1])
       evMinute = Number(startTimeMatch[2])
-    } else if (evParts && evParts.h >= 0) {
-      evHour = evParts.h
-      evMinute = evParts.mi
+      hasTargetTime = true
     }
 
     if (!evParts) {
@@ -549,33 +627,6 @@ routerAdd(
       }
     }
 
-    // 8. Casamento por data COMPLETA (dia+mês+ano) e horário quando disponível
-    const matched = []
-    for (let i = 0; i < scheduleCandidates.length; i++) {
-      const item = scheduleCandidates[i]
-      const parsed = parseScheduleDate(item)
-      if (!parsed) continue
-
-      let parts = null
-      if (parsed instanceof Date) {
-        parts = partsFromRecord(parsed)
-      } else {
-        parts = parsed
-      }
-
-      if (parts.y !== evParts.y || parts.mo !== evParts.mo || parts.d !== evParts.d) {
-        continue
-      }
-
-      // Horário: só filtra quando AMBOS os lados informam horário
-      if (evHour >= 0 && parts.h >= 0) {
-        const diffMin = Math.abs(parts.h * 60 + parts.mi - (evHour * 60 + evMinute))
-        if (diffMin > 1) continue
-      }
-
-      matched.push(item)
-    }
-
     // Extrai o identificador da ocorrência: EXCLUSIVAMENTE metadata.event.id (ex: "1791842350987202610251700")
     // NUNCA persistir metadata.event.metadata.service.id (ID do modelo recorrente, ex: "1791842350987")
     const extractOccurrenceId = (item) => {
@@ -606,6 +657,95 @@ routerAdd(
       return ''
     }
 
+    // 8. Casamento por data CIVIL (dia+mês+ano) e horário (tolerância 1 min, apenas se culto tiver horário)
+    // Coleta auditoria detalhada de cada candidato para o log
+    const candidateAudit = []
+    const matched = []
+
+    for (let i = 0; i < scheduleCandidates.length; i++) {
+      const item = scheduleCandidates[i]
+      const parsed = parseScheduleDate(item)
+      const itemType = String(item.type || '').toLowerCase()
+      const occurrenceId = extractOccurrenceId(item)
+      const itemName = String(
+        item.name || (item.metadata && item.metadata.event ? item.metadata.event.name : '') || '',
+      )
+
+      if (!parsed) {
+        candidateAudit.push({
+          index: i,
+          type: itemType,
+          name: itemName,
+          parsed_date: null,
+          decision: 'REJECTED_UNPARSEABLE_DATE',
+          reason: 'Data não pôde ser interpretada',
+        })
+        continue
+      }
+
+      const dateMatch = parsed.y === evParts.y && parsed.mo === evParts.mo && parsed.d === evParts.d
+
+      if (!dateMatch) {
+        candidateAudit.push({
+          index: i,
+          type: itemType,
+          name: itemName,
+          extracted_ymd: parsed.ymd,
+          extracted_time: parsed.h >= 0 ? `${parsed.h}:${parsed.mi}` : 'none',
+          decision: 'REJECTED_DATE_MISMATCH',
+          reason: `Data ${parsed.ymd} diverge do alvo ${targetYmd}`,
+        })
+        continue
+      }
+
+      // Data civil casou! Verifica horário:
+      // Se o culto NÃO tem horário definido (start_time vazio), aceita qualquer horário do dia.
+      // Se o culto tem horário E o item do Holyrics tem horário, compara com tolerância de 1 minuto.
+      // Se o item do Holyrics não tem horário, aceita.
+      if (hasTargetTime && parsed.h >= 0) {
+        const diffMin = Math.abs(parsed.h * 60 + parsed.mi - (evHour * 60 + evMinute))
+        if (diffMin > 1) {
+          candidateAudit.push({
+            index: i,
+            type: itemType,
+            name: itemName,
+            extracted_ymd: parsed.ymd,
+            extracted_time: `${parsed.h}:${String(parsed.mi).padStart(2, '0')}`,
+            target_time: `${evHour}:${String(evMinute).padStart(2, '0')}`,
+            diff_min: diffMin,
+            decision: 'REJECTED_TIME_MISMATCH',
+            reason: `Horário ${parsed.h}:${parsed.mi} difere do culto (${evHour}:${evMinute}) por ${diffMin} min`,
+          })
+          continue
+        }
+      }
+
+      if (!occurrenceId) {
+        candidateAudit.push({
+          index: i,
+          type: itemType,
+          name: itemName,
+          extracted_ymd: parsed.ymd,
+          extracted_time: parsed.h >= 0 ? `${parsed.h}:${parsed.mi}` : 'none',
+          decision: 'REJECTED_MISSING_ID',
+          reason: 'metadata.event.id não encontrado para a ocorrência',
+        })
+        continue
+      }
+
+      candidateAudit.push({
+        index: i,
+        type: itemType,
+        name: itemName,
+        occurrence_id: occurrenceId,
+        extracted_ymd: parsed.ymd,
+        extracted_time: parsed.h >= 0 ? `${parsed.h}:${parsed.mi}` : 'none',
+        decision: 'ACCEPTED',
+        reason: 'Data civil e horário casaram com o alvo',
+      })
+      matched.push(item)
+    }
+
     // 9. Decisão: 0 candidatos -> EVENT_NOT_FOUND; >1 -> AMBIGUOUS_MATCH. NUNCA escolher ou criar.
     if (matched.length === 0) {
       recordSyncLog({
@@ -615,17 +755,21 @@ routerAdd(
         stage: 'EVENT_NOT_FOUND',
         error:
           'Nenhum agendamento (service/event) do Holyrics encontrado para a data ' +
-          eventDateStr +
+          targetYmd +
+          (hasTargetTime ? ' às ' + trimmedStartTime : '') +
           '.',
         command_id: schedulesRes.command_id,
         duration_ms: schedulesRes.duration_ms,
         details: {
-          month: queryMonth,
-          year: queryYear,
-          schedules_count: allSchedules.length,
+          target_date: targetYmd,
+          target_time: hasTargetTime ? trimmedStartTime : null,
+          target_month: queryMonth,
+          target_year: queryYear,
+          schedules_received: allSchedules.length,
           schedule_candidates: scheduleCandidates.length,
           service_candidates: serviceCandidatesCount,
           event_candidates: eventCandidatesCount,
+          candidates_audit: candidateAudit.slice(0, 20),
         },
       })
       return e.json(200, {
@@ -636,7 +780,10 @@ routerAdd(
         holyrics_event_id: '',
         candidates_found: allSchedules.length,
         message:
-          'Nenhum agendamento do Holyrics encontrado para a data deste culto. Confirme se o culto ou evento existe na agenda do Holyrics (não criamos eventos automaticamente).',
+          'Nenhum agendamento do Holyrics encontrado para a data deste culto (' +
+          targetYmd +
+          (hasTargetTime ? ' às ' + trimmedStartTime : '') +
+          '). Confirme se o culto ou evento existe na agenda do Holyrics (não criamos eventos automaticamente).',
       })
     }
 
@@ -652,10 +799,13 @@ routerAdd(
         command_id: schedulesRes.command_id,
         duration_ms: schedulesRes.duration_ms,
         details: {
-          month: queryMonth,
-          year: queryYear,
+          target_date: targetYmd,
+          target_time: hasTargetTime ? trimmedStartTime : null,
+          target_month: queryMonth,
+          target_year: queryYear,
           matched_count: matched.length,
           candidate_ids: candidateIds,
+          candidates_audit: candidateAudit.slice(0, 20),
         },
       })
       return e.json(200, {
@@ -686,8 +836,10 @@ routerAdd(
         command_id: schedulesRes.command_id,
         duration_ms: schedulesRes.duration_ms,
         details: {
+          target_date: targetYmd,
           schedule_name: String(matched[0].name || ''),
           schedule_type: String(matched[0].type || ''),
+          candidates_audit: candidateAudit.slice(0, 20),
         },
       })
       return e.json(200, {
@@ -733,8 +885,11 @@ routerAdd(
       details: {
         holyrics_event_id: holyricsEventId,
         schedule_name: String(matched[0].name || ''),
+        target_date: targetYmd,
+        target_time: hasTargetTime ? trimmedStartTime : null,
         month: queryMonth,
         year: queryYear,
+        candidates_audit: candidateAudit.slice(0, 20),
       },
     })
 

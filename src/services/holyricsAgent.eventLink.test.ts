@@ -255,79 +255,121 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
 
   /**
    * Espelho exato da lógica de casamento do hook saas_holyrics_resolve_event.js (versão corrigida):
-   * considera type==='service' e type==='event', data COMPLETA (dia+mês+ano em calendário puro),
-   * horário quando ambos informam (tolerância 1 min).
-   * O ID extraído da ocorrência é EXCLUSIVAMENTE metadata.event.id — NUNCA metadata.event.metadata.service.id.
+   * 1. Extração de data civil pura YYYY-MM-DD do alvo (imune a UTC).
+   * 2. start_time do culto: SOMENTE se informado ("HH:mm"), filtra por horário. Se vazio, ignora horário.
+   * 3. Prioridade 1 para datetime string no item ("YYYY-MM-DD HH:mm"), fallback datetime_millis com guarda String/Number.
+   * 4. O ID extraído da ocorrência é EXCLUSIVAMENTE metadata.event.id — NUNCA metadata.event.metadata.service.id.
+   * 5. Coleta detalhes de diagnóstico estruturados.
    */
   const matchScheduleCandidates = (
     schedules: any[],
     eventDate: string,
     startTime = '',
-  ): { matched: any[]; ids: string[] } => {
-    const evParts = (() => {
+  ): { matched: any[]; ids: string[]; audit: any[] } => {
+    const targetYmd = (() => {
       const m = String(eventDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
-      return m ? { y: +m[1], mo: +m[2], d: +m[3], h: -1, mi: -1 } : null
+      return m ? `${m[1]}-${m[2]}-${m[3]}` : ''
     })()
-    if (!evParts) return { matched: [], ids: [] }
+    const evParts = targetYmd
+      ? {
+          y: Number(targetYmd.slice(0, 4)),
+          mo: Number(targetYmd.slice(5, 7)),
+          d: Number(targetYmd.slice(8, 10)),
+          ymd: targetYmd,
+        }
+      : null
+    if (!evParts) return { matched: [], ids: [], audit: [] }
 
     let evHour = -1
     let evMinute = -1
-    const st = startTime.match(/^(\d{1,2}):(\d{2})/)
+    let hasTargetTime = false
+    const trimmedStartTime = String(startTime || '').trim()
+    const st = trimmedStartTime.match(/^(\d{1,2}):(\d{2})/)
     if (st) {
-      evHour = +st[1]
-      evMinute = +st[2]
+      evHour = Number(st[1])
+      evMinute = Number(st[2])
+      hasTargetTime = true
     }
 
     const parseSchedule = (item: any) => {
-      const millis = Number(item.datetime_millis)
-      if (Number.isFinite(millis) && millis > 0) {
-        const ms = millis < 1e11 ? millis * 1000 : millis
-        const dt = new Date(ms)
-        return {
-          y: dt.getUTCFullYear(),
-          mo: dt.getUTCMonth() + 1,
-          d: dt.getUTCDate(),
-          h: dt.getUTCHours(),
-          mi: dt.getUTCMinutes(),
+      if (!item || typeof item !== 'object') return null
+      const strCandidates = [
+        item.datetime,
+        item.date,
+        item.datetime_str,
+        item.start,
+        item.start_time,
+        item.time,
+        item.metadata?.event?.datetime,
+      ]
+      for (const s of strCandidates) {
+        if (!s) continue
+        const str = String(s).trim()
+        if (!str) continue
+        const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?/)
+        if (iso) {
+          return {
+            ymd: `${iso[1]}-${iso[2]}-${iso[3]}`,
+            y: Number(iso[1]),
+            mo: Number(iso[2]),
+            d: Number(iso[3]),
+            h: iso[4] !== undefined ? Number(iso[4]) : -1,
+            mi: iso[5] !== undefined ? Number(iso[5]) : -1,
+          }
+        }
+        const br = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/)
+        if (br) {
+          const dStr = String(br[1]).padStart(2, '0')
+          const moStr = String(br[2]).padStart(2, '0')
+          return {
+            ymd: `${br[3]}-${moStr}-${dStr}`,
+            y: Number(br[3]),
+            mo: Number(moStr),
+            d: Number(dStr),
+            h: br[4] !== undefined ? Number(br[4]) : -1,
+            mi: br[5] !== undefined ? Number(br[5]) : -1,
+          }
         }
       }
-      const iso = String(item.datetime || '').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-      if (iso) return { y: +iso[1], mo: +iso[2], d: +iso[3], h: +iso[4], mi: +iso[5] }
-      const br = String(item.datetime || '').match(
-        /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/,
-      )
-      if (br)
-        return {
-          y: +br[3],
-          mo: +br[2],
-          d: +br[1],
-          h: br[4] !== undefined ? +br[4] : -1,
-          mi: br[5] !== undefined ? +br[5] : -1,
+
+      // Fallback millis
+      const millisCandidates = [
+        item.datetime_millis,
+        item.datetimeMillis,
+        item.timestamp,
+        item.metadata?.event?.datetime_millis,
+      ]
+      for (const rawM of millisCandidates) {
+        if (rawM === undefined || rawM === null || rawM === '') continue
+        const v = typeof rawM === 'number' ? rawM : Number(String(rawM).trim())
+        if (Number.isFinite(v) && v > 0) {
+          const ms = v < 1e11 ? v * 1000 : v
+          const localEpoch = ms - 3 * 3600 * 1000
+          const dt = new Date(localEpoch)
+          const y = dt.getUTCFullYear()
+          const mo = dt.getUTCMonth() + 1
+          const d = dt.getUTCDate()
+          const h = dt.getUTCHours()
+          const mi = dt.getUTCMinutes()
+          return {
+            ymd: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+            y,
+            mo,
+            d,
+            h,
+            mi,
+          }
         }
+      }
       return null
     }
 
-    const candidates = schedules.filter((it) => {
-      const t = String(it.type || '').toLowerCase()
-      return t === 'service' || t === 'event'
-    })
-
-    const matched = candidates.filter((it) => {
-      const p = parseSchedule(it)
-      if (!p) return false
-      if (p.y !== evParts!.y || p.mo !== evParts!.mo || p.d !== evParts!.d) return false
-      if (evHour >= 0 && p.h >= 0) {
-        if (Math.abs(p.h * 60 + p.mi - (evHour * 60 + evMinute)) > 1) return false
-      }
-      return true
-    })
-
     const extractId = (it: any) => {
       if (!it || typeof it !== 'object') return ''
-      if (it.metadata && it.metadata.event && it.metadata.event.id) {
+      if (it.metadata?.event?.id) {
         return String(it.metadata.event.id).trim()
       }
-      if (it.event && it.event.id) {
+      if (it.event?.id) {
         return String(it.event.id).trim()
       }
       if (String(it.type || '').toLowerCase() === 'event' && it.id) {
@@ -336,8 +378,58 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
       return ''
     }
 
+    const candidates = schedules.filter((it) => {
+      const t = String(it.type || '').toLowerCase()
+      return t === 'service' || t === 'event'
+    })
+
+    const audit: any[] = []
+    const matched: any[] = []
+
+    for (let i = 0; i < candidates.length; i++) {
+      const it = candidates[i]
+      const p = parseSchedule(it)
+      const occId = extractId(it)
+
+      if (!p) {
+        audit.push({ index: i, decision: 'REJECTED_UNPARSEABLE_DATE' })
+        continue
+      }
+
+      if (p.y !== evParts.y || p.mo !== evParts.mo || p.d !== evParts.d) {
+        audit.push({
+          index: i,
+          decision: 'REJECTED_DATE_MISMATCH',
+          extracted_ymd: p.ymd,
+          target_ymd: targetYmd,
+        })
+        continue
+      }
+
+      if (hasTargetTime && p.h >= 0) {
+        const diffMin = Math.abs(p.h * 60 + p.mi - (evHour * 60 + evMinute))
+        if (diffMin > 1) {
+          audit.push({
+            index: i,
+            decision: 'REJECTED_TIME_MISMATCH',
+            extracted_time: `${p.h}:${p.mi}`,
+            diff_min: diffMin,
+          })
+          continue
+        }
+      }
+
+      if (!occId) {
+        audit.push({ index: i, decision: 'REJECTED_MISSING_ID' })
+        continue
+      }
+
+      audit.push({ index: i, decision: 'ACCEPTED', occurrence_id: occId })
+      matched.push(it)
+    }
+
     const ids = matched.map(extractId).filter((s) => s)
-    return { matched, ids }
+    return { matched, ids, audit }
   }
 
   const schedulesFixture = [
@@ -579,6 +671,145 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
     const { matched, ids } = matchScheduleCandidates(pureEvent, '2026-10-25', '17:00')
     expect(matched.length).toBe(1)
     expect(ids).toEqual(['EV_CONFERENCE_2026'])
+  })
+
+  it('31. [NOVO] Alvo SEM horário (start_time vazio) casa com ocorrência de qualquer horário no mesmo dia', () => {
+    const morningService = {
+      datetime: '2026-10-25 09:00',
+      datetime_millis: '1792929600000',
+      type: 'service',
+      metadata: { event: { id: 'OCC_MORNING_0900' } },
+    }
+    // start_time ausente/vazio
+    const { matched, ids } = matchScheduleCandidates([morningService], '2026-10-25', '')
+    expect(matched.length).toBe(1)
+    expect(ids).toEqual(['OCC_MORNING_0900'])
+  })
+
+  it('32. [NOVO] Alvo COM horário 17h casa com "2026-10-25 17:00" e NÃO casa com "2026-10-25 09:00"', () => {
+    const morning = {
+      datetime: '2026-10-25 09:00',
+      type: 'service',
+      metadata: { event: { id: 'OCC_0900' } },
+    }
+    const evening = {
+      datetime: '2026-10-25 17:00',
+      type: 'service',
+      metadata: { event: { id: 'OCC_1700' } },
+    }
+
+    const { matched, ids } = matchScheduleCandidates([morning, evening], '2026-10-25', '17:00')
+    expect(matched.length).toBe(1)
+    expect(ids).toEqual(['OCC_1700'])
+    expect(ids).not.toContain('OCC_0900')
+  })
+
+  it('33. [NOVO] Data civil não é deslocada: 25/10 permanece 25/10 mesmo com datetime_millis em epoch string', () => {
+    // 25/10/2026 17:00 BRT = 20:00 UTC = 1792958400000
+    const item = {
+      datetime: '2026-10-25 17:00',
+      datetime_millis: '1792958400000',
+      type: 'service',
+      metadata: { event: { id: 'OCC_DATE_CHECK' } },
+    }
+    const { matched, ids, audit } = matchScheduleCandidates(
+      [item],
+      '2026-10-25 00:00:00.000Z',
+      '17:00',
+    )
+    expect(matched.length).toBe(1)
+    expect(ids).toEqual(['OCC_DATE_CHECK'])
+    expect(audit[0].decision).toBe('ACCEPTED')
+  })
+
+  it('34. [NOVO] Resposta do Agent desempacota lista mesmo vindo em JSON serializado dentro de "result" ou "response"', () => {
+    // Espelho de extractScheduleList
+    const unwrapJsonPayload = (raw: any): any => {
+      if (!raw) return raw
+      let current = raw
+      if (typeof current === 'string') {
+        const trimmed = current.trim()
+        if (
+          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))
+        ) {
+          try {
+            current = JSON.parse(trimmed)
+          } catch {
+            /* intentionally ignored */
+          }
+        }
+      }
+      return current
+    }
+
+    const extractScheduleList = (rawResult: any): any[] => {
+      if (!rawResult) return []
+      let res = unwrapJsonPayload(rawResult)
+      if (res && typeof res === 'object' && !Array.isArray(res)) {
+        if (res.result) {
+          const unwrapped = unwrapJsonPayload(res.result)
+          if (Array.isArray(unwrapped)) return unwrapped
+          if (unwrapped?.schedules && Array.isArray(unwrapped.schedules)) return unwrapped.schedules
+        }
+        if (res.response) {
+          const unwrapped = unwrapJsonPayload(res.response)
+          if (Array.isArray(unwrapped)) return unwrapped
+          if (unwrapped?.schedules && Array.isArray(unwrapped.schedules)) return unwrapped.schedules
+        }
+      }
+      if (res && Array.isArray(res.schedules)) return res.schedules
+      if (Array.isArray(res)) return res
+      return []
+    }
+
+    const raw1 = {
+      result: JSON.stringify({
+        schedules: [{ type: 'service', datetime: '2026-10-25 17:00' }],
+      }),
+    }
+    const list1 = extractScheduleList(raw1)
+    expect(list1.length).toBe(1)
+    expect(list1[0].datetime).toBe('2026-10-25 17:00')
+
+    const raw2 = JSON.stringify({
+      schedules: [{ type: 'event', datetime: '2026-10-25 19:00' }],
+    })
+    const list2 = extractScheduleList(raw2)
+    expect(list2.length).toBe(1)
+    expect(list2[0].datetime).toBe('2026-10-25 19:00')
+  })
+
+  it('35. [NOVO] Diagnóstico estruturado no log: rejeições por data, horário e falta de ID ficam registradas', () => {
+    const items = [
+      {
+        type: 'service',
+        datetime: '2026-10-24 17:00', // Dia anterior
+        metadata: { event: { id: 'OCC_YESTERDAY' } },
+      },
+      {
+        type: 'service',
+        datetime: '2026-10-25 09:00', // Horário diferente
+        metadata: { event: { id: 'OCC_MORNING' } },
+      },
+      {
+        type: 'service',
+        datetime: '2026-10-25 17:00', // Falta metadata.event.id
+      },
+      {
+        type: 'service',
+        datetime: '2026-10-25 17:00', // Casamento perfeito
+        metadata: { event: { id: 'OCC_PERFECT_MATCH' } },
+      },
+    ]
+
+    const { matched, ids, audit } = matchScheduleCandidates(items, '2026-10-25', '17:00')
+    expect(matched.length).toBe(1)
+    expect(ids).toEqual(['OCC_PERFECT_MATCH'])
+    expect(audit[0].decision).toBe('REJECTED_DATE_MISMATCH')
+    expect(audit[1].decision).toBe('REJECTED_TIME_MISMATCH')
+    expect(audit[2].decision).toBe('REJECTED_MISSING_ID')
+    expect(audit[3].decision).toBe('ACCEPTED')
   })
 })
 
