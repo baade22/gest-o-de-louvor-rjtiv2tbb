@@ -1,11 +1,15 @@
-// Hook: saas_holyrics_resolve_event.js (Etapa 3A da auditoria — Vincular culto do SaaS ao evento existente no Holyrics)
+// Hook: saas_holyrics_resolve_event.js (Etapa 3A da auditoria — Vincular culto do SaaS à ocorrência de culto no Holyrics)
 // Endpoint: POST /backend/v1/saas/holyrics/resolve-event
 //
 // Regras da auditoria:
-// - NUNCA cria eventos no Holyrics. Apenas LOCALIZA um evento JÁ EXISTENTE via GetSchedules.
+// - NUNCA cria eventos no Holyrics. Apenas LOCALIZA uma ocorrência JÁ EXISTENTE via GetSchedules.
 // - Payload do comando GET_SCHEDULES é ESTRITAMENTE { month, year } (Holyrics 2.30.0 rejeita campos extras).
-// - Casamento: apenas type === 'event' (nunca 'service' recorrente), por data COMPLETA (dia+mês+ano)
-//   e horário quando disponível, respeitando fuso. Candidato único -> persiste em events.holyrics_event_id.
+// - No Holyrics 2.30.0+, cultos recorrentes aparecem como 'service' e eventos pontuais como 'event'.
+//   Considera candidatos com type === 'service' ou type === 'event'.
+// - Para ocorrências de cultos/serviços, o identificador da ocorrência é obtido EXCLUSIVAMENTE
+//   de metadata.event.id (ex: "1791842350987202610251700").
+// - NUNCA persiste metadata.event.metadata.service.id (o ID do modelo recorrente, ex: "1791842350987").
+// - Casamento por data COMPLETA (dia+mês+ano, formato calendário puro) e horário quando disponível (tolerância 1 min).
 // - 0 candidatos -> EVENT_NOT_FOUND; >1 -> AMBIGUOUS_MATCH. Em ambos: NÃO escolhe, NÃO cria, NÃO envia;
 //   registra pendência em holyrics_sync_logs.
 // - Se events.holyrics_event_id já está preenchido, apenas confirma o vínculo persistido (LINKED).
@@ -526,20 +530,29 @@ routerAdd(
 
     const allSchedules = extractScheduleList(schedulesRes.result)
 
-    // 7. Filtra candidatos: apenas type === 'event' (nunca 'service' recorrente)
-    const eventCandidates = []
+    // 7. Filtra candidatos: considera ocorrências tanto 'service' (cultos recorrentes de domingo) quanto 'event'
+    const scheduleCandidates = []
+    let serviceCandidatesCount = 0
+    let eventCandidatesCount = 0
+
     for (let i = 0; i < allSchedules.length; i++) {
       const item = allSchedules[i]
       if (!item || typeof item !== 'object') continue
       const type = String(item.type || '').toLowerCase()
-      if (type !== 'event') continue
-      eventCandidates.push(item)
+      // No Holyrics 2.30.0+, cultos recorrentes são 'service' e eventos avulsos são 'event'
+      if (type === 'service') {
+        serviceCandidatesCount++
+        scheduleCandidates.push(item)
+      } else if (type === 'event') {
+        eventCandidatesCount++
+        scheduleCandidates.push(item)
+      }
     }
 
     // 8. Casamento por data COMPLETA (dia+mês+ano) e horário quando disponível
     const matched = []
-    for (let i = 0; i < eventCandidates.length; i++) {
-      const item = eventCandidates[i]
+    for (let i = 0; i < scheduleCandidates.length; i++) {
+      const item = scheduleCandidates[i]
       const parsed = parseScheduleDate(item)
       if (!parsed) continue
 
@@ -563,20 +576,33 @@ routerAdd(
       matched.push(item)
     }
 
-    // Extrai metadata.event.id (o ID do evento do Holyrics que deve ser persistido)
-    const extractHolyricsEventId = (item) => {
+    // Extrai o identificador da ocorrência: EXCLUSIVAMENTE metadata.event.id (ex: "1791842350987202610251700")
+    // NUNCA persistir metadata.event.metadata.service.id (ID do modelo recorrente, ex: "1791842350987")
+    const extractOccurrenceId = (item) => {
       if (!item || typeof item !== 'object') return ''
+
+      // Prioridade 1 (regra central): metadata.event.id
       const meta = item.metadata
       if (meta && typeof meta === 'object' && meta.event && typeof meta.event === 'object') {
-        const mid = String(meta.event.id || '').trim()
-        if (mid) return mid
+        const occurrenceId = String(meta.event.id || '').trim()
+        if (occurrenceId) return occurrenceId
       }
-      // Tolerância a variações observáveis sem alterar a semântica do casamento
+
+      // Prioridade 2: item.event.id se estruturado assim
       const nested = item.event
       if (nested && typeof nested === 'object') {
-        const nid = String(nested.id || '').trim()
-        if (nid) return nid
+        const nestedId = String(nested.id || '').trim()
+        if (nestedId) return nestedId
       }
+
+      // Prioridade 3: para type === 'event' que não possua metadata.event.id aninhado,
+      // tolera item.id desde que não seja de um service
+      const itemType = String(item.type || '').toLowerCase()
+      if (itemType === 'event') {
+        const topId = String(item.id || '').trim()
+        if (topId) return topId
+      }
+
       return ''
     }
 
@@ -588,16 +614,18 @@ routerAdd(
         status: 'ERROR',
         stage: 'EVENT_NOT_FOUND',
         error:
-          'Nenhum evento do Holyrics encontrado para a data ' +
+          'Nenhum agendamento (service/event) do Holyrics encontrado para a data ' +
           eventDateStr +
-          ' (type=event, sem fallback para services recorrentes).',
+          '.',
         command_id: schedulesRes.command_id,
         duration_ms: schedulesRes.duration_ms,
         details: {
           month: queryMonth,
           year: queryYear,
           schedules_count: allSchedules.length,
-          event_candidates: eventCandidates.length,
+          schedule_candidates: scheduleCandidates.length,
+          service_candidates: serviceCandidatesCount,
+          event_candidates: eventCandidatesCount,
         },
       })
       return e.json(200, {
@@ -608,21 +636,19 @@ routerAdd(
         holyrics_event_id: '',
         candidates_found: allSchedules.length,
         message:
-          'Nenhum evento do Holyrics encontrado para a data deste culto. Confirme se o evento foi criado no Holyrics (não criamos eventos automaticamente).',
+          'Nenhum agendamento do Holyrics encontrado para a data deste culto. Confirme se o culto ou evento existe na agenda do Holyrics (não criamos eventos automaticamente).',
       })
     }
 
     if (matched.length > 1) {
-      const candidateIds = matched
-        .map((it) => extractHolyricsEventId(it) || String(it.id || ''))
-        .filter((s) => s)
+      const candidateIds = matched.map((it) => extractOccurrenceId(it)).filter((s) => s)
       recordSyncLog({
         event_id: eventId,
         action: 'RESOLVE_EVENT_LINK',
         status: 'ERROR',
         stage: 'AMBIGUOUS_MATCH',
         error:
-          'Mais de um evento do Holyrics encontrado para a mesma data/hora. Nenhuma associação foi escolhida automaticamente.',
+          'Mais de um agendamento do Holyrics encontrado para a mesma data/hora. Nenhuma associação foi escolhida automaticamente.',
         command_id: schedulesRes.command_id,
         duration_ms: schedulesRes.duration_ms,
         details: {
@@ -641,14 +667,14 @@ routerAdd(
         matched_count: matched.length,
         candidate_ids: candidateIds,
         message:
-          'Mais de um evento do Holyrics corresponde à data/hora deste culto (' +
+          'Mais de um agendamento do Holyrics corresponde à data/hora deste culto (' +
           matched.length +
           ' candidatos). A associação não foi feita automaticamente — resolva a duplicidade no Holyrics.',
       })
     }
 
     // 10. Candidato único: persiste em events.holyrics_event_id
-    const holyricsEventId = extractHolyricsEventId(matched[0]) || String(matched[0].id || '').trim()
+    const holyricsEventId = extractOccurrenceId(matched[0])
     if (!holyricsEventId) {
       recordSyncLog({
         event_id: eventId,
@@ -656,10 +682,13 @@ routerAdd(
         status: 'ERROR',
         stage: 'MISSING_EVENT_ID',
         error:
-          'Evento do Holyrics localizado na data, mas sem ID identificável (metadata.event.id ausente).',
+          'Agendamento do Holyrics localizado na data, mas sem ID de ocorrência identificável (metadata.event.id ausente).',
         command_id: schedulesRes.command_id,
         duration_ms: schedulesRes.duration_ms,
-        details: { schedule_name: String(matched[0].name || '') },
+        details: {
+          schedule_name: String(matched[0].name || ''),
+          schedule_type: String(matched[0].type || ''),
+        },
       })
       return e.json(200, {
         success: false,
@@ -668,7 +697,7 @@ routerAdd(
         error_code: 'EVENT_ID_NOT_IDENTIFIABLE',
         holyrics_event_id: '',
         message:
-          'Evento encontrado na data, mas sem ID identificável na resposta do Holyrics (metadata.event.id ausente).',
+          'Agendamento encontrado na data, mas sem ID de ocorrência identificável na resposta do Holyrics (metadata.event.id ausente).',
       })
     }
 
@@ -717,7 +746,7 @@ routerAdd(
       event_id: eventId,
       schedule_name: String(matched[0].name || ''),
       message:
-        'Culto vinculado ao evento do Holyrics (' +
+        'Culto vinculado à ocorrência do Holyrics (' +
         holyricsEventId +
         '). Associação persistida no SaaS.',
     })

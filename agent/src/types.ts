@@ -98,10 +98,26 @@ export interface AgentCommand {
  */
 export interface HolyricsScheduleItem {
   id: string
-  type?: 'event' | 'service'
+  type?: 'event' | 'service' | string
   datetime_millis?: number
+  datetime?: string
   name?: string
-  metadata?: { event?: { id?: string } }
+  metadata?: {
+    event?: {
+      id?: string
+      datetime?: string
+      metadata?: {
+        service?: {
+          id?: string
+          name?: string
+          [key: string]: any
+        }
+        [key: string]: any
+      }
+      [key: string]: any
+    }
+    [key: string]: any
+  }
   [key: string]: any
 }
 

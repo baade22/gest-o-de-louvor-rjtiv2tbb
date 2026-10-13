@@ -254,11 +254,12 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
   })
 
   /**
-   * Espelho exato da lógica de casamento do hook saas_holyrics_resolve_event.js:
-   * apenas type==='event', data COMPLETA (dia+mês+ano), horário quando ambos informam.
-   * O ID extraído é SEMPRE metadata.event.id — nunca o ID interno do SaaS.
+   * Espelho exato da lógica de casamento do hook saas_holyrics_resolve_event.js (versão corrigida):
+   * considera type==='service' e type==='event', data COMPLETA (dia+mês+ano em calendário puro),
+   * horário quando ambos informam (tolerância 1 min).
+   * O ID extraído da ocorrência é EXCLUSIVAMENTE metadata.event.id — NUNCA metadata.event.metadata.service.id.
    */
-  const matchEventCandidates = (
+  const matchScheduleCandidates = (
     schedules: any[],
     eventDate: string,
     startTime = '',
@@ -306,7 +307,11 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
       return null
     }
 
-    const candidates = schedules.filter((it) => String(it.type || '').toLowerCase() === 'event')
+    const candidates = schedules.filter((it) => {
+      const t = String(it.type || '').toLowerCase()
+      return t === 'service' || t === 'event'
+    })
+
     const matched = candidates.filter((it) => {
       const p = parseSchedule(it)
       if (!p) return false
@@ -317,13 +322,21 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
       return true
     })
 
-    const ids = matched
-      .map((it) =>
-        it.metadata && it.metadata.event && it.metadata.event.id
-          ? String(it.metadata.event.id).trim()
-          : '',
-      )
-      .filter((s) => s)
+    const extractId = (it: any) => {
+      if (!it || typeof it !== 'object') return ''
+      if (it.metadata && it.metadata.event && it.metadata.event.id) {
+        return String(it.metadata.event.id).trim()
+      }
+      if (it.event && it.event.id) {
+        return String(it.event.id).trim()
+      }
+      if (String(it.type || '').toLowerCase() === 'event' && it.id) {
+        return String(it.id).trim()
+      }
+      return ''
+    }
+
+    const ids = matched.map(extractId).filter((s) => s)
     return { matched, ids }
   }
 
@@ -333,6 +346,16 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
       type: 'service',
       datetime: '2025-08-10 19:00',
       name: 'Culto de Domingo',
+      metadata: {
+        event: {
+          id: 'OCCURRENCE_20250810_1900',
+          metadata: {
+            service: {
+              id: 'SERVICE_TEMPLATE_123',
+            },
+          },
+        },
+      },
     },
     {
       id: 'ev_holyrics_1',
@@ -351,26 +374,78 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
   ]
 
   it('14. [MOCK] Evento único na data é casado e o ID extraído vem de metadata.event.id', () => {
-    const { matched, ids } = matchEventCandidates(schedulesFixture, '2025-08-10', '19:00')
+    const onlyEvent = [schedulesFixture[1], schedulesFixture[2]]
+    const { matched, ids } = matchScheduleCandidates(onlyEvent, '2025-08-10', '19:00')
     expect(matched.length).toBe(1)
     expect(ids).toEqual(['EV_HOLYRICS_001'])
   })
 
-  it('15. [MOCK] Service recorrente na MESMA data é descartado (nunca casado)', () => {
-    const onlyService = [
-      {
-        id: 'svc_recurring_1',
-        type: 'service',
-        datetime: '2025-08-10 19:00',
-        name: 'Culto de Domingo',
+  it('15. [MOCK] Item type=service (culto de domingo) é selecionado e seu ID vem de metadata.event.id (ocorrência), NUNCA do service.id', () => {
+    const realHolyricsServiceItem = {
+      datetime: '2026-10-25 17:00',
+      datetime_millis: '1792958400000',
+      id: '1791842350987',
+      name: 'Culto de Celebração',
+      type: 'service',
+      metadata: {
+        event: {
+          datetime: '2026-10-25 17:00',
+          id: '1791842350987202610251700', // ID da ocorrência completa
+          name: 'Culto de Celebração',
+          metadata: {
+            service: {
+              id: '1791842350987', // ID do modelo recorrente
+              name: 'Culto de Celebração',
+            },
+          },
+        },
       },
-    ]
-    const { matched, ids } = matchEventCandidates(onlyService, '2025-08-10', '19:00')
-    expect(matched.length).toBe(0)
-    expect(ids).toEqual([])
+    }
+
+    const { matched, ids } = matchScheduleCandidates(
+      [realHolyricsServiceItem],
+      '2026-10-25',
+      '17:00',
+    )
+    expect(matched.length).toBe(1)
+    expect(ids.length).toBe(1)
+    // Regra central: ID da ocorrência, NUNCA o ID do service recorrente
+    expect(ids[0]).toBe('1791842350987202610251700')
+    expect(ids[0]).not.toBe('1791842350987')
+    expect(ids[0]).not.toBe(realHolyricsServiceItem.metadata.event.metadata.service.id)
   })
 
-  it('16. [MOCK] Zero candidatos de evento na data => EVENT_NOT_FOUND (nada persistido)', () => {
+  it('15b. [MOCK] Duas ocorrências do mesmo serviço em domingos diferentes geram IDs distintos', () => {
+    const sunday1 = {
+      datetime: '2026-10-18 17:00',
+      type: 'service',
+      metadata: {
+        event: {
+          id: '1791842350987202610181700',
+          metadata: { service: { id: '1791842350987' } },
+        },
+      },
+    }
+    const sunday2 = {
+      datetime: '2026-10-25 17:00',
+      type: 'service',
+      metadata: {
+        event: {
+          id: '1791842350987202610251700',
+          metadata: { service: { id: '1791842350987' } },
+        },
+      },
+    }
+
+    const resSunday1 = matchScheduleCandidates([sunday1, sunday2], '2026-10-18', '17:00')
+    const resSunday2 = matchScheduleCandidates([sunday1, sunday2], '2026-10-25', '17:00')
+
+    expect(resSunday1.ids).toEqual(['1791842350987202610181700'])
+    expect(resSunday2.ids).toEqual(['1791842350987202610251700'])
+    expect(resSunday1.ids[0]).not.toEqual(resSunday2.ids[0])
+  })
+
+  it('16. [MOCK] Zero candidatos de agendamento na data => EVENT_NOT_FOUND (nada persistido)', () => {
     const otherMonth = [
       {
         id: 'ev_far',
@@ -379,27 +454,27 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
         metadata: { event: { id: 'FAR' } },
       },
     ]
-    const { matched, ids } = matchEventCandidates(otherMonth, '2025-08-10', '19:00')
+    const { matched, ids } = matchScheduleCandidates(otherMonth, '2025-08-10', '19:00')
     expect(matched.length).toBe(0)
     expect(ids).toEqual([])
   })
 
-  it('17. [MOCK] Dois eventos do Holyrics na mesma data/hora => AMBIGUOUS_MATCH (nenhum escolhido)', () => {
+  it('17. [MOCK] Dois agendamentos do Holyrics na mesma data/hora => AMBIGUOUS_MATCH (nenhum escolhido)', () => {
     const duplicated = [
       {
         id: 'ev_a',
-        type: 'event',
-        datetime_millis: Date.UTC(2025, 7, 10, 22, 0),
-        metadata: { event: { id: 'A' } },
+        type: 'service',
+        datetime: '2026-10-25 17:00',
+        metadata: { event: { id: 'OCCURRENCE_A' } },
       },
       {
         id: 'ev_b',
         type: 'event',
-        datetime_millis: Date.UTC(2025, 7, 10, 22, 0),
-        metadata: { event: { id: 'B' } },
+        datetime: '2026-10-25 17:00',
+        metadata: { event: { id: 'OCCURRENCE_B' } },
       },
     ]
-    const { matched, ids } = matchEventCandidates(duplicated, '2025-08-10', '19:00')
+    const { matched, ids } = matchScheduleCandidates(duplicated, '2026-10-25', '17:00')
     expect(matched.length).toBe(2)
     expect(ids.length).toBe(2)
     // A decisão do hook é NÃO escolher: dois IDs distintos — a persistência é recusada
@@ -407,42 +482,103 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
   })
 
   it('18. [MOCK] Data diferente (dia/mês/ano) não casa mesmo com horário igual', () => {
-    const { matched } = matchEventCandidates(schedulesFixture, '2025-08-17', '19:00')
+    const { matched } = matchScheduleCandidates(schedulesFixture, '2025-08-17', '19:00')
     expect(matched.length).toBe(0)
   })
 
   it('19. [MOCK] Horário divergente (>1 min) descarta o candidato mesmo com data igual', () => {
-    const { matched } = matchEventCandidates(schedulesFixture, '2025-08-10', '10:00')
+    const { matched } = matchScheduleCandidates(schedulesFixture, '2025-08-10', '10:00')
     expect(matched.length).toBe(0)
   })
 
-  it('20. [MOCK] Evento sem horário informado casa por data completa', () => {
+  it('20. [MOCK] Agendamento sem horário informado casa por data completa', () => {
     const noTime = [
-      { id: 'ev_notime', type: 'event', datetime: '2025-08-10', metadata: { event: { id: 'NT' } } },
+      {
+        id: 'ev_notime',
+        type: 'service',
+        datetime: '2025-08-10',
+        metadata: { event: { id: 'NT' } },
+      },
     ]
-    const { matched, ids } = matchEventCandidates(noTime, '2025-08-10', '19:00')
+    const { matched, ids } = matchScheduleCandidates(noTime, '2025-08-10', '19:00')
     expect(matched.length).toBe(1)
     expect(ids).toEqual(['NT'])
   })
 
   it('21. [MOCK] Fuso: datetime_millis 22:00 UTC corresponde a 19:00 de Brasília (-3h)', () => {
-    // Fixture usa Date.UTC(2025,7,10,22,0) — 22:00 UTC == 19:00 em UTC-3
-    const { matched } = matchEventCandidates(schedulesFixture, '2025-08-10', '19:00')
+    const onlyEvent = [schedulesFixture[1]]
+    const { matched } = matchScheduleCandidates(onlyEvent, '2025-08-10', '19:00')
     expect(matched.length).toBe(1)
   })
 
-  it('22. [MOCK] metadata.event.id ausente não produz ID — hook recusa persistir sem ID identificável', () => {
+  it('22. [MOCK] metadata.event.id ausente em service não produz ID — hook recusa persistir sem ID identificável', () => {
     const missingId = [
       {
-        id: 'ev_noid',
-        type: 'event',
-        datetime_millis: Date.UTC(2025, 7, 10, 22, 0),
-        name: 'Sem ID',
+        id: '1791842350987',
+        type: 'service',
+        datetime: '2026-10-25 17:00',
+        name: 'Sem ID de ocorrência',
+        metadata: {
+          event: {
+            name: 'Culto',
+            // id da ocorrência ausente!
+            metadata: { service: { id: '1791842350987' } },
+          },
+        },
       },
     ]
-    const { matched, ids } = matchEventCandidates(missingId, '2025-08-10', '19:00')
+    const { matched, ids } = matchScheduleCandidates(missingId, '2026-10-25', '17:00')
     expect(matched.length).toBe(1)
+    // NUNCA pode ter pego '1791842350987'
     expect(ids).toEqual([])
+  })
+
+  it('22b. [MOCK] Caso real: domingo 25/10/2026 às 17h com service recorrente casa ID completo da ocorrência', () => {
+    const schedulePayload = [
+      {
+        datetime: '2026-10-25 17:00',
+        datetime_millis: '1792958400000',
+        id: '1791842350987',
+        name: 'Culto de Celebração',
+        type: 'service',
+        metadata: {
+          event: {
+            datetime: '2026-10-25 17:00',
+            id: '1791842350987202610251700',
+            name: 'Culto de Celebração',
+            metadata: {
+              service: {
+                id: '1791842350987',
+                name: 'Culto de Celebração',
+              },
+            },
+          },
+        },
+      },
+    ]
+
+    const { matched, ids } = matchScheduleCandidates(
+      schedulePayload,
+      '2026-10-25 00:00:00.000Z',
+      '17:00',
+    )
+    expect(matched.length).toBe(1)
+    expect(ids).toEqual(['1791842350987202610251700'])
+    expect(ids[0]).not.toBe('1791842350987')
+  })
+
+  it('22c. [MOCK] Item event puro sem metadata aninhado continua sendo associado pelo seu id', () => {
+    const pureEvent = [
+      {
+        id: 'EV_CONFERENCE_2026',
+        type: 'event',
+        datetime: '2026-10-25 17:00',
+        name: 'Conferência Anual',
+      },
+    ]
+    const { matched, ids } = matchScheduleCandidates(pureEvent, '2026-10-25', '17:00')
+    expect(matched.length).toBe(1)
+    expect(ids).toEqual(['EV_CONFERENCE_2026'])
   })
 })
 
