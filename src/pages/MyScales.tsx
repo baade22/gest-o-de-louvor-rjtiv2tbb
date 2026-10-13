@@ -29,6 +29,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { formatCalendarDateDisplay } from '@/lib/dateUtils'
 
 export default function MyScales() {
   const { currentMember, currentChurch } = useAuth()
@@ -137,17 +138,7 @@ export default function MyScales() {
   })
 
   const formatDateDisplay = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr)
-      return d.toLocaleDateString('pt-BR', {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
+    return formatCalendarDateDisplay(dateStr, 'short')
   }
 
   return (

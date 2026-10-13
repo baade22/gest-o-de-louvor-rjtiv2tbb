@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { getLocalTodayYMD, toCalendarYMD } from '@/lib/dateUtils'
 
 export default function EventForm() {
   const { id } = useParams<{ id: string }>()
@@ -29,7 +30,7 @@ export default function EventForm() {
 
   const [formData, setFormData] = useState({
     title: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalTodayYMD(),
     start_time: '19:00',
     end_time: '21:00',
     description: '',
@@ -41,11 +42,11 @@ export default function EventForm() {
       const fetchEvent = async () => {
         try {
           const ev = await pb.collection('events').getOne<EventItem>(id)
-          // extrai YYYY-MM-DD
-          const rawDate = ev.date ? ev.date.split(' ')[0].split('T')[0] : ''
+          // extrai YYYY-MM-DD preservando valor de calendário
+          const rawDate = toCalendarYMD(ev.date)
           setFormData({
             title: ev.title || '',
-            date: rawDate || new Date().toISOString().split('T')[0],
+            date: rawDate || getLocalTodayYMD(),
             start_time: ev.start_time || '',
             end_time: ev.end_time || '',
             description: ev.description || '',

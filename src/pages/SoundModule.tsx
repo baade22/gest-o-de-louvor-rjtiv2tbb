@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { EventItem, EventTask, EventMember } from '@/types'
 import { listEventTasks, updateTaskStatus } from '@/services/tasks'
 import { useToast } from '@/hooks/use-toast'
+import { formatCalendarDateDisplay, getLocalTodayYMD } from '@/lib/dateUtils'
 
 export default function SoundModule() {
   const { currentChurch, currentMember } = useAuth()
@@ -24,7 +25,7 @@ export default function SoundModule() {
     if (!currentChurch) return
     setIsLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getLocalTodayYMD()
       const evs = await pb.collection('events').getFullList<EventItem>({
         filter: `church_id = "${currentChurch.id}" && date >= "${today}"`,
         sort: 'date',
@@ -144,7 +145,7 @@ export default function SoundModule() {
                 <p className="text-xs text-slate-500 flex items-center gap-3 mt-1">
                   <span className="flex items-center gap-1 font-semibold text-slate-700">
                     <CalendarDays className="h-3.5 w-3.5 text-sky-600" />
-                    {nextEvent.date.slice(0, 10)}
+                    {formatCalendarDateDisplay(nextEvent.date, 'numeric')}
                   </span>
                   {nextEvent.start_time && (
                     <span className="flex items-center gap-1">

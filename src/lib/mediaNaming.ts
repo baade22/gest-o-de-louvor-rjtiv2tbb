@@ -77,29 +77,30 @@ export function formatEventDayMonth(dateInput?: string | Date | null): string {
   if (!dateInput) return 'Sem Data'
 
   try {
-    let dateObj: Date
     if (typeof dateInput === 'string') {
       const trimmed = dateInput.trim()
       if (!trimmed) return 'Sem Data'
-      // Se vier como YYYY-MM-DD
+      // Se vier como YYYY-MM-DD (com ou sem horário UTC)
       const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/)
       if (dateOnlyMatch) {
         const day = dateOnlyMatch[3]
         const month = dateOnlyMatch[2]
         return `${day}-${month}`
       }
-      dateObj = new Date(trimmed)
-    } else {
-      dateObj = dateInput
+      const d = new Date(trimmed)
+      if (isNaN(d.getTime())) return 'Sem Data'
+      const day = String(d.getUTCDate()).padStart(2, '0')
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+      return `${day}-${month}`
     }
 
-    if (isNaN(dateObj.getTime())) {
-      return 'Sem Data'
+    if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+      const day = String(dateInput.getDate()).padStart(2, '0')
+      const month = String(dateInput.getMonth() + 1).padStart(2, '0')
+      return `${day}-${month}`
     }
 
-    const day = String(dateObj.getDate()).padStart(2, '0')
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-    return `${day}-${month}`
+    return 'Sem Data'
   } catch {
     return 'Sem Data'
   }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T23:36:57.562Z",
+  "generatedAt": "2026-10-13T00:26:57.643Z",
   "collections": [
     {
       "name": "users",
@@ -1546,7 +1546,8 @@
             "GET_LYRICS_PLAYLIST",
             "ADD_LYRICS_TO_PLAYLIST",
             "TRANSFER_MEDIA",
-            "SYNC_MEDIA_PLAYLIST"
+            "SYNC_MEDIA_PLAYLIST",
+            "GET_SCHEDULES"
           ]
         },
         {

@@ -94,6 +94,7 @@ import {
   syncEventMediaPlaylistWithHolyrics,
 } from '@/services/media'
 import { generateHolyricsFileName } from '@/lib/mediaNaming'
+import { formatCalendarDateDisplay } from '@/lib/dateUtils'
 
 export default function EventScaleDetail() {
   const { id } = useParams<{ id: string }>()
@@ -327,9 +328,14 @@ export default function EventScaleDetail() {
     } catch (err: any) {
       console.error('Erro ao vincular evento do Holyrics:', err)
       setEventLinkStatus(null)
+      const errorMsg =
+        err?.response?.data?.message ||
+        err?.data?.message ||
+        err?.message ||
+        'Não foi possível consultar as agendas do Holyrics.'
       toast({
         title: 'Erro ao vincular evento',
-        description: err?.message || 'Não foi possível consultar as agendas do Holyrics.',
+        description: errorMsg,
         variant: 'destructive',
       })
     } finally {
@@ -841,17 +847,7 @@ export default function EventScaleDetail() {
   }
 
   const formatDateDisplay = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr)
-      return d.toLocaleDateString('pt-BR', {
-        weekday: 'long',
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
+    return formatCalendarDateDisplay(dateStr, 'full')
   }
 
   if (isLoading) {

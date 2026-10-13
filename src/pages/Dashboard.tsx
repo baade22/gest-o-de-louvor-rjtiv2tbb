@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { formatCalendarDateDisplay, getLocalTodayYMD } from '@/lib/dateUtils'
 import {
   Dialog,
   DialogContent,
@@ -204,24 +205,10 @@ export default function Dashboard() {
   }
 
   const formatDateDisplay = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr)
-      return d.toLocaleDateString('pt-BR', {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
+    return formatCalendarDateDisplay(dateStr, 'short')
   }
 
-  const todayDisplay = new Date().toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
+  const todayDisplay = formatCalendarDateDisplay(getLocalTodayYMD(), 'full')
 
   return (
     <div className="space-y-8">

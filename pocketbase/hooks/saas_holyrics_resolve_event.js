@@ -277,7 +277,19 @@ routerAdd(
       cmd.set('payload', payload)
       cmd.set('status', 'PENDING')
       cmd.set('created_at', nowIso)
-      $app.save(cmd)
+
+      try {
+        $app.save(cmd)
+      } catch (err) {
+        return {
+          command_id: cmdId,
+          status: 'FAILED',
+          result: null,
+          error: 'Falha ao registrar comando ' + action + ' na fila: ' + err.message,
+          error_code: 'COMMAND_QUEUE_FAILED',
+          duration_ms: 0,
+        }
+      }
 
       const start = Date.now()
       let finalStatus = 'PENDING'
@@ -422,20 +434,27 @@ routerAdd(
     const eventDateStr = eventRecord.getString('date') || ''
     const eventStartTime = eventRecord.getString('start_time') || ''
 
-    // Componentes da data do culto (campo date do PocketBase é gravado em UTC com a hora local da igreja)
+    // Componentes da data do culto (preservando o valor de calendário YYYY-MM-DD)
+    // O campo date do PocketBase sempre armazena "YYYY-MM-DD HH:mm:ss.SSSZ".
+    // Extraímos prioritariamente a data de calendário dos dígitos "YYYY-MM-DD",
+    // imune a qualquer interpretação de fuso.
     let evParts = null
-    try {
-      const parsedDate = new Date(eventDateStr)
-      if (!isNaN(parsedDate.getTime())) {
-        evParts = partsFromRecord(parsedDate)
+    const datePatternMatch = String(eventDateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (datePatternMatch) {
+      evParts = {
+        y: Number(datePatternMatch[1]),
+        mo: Number(datePatternMatch[2]),
+        d: Number(datePatternMatch[3]),
+        h: -1,
+        mi: -1,
       }
-    } catch (_) {}
-
-    if (!evParts) {
-      const m = eventDateStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
-      if (m) {
-        evParts = { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]), h: -1, mi: -1 }
-      }
+    } else {
+      try {
+        const parsedDate = new Date(eventDateStr)
+        if (!isNaN(parsedDate.getTime())) {
+          evParts = partsFromRecord(parsedDate)
+        }
+      } catch (_) {}
     }
 
     // Horário do culto vira do campo start_time ("HH:mm" ou "HH:mm:ss") quando presente
@@ -478,11 +497,15 @@ routerAdd(
     )
 
     if (schedulesRes.status !== 'DONE' || !schedulesRes.result) {
+      const isTimeout = schedulesRes.status === 'PENDING'
       const techErr =
         schedulesRes.error ||
-        (schedulesRes.status === 'PENDING'
-          ? 'Tempo limite de resposta do LouvorFlow Agent esgotado na consulta GetSchedules (TIMEOUT).'
+        (isTimeout
+          ? 'Tempo limite de resposta do LouvorFlow Agent esgotado na consulta GetSchedules (TIMEOUT). Verifique se o Agent está aberto no computador da igreja.'
           : 'Falha ao consultar GetSchedules no Holyrics.')
+      const errorCode = isTimeout
+        ? 'AGENT_TIMEOUT'
+        : schedulesRes.error_code || 'GET_SCHEDULES_FAILED'
       recordSyncLog({
         event_id: eventId,
         action: 'RESOLVE_EVENT_LINK',
@@ -495,7 +518,7 @@ routerAdd(
       })
       return e.json(200, {
         success: false,
-        error_code: 'GET_SCHEDULES_FAILED',
+        error_code: errorCode,
         status: 'SYNC_PENDING',
         message: techErr,
       })

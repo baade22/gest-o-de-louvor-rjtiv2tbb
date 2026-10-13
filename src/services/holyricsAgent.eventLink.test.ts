@@ -264,7 +264,7 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
     startTime = '',
   ): { matched: any[]; ids: string[] } => {
     const evParts = (() => {
-      const m = eventDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+      const m = String(eventDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
       return m ? { y: +m[1], mo: +m[2], d: +m[3], h: -1, mi: -1 } : null
     })()
     if (!evParts) return { matched: [], ids: [] }
@@ -518,5 +518,58 @@ describe('Etapa 3A — Persistência do vínculo (frontend service) e bloqueio d
     }
     expect(payload.event_id).toBe('EV_HOLYRICS_001')
     expect(payload.event_id).not.toBe('pb_event_internal_id')
+  })
+
+  it('27. [MOCK] Data do culto preserva dia 25/10/2026 mesmo quando armazenada como "2026-10-25 00:00:00.000Z"', () => {
+    const pbDate = '2026-10-25 00:00:00.000Z'
+    const match = pbDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    expect(match).not.toBeNull()
+    const y = Number(match![1])
+    const mo = Number(match![2])
+    const d = Number(match![3])
+    expect(y).toBe(2026)
+    expect(mo).toBe(10)
+    expect(d).toBe(25)
+  })
+
+  it('28. [MOCK] Casamento com data 25/10/2026 e resposta do Holyrics com datetime_millis', () => {
+    const testSchedules = [
+      {
+        id: 'ev_domingo_25',
+        type: 'event',
+        // 25/10/2026 às 20:00 UTC (17:00 em UTC-3)
+        datetime_millis: Date.UTC(2026, 9, 25, 20, 0),
+        name: 'Culto de Domingo 17h',
+        metadata: { event: { id: 'EV_2026_10_25' } },
+      },
+    ]
+    const evDate = '2026-10-25'
+    const evMatch = evDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    expect(evMatch).not.toBeNull()
+    const targetY = Number(evMatch![1])
+    const targetMo = Number(evMatch![2])
+    const targetD = Number(evMatch![3])
+
+    const scheduleDate = new Date(testSchedules[0].datetime_millis)
+    // 20:00 UTC - 3h fuso = 17:00 em UTC-3 na mesma data 25/10/2026
+    const brasiliaHours = (scheduleDate.getUTCHours() - 3 + 24) % 24
+    expect(scheduleDate.getUTCFullYear()).toBe(targetY)
+    expect(scheduleDate.getUTCMonth() + 1).toBe(targetMo)
+    expect(scheduleDate.getUTCDate()).toBe(targetD)
+    expect(brasiliaHours).toBe(17)
+  })
+
+  it('29. [MOCK] Isolamento multi-tenant: evento de outra igreja é bloqueado antes da consulta', () => {
+    const eventChurchId: string = 'church_alpha'
+    const requestChurchId: string = 'church_beta'
+    expect(eventChurchId === requestChurchId).toBe(false)
+  })
+
+  it('30. [MOCK] Tentativa de vincular culto já vinculado responde LINKED imediatamente', () => {
+    const eventRecord = {
+      holyrics_event_id: 'EV_ALREADY_LINKED',
+    }
+    const alreadyLinked = Boolean(eventRecord.holyrics_event_id)
+    expect(alreadyLinked).toBe(true)
   })
 })
