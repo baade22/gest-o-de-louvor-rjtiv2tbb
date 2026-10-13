@@ -17,10 +17,9 @@
 //    reporta erro técnico real da etapa. Nunca repete CreateSong cegamente.
 // 4. Exclusão mútua / Lock por church_id + song_id: impede dois cliques simultâneos de criarem músicas duplicadas.
 // 5. Playlist: GetSongPlaylist compara exclusivamente por ID (nunca por título). Se já estiver -> ALREADY_IN_PLAYLIST.
-//    Se ausente -> AddLyricsToPlaylist com index (posição no repertório do evento, base 0) e payload mínimo.
+//    Se ausente -> AddToPlaylist com event_id do culto no Holyrics (events.holyrics_event_id), index -1 e ignore_duplicates:true.
 //    Depois consulta GetSongPlaylist novamente: só marca ADDED_TO_PLAYLIST se o ID aparecer; se não aparecer -> ERROR
-//    com mensagem técnica real: "AddLyricsToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação."
-// 6. Payloads mínimos à API do Holyrics em tudo (evita bugs de lista vazia no Holyrics).
+//    com mensagem técnica real: "AddToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação."// 6. Payloads mínimos à API do Holyrics em tudo (evita bugs de lista vazia no Holyrics).
 // 7. Registro diagnóstico detalhado em holyrics_sync_logs com command_id, duração, http_status, stage, status e details sanitizados.
 
 routerAdd(
@@ -1312,29 +1311,29 @@ routerAdd(
         }
 
         // -------------------------------------------------------------
-        // ETAPA 5 & 6: ADD_LYRICS_TO_PLAYLIST + Confirmação via GetSongPlaylist
-        // Semântica da API oficial: index (posição base 0), payload mínimo.
+        // ETAPA 5 & 6: ADD_TO_PLAYLIST + Confirmação via GetSongPlaylist
+        // Semântica da API oficial unificada (Etapa 3B): ação AddToPlaylist com event_id do Holyrics.
         // -------------------------------------------------------------
         logSteps.push(
-          `GetSongPlaylist → NOT_FOUND | AddLyricsToPlaylist → EXECUTING (index ${playlistIndexBase0})`,
+          `GetSongPlaylist → NOT_FOUND | AddToPlaylist → EXECUTING (holyrics_event_id: ${holyricsEventId}, index -1)`,
         )
         eventSongRec.set('holyrics_status', 'ADDING_TO_PLAYLIST')
         try {
           $app.save(eventSongRec)
         } catch (_) {}
 
-        // Payload mínimo para o Holyrics: event_id DEVE ser o ID REAL do evento no Holyrics
-        // (persistido em events.holyrics_event_id pela vinculação), NUNCA o ID interno do SaaS.
-        // Os demais campos (song_id/event_id SaaS) são metadados internos de rastreio do SaaS.
+        // Payload mínimo para o Holyrics AddToPlaylist de músicas:
+        // { items: [{ type: "song", id: holyricsSongId }], event_id: holyricsEventId, index: -1, ignore_duplicates: true }
+        // Campo auxiliar song_id (ID do SaaS) é enviado apenas para rastreio nos logs locais/SaaS.
         const addPayload = {
-          id: holyricsSongId,
-          index: playlistIndexBase0,
-          media_playlist: false,
-          song_id: songId,
+          items: [{ type: 'song', id: holyricsSongId }],
           event_id: holyricsEventId,
+          index: -1,
+          ignore_duplicates: true,
+          song_id: songId,
         }
 
-        const addRes = runCommandSync('ADD_LYRICS_TO_PLAYLIST', addPayload, 10000)
+        const addRes = runCommandSync('ADD_TO_PLAYLIST', addPayload, 10000)
 
         // REGRA CRÍTICA 6: Executar GetSongPlaylist novamente para confirmação real
         eventSongRec.set('holyrics_status', 'VERIFYING_PLAYLIST')
@@ -1359,7 +1358,7 @@ routerAdd(
           } catch (_) {}
 
           logSteps.push(
-            `AddLyricsToPlaylist → OK | GetSongPlaylist Confirm → FOUND | FINAL → ADDED_TO_PLAYLIST`,
+            `AddToPlaylist → OK | GetSongPlaylist Confirm → FOUND | FINAL → ADDED_TO_PLAYLIST`,
           )
           const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
           console.log(
@@ -1372,11 +1371,11 @@ routerAdd(
             song_id: songId,
             holyrics_song_id: holyricsSongId,
             song_title: songTitle,
-            action: 'ADD_LYRICS_TO_PLAYLIST',
+            action: 'ADD_TO_PLAYLIST',
             stage: 'CONFIRMED_IN_PLAYLIST',
             status: 'SUCCESS',
             duration_ms: addRes.duration_ms,
-            details: { index: playlistIndexBase0, repertoire_order: repertoireOrder },
+            details: { index: -1, repertoire_order: repertoireOrder, event_id: holyricsEventId },
           })
 
           results.push({
@@ -1397,7 +1396,7 @@ routerAdd(
           // O {"status":"ok"} nunca é prova suficiente. Mensagem técnica real exata
           const technicalAddError =
             addRes.status === 'DONE'
-              ? 'AddLyricsToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação.'
+              ? 'AddToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação.'
               : addRes.error ||
                 (addRes.status === 'PENDING'
                   ? 'Tempo limite de resposta do LouvorFlow Agent esgotado na inserção na playlist (TIMEOUT).'
@@ -1411,7 +1410,7 @@ routerAdd(
           countErrors++
 
           logSteps.push(
-            `AddLyricsToPlaylist → ${addRes.status} | GetSongPlaylist Confirm → NOT_FOUND | FINAL → ERROR`,
+            `AddToPlaylist → ${addRes.status} | GetSongPlaylist Confirm → NOT_FOUND | FINAL → ERROR`,
           )
           console.log(
             `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')}`,
@@ -1423,7 +1422,7 @@ routerAdd(
             song_id: songId,
             holyrics_song_id: holyricsSongId,
             song_title: songTitle,
-            action: 'ADD_LYRICS_TO_PLAYLIST',
+            action: 'ADD_TO_PLAYLIST',
             stage: 'FAILED_PLAYLIST_CONFIRMATION',
             status: 'ERROR',
             error: technicalAddError,
@@ -1436,10 +1435,10 @@ routerAdd(
             song_id: songId,
             song_title: songTitle,
             holyrics_song_id: holyricsSongId,
-            action: 'ADD_LYRICS_TO_PLAYLIST',
+            action: 'ADD_TO_PLAYLIST',
             status: 'ERROR',
             error: technicalAddError,
-            detail: `${songStatusLabel} • ✕ Etapa: AddLyricsToPlaylist — ${technicalAddError}`,
+            detail: `${songStatusLabel} • ✕ Etapa: AddToPlaylist — ${technicalAddError}`,
           })
         }
       } finally {

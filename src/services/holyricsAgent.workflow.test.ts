@@ -114,7 +114,10 @@ describe('Holyrics Repertoire Sync v0.0.31 - Auditoria Completa e Máquina de Es
     expect(appearsImmediately).toBe(false)
 
     // O ID recebido de CreateSong é preservado e deve ser usado para adicionar na playlist
-    const addToPlaylistRes = await client.addToPlaylist(createRes.id!, { index: 0 })
+    const addToPlaylistRes = await client.addToPlaylist(createRes.id!, {
+      eventId: 'evt_holyrics_wf',
+      index: 0,
+    })
     expect(addToPlaylistRes.success).toBe(true)
   })
 
@@ -299,7 +302,7 @@ describe('Holyrics Repertoire Sync v0.0.31 - Auditoria Completa e Máquina de Es
     const initialPlaylist = await client.getSongPlaylist()
     expect(initialPlaylist.items.some((i) => i.id === '444444')).toBe(false)
 
-    const addRes = await client.addToPlaylist('444444', { index: 2 })
+    const addRes = await client.addToPlaylist('444444', { eventId: 'evt_holyrics_wf', index: 2 })
     expect(addRes.success).toBe(true)
 
     const confirmedPlaylist = await client.getSongPlaylist()

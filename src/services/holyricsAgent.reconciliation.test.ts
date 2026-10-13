@@ -173,7 +173,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
     expect(createRes.id).not.toBe(oldObsoleteId)
 
     // Passo 3: Inclusão na playlist usando o NOVO ID
-    const addRes = await client.addToPlaylist(createRes.id!, { index: 0 })
+    const addRes = await client.addToPlaylist(createRes.id!, { eventId: 'hly_evt_recon', index: 0 })
     expect(addRes.success).toBe(true)
     expect(addedToPlaylistId).toBe(newCreatedId)
 
@@ -250,7 +250,10 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
     expect(playlistCheck.items.some((i) => i.id === validHolyricsId)).toBe(false)
 
     // Adiciona à playlist
-    const addRes = await client.addToPlaylist(validHolyricsId, { index: 0 })
+    const addRes = await client.addToPlaylist(validHolyricsId, {
+      eventId: 'hly_evt_recon',
+      index: 0,
+    })
     expect(addRes.success).toBe(true)
     expect(addLyricsCalls).toBe(1)
     expect(createSongSpy).not.toHaveBeenCalled()
@@ -374,7 +377,11 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
     ]
 
     for (let i = 0; i < repertoire.length; i++) {
-      await client.addToPlaylist(repertoire[i].holyricsId, { index: i, media_playlist: false })
+      await client.addToPlaylist(repertoire[i].holyricsId, {
+        eventId: 'hly_evt_order',
+        index: i,
+        media_playlist: false,
+      })
     }
 
     expect(addedIndices).toEqual([

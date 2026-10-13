@@ -119,16 +119,19 @@ describe('HolyricsClient Local Unit Tests', () => {
     expect(searchRes.matches[0].title).toBe('Bondade de Deus')
   })
 
-  it('AddLyricsToPlaylist: envia requisição formatada e obtém ok', async () => {
+  it('AddToPlaylist: envia requisição formatada e obtém ok', async () => {
     const client = new HolyricsClient('127.0.0.1', 8091, 'valid-token')
 
     globalThis.fetch = vi.fn().mockImplementation((url, init) => {
-      // Holyrics local API action
-      const actionParam = 'AddLyricsToPlaylist'
+      // Holyrics local API action unificada
+      const actionParam = 'AddToPlaylist'
       expect(String(url)).toContain(actionParam)
       expect(String(url)).toContain('token=valid-token')
       const body = JSON.parse(init.body)
-      expect(body.id).toBe('hly_101')
+      expect(body.items[0].id).toBe('hly_101')
+      expect(body.event_id).toBe('hly_occ_555')
+      expect(body.index).toBe(-1)
+      expect(body.ignore_duplicates).toBe(true)
 
       return Promise.resolve({
         status: 200,
@@ -145,7 +148,7 @@ describe('HolyricsClient Local Unit Tests', () => {
       } as any)
     })
 
-    const addRes = await client.addToPlaylist('hly_101')
+    const addRes = await client.addToPlaylist('hly_101', { eventId: 'hly_occ_555' })
     expect(addRes.success).toBe(true)
   })
 })

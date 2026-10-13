@@ -382,30 +382,54 @@ export class LouvorFlowAgent {
 
         case 'ADD_TO_PLAYLIST':
         case 'ADD_LYRICS_TO_PLAYLIST': {
-          const holyricsSongId = String(
-            cmd.payload?.holyrics_song_id || cmd.payload?.id || '',
-          ).trim()
+          // Extrai ID da música (pode vir no item unificado ou direto)
+          let holyricsSongId = String(cmd.payload?.holyrics_song_id || cmd.payload?.id || '').trim()
+          if (
+            !holyricsSongId &&
+            Array.isArray(cmd.payload?.items) &&
+            cmd.payload.items.length > 0
+          ) {
+            const firstItem = cmd.payload.items[0]
+            holyricsSongId = String(firstItem?.id || firstItem?.holyrics_song_id || '').trim()
+          }
+
           if (!holyricsSongId) {
             status = 'FAILED'
             errorMsg = 'holyrics_song_id não informado no payload.'
             errorCode = 'MISSING_SONG_ID'
             break
           }
+
+          // Etapa 3B: event_id da ocorrência no Holyrics é OBRIGATÓRIO
+          const eventId = String(cmd.payload?.event_id || '').trim()
+          if (!eventId) {
+            status = 'FAILED'
+            errorMsg = 'event_id da ocorrência do culto no Holyrics é obrigatório.'
+            errorCode = 'MISSING_EVENT_ID'
+            resultPayload = { error_code: errorCode }
+            break
+          }
+
           const playlistIndex =
             cmd.payload?.index !== undefined && cmd.payload?.index !== null
               ? Number(cmd.payload.index)
-              : undefined
+              : -1
+          const ignoreDuplicates = cmd.payload?.ignore_duplicates ?? true
           const mediaPlaylist = cmd.payload?.media_playlist ?? false
 
           const addRes = await this.holyrics.addToPlaylist(holyricsSongId, {
+            eventId,
             index: playlistIndex,
+            ignoreDuplicates,
             media_playlist: mediaPlaylist,
           })
+
           if (addRes.success) {
             status = 'DONE'
             resultPayload = {
               added: true,
               holyrics_song_id: holyricsSongId,
+              event_id: eventId,
               title: cmd.payload?.title,
               index: playlistIndex,
               data: addRes.data,
@@ -673,8 +697,33 @@ export class LouvorFlowAgent {
     error_code?: string
   }> {
     const payload = cmd.payload || {}
-    const eventId = payload.event_id ? String(payload.event_id) : undefined
+    const eventId = String(payload.event_id || '').trim()
     const itemsRaw = Array.isArray(payload.items) ? payload.items : []
+
+    // Validação estrita de event_id da ocorrência vinculada (Regra Etapa 3B)
+    if (!eventId) {
+      const errMissingEvent =
+        'event_id da ocorrência do culto no Holyrics ausente no payload do comando SYNC_MEDIA_PLAYLIST.'
+      console.error(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          event: 'sync_media_error',
+          command_id: cmd.command_id,
+          stage: 'VALIDATE_EVENT_ID',
+          holyrics_event_id: null,
+          api_method: null,
+          http_status: null,
+          error_message: errMissingEvent,
+          error_code: 'MISSING_EVENT_ID',
+        }),
+      )
+      return {
+        success: false,
+        error: errMissingEvent,
+        error_code: 'MISSING_EVENT_ID',
+        result: { synced_count: 0, failed_count: itemsRaw.length, items: [] },
+      }
+    }
 
     if (itemsRaw.length === 0) {
       return {
@@ -707,22 +756,72 @@ export class LouvorFlowAgent {
       return orderA - orderB
     })
 
-    // Consulta playlist atual para verificar existência prévia e não duplicar músicas/versículos/mídias existentes
+    // Deriva mês e ano para consultar GetSchedules da ocorrência vinculada
+    let eventDateMonth = new Date().getMonth() + 1
+    let eventDateYear = new Date().getFullYear()
+    if (payload.event_date && typeof payload.event_date === 'string') {
+      const dMatch = payload.event_date.match(/^(\d{4})-(\d{2})/)
+      if (dMatch) {
+        eventDateYear = parseInt(dMatch[1], 10)
+        eventDateMonth = parseInt(dMatch[2], 10)
+      }
+    }
+
+    // Consulta ocorrência de destino via GetSchedules (ou GetPlaylist como fallback complementar)
+    // para verificar mídias já presentes na playlist daquele evento específico
     let existingItemNames = new Set<string>()
+    let targetScheduleFound = false
     try {
-      const currentPlaylist = await this.holyrics.getPlaylist({
-        type: 'all',
-      })
-      if (currentPlaylist.success && Array.isArray(currentPlaylist.items)) {
-        for (const item of currentPlaylist.items) {
-          const name = String(item.name || item.title || '')
-            .trim()
-            .toLowerCase()
-          if (name) existingItemNames.add(name)
+      const schedRes = await this.holyrics.getSchedules(eventDateMonth, eventDateYear)
+      if (schedRes.success && Array.isArray(schedRes.schedules)) {
+        // Localiza a ocorrência específica pelo event_id persistido
+        const targetSchedule = schedRes.schedules.find((s: any) => {
+          const sId = String(
+            s.id || s.event_id || s.metadata?.event?.id || s.event?.id || '',
+          ).trim()
+          return sId === eventId
+        })
+
+        if (targetSchedule) {
+          targetScheduleFound = true
+          const plItems =
+            targetSchedule.playlist?.items ||
+            targetSchedule.playlist ||
+            targetSchedule.items ||
+            targetSchedule.metadata?.event?.playlist?.items ||
+            []
+          if (Array.isArray(plItems)) {
+            for (const item of plItems) {
+              const name = String(item.name || item.title || item.file_name || '')
+                .trim()
+                .toLowerCase()
+              if (name) existingItemNames.add(name)
+            }
+          }
         }
       }
     } catch (_) {
-      // Falha não impeditiva na leitura prévia
+      // Falha não-impeditiva em GetSchedules pré-inserção
+    }
+
+    // Se GetSchedules não encontrou a playlist da ocorrência, consulta GetPlaylist com event_id
+    if (existingItemNames.size === 0) {
+      try {
+        const currentPlaylist = await this.holyrics.getPlaylist({
+          type: 'all',
+          event_id: eventId,
+        })
+        if (currentPlaylist.success && Array.isArray(currentPlaylist.items)) {
+          for (const item of currentPlaylist.items) {
+            const name = String(item.name || item.title || '')
+              .trim()
+              .toLowerCase()
+            if (name) existingItemNames.add(name)
+          }
+        }
+      } catch (_) {
+        // Falha não impeditiva na leitura prévia
+      }
     }
 
     const itemsToAdd: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }> = []
@@ -752,6 +851,7 @@ export class LouvorFlowAgent {
             event: 'sync_media_error',
             command_id: cmd.command_id,
             stage: 'VALIDATE_FILENAME',
+            holyrics_event_id: eventId,
             media_type: mediaType || 'UNKNOWN',
             file_name: 'UNKNOWN',
             api_method: null,
@@ -805,6 +905,7 @@ export class LouvorFlowAgent {
             event: 'sync_media_error',
             command_id: cmd.command_id,
             stage: 'CHECK_LOCAL_DISK',
+            holyrics_event_id: eventId,
             media_type: holyricsType,
             file_name: fileName,
             api_method: null,
@@ -863,6 +964,7 @@ export class LouvorFlowAgent {
             event: 'sync_media_error',
             command_id: cmd.command_id,
             stage: 'VERIFY_HOLYRICS_RECOGNITION',
+            holyrics_event_id: eventId,
             media_type: holyricsType,
             file_name: fileName,
             api_method: 'GetFile',
@@ -885,7 +987,7 @@ export class LouvorFlowAgent {
         continue
       }
 
-      // Prevenção de duplicações na playlist existente
+      // Prevenção de duplicações na playlist da ocorrência de destino
       const lowerName = fileName.toLowerCase()
       if (existingItemNames.has(lowerName)) {
         detailedResults.push({
@@ -907,38 +1009,100 @@ export class LouvorFlowAgent {
     let addedCount = 0
     let failedCount = 0
 
-    // Passo 5: Chamar AddToPlaylist sem event_id do SaaS
+    // Passo 5: Chamar AddToPlaylist com event_id obrigatório da ocorrência do culto
     if (itemsToAdd.length > 0) {
+      console.log(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          event: 'sync_media_execute',
+          command_id: cmd.command_id,
+          stage: 'ADD_TO_PLAYLIST',
+          holyrics_event_id: eventId,
+          items_count: itemsToAdd.length,
+          api_method: 'AddToPlaylist',
+        }),
+      )
+
       const addRes = await this.holyrics.addMediaToPlaylist({
         items: itemsToAdd,
+        eventId: eventId,
+        index: -1,
         ignoreDuplicates: true,
       })
 
       if (addRes.success) {
-        // Passo 6: Consultar a playlist resultante e verificar os itens adicionados
+        // Passo 6: Verificação rigorosa pós-inserção na playlist da ocorrência de destino.
+        // O status "ok" da API HTTP NÃO é prova de inserção efetiva.
+        // Consultamos a ocorrência via GetSchedules (payload mínimo {month, year})
+        // com fallback para GetPlaylist({ type: 'all', event_id: eventId }).
         let verifiedNames = new Set<string>()
+        let verificationMethodUsed = 'none'
         let postPlaylistError = ''
+
         try {
-          const postPlaylist = await this.holyrics.getPlaylist({
-            type: 'all',
-          })
-          if (postPlaylist.success && Array.isArray(postPlaylist.items)) {
-            for (const item of postPlaylist.items) {
-              const name = String(item.name || item.title || '')
-                .trim()
-                .toLowerCase()
-              if (name) verifiedNames.add(name)
+          const verifySchedRes = await this.holyrics.getSchedules(eventDateMonth, eventDateYear)
+          if (verifySchedRes.success && Array.isArray(verifySchedRes.schedules)) {
+            const destSchedule = verifySchedRes.schedules.find((s: any) => {
+              const sId = String(
+                s.id || s.event_id || s.metadata?.event?.id || s.event?.id || '',
+              ).trim()
+              return sId === eventId
+            })
+            if (destSchedule) {
+              const destPlItems =
+                destSchedule.playlist?.items ||
+                destSchedule.playlist ||
+                destSchedule.items ||
+                destSchedule.metadata?.event?.playlist?.items ||
+                []
+              if (Array.isArray(destPlItems) && destPlItems.length > 0) {
+                verificationMethodUsed = 'GetSchedules'
+                for (const it of destPlItems) {
+                  const itName = String(it.name || it.title || it.file_name || '')
+                    .trim()
+                    .toLowerCase()
+                  if (itName) verifiedNames.add(itName)
+                }
+              }
             }
-          } else {
-            postPlaylistError = postPlaylist.error || 'Falha ao consultar GetPlaylist pós-inserção'
           }
         } catch (err: any) {
-          postPlaylistError = err.message || 'Exceção ao consultar GetPlaylist pós-inserção'
+          postPlaylistError = `GetSchedules error: ${err.message}`
+        }
+
+        // Fallback: se GetSchedules não listou os itens da playlist da ocorrência,
+        // consulta GetPlaylist passando event_id
+        if (verifiedNames.size === 0) {
+          try {
+            const postPlaylist = await this.holyrics.getPlaylist({
+              type: 'all',
+              event_id: eventId,
+            })
+            if (
+              postPlaylist.success &&
+              Array.isArray(postPlaylist.items) &&
+              postPlaylist.items.length > 0
+            ) {
+              verificationMethodUsed = 'GetPlaylist'
+              for (const item of postPlaylist.items) {
+                const name = String(item.name || item.title || '')
+                  .trim()
+                  .toLowerCase()
+                if (name) verifiedNames.add(name)
+              }
+            } else if (!postPlaylist.success) {
+              postPlaylistError =
+                postPlaylist.error || 'Falha ao consultar GetPlaylist pós-inserção'
+            }
+          } catch (err: any) {
+            postPlaylistError = err.message || 'Exceção ao consultar GetPlaylist pós-inserção'
+          }
         }
 
         for (const added of itemsToAdd) {
-          const isVerified = verifiedNames.size > 0 && verifiedNames.has(added.name.toLowerCase())
-          if (isVerified || (verifiedNames.size === 0 && !postPlaylistError)) {
+          const isVerified = verifiedNames.has(added.name.toLowerCase())
+          // Se a verificação confirmou o item na playlist da ocorrência
+          if (isVerified) {
             detailedResults.push({
               name: added.name,
               status: 'ADDED',
@@ -946,36 +1110,45 @@ export class LouvorFlowAgent {
             })
             addedCount++
           } else {
+            // Se o item não pôde ser confirmado na playlist da ocorrência de destino,
+            // marca como FAILED com erro técnico de inclusão/verificação.
+            // O arquivo físico permanece intacto em disco para que a retentativa
+            // ocorra sem precisar re-transferir o arquivo!
             const errorCode = 'PLAYLIST_VERIFICATION_FAILED'
             const errorMsg = postPlaylistError
-              ? `Holyrics aceitou AddToPlaylist mas a verificação falhou: ${postPlaylistError}`
-              : `Holyrics respondeu sucesso em AddToPlaylist, mas o arquivo "${added.name}" não foi encontrado na playlist consultada.`
+              ? `Holyrics aceitou AddToPlaylist para a ocorrência #${eventId}, mas a verificação falhou: ${postPlaylistError}`
+              : `Holyrics respondeu ok em AddToPlaylist para a ocorrência #${eventId}, mas a mídia "${added.name}" não foi confirmada na playlist da ocorrência de destino.`
+
             console.error(
               JSON.stringify({
                 timestamp: new Date().toISOString(),
                 event: 'sync_media_error',
                 command_id: cmd.command_id,
-                stage: 'VERIFY_RESULTING_PLAYLIST',
+                stage: 'VERIFY_SCHEDULE_PLAYLIST',
+                holyrics_event_id: eventId,
                 media_type: added.type,
                 file_name: added.name,
-                api_method: 'GetPlaylist',
+                api_method:
+                  verificationMethodUsed !== 'none' ? verificationMethodUsed : 'GetSchedules',
                 http_status: 200,
                 error_message: errorMsg,
                 error_code: errorCode,
               }),
             )
+
             detailedResults.push({
               name: added.name,
               status: 'FAILED',
-              error: `${errorMsg} Ação recomendada: verifique se o Holyrics está com a playlist aberta.`,
+              error: `${errorMsg} (O arquivo está salvo em disco; nova tentativa não re-transferirá).`,
               error_code: errorCode,
-              stage: 'VERIFY_RESULTING_PLAYLIST',
+              stage: 'VERIFY_SCHEDULE_PLAYLIST',
               media_type: added.type,
             })
             failedCount++
           }
         }
       } else {
+        // Falha no AddToPlaylist HTTP
         const errorCode = addRes.error_code || 'ADD_TO_PLAYLIST_API_ERROR'
         const errorMsg = addRes.error || 'Erro na API Holyrics AddToPlaylist'
         console.error(
@@ -984,6 +1157,7 @@ export class LouvorFlowAgent {
             event: 'sync_media_error',
             command_id: cmd.command_id,
             stage: 'ADD_TO_PLAYLIST',
+            holyrics_event_id: eventId,
             media_type: 'multiple',
             file_name: itemsToAdd.map((it) => it.name).join(', '),
             api_method: 'AddToPlaylist',
@@ -997,7 +1171,7 @@ export class LouvorFlowAgent {
           detailedResults.push({
             name: added.name,
             status: 'FAILED',
-            error: `${errorMsg}. Ação recomendada: verifique se a API do Holyrics está habilitada com permissão de playlist.`,
+            error: `${errorMsg} (Arquivo preservado em disco para retentativa sem re-transferência).`,
             error_code: errorCode,
             stage: 'ADD_TO_PLAYLIST',
             media_type: added.type,
@@ -1022,7 +1196,7 @@ export class LouvorFlowAgent {
 
     if (failedCount > 0 && addedCount === 0 && alreadyPresentCount === 0) {
       const firstFailure = detailedResults.find((r) => r.status === 'FAILED')
-      summaryError = firstFailure?.error || 'Falha ao incluir mídias na playlist'
+      summaryError = firstFailure?.error || 'Falha ao incluir mídias na playlist da ocorrência.'
       summaryErrorCode = firstFailure?.error_code || 'SYNC_MEDIA_PLAYLIST_FAILED'
     } else if (notRecognizedCount > 0 && addedCount === 0 && alreadyPresentCount === 0) {
       summaryError = 'Mídia física presente no disco, mas ainda não reconhecida pelo Holyrics.'
@@ -1038,6 +1212,7 @@ export class LouvorFlowAgent {
         addedCount > 0 ||
         alreadyPresentCount > 0,
       result: {
+        event_id: eventId,
         synced_count: addedCount,
         already_present_count: alreadyPresentCount,
         pending_local_count: pendingLocalCount,

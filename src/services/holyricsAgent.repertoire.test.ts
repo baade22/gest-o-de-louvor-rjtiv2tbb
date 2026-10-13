@@ -133,7 +133,11 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
     expect(step4.items.some((i) => i.id === '1790728009858')).toBe(false)
 
     // Adiciona à Playlist
-    const step5 = await client.addToPlaylist('1790728009858', { index: 0, media_playlist: false })
+    const step5 = await client.addToPlaylist('1790728009858', {
+      eventId: 'evt_holyrics_rep',
+      index: 0,
+      media_playlist: false,
+    })
     expect(step5.success).toBe(true)
 
     // Confirmação GetSongPlaylist
@@ -253,7 +257,11 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
     })
     globalThis.fetch = fetchMock
 
-    const addRes = await client.addToPlaylist('1790729773014', { index: 1, media_playlist: false })
+    const addRes = await client.addToPlaylist('1790729773014', {
+      eventId: 'evt_holyrics_rep',
+      index: 1,
+      media_playlist: false,
+    })
     expect(addRes.success).toBe(true)
 
     const checkRes = await client.getSongPlaylist()
@@ -317,7 +325,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
     })
     globalThis.fetch = fetchMock
 
-    const addRes = await client.addToPlaylist('1790728009858')
+    const addRes = await client.addToPlaylist('1790728009858', { eventId: 'evt_holyrics_rep' })
     expect(addRes.success).toBe(true)
 
     // Verificação estrita

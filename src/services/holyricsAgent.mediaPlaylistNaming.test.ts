@@ -505,8 +505,8 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     expect(res.result?.holyrics_detected).toBe(false)
   })
 
-  // 15. Compatibilidade com a sincronização musical existente
-  it('15. Preserva integralmente o método e comportamento AddLyricsToPlaylist para músicas', async () => {
+  // 15. Compatibilidade unificada com AddToPlaylist e event_id na Etapa 3B
+  it('15. Preserva ação unificada AddToPlaylist para músicas com event_id obrigatório da ocorrência', async () => {
     const client = new HolyricsClient(
       agentConfig.holyricsHost,
       agentConfig.holyricsPort,
@@ -518,15 +518,20 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       data: { playlist: ['song_1'] },
     })
 
-    const res = await client.addToPlaylist('song_hly_123', { index: 0 })
+    const res = await client.addToPlaylist('song_hly_123', {
+      eventId: 'occ_hly_999',
+      index: -1,
+      ignoreDuplicates: true,
+    })
     expect(res.success).toBe(true)
-    // Confirma payload oficial mínimo { id, media_playlist, index }
+    // Confirma payload oficial mínimo com event_id da ocorrência vinculada
     expect(requestSpy).toHaveBeenCalledWith(
-      'AddLyricsToPlaylist',
+      'AddToPlaylist',
       {
-        id: 'song_hly_123',
-        media_playlist: false,
-        index: 0,
+        items: [{ type: 'song', id: 'song_hly_123' }],
+        event_id: 'occ_hly_999',
+        index: -1,
+        ignore_duplicates: true,
       },
       5000,
     )
@@ -595,16 +600,24 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     })
   })
 
-  // 17. Payload de AddToPlaylist sem event_id do SaaS e com { items, ignore_duplicates: true } usando nome físico
-  it('17. Payload de AddToPlaylist usa exatamente { items, ignore_duplicates: true } sem event_id do SaaS', async () => {
+  // 17. Payload de AddToPlaylist com event_id da ocorrência repassado intacto
+  it('17. Payload de AddToPlaylist usa exatamente { items, event_id, index, ignore_duplicates: true } com event_id da ocorrência', async () => {
     const agent = new LouvorFlowAgent(agentConfig)
     let capturedPayload: any = null
 
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
-    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+      success: true,
+      schedules: [
+        {
+          id: 'hly_occ_dest_123',
+          playlist: { items: [{ name: 'Culto - Video.mp4' }] },
+        },
+      ],
+    })
     vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
 
-    // Intercepta a chamada de rede ou método addMediaToPlaylist
+    // Intercepta a chamada addMediaToPlaylist
     const addMediaSpy = vi
       .spyOn((agent as any).holyrics, 'addMediaToPlaylist')
       .mockImplementation(async (params: any) => {
@@ -619,7 +632,8 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       command_id: 'cmd_payload_check',
       action: 'SYNC_MEDIA_PLAYLIST',
       payload: {
-        event_id: 'saas_event_never_sent_to_holyrics',
+        event_id: 'hly_occ_dest_123',
+        event_date: '2025-05-18',
         items: [
           {
             holyrics_filename: 'Culto - Video.mp4',
@@ -636,11 +650,10 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     expect(res.success).toBe(true)
     expect(capturedPayload).toEqual({
       items: [{ type: 'video', name: 'Culto - Video.mp4' }],
+      eventId: 'hly_occ_dest_123',
+      index: -1,
       ignoreDuplicates: true,
     })
-    // Garante que event_id do SaaS não vazou no parâmetro
-    expect(capturedPayload.event_id).toBeUndefined()
-    expect(capturedPayload.eventId).toBeUndefined()
   })
 
   // 18. Mídia não reconhecida retornando estado explícito MEDIA_NOT_RECOGNIZED
@@ -897,6 +910,16 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         created_at: new Date().toISOString(),
       }
 
+      vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+        success: true,
+        schedules: [
+          {
+            id: 'evt_1',
+            playlist: { items: [{ name: fileName }] },
+          },
+        ],
+      })
+
       const res = await agent.handleSyncMediaPlaylist(cmd)
       expect(callCount).toBe(2)
       expect(res.success).toBe(true)
@@ -904,6 +927,8 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       expect(res.result?.not_recognized_count).toBe(0)
       expect(addMediaSpy).toHaveBeenCalledWith({
         items: [{ type: 'audio', name: fileName }],
+        eventId: 'evt_1',
+        index: -1,
         ignoreDuplicates: true,
       })
     })
@@ -1220,6 +1245,22 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         .mockResolvedValue({
           success: true,
         })
+
+      vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+        success: true,
+        schedules: [
+          {
+            id: 'evt_consist',
+            playlist: {
+              items: [
+                {
+                  name: 'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
+                },
+              ],
+            },
+          },
+        ],
+      })
 
       const cmdSync: AgentCommand = {
         id: 'cmd_sync_consist',

@@ -213,8 +213,8 @@ describe('Validação de Correções P1, P2 e P3 - LouvorFlow ↔ Holyrics Agent
     expect(addPayloadItems[1].name).toBe('Video2.mp4')
   })
 
-  // Regressão: Sincronização Musical
-  it('Regressão: Sincronização musical AddLyricsToPlaylist preserva payload mínimo oficial', async () => {
+  // Regressão: Sincronização Musical Unificada com AddToPlaylist e event_id obrigatório (Etapa 3B)
+  it('Etapa 3B: Sincronização musical AddToPlaylist preserva payload mínimo oficial com event_id', async () => {
     const agent = new LouvorFlowAgent(agentConfig)
     const client = (agent as any).holyrics
 
@@ -223,14 +223,19 @@ describe('Validação de Correções P1, P2 e P3 - LouvorFlow ↔ Holyrics Agent
       data: { playlist: ['hly_song_999'] },
     })
 
-    const res = await client.addToPlaylist('hly_song_999', { index: 0 })
+    const res = await client.addToPlaylist('hly_song_999', {
+      eventId: 'hly_occ_777',
+      index: -1,
+      ignoreDuplicates: true,
+    })
     expect(res.success).toBe(true)
     expect(reqSpy).toHaveBeenCalledWith(
-      'AddLyricsToPlaylist',
+      'AddToPlaylist',
       {
-        id: 'hly_song_999',
-        media_playlist: false,
-        index: 0,
+        items: [{ type: 'song', id: 'hly_song_999' }],
+        event_id: 'hly_occ_777',
+        index: -1,
+        ignore_duplicates: true,
       },
       5000,
     )

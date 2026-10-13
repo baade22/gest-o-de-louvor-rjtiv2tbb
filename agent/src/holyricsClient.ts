@@ -800,33 +800,62 @@ export class HolyricsClient {
   }
 
   /**
-   * AddLyricsToPlaylist: Adiciona uma letra identificada pelo ID à playlist do Holyrics
-   * Formato oficial validado:
-   * POST /api/AddLyricsToPlaylist?token=...
-   * Body: { id: "<HOLYRICS_SONG_ID>", index: <posição>, media_playlist: false }
+   * AddToPlaylist: Adiciona itens (músicas ou mídias) à playlist da ocorrência do culto no Holyrics.
+   * Regra Etapa 3B: Tanto músicas quanto mídias devem ser enviadas exclusivamente pela ação AddToPlaylist
+   * do Holyrics, sempre com o event_id da ocorrência vinculada ao culto no SaaS.
+   * Payload mínimo oficial:
+   * POST /api/AddToPlaylist?token=...
+   * Body: {
+   *   items: [{ type: "song" | "video" | "image" | "audio" | "file", id?: string, name?: string }],
+   *   event_id: string,
+   *   index: number,
+   *   ignore_duplicates: boolean
+   * }
    */
   public async addToPlaylist(
     songId: string,
-    options?: { index?: number; media_playlist?: boolean },
+    options: {
+      eventId: string
+      index?: number
+      ignoreDuplicates?: boolean
+      media_playlist?: boolean
+    },
   ): Promise<{
     success: boolean
     data?: any
     error?: string
     error_code?: string
     rawResponse?: any
+    payloadSent?: Record<string, any>
+    httpStatus?: number
   }> {
-    const payload: Record<string, any> = {
-      id: songId,
-      media_playlist: options?.media_playlist ?? false,
-    }
-    if (options?.index !== undefined && options?.index !== null) {
-      payload.index = Number(options.index)
+    const eventId = String(options?.eventId || '').trim()
+    if (!eventId) {
+      return {
+        success: false,
+        error: 'event_id da ocorrência no Holyrics é obrigatório para AddToPlaylist.',
+        error_code: 'MISSING_EVENT_ID',
+      }
     }
 
-    // 1. Chamada primária com o payload oficial validado
-    const res = await this.request('AddLyricsToPlaylist', payload, 5000)
+    // Payload mínimo oficial conforme regra Holyrics 2.30.0 (sem campos extras)
+    const payload: Record<string, any> = {
+      items: [{ type: 'song', id: songId }],
+      event_id: eventId,
+      index: options.index !== undefined && options.index !== null ? Number(options.index) : -1,
+      ignore_duplicates: options.ignoreDuplicates ?? true,
+    }
+
+    // 1. Chamada primária com a ação unificada AddToPlaylist
+    const res = await this.request('AddToPlaylist', payload, 5000)
     if (res.status === 'ok') {
-      return { success: true, data: res.data, rawResponse: res.data }
+      return {
+        success: true,
+        data: res.data,
+        rawResponse: res.data,
+        payloadSent: payload,
+        httpStatus: res.httpStatus,
+      }
     }
 
     const errStr =
@@ -834,25 +863,15 @@ export class HolyricsClient {
         ? res.error
         : res.error?.message || 'Falha ao adicionar à playlist'
 
-    // Se falha for de conexão ou timeout, não faz fallbacks e retorna imediatamente
+    // Se falha for de conexão ou timeout, encerra sem fallbacks indesejados
     if (errStr === 'TIMEOUT_HOLYRICS' || errStr.includes('CONNECTION_REFUSED')) {
       return {
         success: false,
         error: errStr,
         error_code: errStr === 'TIMEOUT_HOLYRICS' ? 'TIMEOUT_HOLYRICS' : 'CONNECTION_REFUSED',
+        payloadSent: payload,
+        httpStatus: res.httpStatus,
       }
-    }
-
-    // Fallback secundário documentado no Holyrics: { item: { id: "..." } }
-    const resFallback = await this.request('AddLyricsToPlaylist', { item: { id: songId } }, 4000)
-    if (resFallback.status === 'ok') {
-      return { success: true, data: resFallback.data, rawResponse: resFallback.data }
-    }
-
-    // Fallback AddToPlaylist
-    const resGeneric = await this.request('AddToPlaylist', { type: 'song', id: songId }, 4000)
-    if (resGeneric.status === 'ok') {
-      return { success: true, data: resGeneric.data, rawResponse: resGeneric.data }
     }
 
     const isAuthAdd =
@@ -867,22 +886,25 @@ export class HolyricsClient {
       success: false,
       error: errStr,
       error_code: isAuthAdd ? 'AUTH_FORBIDDEN' : 'ADD_PLAYLIST_FAILED',
+      payloadSent: payload,
+      httpStatus: res.httpStatus,
     }
   }
 
   /**
-   * AddMediaToPlaylist: Adiciona mídias à playlist do Holyrics via AddToPlaylist oficial
+   * AddMediaToPlaylist: Adiciona mídias à playlist da ocorrência do culto no Holyrics via AddToPlaylist oficial.
+   * Regra Etapa 3B: eventId é obrigatório e repassado no payload:
    * POST /api/AddToPlaylist?token=...
-   * Payload mínimo oficial:
-   * {
-   *   items: [{ type: "video" | "image" | "audio", name: "Nome Fisico.mp4" }],
-   *   index: number (opcional, base 0),
-   *   ignore_duplicates: true (evitar duplicar),
-   *   event_id?: string (opcional para Holyrics 2.26+)
+   * Body: {
+   *   items: [{ type: "video" | "image" | "audio" | "file", name: "Nome Fisico.mp4" }],
+   *   event_id: string,
+   *   index: number,
+   *   ignore_duplicates: boolean
    * }
    */
   public async addMediaToPlaylist(params: {
     items: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }>
+    eventId: string
     index?: number
     ignoreDuplicates?: boolean
   }): Promise<{
@@ -893,14 +915,21 @@ export class HolyricsClient {
     httpStatus?: number
     payloadSent?: Record<string, any>
   }> {
-    // Payload oficial suportado pelo Holyrics AddToPlaylist para mídias:
-    // NUNCA envia event_id do SaaS. Envia apenas items e ignore_duplicates (e index se fornecido).
+    const eventId = String(params.eventId || '').trim()
+    if (!eventId) {
+      return {
+        success: false,
+        error: 'event_id da ocorrência no Holyrics é obrigatório para addMediaToPlaylist.',
+        error_code: 'MISSING_EVENT_ID',
+      }
+    }
+
+    // Payload oficial com event_id da ocorrência vinculada ao culto no SaaS
     const payload: Record<string, any> = {
       items: params.items,
+      event_id: eventId,
+      index: params.index !== undefined && params.index !== null ? Number(params.index) : -1,
       ignore_duplicates: params.ignoreDuplicates ?? true,
-    }
-    if (params.index !== undefined && params.index !== null) {
-      payload.index = Number(params.index)
     }
 
     const res = await this.request('AddToPlaylist', payload, 6000)

@@ -265,10 +265,12 @@ routerAdd(
     const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19)
     cmdRec.set('created_at', nowIso)
 
+    const eventDateStr = eventRecord.getString('date') || ''
     const payload = {
       event_id: holyricsEventId,
       church_id: churchId,
       event_title: eventRecord.getString('title'),
+      event_date: eventDateStr,
       items: items,
     }
 
