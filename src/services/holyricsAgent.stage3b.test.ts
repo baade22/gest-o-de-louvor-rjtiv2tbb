@@ -146,15 +146,19 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
       connected: true,
       tokenValid: true,
     })
-    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
-      success: true,
-      schedules: [
-        {
-          id: 'exact_holyrics_event_id_12345',
-          playlist: { items: [{ name: 'Avisos.mp4' }] },
-        },
-      ],
-    })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+    // Ocorrência vazia antes da inserção; com a mídia na verificação pós-inserção
+    vi.spyOn((agent as any).holyrics, 'getSchedules')
+      .mockResolvedValueOnce({ success: true, schedules: [] })
+      .mockResolvedValue({
+        success: true,
+        schedules: [
+          {
+            id: 'exact_holyrics_event_id_12345',
+            playlist: { items: [{ name: 'Avisos.mp4' }] },
+          },
+        ],
+      })
     vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
     vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockImplementation(
       async (params: any) => {
@@ -214,6 +218,7 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
       tokenValid: true,
     })
     vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
     vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockImplementation(
       async (params: any) => {
         eventCalls.push({ eventId: params.eventId, items: params.items })
@@ -226,12 +231,14 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
     fs.writeFileSync(path.join(tempBaseDir, 'image', 'Banner_Culto_B.jpg'), 'dataB')
 
     // Culto A (manhã)
-    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValueOnce({
-      success: true,
-      schedules: [
-        { id: 'holyrics_occ_manha', playlist: { items: [{ name: 'Video_Culto_A.mp4' }] } },
-      ],
-    })
+    vi.spyOn((agent as any).holyrics, 'getSchedules')
+      .mockResolvedValueOnce({ success: true, schedules: [] })
+      .mockResolvedValueOnce({
+        success: true,
+        schedules: [
+          { id: 'holyrics_occ_manha', playlist: { items: [{ name: 'Video_Culto_A.mp4' }] } },
+        ],
+      })
     const cmdCultoA: AgentCommand = {
       id: 'cmd_culto_a',
       command_id: 'cmd_culto_a',
@@ -249,12 +256,14 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
     expect(resA.success).toBe(true)
 
     // Culto B (noite)
-    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValueOnce({
-      success: true,
-      schedules: [
-        { id: 'holyrics_occ_noite', playlist: { items: [{ name: 'Banner_Culto_B.jpg' }] } },
-      ],
-    })
+    vi.spyOn((agent as any).holyrics, 'getSchedules')
+      .mockResolvedValueOnce({ success: true, schedules: [] })
+      .mockResolvedValueOnce({
+        success: true,
+        schedules: [
+          { id: 'holyrics_occ_noite', playlist: { items: [{ name: 'Banner_Culto_B.jpg' }] } },
+        ],
+      })
     const cmdCultoB: AgentCommand = {
       id: 'cmd_culto_b',
       command_id: 'cmd_culto_b',
