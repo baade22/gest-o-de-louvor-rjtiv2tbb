@@ -7,6 +7,12 @@ import { Readable } from 'stream'
 import type { AgentConfig, AgentCommand, AgentStatusInfo } from './types.js'
 import { HolyricsClient } from './holyricsClient.js'
 import { saveConfig } from './config.js'
+import {
+  findEventSchedule,
+  findItemIdsToRemove,
+  getMediaPlaylist,
+  planSongReorder,
+} from './eventPlaylist.js'
 
 export class LouvorFlowAgent {
   private config: AgentConfig
@@ -110,7 +116,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.37',
+          version: '0.0.38',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -256,7 +262,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.37',
+          version: '0.0.38',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -603,6 +609,34 @@ export class LouvorFlowAgent {
           break
         }
 
+        case 'REMOVE_FROM_EVENT_PLAYLIST': {
+          const removeRes = await this.handleRemoveFromEventPlaylist(cmd)
+          if (removeRes.success) {
+            status = 'DONE'
+            resultPayload = removeRes.result
+          } else {
+            status = 'FAILED'
+            errorMsg = removeRes.error || 'Erro ao remover itens da playlist do culto.'
+            errorCode = removeRes.error_code || 'REMOVE_FROM_PLAYLIST_FAILED'
+            resultPayload = { error_code: errorCode, ...removeRes.result }
+          }
+          break
+        }
+
+        case 'REORDER_EVENT_SONGS': {
+          const reorderRes = await this.handleReorderEventSongs(cmd)
+          if (reorderRes.success) {
+            status = 'DONE'
+            resultPayload = reorderRes.result
+          } else {
+            status = 'FAILED'
+            errorMsg = reorderRes.error || 'Erro ao ordenar as músicas na playlist do culto.'
+            errorCode = reorderRes.error_code || 'REORDER_FAILED'
+            resultPayload = { error_code: errorCode, ...reorderRes.result }
+          }
+          break
+        }
+
         default:
           status = 'FAILED'
           errorMsg = `Ação desconhecida: ${cmd.action}`
@@ -705,6 +739,187 @@ export class LouvorFlowAgent {
    * 6. Move atomicamente para o destino final
    * 7. Consulta GetFile no Holyrics para testar indexação/reconhecimento
    */
+  /**
+   * Lê a media_playlist da ocorrência do culto via GetSchedules({ month, year }).
+   */
+  private async readEventMediaPlaylist(payload: Record<string, any>): Promise<{
+    success: boolean
+    playlist: import('./eventPlaylist.js').PlaylistItem[]
+    error?: string
+    error_code?: string
+  }> {
+    const eventId = String(payload.event_id || '').trim()
+    const month = Number(payload.month)
+    const year = Number(payload.year)
+    if (!eventId) {
+      return {
+        success: false,
+        playlist: [],
+        error: 'event_id da ocorrência do culto no Holyrics ausente.',
+        error_code: 'MISSING_EVENT_ID',
+      }
+    }
+    if (!Number.isFinite(month) || month < 1 || month > 12 || !Number.isFinite(year)) {
+      return {
+        success: false,
+        playlist: [],
+        error: 'month e year do culto são obrigatórios.',
+        error_code: 'MISSING_SCHEDULE_PARAMS',
+      }
+    }
+    const schedulesRes = await this.holyrics.getSchedules(month, year)
+    if (!schedulesRes.success) {
+      return {
+        success: false,
+        playlist: [],
+        error: schedulesRes.error || 'Erro ao consultar GetSchedules no Holyrics.',
+        error_code: schedulesRes.error_code || 'GET_SCHEDULES_FAILED',
+      }
+    }
+    const schedule = findEventSchedule(schedulesRes.schedules, eventId)
+    if (!schedule) {
+      return {
+        success: false,
+        playlist: [],
+        error: `Culto #${eventId} não encontrado na programação de ${month}/${year} do Holyrics.`,
+        error_code: 'EVENT_NOT_FOUND_IN_SCHEDULES',
+      }
+    }
+    return { success: true, playlist: getMediaPlaylist(schedule) }
+  }
+
+  /**
+   * REMOVE_FROM_EVENT_PLAYLIST: tira da playlist do culto as músicas (song_ids) e as
+   * mídias (media: [{ media_type, file_name }]) que saíram do LouvorFlow. Com
+   * delete_files: true, apaga também os arquivos que o Agent gravou na biblioteca.
+   */
+  public async handleRemoveFromEventPlaylist(cmd: AgentCommand): Promise<{
+    success: boolean
+    result?: Record<string, any>
+    error?: string
+    error_code?: string
+  }> {
+    const payload = cmd.payload || {}
+    const songIds: string[] = Array.isArray(payload.song_ids)
+      ? payload.song_ids.map((s: any) => String(s || '').trim()).filter(Boolean)
+      : []
+    const media: Array<{ media_type?: string; file_name?: string }> = Array.isArray(payload.media)
+      ? payload.media
+      : []
+    const mediaNames = media.map((m) => String(m?.file_name || '').trim()).filter(Boolean)
+
+    let removedIds: string[] = []
+    let playlistError = ''
+    let playlistErrorCode = ''
+
+    if (songIds.length > 0 || mediaNames.length > 0) {
+      const read = await this.readEventMediaPlaylist(payload)
+      if (!read.success) {
+        playlistError = read.error || ''
+        playlistErrorCode = read.error_code || ''
+      } else {
+        removedIds = findItemIdsToRemove(read.playlist, songIds, mediaNames)
+        const removeRes = await this.holyrics.removeFromMediaPlaylist(
+          removedIds,
+          String(payload.event_id),
+        )
+        if (!removeRes.success) {
+          playlistError = removeRes.error || ''
+          playlistErrorCode = removeRes.error_code || 'REMOVE_FROM_PLAYLIST_FAILED'
+          removedIds = []
+        }
+      }
+    }
+
+    const deletedFiles: string[] = []
+    if (payload.delete_files === true) {
+      for (const m of media) {
+        const filePath = this.resolveLibraryFile(m?.media_type, m?.file_name)
+        if (filePath && fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath)
+            deletedFiles.push(path.basename(filePath))
+          } catch (err: any) {
+            console.error(`[Agent Media] Não foi possível apagar "${filePath}": ${err.message}`)
+          }
+        }
+      }
+    }
+
+    const result = {
+      removed_items: removedIds.length,
+      deleted_files: deletedFiles,
+    }
+    if (playlistError) {
+      return { success: false, result, error: playlistError, error_code: playlistErrorCode }
+    }
+    return { success: true, result }
+  }
+
+  /**
+   * Caminho de um arquivo dentro da biblioteca de mídias do Holyrics, na subpasta do tipo.
+   * Nunca sai da biblioteca: usa só o nome do arquivo (sem pastas).
+   */
+  private resolveLibraryFile(mediaType?: string, fileName?: string): string {
+    const folders: Record<string, string> = {
+      IMAGEM: 'image',
+      VIDEO: 'video',
+      AUDIO: 'audio',
+      DOCUMENTO: 'automaticPresentations',
+    }
+    const folder = folders[String(mediaType || '').toUpperCase()]
+    const baseName = path.basename(String(fileName || '').replace(/\\/g, '/'))
+    if (!folder || !baseName || baseName === '.' || baseName === '..') return ''
+    return path.join(path.resolve(this.config.holyricsMediaPath), folder, baseName)
+  }
+
+  /**
+   * REORDER_EVENT_SONGS: deixa as músicas do culto na ordem do repertório
+   * (song_ids em ordem). Como a API não move itens, remove as músicas fora de ordem e
+   * as reinsere nas mesmas posições, na ordem certa. Mídias não se movem.
+   */
+  public async handleReorderEventSongs(cmd: AgentCommand): Promise<{
+    success: boolean
+    result?: Record<string, any>
+    error?: string
+    error_code?: string
+  }> {
+    const payload = cmd.payload || {}
+    const eventId = String(payload.event_id || '').trim()
+    const songIds: string[] = Array.isArray(payload.song_ids)
+      ? payload.song_ids.map((s: any) => String(s || '').trim()).filter(Boolean)
+      : []
+
+    const read = await this.readEventMediaPlaylist(payload)
+    if (!read.success) {
+      return { success: false, error: read.error, error_code: read.error_code }
+    }
+
+    const plan = planSongReorder(read.playlist, songIds)
+    if (!plan) return { success: true, result: { reordered: false } }
+
+    const removeRes = await this.holyrics.removeFromMediaPlaylist(plan.removeIds, eventId)
+    if (!removeRes.success) {
+      return { success: false, error: removeRes.error, error_code: removeRes.error_code }
+    }
+    for (const insert of plan.inserts) {
+      const addRes = await this.holyrics.addToPlaylist(insert.songId, {
+        eventId,
+        index: insert.index,
+        ignoreDuplicates: true,
+      })
+      if (!addRes.success) {
+        return {
+          success: false,
+          result: { reordered: false, failed_song_id: insert.songId },
+          error: addRes.error || 'Falha ao reinserir música na playlist.',
+          error_code: addRes.error_code || 'ADD_PLAYLIST_FAILED',
+        }
+      }
+    }
+    return { success: true, result: { reordered: true, moved: plan.inserts.length } }
+  }
+
   /**
    * handleSyncMediaPlaylist:
    * Processa o comando SYNC_MEDIA_PLAYLIST

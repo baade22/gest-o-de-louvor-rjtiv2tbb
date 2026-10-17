@@ -88,6 +88,8 @@ export interface AgentCommand {
     | 'TRANSFER_MEDIA'
     | 'SYNC_MEDIA_PLAYLIST'
     | 'GET_SCHEDULES'
+    | 'REMOVE_FROM_EVENT_PLAYLIST'
+    | 'REORDER_EVENT_SONGS'
   payload: Record<string, any>
   created_at: string
 }
