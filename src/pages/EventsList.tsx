@@ -13,13 +13,12 @@ import {
   Trash2,
   Edit,
   Users,
-  Music2,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,

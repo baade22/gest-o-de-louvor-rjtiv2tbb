@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import {
-  Music2,
-  Lock,
-  ShieldCheck,
-  Check,
-  ArrowRight,
-  AlertCircle,
-  Eye,
-  EyeOff,
-} from 'lucide-react'
+import { Music2, ShieldCheck, Check, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

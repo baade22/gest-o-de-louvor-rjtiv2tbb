@@ -2,13 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import crypto from 'crypto'
 import {
   generateHolyricsFileName,
   sanitizeWindowsSegment,
-  formatEventDayMonth,
   extractFileExtension,
-  removeAccents,
   cleanRepeatedExtension,
 } from '../lib/mediaNaming'
 import { LouvorFlowAgent } from '../../agent/src/agent'
