@@ -1485,6 +1485,69 @@ routerAdd(
       }
     }
 
+    // ETAPA 7: Ordem da playlist. Músicas que já estavam na playlist ficam onde estavam e as novas
+    // entram no fim, então o Agent (0.0.38+) reposiciona as músicas na ordem do repertório.
+    const orderedSongIds = results
+      .filter((r) => r.status === 'SUCCESS' && r.holyrics_song_id)
+      .sort((a, b) => a.order - b.order)
+      .map((r) => String(r.holyrics_song_id))
+    const versionAtLeast = (v, min) => {
+      const pa = String(v || '0')
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0)
+      const pb = String(min)
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0)
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0)
+      }
+      return true
+    }
+    let orderNote = ''
+    let playlistOrder = { status: 'SKIPPED' }
+    if (orderedSongIds.length > 1) {
+      if (!versionAtLeast(agentRecord.getString('version'), '0.0.38')) {
+        playlistOrder = { status: 'AGENT_OUTDATED' }
+        orderNote =
+          ' Para a playlist seguir a ordem do repertório, atualize o LouvorFlow Agent para a versão 0.0.38.'
+      } else if (!eventYear || !eventMonth) {
+        playlistOrder = { status: 'INVALID_EVENT_DATE' }
+      } else {
+        const reorderRes = runCommandSync(
+          'REORDER_EVENT_SONGS',
+          {
+            event_id: holyricsEventId,
+            month: eventMonth,
+            year: eventYear,
+            song_ids: orderedSongIds,
+          },
+          20000,
+        )
+        const reorderResult = unwrapCommandResult(reorderRes.result) || {}
+        if (reorderRes.status === 'DONE') {
+          playlistOrder = { status: reorderResult.reordered ? 'REORDERED' : 'ALREADY_ORDERED' }
+          if (reorderResult.reordered) orderNote = ' Ordem da playlist ajustada ao repertório.'
+        } else {
+          playlistOrder = { status: 'ERROR', error: reorderRes.error || reorderRes.status }
+          orderNote =
+            ' Não foi possível ajustar a ordem da playlist: ' +
+            (reorderRes.status === 'PENDING'
+              ? 'o Agent não respondeu a tempo.'
+              : reorderRes.error || 'erro no Holyrics.')
+        }
+        recordSyncLog({
+          command_id: reorderRes.command_id,
+          event_id: eventId,
+          action: 'REORDER_EVENT_SONGS',
+          stage: playlistOrder.status,
+          status: reorderRes.status === 'DONE' ? 'SUCCESS' : 'ERROR',
+          duration_ms: reorderRes.duration_ms,
+          error: playlistOrder.error || '',
+          details: { song_ids: orderedSongIds },
+        })
+      }
+    }
+
     const totalProcessed = eventSongRecords.length
     const isFullSuccess = countErrors === 0
 
@@ -1509,7 +1572,8 @@ routerAdd(
         already_in_playlist: countAlreadyInPlaylist,
         errors: countErrors,
       },
-      message: summaryMessage,
+      playlist_order: playlistOrder,
+      message: summaryMessage + orderNote,
     })
   },
   $apis.requireAuth(),

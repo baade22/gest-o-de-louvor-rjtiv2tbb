@@ -895,6 +895,35 @@ export class HolyricsClient {
   }
 
   /**
+   * RemoveFromMediaPlaylist: remove itens (pelo id do item na playlist) da playlist
+   * da ocorrência do culto no Holyrics.
+   * POST /api/RemoveFromMediaPlaylist?token=...
+   * Body: { ids: string[], event_id: string }
+   */
+  public async removeFromMediaPlaylist(
+    ids: string[],
+    eventId: string,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const cleanEventId = String(eventId || '').trim()
+    if (!cleanEventId) {
+      return {
+        success: false,
+        error: 'event_id da ocorrência no Holyrics é obrigatório para RemoveFromMediaPlaylist.',
+        error_code: 'MISSING_EVENT_ID',
+      }
+    }
+    if (ids.length === 0) return { success: true }
+
+    const res = await this.request('RemoveFromMediaPlaylist', { ids, event_id: cleanEventId }, 5000)
+    if (res.status === 'ok') return { success: true }
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Falha ao remover itens da playlist'
+    return { success: false, error: errStr, error_code: 'REMOVE_FROM_PLAYLIST_FAILED' }
+  }
+
+  /**
    * AddMediaToPlaylist: Adiciona mídias à playlist da ocorrência do culto no Holyrics via AddToPlaylist oficial.
    * Regra Etapa 3B: eventId é obrigatório e repassado no payload:
    * POST /api/AddToPlaylist?token=...
