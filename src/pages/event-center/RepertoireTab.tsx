@@ -213,6 +213,158 @@ export function RepertoireTab({
     }
   }
 
+  const renderParts = (item: EventSong, index: number) => {
+    const song = item.expand?.song_id
+    const original = song?.key
+    const key = item.custom_key || original
+    const sync = songSyncStatus(item.holyrics_status, item.holyrics_playlist_order)
+    const vocal = item.expand?.lead_vocal
+    const meta = [song?.artist, song?.bpm ? `${song.bpm} BPM` : null].filter(Boolean).join(' · ')
+    const keyEl = key ? (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 py-0.5 pl-2 pr-0.5">
+        {original && original !== key && (
+          <span className="text-xs font-semibold text-slate-400">{original} →</span>
+        )}
+        <span className="font-mono text-sm font-bold text-slate-900">{key}</span>
+        {canEdit && (
+          <>
+            <KeyStep label="Descer meio tom" onClick={() => changeKey(item, -1)}>
+              <Minus className="h-3 w-3" />
+            </KeyStep>
+            <KeyStep label="Subir meio tom" onClick={() => changeKey(item, 1)}>
+              <Plus className="h-3 w-3" />
+            </KeyStep>
+          </>
+        )}
+      </span>
+    ) : (
+      <span className="text-xs text-slate-400">—</span>
+    )
+    const vocalEl = canEdit ? (
+      <Select value={item.lead_vocal || NO_VOCAL} onValueChange={(v) => changeVocal(item, v)}>
+        <SelectTrigger
+          className="h-8 w-[150px] rounded-lg border-transparent px-2 hover:border-slate-200 focus:ring-1"
+          aria-label="Voz principal"
+        >
+          <VocalLabel member={vocal} />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          <SelectItem value={NO_VOCAL}>Sem definir</SelectItem>
+          {vocalOptions.scaled.length > 0 && (
+            <SelectGroup>
+              <SelectLabel>No louvor deste culto</SelectLabel>
+              {vocalOptions.scaled.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {churchMemberName(m)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          )}
+          <SelectGroup>
+            <SelectLabel>Outros membros</SelectLabel>
+            {vocalOptions.others.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {churchMemberName(m)}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    ) : (
+      <VocalLabel member={vocal} />
+    )
+    const syncEl = (
+      <Chip tone={sync.tone} title={item.holyrics_error || undefined}>
+        {sync.label}
+      </Chip>
+    )
+    const menuEl = (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg text-slate-500"
+            aria-label="Ações da música"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem asChild className="gap-2">
+            <Link to={`/songs/${item.song_id}`}>
+              <FileMusic className="h-4 w-4 text-slate-500" />
+              Abrir cifra
+            </Link>
+          </DropdownMenuItem>
+          {song?.youtube_url && (
+            <DropdownMenuItem asChild className="gap-2">
+              <a href={song.youtube_url} target="_blank" rel="noreferrer">
+                <Youtube className="h-4 w-4 text-slate-500" />
+                Ouvir referência
+              </a>
+            </DropdownMenuItem>
+          )}
+          {canEdit && (
+            <>
+              <DropdownMenuItem
+                disabled={index === 0}
+                onSelect={() => moveTo(index, index - 1)}
+                className="gap-2"
+              >
+                <ArrowUp className="h-4 w-4 text-slate-500" />
+                Mover para cima
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={index === songs.length - 1}
+                onSelect={() => moveTo(index, index + 1)}
+                className="gap-2"
+              >
+                <ArrowDown className="h-4 w-4 text-slate-500" />
+                Mover para baixo
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => removeSong(item)}
+                className="gap-2 text-red-600 focus:bg-red-50 focus:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                Remover do culto
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+    const dragProps = {
+      draggable: canEdit,
+      onDragStart: (e: React.DragEvent) => {
+        setDragIndex(index)
+        e.dataTransfer.effectAllowed = 'move'
+      },
+      onDragOver: (e: React.DragEvent) => {
+        if (dragIndex === null) return
+        e.preventDefault()
+        setOverIndex(index)
+      },
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault()
+        if (dragIndex !== null) moveTo(dragIndex, index)
+        setDragIndex(null)
+        setOverIndex(null)
+      },
+      onDragEnd: () => {
+        setDragIndex(null)
+        setOverIndex(null)
+      },
+    }
+    const dragClass = cn(
+      dragIndex === index && 'opacity-40',
+      overIndex === index && dragIndex !== null && dragIndex !== index && 'bg-teal-50/60',
+    )
+    return { song, meta, keyEl, vocalEl, syncEl, menuEl, dragProps, dragClass }
+  }
+
   const table = (
     <SectionCard
       title="Repertório"
@@ -233,215 +385,101 @@ export function RepertoireTab({
           }
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
-                {canEdit && <th className="w-8 py-2.5 pl-3" aria-label="Arrastar" />}
-                <th className="w-10 py-2.5 pl-2">#</th>
-                <th className="py-2.5">Música</th>
-                <th className="py-2.5">Tom</th>
-                <th className="py-2.5">Voz principal</th>
-                <th className="py-2.5">Holyrics</th>
-                <th className="w-12 py-2.5 pr-3" aria-label="Ações" />
-              </tr>
-            </thead>
-            <tbody>
-              {songs.map((item, index) => {
-                const song = item.expand?.song_id
-                const original = song?.key
-                const key = item.custom_key || original
-                const sync = songSyncStatus(item.holyrics_status, item.holyrics_playlist_order)
-                const vocal = item.expand?.lead_vocal
-                return (
-                  <tr
-                    key={item.id}
-                    draggable={canEdit}
-                    onDragStart={(e) => {
-                      setDragIndex(index)
-                      e.dataTransfer.effectAllowed = 'move'
-                    }}
-                    onDragOver={(e) => {
-                      if (dragIndex === null) return
-                      e.preventDefault()
-                      setOverIndex(index)
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      if (dragIndex !== null) moveTo(dragIndex, index)
-                      setDragIndex(null)
-                      setOverIndex(null)
-                    }}
-                    onDragEnd={() => {
-                      setDragIndex(null)
-                      setOverIndex(null)
-                    }}
-                    className={cn(
-                      'border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/70',
-                      dragIndex === index && 'opacity-40',
-                      overIndex === index &&
-                        dragIndex !== null &&
-                        dragIndex !== index &&
-                        'bg-teal-50/60',
-                    )}
-                  >
-                    {canEdit && (
-                      <td className="cursor-grab py-3 pl-3 text-slate-300 active:cursor-grabbing">
-                        <GripVertical className="h-4 w-4" />
-                      </td>
-                    )}
-                    <td className="py-3 pl-2">
-                      <span className="grid h-6 w-6 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">
-                        {index + 1}
-                      </span>
-                    </td>
-                    <td className="max-w-[260px] py-3 pr-3">
+        <>
+          {/* Celular: um cartão por música */}
+          <ul className="divide-y divide-slate-100 md:hidden">
+            {songs.map((item, index) => {
+              const { song, meta, keyEl, vocalEl, syncEl, menuEl } = renderParts(item, index)
+              return (
+                <li key={item.id} className="space-y-2.5 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
                       <Link
                         to={`/songs/${item.song_id}`}
-                        className="block truncate font-semibold text-slate-900 hover:text-teal-700"
+                        className="block truncate font-semibold text-slate-900"
                       >
                         {song?.title || 'Música'}
                       </Link>
-                      <div className="truncate text-xs text-slate-500">
-                        {[song?.artist, song?.bpm ? `${song.bpm} BPM` : null]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </div>
+                      {meta && <div className="truncate text-xs text-slate-500">{meta}</div>}
                       {item.notes && (
                         <div className="truncate text-xs text-amber-700">{item.notes}</div>
                       )}
-                    </td>
-                    <td className="py-3 pr-3">
-                      {key ? (
-                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 py-0.5 pl-2 pr-0.5">
-                          {original && original !== key && (
-                            <span className="text-xs font-semibold text-slate-400">
-                              {original} →
-                            </span>
-                          )}
-                          <span className="font-mono text-sm font-bold text-slate-900">{key}</span>
-                          {canEdit && (
-                            <>
-                              <KeyStep label="Descer meio tom" onClick={() => changeKey(item, -1)}>
-                                <Minus className="h-3 w-3" />
-                              </KeyStep>
-                              <KeyStep label="Subir meio tom" onClick={() => changeKey(item, 1)}>
-                                <Plus className="h-3 w-3" />
-                              </KeyStep>
-                            </>
-                          )}
+                    </div>
+                    <div className="-mr-1.5 -mt-1">{menuEl}</div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pl-9">
+                    {keyEl}
+                    <div className="min-w-0">{vocalEl}</div>
+                    <div className="ml-auto">{syncEl}</div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Computador: tabela */}
+          <div className="hidden md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
+                  {canEdit && <th className="w-8 py-2.5 pl-3" aria-label="Arrastar" />}
+                  <th className="w-10 py-2.5 pl-2">#</th>
+                  <th className="py-2.5">Música</th>
+                  <th className="py-2.5">Tom</th>
+                  <th className="py-2.5">Voz principal</th>
+                  <th className="py-2.5">Holyrics</th>
+                  <th className="w-12 py-2.5 pr-3" aria-label="Ações" />
+                </tr>
+              </thead>
+              <tbody>
+                {songs.map((item, index) => {
+                  const { song, meta, keyEl, vocalEl, syncEl, menuEl, dragProps, dragClass } =
+                    renderParts(item, index)
+                  return (
+                    <tr
+                      key={item.id}
+                      {...dragProps}
+                      className={cn(
+                        'border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/70',
+                        dragClass,
+                      )}
+                    >
+                      {canEdit && (
+                        <td className="cursor-grab py-3 pl-3 text-slate-300 active:cursor-grabbing">
+                          <GripVertical className="h-4 w-4" />
+                        </td>
+                      )}
+                      <td className="py-3 pl-2">
+                        <span className="grid h-6 w-6 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">
+                          {index + 1}
                         </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-3">
-                      {canEdit ? (
-                        <Select
-                          value={item.lead_vocal || NO_VOCAL}
-                          onValueChange={(v) => changeVocal(item, v)}
+                      </td>
+                      <td className="max-w-[260px] py-3 pr-3">
+                        <Link
+                          to={`/songs/${item.song_id}`}
+                          className="block truncate font-semibold text-slate-900 hover:text-teal-700"
                         >
-                          <SelectTrigger
-                            className="h-8 w-[150px] rounded-lg border-transparent px-2 hover:border-slate-200 focus:ring-1"
-                            aria-label="Voz principal"
-                          >
-                            <VocalLabel member={vocal} />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-72">
-                            <SelectItem value={NO_VOCAL}>Sem definir</SelectItem>
-                            {vocalOptions.scaled.length > 0 && (
-                              <SelectGroup>
-                                <SelectLabel>No louvor deste culto</SelectLabel>
-                                {vocalOptions.scaled.map((m) => (
-                                  <SelectItem key={m.id} value={m.id}>
-                                    {churchMemberName(m)}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            )}
-                            <SelectGroup>
-                              <SelectLabel>Outros membros</SelectLabel>
-                              {vocalOptions.others.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>
-                                  {churchMemberName(m)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <VocalLabel member={vocal} />
-                      )}
-                    </td>
-                    <td className="py-3 pr-3">
-                      <Chip tone={sync.tone} title={item.holyrics_error || undefined}>
-                        {sync.label}
-                      </Chip>
-                    </td>
-                    <td className="py-3 pr-3 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg text-slate-500"
-                            aria-label="Ações da música"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem asChild className="gap-2">
-                            <Link to={`/songs/${item.song_id}`}>
-                              <FileMusic className="h-4 w-4 text-slate-500" />
-                              Abrir cifra
-                            </Link>
-                          </DropdownMenuItem>
-                          {song?.youtube_url && (
-                            <DropdownMenuItem asChild className="gap-2">
-                              <a href={song.youtube_url} target="_blank" rel="noreferrer">
-                                <Youtube className="h-4 w-4 text-slate-500" />
-                                Ouvir referência
-                              </a>
-                            </DropdownMenuItem>
-                          )}
-                          {canEdit && (
-                            <>
-                              <DropdownMenuItem
-                                disabled={index === 0}
-                                onSelect={() => moveTo(index, index - 1)}
-                                className="gap-2"
-                              >
-                                <ArrowUp className="h-4 w-4 text-slate-500" />
-                                Mover para cima
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={index === songs.length - 1}
-                                onSelect={() => moveTo(index, index + 1)}
-                                className="gap-2"
-                              >
-                                <ArrowDown className="h-4 w-4 text-slate-500" />
-                                Mover para baixo
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onSelect={() => removeSong(item)}
-                                className="gap-2 text-red-600 focus:bg-red-50 focus:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Remover do culto
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                          {song?.title || 'Música'}
+                        </Link>
+                        <div className="truncate text-xs text-slate-500">{meta}</div>
+                        {item.notes && (
+                          <div className="truncate text-xs text-amber-700">{item.notes}</div>
+                        )}
+                      </td>
+                      <td className="py-3 pr-3">{keyEl}</td>
+                      <td className="py-3 pr-3">{vocalEl}</td>
+                      <td className="py-3 pr-3">{syncEl}</td>
+                      <td className="py-3 pr-3 text-right">{menuEl}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </SectionCard>
   )
@@ -471,7 +509,7 @@ function KeyStep({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="grid h-6 w-6 place-items-center rounded-md bg-slate-100 text-slate-600 transition-colors hover:bg-teal-100 hover:text-teal-800"
+      className="grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-slate-600 transition-colors hover:bg-teal-100 hover:text-teal-800 md:h-6 md:w-6"
     >
       {children}
     </button>

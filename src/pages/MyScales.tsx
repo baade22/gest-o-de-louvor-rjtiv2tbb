@@ -160,17 +160,17 @@ export default function MyScales() {
           setActiveFilter(v as 'TODAS' | 'PENDENTES' | 'CONFIRMADAS' | 'RECUSADAS')
         }
       >
-        <TabsList className="grid grid-cols-4 rounded-xl bg-slate-100 p-1 h-11">
-          <TabsTrigger value="TODAS" className="rounded-lg text-xs font-bold">
+        <TabsList className="flex h-11 w-full justify-start overflow-x-auto rounded-xl bg-slate-100 p-1 sm:grid sm:grid-cols-4">
+          <TabsTrigger value="TODAS" className="shrink-0 rounded-lg px-3 text-xs font-bold">
             Todas ({scales.length})
           </TabsTrigger>
-          <TabsTrigger value="PENDENTES" className="rounded-lg text-xs font-bold">
+          <TabsTrigger value="PENDENTES" className="shrink-0 rounded-lg px-3 text-xs font-bold">
             Pendentes ({scales.filter((s) => s.status === 'PENDENTE').length})
           </TabsTrigger>
-          <TabsTrigger value="CONFIRMADAS" className="rounded-lg text-xs font-bold">
+          <TabsTrigger value="CONFIRMADAS" className="shrink-0 rounded-lg px-3 text-xs font-bold">
             Confirmadas ({scales.filter((s) => s.status === 'CONFIRMADO').length})
           </TabsTrigger>
-          <TabsTrigger value="RECUSADAS" className="rounded-lg text-xs font-bold">
+          <TabsTrigger value="RECUSADAS" className="shrink-0 rounded-lg px-3 text-xs font-bold">
             Recusadas ({scales.filter((s) => s.status === 'RECUSADO').length})
           </TabsTrigger>
         </TabsList>
