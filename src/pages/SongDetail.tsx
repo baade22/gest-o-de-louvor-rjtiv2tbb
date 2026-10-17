@@ -38,6 +38,7 @@ import {
   getSemitoneDifference,
 } from '@/lib/transposition'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { YouTubeSearchModal } from '@/components/YouTubeSearchModal'
 import {
   getVideosForSong,
@@ -65,6 +66,7 @@ export default function SongDetail() {
   const { canManageContent, currentChurch } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [song, setSong] = useState<Song | null>(null)
   const [videos, setVideos] = useState<SongVideo[]>([])
@@ -220,18 +222,25 @@ export default function SongDetail() {
     }
   }
 
-  const handleRemoveVideo = async (videoId: string) => {
+  const handleRemoveVideo = (videoId: string) => {
     if (!song) return
-    if (!window.confirm('Remover este vídeo de referência da música?')) return
-    try {
-      await removeVideoFromSong(song.id, videoId)
-      toast({
-        title: 'Vídeo removido',
-      })
-      fetchSongData()
-    } catch (err) {
-      console.error(err)
-    }
+    confirm({
+      title: 'Remover este vídeo de referência?',
+      description: 'Só o vínculo com a música é apagado. O vídeo continua no YouTube.',
+      confirmLabel: 'Remover vídeo',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await removeVideoFromSong(song.id, videoId)
+          toast({
+            title: 'Vídeo removido',
+          })
+          fetchSongData()
+        } catch (err) {
+          console.error(err)
+        }
+      },
+    })
   }
 
   // Enviar música para o Holyrics via LouvorFlow Agent com polling automático
@@ -949,6 +958,7 @@ export default function SongDetail() {
           </div>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

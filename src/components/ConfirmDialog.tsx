@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -21,6 +21,8 @@ interface ConfirmDialogProps {
   /** Botão vermelho para ações que apagam algo. */
   destructive?: boolean
   onConfirm: () => Promise<unknown> | unknown
+  /** Conteúdo extra abaixo da descrição (ex.: lista de consequências). */
+  children?: React.ReactNode
 }
 
 /**
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirmar',
   destructive = false,
   onConfirm,
+  children,
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
   const { toast } = useToast()
@@ -69,6 +72,7 @@ export function ConfirmDialog({
             </AlertDialogDescription>
           )}
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter className="gap-2 sm:gap-0">
           <AlertDialogCancel disabled={busy} className="rounded-lg">
             Cancelar
@@ -89,4 +93,25 @@ export function ConfirmDialog({
       </AlertDialogContent>
     </AlertDialog>
   )
+}
+
+type ConfirmOptions = Omit<ConfirmDialogProps, 'open' | 'onOpenChange' | 'children'>
+
+/**
+ * Atalho para trocar `if (!window.confirm(...)) return` pelo diálogo do app:
+ * `confirm({ title, onConfirm })` abre o diálogo e `dialog` vai no JSX.
+ */
+export function useConfirm() {
+  const [open, setOpen] = useState(false)
+  // Mantém o último conteúdo durante a animação de fechar
+  const [options, setOptions] = useState<ConfirmOptions | null>(null)
+
+  const confirm = useCallback((next: ConfirmOptions) => {
+    setOptions(next)
+    setOpen(true)
+  }, [])
+
+  const dialog = options ? <ConfirmDialog {...options} open={open} onOpenChange={setOpen} /> : null
+
+  return { confirm, dialog }
 }

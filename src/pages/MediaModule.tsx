@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import type { MediaAsset, EventItem, ChurchMember } from '@/types'
 import {
   listAllChurchMedia,
@@ -72,6 +73,7 @@ function detectMediaTypeFromExtension(
 export default function MediaModule() {
   const { currentChurch, currentMember, isAdmin, isMaster } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [backendAllowed, setBackendAllowed] = useState<boolean | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
@@ -273,15 +275,23 @@ export default function MediaModule() {
     window.open(url, '_blank')
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Excluir esta mídia?')) return
-    try {
-      await deleteMediaAsset(id)
-      toast({ title: 'Mídia excluída' })
-      loadData()
-    } catch (err) {
-      console.error(err)
-    }
+  const handleDelete = (id: string) => {
+    confirm({
+      title: 'Excluir esta mídia?',
+      description:
+        'O arquivo é apagado do LouvorFlow. Cópias já transferidas para o computador do Holyrics continuam lá.',
+      confirmLabel: 'Excluir mídia',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteMediaAsset(id)
+          toast({ title: 'Mídia excluída' })
+          loadData()
+        } catch (err) {
+          console.error(err)
+        }
+      },
+    })
   }
 
   return (
@@ -619,6 +629,7 @@ export default function MediaModule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

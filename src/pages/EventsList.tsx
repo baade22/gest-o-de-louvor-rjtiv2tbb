@@ -28,11 +28,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { formatCalendarDateDisplay, getLocalTodayYMD, toCalendarYMD } from '@/lib/dateUtils'
 
 export default function EventsList() {
   const { currentChurch, canManageContent } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [events, setEvents] = useState<EventItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -63,30 +65,32 @@ export default function EventsList() {
     fetchEvents()
   }, [currentChurch])
 
-  const handleDeleteEvent = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteEvent = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (
-      !window.confirm(
-        'Tem certeza que deseja excluir este culto/evento e todas as suas escalas associadas?',
-      )
-    )
-      return
-
-    try {
-      await pb.collection('events').delete(id)
-      toast({
-        title: 'Evento excluído',
-        description: 'O evento e repertório foram removidos com sucesso.',
-      })
-      setEvents((prev) => prev.filter((ev) => ev.id !== id))
-    } catch (err) {
-      console.error(err)
-      toast({
-        title: 'Erro ao excluir',
-        description: 'Não foi possível excluir o evento.',
-        variant: 'destructive',
-      })
-    }
+    confirm({
+      title: 'Excluir este culto?',
+      description:
+        'A escala, o repertório, as tarefas e o roteiro dele também são apagados. Não dá para desfazer.',
+      confirmLabel: 'Excluir culto',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await pb.collection('events').delete(id)
+          toast({
+            title: 'Evento excluído',
+            description: 'O evento e repertório foram removidos com sucesso.',
+          })
+          setEvents((prev) => prev.filter((ev) => ev.id !== id))
+        } catch (err) {
+          console.error(err)
+          toast({
+            title: 'Erro ao excluir',
+            description: 'Não foi possível excluir o evento.',
+            variant: 'destructive',
+          })
+        }
+      },
+    })
   }
 
   const now = new Date()
@@ -318,6 +322,7 @@ export default function EventsList() {
           )}
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }
