@@ -16,11 +16,11 @@
 //    estrita (normalizeTitle/normalizeArtist). Se a música já existir, salva o ID e continua para a playlist. Se não existir,
 //    reporta erro técnico real da etapa. Nunca repete CreateSong cegamente.
 // 4. Exclusão mútua / Lock por church_id + song_id: impede dois cliques simultâneos de criarem músicas duplicadas.
-// 5. Playlist: lê a playlist do culto (GetSchedules do mês, lyrics_playlist da ocorrência) e compara
-//    exclusivamente por ID (nunca por título). GetSongPlaylist (lista aberta na tela) é só reserva. Se já estiver -> ALREADY_IN_PLAYLIST.
+// 5. Playlist: lê a playlist do culto via GetSchedules do mês (ocorrência por metadata.event.id,
+//    media_playlist, comparando song_id/reference_id; nunca por título). Se já estiver -> ALREADY_IN_PLAYLIST.
 //    Se ausente -> AddToPlaylist com event_id do culto no Holyrics (events.holyrics_event_id), index -1 e ignore_duplicates:true.
-//    Depois consulta GetSongPlaylist novamente: só marca ADDED_TO_PLAYLIST se o ID aparecer; se não aparecer -> ERROR
-//    com mensagem técnica real: "AddToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação."// 6. Payloads mínimos à API do Holyrics em tudo (evita bugs de lista vazia no Holyrics).
+//    Depois lê GetSchedules de novo: só marca ADDED_TO_PLAYLIST se o song_id aparecer na media_playlist; senão -> ERROR.
+// 6. Payloads mínimos à API do Holyrics em tudo (evita bugs de lista vazia no Holyrics).
 // 7. Registro diagnóstico detalhado em holyrics_sync_logs com command_id, duração, http_status, stage, status e details sanitizados.
 
 routerAdd(
@@ -492,7 +492,6 @@ routerAdd(
       return null
     }
 
-    // Consulta GetSongPlaylist
     const unwrapCommandResult = (raw) => {
       let resData = raw
       if (typeof resData === 'string') {
@@ -526,12 +525,14 @@ routerAdd(
       return String(item.id || '').trim()
     }
 
-    // Lê a playlist da ocorrência do culto no Holyrics (a mesma que recebe o AddToPlaylist
-    // com event_id). GetSongPlaylist não aceita event_id: ele devolve a lista aberta na tela
-    // do Holyrics, que pode ser de outro culto. Por isso a fonte é GetSchedules do mês,
-    // juntando lyrics_playlist e as músicas de media_playlist.
+    // Lê os IDs das músicas na playlist da ocorrência do culto no Holyrics, a mesma que recebe o
+    // AddToPlaylist com event_id. A fonte é GetSchedules do mês: acha a ocorrência por
+    // metadata.event.id e lê a media_playlist, onde cada música vem como
+    // { id: "zMYT...", type: "song", song_id: "1791856351158", reference_id: "..." }.
+    // O id do item é da playlist; o ID da música no acervo é song_id (ou reference_id).
+    // lyrics_playlist e GetSongPlaylist (lista aberta na tela) não servem para conferir.
     // Retorna null quando não consegue ler a programação do culto.
-    const fetchEventSchedulePlaylist = () => {
+    const fetchEventPlaylistSongIds = () => {
       if (!eventYear || !eventMonth) return null
       const schedRes = runCommandSync(
         'GET_SCHEDULES',
@@ -555,56 +556,23 @@ routerAdd(
         }
       }
       if (!schedule) return null
-      const items = []
-      const lyrics = Array.isArray(schedule.lyrics_playlist) ? schedule.lyrics_playlist : []
-      for (let i = 0; i < lyrics.length; i++) items.push(lyrics[i])
+      const ids = []
       const media = Array.isArray(schedule.media_playlist) ? schedule.media_playlist : []
       for (let i = 0; i < media.length; i++) {
-        const t = String((media[i] && media[i].type) || '').toLowerCase()
-        if (t === 'song' || t === 'lyrics') items.push(media[i])
+        const it = media[i]
+        if (!it || String(it.type || '').toLowerCase() !== 'song') continue
+        const songIdInPlaylist = String(it.song_id || it.reference_id || '').trim()
+        if (songIdInPlaylist) ids.push(songIdInPlaylist)
       }
-      return items
+      return ids
     }
 
-    // Playlist aberta na tela do Holyrics (comportamento antigo), usada só como reserva
-    const fetchActivePlaylist = () => {
-      const playlistCmdRes = runCommandSync(
-        'GET_SONG_PLAYLIST',
-        { church_id: churchId, agent_id: agentId, event_id: eventId },
-        8000,
-      )
-      if (playlistCmdRes.status === 'DONE' && playlistCmdRes.result) {
-        const resData = unwrapCommandResult(playlistCmdRes.result)
-        const pItems = Array.isArray(resData?.items)
-          ? resData.items
-          : Array.isArray(resData)
-            ? resData
-            : []
-        return pItems
-      }
-      return null
+    // Busca inicial: músicas que já estão na playlist do culto
+    const currentPlaylistMap = {}
+    const initialPlaylistIds = fetchEventPlaylistSongIds() || []
+    for (let i = 0; i < initialPlaylistIds.length; i++) {
+      currentPlaylistMap[initialPlaylistIds[i]] = true
     }
-
-    const fetchHolyricsPlaylist = () => {
-      const eventItems = fetchEventSchedulePlaylist()
-      if (eventItems !== null) return eventItems
-      return fetchActivePlaylist()
-    }
-
-    // Busca inicial da playlist
-    let currentPlaylistItems = fetchHolyricsPlaylist() || []
-    const buildPlaylistIdMap = (items) => {
-      const map = {}
-      for (let pIdx = 0; pIdx < items.length; pIdx++) {
-        const item = items[pIdx]
-        const pId = String(item.id || item.song_id || item.songId || '')
-        if (pId) {
-          map[pId] = true
-        }
-      }
-      return map
-    }
-    let currentPlaylistMap = buildPlaylistIdMap(currentPlaylistItems)
 
     const results = []
     let countCreated = 0
@@ -1322,7 +1290,7 @@ routerAdd(
         }
 
         // -------------------------------------------------------------
-        // ETAPA 4: Verificar se holyrics_song_id já está na playlist (GetSongPlaylist por ID)
+        // ETAPA 4: Verificar se holyrics_song_id já está na media_playlist do culto (GetSchedules)
         // -------------------------------------------------------------
         eventSongRec.set('holyrics_status', 'CHECKING_PLAYLIST')
         try {
@@ -1343,9 +1311,7 @@ routerAdd(
             $app.save(eventSongRec)
           } catch (_) {}
 
-          logSteps.push(
-            `GetSongPlaylist → FOUND (#${holyricsSongId}) | AddLyricsToPlaylist → SKIPPED`,
-          )
+          logSteps.push(`GetSchedules → FOUND (#${holyricsSongId}) | AddToPlaylist → SKIPPED`)
           const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
           console.log(
             `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')} | FINAL → ALREADY_IN_PLAYLIST (${durationSec}s)`,
@@ -1381,11 +1347,11 @@ routerAdd(
         }
 
         // -------------------------------------------------------------
-        // ETAPA 5 & 6: ADD_TO_PLAYLIST + Confirmação via GetSongPlaylist
+        // ETAPA 5 & 6: ADD_TO_PLAYLIST + Confirmação via GetSchedules (media_playlist do culto)
         // Semântica da API oficial unificada (Etapa 3B): ação AddToPlaylist com event_id do Holyrics.
         // -------------------------------------------------------------
         logSteps.push(
-          `GetSongPlaylist → NOT_FOUND | AddToPlaylist → EXECUTING (holyrics_event_id: ${holyricsEventId}, index -1)`,
+          `GetSchedules → NOT_FOUND | AddToPlaylist → EXECUTING (holyrics_event_id: ${holyricsEventId}, index -1)`,
         )
         eventSongRec.set('holyrics_status', 'ADDING_TO_PLAYLIST')
         try {
@@ -1405,15 +1371,15 @@ routerAdd(
 
         const addRes = runCommandSync('ADD_TO_PLAYLIST', addPayload, 10000)
 
-        // REGRA CRÍTICA 6: Executar GetSongPlaylist novamente para confirmação real
+        // REGRA CRÍTICA 6: Ler GetSchedules novamente para confirmação real
         eventSongRec.set('holyrics_status', 'VERIFYING_PLAYLIST')
         try {
           $app.save(eventSongRec)
         } catch (_) {}
 
-        const confirmedPlaylist = fetchHolyricsPlaylist() || []
-        const appearsInPlaylist = confirmedPlaylist.some(
-          (it) => String(it.id || it.song_id || it.songId || '').trim() === holyricsSongId,
+        const confirmedIds = addRes.status === 'DONE' ? fetchEventPlaylistSongIds() : null
+        const appearsInPlaylist = Boolean(
+          confirmedIds && confirmedIds.indexOf(holyricsSongId) !== -1,
         )
 
         if (appearsInPlaylist) {
@@ -1428,7 +1394,7 @@ routerAdd(
           } catch (_) {}
 
           logSteps.push(
-            `AddToPlaylist → OK | GetSongPlaylist Confirm → FOUND | FINAL → ADDED_TO_PLAYLIST`,
+            `AddToPlaylist → OK | GetSchedules Confirm → FOUND | FINAL → ADDED_TO_PLAYLIST`,
           )
           const durationSec = ((Date.now() - songStartTime) / 1000).toFixed(1)
           console.log(
@@ -1466,7 +1432,9 @@ routerAdd(
           // O {"status":"ok"} nunca é prova suficiente. Mensagem técnica real exata
           const technicalAddError =
             addRes.status === 'DONE'
-              ? 'AddToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação.'
+              ? confirmedIds === null
+                ? 'AddToPlaylist retornou OK, mas não foi possível ler a programação do culto (GetSchedules) para confirmar.'
+                : 'AddToPlaylist retornou OK, mas a música não apareceu na media_playlist do culto (GetSchedules).'
               : addRes.error ||
                 (addRes.status === 'PENDING'
                   ? 'Tempo limite de resposta do LouvorFlow Agent esgotado na inserção na playlist (TIMEOUT).'
@@ -1480,7 +1448,7 @@ routerAdd(
           countErrors++
 
           logSteps.push(
-            `AddToPlaylist → ${addRes.status} | GetSongPlaylist Confirm → NOT_FOUND | FINAL → ERROR`,
+            `AddToPlaylist → ${addRes.status} | GetSchedules Confirm → NOT_FOUND | FINAL → ERROR`,
           )
           console.log(
             `[HOLYRICS_SYNC] Song: ${songTitle} | LouvorFlow ID: ${songId} | Holyrics ID: ${holyricsSongId} | Order: ${repertoireOrder}\n${logSteps.join(' | ')}`,
