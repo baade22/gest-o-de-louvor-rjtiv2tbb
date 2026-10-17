@@ -2,13 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import crypto from 'crypto'
 import {
   generateHolyricsFileName,
   sanitizeWindowsSegment,
-  formatEventDayMonth,
   extractFileExtension,
-  removeAccents,
   cleanRepeatedExtension,
 } from '../lib/mediaNaming'
 import { LouvorFlowAgent } from '../../agent/src/agent'
@@ -131,22 +128,12 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
 
     // Mock fetch com conteúdo diferente "VERSAO_2"
     const fileContent = 'VERSAO_2_PAYLOAD_DIFERENTE'
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-length': String(fileContent.length) }),
-      body: {
-        getReader() {
-          let done = false
-          return {
-            async read() {
-              if (done) return { done: true, value: undefined }
-              done = true
-              return { done: false, value: Buffer.from(fileContent) }
-            },
-          }
-        },
-      },
-    } as any)
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(fileContent, {
+          headers: { 'content-length': String(Buffer.byteLength(fileContent)) },
+        }),
+    )
 
     vi.spyOn(agent as any, 'validateFileContent').mockReturnValue({ valid: true })
 
@@ -184,22 +171,12 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     const filePath = path.join(targetDir, fileName)
     fs.writeFileSync(filePath, fileContent)
 
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-length': String(fileContent.length) }),
-      body: {
-        getReader() {
-          let done = false
-          return {
-            async read() {
-              if (done) return { done: true, value: undefined }
-              done = true
-              return { done: false, value: Buffer.from(fileContent) }
-            },
-          }
-        },
-      },
-    } as any)
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(fileContent, {
+          headers: { 'content-length': String(Buffer.byteLength(fileContent)) },
+        }),
+    )
 
     vi.spyOn(agent as any, 'validateFileContent').mockReturnValue({ valid: true })
 
@@ -281,6 +258,28 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       success: true,
       items: [],
     })
+    vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
+      recognized: true,
+      methodUsed: 'GetFile',
+    })
+    // Antes da inserção a ocorrência está vazia; depois, contém as três mídias
+    vi.spyOn((agent as any).holyrics, 'getSchedules')
+      .mockResolvedValueOnce({ success: true, schedules: [] })
+      .mockResolvedValue({
+        success: true,
+        schedules: [
+          {
+            id: 'evt_123',
+            playlist: {
+              items: [
+                { name: 'Culto - Video.mp4' },
+                { name: 'Culto - Imagem.png' },
+                { name: 'Culto - Audio.mp3' },
+              ],
+            },
+          },
+        ],
+      })
 
     // Cria os arquivos físicos locais para a validação em disco
     fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Culto - Video.mp4'), 'vid')
@@ -311,6 +310,8 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         { type: 'image', name: 'Culto - Imagem.png' },
         { type: 'audio', name: 'Culto - Audio.mp3' },
       ],
+      eventId: 'evt_123',
+      index: -1,
       ignoreDuplicates: true,
     })
   })
@@ -322,6 +323,14 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     let capturedItems: any[] = []
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
     vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+      success: true,
+      schedules: [],
+    })
+    vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
+      recognized: true,
+      methodUsed: 'GetFile',
+    })
     vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockImplementation(
       async (params: any) => {
         capturedItems = params.items
@@ -359,10 +368,26 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     const agent = new LouvorFlowAgent(agentConfig)
 
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
-    // Simula que 'Abertura.mp4' já está na playlist lida do Holyrics
-    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({
+    // Simula que 'Abertura.mp4' já está na playlist lida do Holyrics; após a inserção, Avisos.mp4 também
+    vi.spyOn((agent as any).holyrics, 'getPlaylist')
+      .mockResolvedValueOnce({
+        success: true,
+        items: [{ name: 'Abertura.mp4', type: 'video' } as any],
+      })
+      .mockResolvedValue({
+        success: true,
+        items: [
+          { name: 'Abertura.mp4', type: 'video' } as any,
+          { name: 'Avisos.mp4', type: 'video' },
+        ],
+      })
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
       success: true,
-      items: [{ name: 'Abertura.mp4', type: 'video' } as any],
+      schedules: [],
+    })
+    vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
+      recognized: true,
+      methodUsed: 'GetFile',
     })
 
     const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockResolvedValue({
@@ -408,6 +433,14 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         { name: 'Porque Ele Vive', type: 'song' } as any,
         { name: 'João 3:16', type: 'bible' } as any,
       ],
+    })
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+      success: true,
+      schedules: [],
+    })
+    vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
+      recognized: true,
+      methodUsed: 'GetFile',
     })
 
     const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist').mockResolvedValue({
@@ -471,22 +504,12 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     vi.spyOn(agent as any, 'validateFileContent').mockReturnValue({ valid: true })
 
     const fileContent = 'CONTEUDO_TESTE'
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-length': String(fileContent.length) }),
-      body: {
-        getReader() {
-          let done = false
-          return {
-            async read() {
-              if (done) return { done: true, value: undefined }
-              done = true
-              return { done: false, value: Buffer.from(fileContent) }
-            },
-          }
-        },
-      },
-    } as any)
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(fileContent, {
+          headers: { 'content-length': String(Buffer.byteLength(fileContent)) },
+        }),
+    )
 
     const res = await agent.handleTransferMedia({
       id: 'cmd_unrec',
@@ -583,7 +606,7 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         title: 'video.promo.v1.mpeg.mp4',
         originalFileName: 'video.promo.v1.mpeg.mp4',
       })
-      expect(fn).toBe('Culto Quarta - Avisos - 03-09 - video promo v1 mpeg.mp4')
+      expect(fn).toBe('Culto Quarta - Avisos - 03-09 - video.promo.v1.mpeg.mp4')
       expect((fn.match(/\.mp4/gi) || []).length).toBe(1)
     })
 
@@ -606,15 +629,18 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     let capturedPayload: any = null
 
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
-    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
-      success: true,
-      schedules: [
-        {
-          id: 'hly_occ_dest_123',
-          playlist: { items: [{ name: 'Culto - Video.mp4' }] },
-        },
-      ],
-    })
+    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockResolvedValue({ success: true, items: [] })
+    vi.spyOn((agent as any).holyrics, 'getSchedules')
+      .mockResolvedValueOnce({ success: true, schedules: [] })
+      .mockResolvedValue({
+        success: true,
+        schedules: [
+          {
+            id: 'hly_occ_dest_123',
+            playlist: { items: [{ name: 'Culto - Video.mp4' }] },
+          },
+        ],
+      })
     vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
 
     // Intercepta a chamada addMediaToPlaylist
@@ -794,22 +820,12 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
 
     // Cria mock para download de imagem PNG válida com assinatura PNG (\x89PNG\r\n\x1a\n)
     const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-length': String(pngHeader.length) }),
-      body: {
-        getReader() {
-          let done = false
-          return {
-            async read() {
-              if (done) return { done: true, value: undefined }
-              done = true
-              return { done: false, value: pngHeader }
-            },
-          }
-        },
-      },
-    } as any)
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(pngHeader, {
+          headers: { 'content-length': String(Buffer.byteLength(pngHeader)) },
+        }),
+    )
 
     const cmd: AgentCommand = {
       id: 'cmd_transfer_png',
@@ -910,15 +926,17 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
         created_at: new Date().toISOString(),
       }
 
-      vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
-        success: true,
-        schedules: [
-          {
-            id: 'evt_1',
-            playlist: { items: [{ name: fileName }] },
-          },
-        ],
-      })
+      vi.spyOn((agent as any).holyrics, 'getSchedules')
+        .mockResolvedValueOnce({ success: true, schedules: [] })
+        .mockResolvedValue({
+          success: true,
+          schedules: [
+            {
+              id: 'evt_1',
+              playlist: { items: [{ name: fileName }] },
+            },
+          ],
+        })
 
       const res = await agent.handleSyncMediaPlaylist(cmd)
       expect(callCount).toBe(2)
@@ -1186,22 +1204,12 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
 
       // Simula gravação com transferência pelo Agent
       const audioBytes = Buffer.from('AUDIO_TEST_PAYLOAD')
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-length': String(audioBytes.length) }),
-        body: {
-          getReader() {
-            let done = false
-            return {
-              async read() {
-                if (done) return { done: true, value: undefined }
-                done = true
-                return { done: false, value: audioBytes }
-              },
-            }
-          },
-        },
-      } as any)
+      globalThis.fetch = vi.fn().mockImplementation(
+        async () =>
+          new Response(audioBytes, {
+            headers: { 'content-length': String(Buffer.byteLength(audioBytes)) },
+          }),
+      )
 
       vi.spyOn(agent as any, 'validateFileContent').mockReturnValue({ valid: true })
       vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({
@@ -1246,21 +1254,23 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
           success: true,
         })
 
-      vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
-        success: true,
-        schedules: [
-          {
-            id: 'evt_consist',
-            playlist: {
-              items: [
-                {
-                  name: 'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
-                },
-              ],
+      vi.spyOn((agent as any).holyrics, 'getSchedules')
+        .mockResolvedValueOnce({ success: true, schedules: [] })
+        .mockResolvedValue({
+          success: true,
+          schedules: [
+            {
+              id: 'evt_consist',
+              playlist: {
+                items: [
+                  {
+                    name: 'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
+                  },
+                ],
+              },
             },
-          },
-        ],
-      })
+          ],
+        })
 
       const cmdSync: AgentCommand = {
         id: 'cmd_sync_consist',
@@ -1292,6 +1302,8 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
             name: 'teste - Avisos - 12-10 - WhatsApp Audio 2026-08-02 at 15.52.41.mp3',
           },
         ],
+        eventId: 'evt_consist',
+        index: -1,
         ignoreDuplicates: true,
       })
     })

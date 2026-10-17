@@ -6,7 +6,6 @@ import {
   transposeCifraText,
   getSemitoneDifference,
   isChordToken,
-  AVAILABLE_KEYS,
 } from './transposition'
 
 describe('Utilitário de Transposição LouvorFlow (Requisito 5, 6, 8)', () => {

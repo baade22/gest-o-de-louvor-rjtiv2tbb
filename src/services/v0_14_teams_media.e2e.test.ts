@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import type { EventTask, MediaAsset, InternalNotification, TeamArea } from '@/types'
+import { describe, it, expect } from 'vitest'
+import type { EventTask, MediaAsset, InternalNotification } from '@/types'
 
 describe('LouvorFlow v0.0.14 - Equipes, Tarefas, Mídias e Multi-tenant E2E Validation', () => {
   const churchA = '8minai50ybqzkek'

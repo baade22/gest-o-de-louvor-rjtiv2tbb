@@ -27,3 +27,8 @@ export async function markAllNotificationsAsRead(): Promise<boolean> {
   })
   return res.success
 }
+
+/** Apaga notificações já lidas do próprio usuário (regra da coleção: só o dono). */
+export async function deleteNotifications(ids: string[]): Promise<void> {
+  await Promise.all(ids.map((id) => pb.collection('notifications').delete(id)))
+}

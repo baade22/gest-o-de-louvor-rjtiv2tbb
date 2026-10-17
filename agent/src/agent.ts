@@ -629,7 +629,27 @@ export class LouvorFlowAgent {
       }),
     )
 
-    // Reporta resultado ao LouvorFlow com 1 retry simples (1s) em caso de falha de rede
+    await this.reportCommandResult(cmd, status, resultPayload, errorMsg, duration)
+
+    return {
+      status,
+      result: resultPayload,
+      error: errorMsg,
+      error_code: errorCode,
+      duration_ms: duration,
+    }
+  }
+
+  /**
+   * Reporta resultado ao LouvorFlow com 1 retry simples (1s) em caso de falha de rede
+   */
+  private async reportCommandResult(
+    cmd: AgentCommand,
+    status: 'DONE' | 'FAILED',
+    resultPayload: any,
+    errorMsg: string,
+    duration: number,
+  ) {
     const reportUrl = `${this.config.saasUrl.replace(/\/+$/, '')}/backend/v1/agent/commands/${cmd.command_id}/result`
     const sendReport = async (): Promise<boolean> => {
       const res = await fetch(reportUrl, {

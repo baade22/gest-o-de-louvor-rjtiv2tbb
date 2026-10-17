@@ -135,6 +135,30 @@ export async function listHolyricsAgents(churchId: string): Promise<HolyricsAgen
 }
 
 /**
+ * Exclui computadores (agentes) da congregação. Só MASTER/ADMIN.
+ */
+export async function deleteHolyricsAgents(
+  churchId: string,
+  agentIds: string[],
+): Promise<{ deleted: number }> {
+  return pb.send<{ success: boolean; deleted: number }>('/backend/v1/saas/holyrics/agents/delete', {
+    method: 'POST',
+    body: { church_id: churchId, agent_ids: agentIds },
+  })
+}
+
+export async function renameHolyricsAgent(
+  churchId: string,
+  agentId: string,
+  name: string,
+): Promise<void> {
+  await pb.send('/backend/v1/saas/holyrics/agents/rename', {
+    method: 'POST',
+    body: { church_id: churchId, agent_id: agentId, name },
+  })
+}
+
+/**
  * Testa a conexão real entre SaaS -> Agent -> Holyrics Local API (sem mock)
  */
 export async function testHolyricsAgent(

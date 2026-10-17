@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HolyricsClient } from '../../agent/src/holyricsClient.js'
-import { syncEventRepertoireWithHolyrics } from './holyricsAgent.js'
-import pb from '../lib/pocketbase/client.js'
+import { withTextBody } from '../test/fetchMock.js'
 
 /**
  * Suíte de Testes Automatizados com Mocks:
@@ -31,7 +30,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
     const savedId = '1791754549348'
     const songTitle = 'Eu Vou Construir'
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+    globalThis.fetch = withTextBody(async (url: string) => {
       if (url.includes('CreateSong')) {
         createSongSpy()
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
@@ -59,7 +58,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
           json: async () => ({ status: 'ok', data: [] }),
         }
       }
-      if (url.includes('AddLyricsToPlaylist')) {
+      if (url.includes('AddToPlaylist')) {
         return {
           ok: true,
           status: 200,
@@ -93,7 +92,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
     let createSongCalled = false
     let addedToPlaylistId: string | null = null
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts: any) => {
+    globalThis.fetch = withTextBody(async (url: string, opts: any) => {
       if (url.includes('GetSongs')) {
         // Acervo não possui mais o oldObsoleteId (usuário excluiu manualmente)
         return {
@@ -136,9 +135,9 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
         }
       }
 
-      if (url.includes('AddLyricsToPlaylist')) {
+      if (url.includes('AddToPlaylist')) {
         const body = JSON.parse(opts.body)
-        addedToPlaylistId = body.id
+        addedToPlaylistId = body.items[0].id
         return {
           ok: true,
           status: 200,
@@ -187,7 +186,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
     const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
     const createSongSpy = vi.fn()
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+    globalThis.fetch = withTextBody(async (url: string) => {
       if (url.includes('GetSongs')) {
         throw new Error('Falha de rede / Timeout ao conectar no Holyrics')
       }
@@ -214,7 +213,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
 
     const validHolyricsId = '1791754549348'
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+    globalThis.fetch = withTextBody(async (url: string) => {
       if (url.includes('CreateSong')) {
         createSongSpy()
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
@@ -236,7 +235,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
           json: async () => ({ status: 'ok', data: [] }), // Ausente da playlist
         }
       }
-      if (url.includes('AddLyricsToPlaylist')) {
+      if (url.includes('AddToPlaylist')) {
         addLyricsCalls++
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
       }
@@ -266,7 +265,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
 
     const newlyCreatedId = '1791999888777'
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+    globalThis.fetch = withTextBody(async (url: string) => {
       if (url.includes('CreateSong')) {
         createCount++
         return {
@@ -286,7 +285,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
           json: async () => ({ status: 'ok', data: [] }),
         }
       }
-      if (url.includes('AddLyricsToPlaylist')) {
+      if (url.includes('AddToPlaylist')) {
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
       }
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
@@ -314,7 +313,7 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
 
     const persistedNewId = '1791778899000'
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+    globalThis.fetch = withTextBody(async (url: string) => {
       if (url.includes('CreateSong')) {
         createSongSpy()
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
@@ -361,10 +360,10 @@ describe('Holyrics Repertoire Sync - Validação do Acervo e Prevenção de Desa
 
     const addedIndices: { id: string; index: number }[] = []
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts: any) => {
-      if (url.includes('AddLyricsToPlaylist')) {
+    globalThis.fetch = withTextBody(async (url: string, opts: any) => {
+      if (url.includes('AddToPlaylist')) {
         const body = JSON.parse(opts.body)
-        addedIndices.push({ id: body.id, index: body.index })
+        addedIndices.push({ id: body.items[0].id, index: body.index })
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
       }
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }

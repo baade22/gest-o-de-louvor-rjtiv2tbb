@@ -4,6 +4,8 @@
 
 export const CHROMATIC_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 export const CHROMATIC_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+// Grafia usual quando a nota original não tem acidente (ex: C -2 -> Bb, e não A#)
+export const CHROMATIC_COMMON = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B']
 
 // Mapeamento de notas para índice de 0 a 11
 const NOTE_TO_INDEX: Record<string, number> = {
@@ -35,7 +37,8 @@ const ROOT_NOTE_REGEX = /^([A-G][#b]?)(.*)$/
 
 /**
  * Transpõe uma nota única por um determinado número de semitons (-11 a +11).
- * Usa sustenidos por padrão, a menos que o tom original usasse bemol explicitamente ou preferFlats seja true.
+ * Mantém o acidente da nota original (# ou b). Notas naturais usam a grafia usual (Eb, Bb, C#, F#, G#),
+ * a menos que preferFlats seja true.
  */
 export function transposeNote(note: string, semitones: number, preferFlats = false): string {
   if (semitones === 0) return note
@@ -45,8 +48,9 @@ export function transposeNote(note: string, semitones: number, preferFlats = fal
 
   // Normaliza o offset para o intervalo 0..11
   const newIndex = (((index + semitones) % 12) + 12) % 12
-  const useFlats = preferFlats || normalized.includes('b')
-  return useFlats ? CHROMATIC_FLAT[newIndex] : CHROMATIC_SHARP[newIndex]
+  if (preferFlats || normalized.includes('b')) return CHROMATIC_FLAT[newIndex]
+  if (normalized.includes('#')) return CHROMATIC_SHARP[newIndex]
+  return CHROMATIC_COMMON[newIndex]
 }
 
 /**

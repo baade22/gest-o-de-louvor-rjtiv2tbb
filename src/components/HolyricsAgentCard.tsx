@@ -1,56 +1,128 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Monitor,
-  Laptop,
-  CheckCircle2,
-  AlertTriangle,
-  RefreshCw,
-  Copy,
   Check,
-  Radio,
-  ExternalLink,
-  ShieldCheck,
   Clock,
+  Copy,
   Download,
+  Loader2,
+  Monitor,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Radio,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
-import { useToast } from '@/hooks/use-toast'
 import {
-  listHolyricsAgents,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
+import { Chip, EmptyState, timeAgo, type Tone } from '@/pages/event-center/shared'
+import {
+  deleteHolyricsAgents,
   generateHolyricsPairingCode,
+  listHolyricsAgents,
+  renameHolyricsAgent,
   testHolyricsAgent,
   type HolyricsAgentInfo,
 } from '@/services/holyricsAgent'
+
+const AGENT_LATEST_VERSION = '0.0.37'
+const AGENT_DOWNLOAD = `${import.meta.env.BASE_URL}LouvorFlow-Agent-${AGENT_LATEST_VERSION}.zip`
+const STALE_DAYS = 30
+
+type Filter = 'all' | 'online' | 'stale'
 
 interface HolyricsAgentCardProps {
   currentChurch: any
   isAdmin: boolean
 }
 
+/** Datas do PocketBase vêm como "2026-10-17 12:00:00.000Z". */
+const parsePbDate = (value?: string) => {
+  if (!value) return NaN
+  const iso = value.trim().replace(' ', 'T')
+  return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z').getTime()
+}
+
+/** Situação do computador do ponto de vista de quem administra. */
+export function agentState(agent: HolyricsAgentInfo, now = Date.now()) {
+  if (agent.status === 'ONLINE') return { label: 'Online', tone: 'ok' as Tone, key: 'online' }
+  if (!agent.paired_at) {
+    const expires = parsePbDate(agent.pairing_expires_at)
+    if (agent.has_pairing_code && expires > now) {
+      return { label: 'Aguardando código', tone: 'violet' as Tone, key: 'pairing' }
+    }
+    return { label: 'Nunca conectou', tone: 'neutral' as Tone, key: 'never' }
+  }
+  return { label: 'Offline', tone: 'neutral' as Tone, key: 'offline' }
+}
+
+/** Sem contato há mais de 30 dias (ou nunca conectou). */
+export function isStaleAgent(agent: HolyricsAgentInfo, now = Date.now()) {
+  if (agent.status === 'ONLINE') return false
+  const ref = agent.last_seen_at || agent.paired_at
+  if (!ref) return agentState(agent, now).key !== 'pairing'
+  const time = parsePbDate(ref)
+  return Number.isNaN(time) || now - time > STALE_DAYS * 24 * 60 * 60 * 1000
+}
+
+/** "0.0.24" < "0.0.37" */
+export function isOutdatedVersion(version?: string, latest = AGENT_LATEST_VERSION) {
+  if (!version) return false
+  const a = version.split('.').map((n) => parseInt(n, 10) || 0)
+  const b = latest.split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0)
+  }
+  return false
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  win32: 'Windows',
+  darwin: 'macOS',
+  linux: 'Linux',
+}
+
+const platformLabel = (p?: string) => (p ? PLATFORM_LABELS[p] || p : '')
+
+const agentDisplayName = (a: HolyricsAgentInfo) => a.name || a.machine_name || 'Computador'
+
 export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardProps) {
   const { toast } = useToast()
   const [agents, setAgents] = useState<HolyricsAgentInfo[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [selected, setSelected] = useState<string[]>([])
+  const [toDelete, setToDelete] = useState<HolyricsAgentInfo[]>([])
+  const [renaming, setRenaming] = useState<HolyricsAgentInfo | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [isRenamingSaving, setIsRenamingSaving] = useState(false)
+  const [testingAgentId, setTestingAgentId] = useState<string | null>(null)
+
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false)
   const [isGeneratingCode, setIsGeneratingCode] = useState(false)
   const [pairingData, setPairingData] = useState<{ code: string; expires_at: string } | null>(null)
   const [agentNameInput, setAgentNameInput] = useState('PC Projeção Holyrics')
-  const [testingAgentId, setTestingAgentId] = useState<string | null>(null)
-  const [testResult, setTestResult] = useState<{
-    agentId: string
-    success: boolean
-    message: string
-  } | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
 
   const fetchAgents = async () => {
@@ -58,6 +130,7 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
     try {
       const list = await listHolyricsAgents(currentChurch.id)
       setAgents(list)
+      setSelected((prev) => prev.filter((id) => list.some((a) => a.id === id)))
     } catch (err: any) {
       console.error('Erro ao listar agentes:', err)
     } finally {
@@ -67,17 +140,66 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
 
   useEffect(() => {
     fetchAgents()
-    // Polling a cada 10 segundos na tela de integrações para atualizar status do agent em tempo real
+    // Atualiza o status dos computadores a cada 10 segundos
     const interval = setInterval(fetchAgents, 10000)
     return () => clearInterval(interval)
   }, [currentChurch?.id])
 
-  // Identifica agentes online e pareados
-  const activeAgent = agents.find((a) => a.status === 'ONLINE')
-  const pairedAgents = agents.filter((a) => Boolean(a.paired_at))
-  const isAnyOnline = Boolean(activeAgent)
+  const onlineCount = agents.filter((a) => a.status === 'ONLINE').length
+  const staleCount = agents.filter((a) => isStaleAgent(a)).length
 
-  // Gerar código de pareamento
+  const visible = useMemo(() => {
+    if (filter === 'online') return agents.filter((a) => a.status === 'ONLINE')
+    if (filter === 'stale') return agents.filter((a) => isStaleAgent(a))
+    return agents
+  }, [agents, filter])
+
+  const allVisibleSelected = visible.length > 0 && visible.every((a) => selected.includes(a.id))
+  const selectedAgents = agents.filter((a) => selected.includes(a.id))
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const toggleAllVisible = () =>
+    setSelected((prev) =>
+      allVisibleSelected
+        ? prev.filter((id) => !visible.some((a) => a.id === id))
+        : [...new Set([...prev, ...visible.map((a) => a.id)])],
+    )
+
+  const handleDelete = async () => {
+    const ids = toDelete.map((a) => a.id)
+    const res = await deleteHolyricsAgents(currentChurch.id, ids)
+    toast({
+      title: res.deleted === 1 ? 'Computador excluído' : `${res.deleted} computadores excluídos`,
+    })
+    setSelected((prev) => prev.filter((id) => !ids.includes(id)))
+    setAgents((prev) => prev.filter((a) => !ids.includes(a.id)))
+    fetchAgents()
+  }
+
+  const handleRename = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!renaming || !renameValue.trim()) return
+    setIsRenamingSaving(true)
+    try {
+      await renameHolyricsAgent(currentChurch.id, renaming.id, renameValue.trim())
+      setAgents((prev) =>
+        prev.map((a) => (a.id === renaming.id ? { ...a, name: renameValue.trim() } : a)),
+      )
+      setRenaming(null)
+      toast({ title: 'Nome atualizado' })
+    } catch (err: any) {
+      toast({
+        title: 'Não foi possível renomear',
+        description: err?.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsRenamingSaving(false)
+    }
+  }
+
   const handleOpenPairModal = () => {
     setPairingData(null)
     setAgentNameInput('PC Projeção Holyrics')
@@ -90,14 +212,7 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
     setIsGeneratingCode(true)
     try {
       const res = await generateHolyricsPairingCode(currentChurch.id, agentNameInput)
-      setPairingData({
-        code: res.pairing_code,
-        expires_at: res.expires_at,
-      })
-      toast({
-        title: 'Código gerado com sucesso!',
-        description: 'Válido por 10 minutos. Digite-o no LouvorFlow Agent no computador da igreja.',
-      })
+      setPairingData({ code: res.pairing_code, expires_at: res.expires_at })
       fetchAgents()
     } catch (err: any) {
       toast({
@@ -115,44 +230,28 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
     navigator.clipboard.writeText(pairingData.code.replace(/\s+/g, ''))
     setCopiedCode(true)
     setTimeout(() => setCopiedCode(false), 2000)
-    toast({ title: 'Copiado!', description: 'Código copiado para a área de transferência.' })
   }
 
-  // Testar conexão SaaS -> Agent -> Holyrics Local
+  // Testa a conexão SaaS -> Agent -> Holyrics local
   const handleTestAgent = async (agent: HolyricsAgentInfo) => {
     if (!currentChurch) return
     setTestingAgentId(agent.id)
-    setTestResult(null)
     try {
       const res = await testHolyricsAgent(currentChurch.id, agent.id)
-      setTestResult({
-        agentId: agent.id,
-        success: res.success && res.holyrics_connected,
-        message: res.message,
-      })
-
       if (res.success && res.holyrics_connected) {
-        toast({
-          title: 'Conexão confirmada!',
-          description: res.message,
-        })
+        toast({ title: 'Conexão confirmada', description: res.message })
       } else {
         toast({
-          title: res.agent_online ? 'Holyrics não respondeu' : 'Agent offline',
+          title: res.agent_online ? 'O Holyrics não respondeu' : 'Computador offline',
           description: res.message,
           variant: 'destructive',
         })
       }
       fetchAgents()
     } catch (err: any) {
-      setTestResult({
-        agentId: agent.id,
-        success: false,
-        message: err.message || 'Falha ao testar agente.',
-      })
       toast({
         title: 'Erro ao testar',
-        description: err.message || 'Falha de comunicação com o Agent.',
+        description: err.message || 'Falha de comunicação com o computador.',
         variant: 'destructive',
       })
     } finally {
@@ -160,325 +259,496 @@ export function HolyricsAgentCard({ currentChurch, isAdmin }: HolyricsAgentCardP
     }
   }
 
+  const deletingOnline = toDelete.filter((a) => a.status === 'ONLINE')
+  const deleteTitle =
+    toDelete.length === 1
+      ? `Excluir "${agentDisplayName(toDelete[0])}"?`
+      : `Excluir ${toDelete.length} computadores?`
+  const deleteNames =
+    toDelete.length <= 3
+      ? toDelete.map((a) => `"${agentDisplayName(a)}"`).join(toDelete.length === 2 ? ' e ' : ', ')
+      : `${toDelete.length} computadores`
+
+  const FILTERS: { key: Filter; label: string; count: number }[] = [
+    { key: 'all', label: 'Todos', count: agents.length },
+    { key: 'online', label: 'Online', count: onlineCount },
+    { key: 'stale', label: `Sem uso há ${STALE_DAYS} dias`, count: staleCount },
+  ]
+
   return (
     <>
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all col-span-1 md:col-span-2">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700 font-extrabold text-sm">
-                <Laptop className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  Holyrics Local Agent
-                  <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-bold">
-                    Ponte Segura SaaS ↔ Local
-                  </Badge>
-                </h3>
-                <p className="text-xs text-slate-400 font-medium">
-                  Comunicação direta com o Holyrics (127.0.0.1:8091) no computador da congregação
-                </p>
-              </div>
+      <section className="col-span-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+        {/* Cabeçalho */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white">
+            <Monitor className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-[15px] font-semibold text-slate-900">Computadores conectados</h3>
+              {onlineCount > 0 ? (
+                <Chip tone="ok">{onlineCount} online</Chip>
+              ) : agents.some((a) => a.paired_at) ? (
+                <Chip tone="warn">Nenhum online</Chip>
+              ) : null}
             </div>
-
-            {isAnyOnline ? (
-              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100 text-xs gap-1.5 font-semibold px-3 py-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />🟢 Computador
-                Conectado
-              </Badge>
-            ) : pairedAgents.length > 0 ? (
-              <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs gap-1 font-semibold px-2.5 py-1">
-                <AlertTriangle className="h-3 w-3" />
-                Computador Offline
-              </Badge>
-            ) : (
-              <Badge
-                variant="outline"
-                className="bg-slate-50 text-slate-500 border-slate-200 text-xs px-2.5 py-1"
-              >
-                ⚪ Não pareado
-              </Badge>
-            )}
+            <p className="text-xs text-slate-500">
+              Computadores com o LouvorFlow Agent, que levam repertório e mídias ao Holyrics.
+            </p>
           </div>
-
-          <p className="text-xs text-slate-600 leading-relaxed">
-            O <strong>LouvorFlow Agent</strong> é um aplicativo leve que roda no computador onde o
-            Holyrics está instalado. Ele recebe os comandos de envio de músicas e repertório de
-            forma 100% segura (comunicação de saída),{' '}
-            <strong>sem exigir liberação de portas no roteador</strong> e sem expor o IP da igreja.
-          </p>
-
-          {/* LISTA DE AGENTS PAREADOS */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Computadores Registrados ({pairedAgents.length})
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchAgents}
-                className="h-7 text-xs text-slate-500 hover:text-slate-900 gap-1"
-              >
-                <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
-            </div>
-
-            {pairedAgents.length === 0 ? (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 text-xs text-slate-500 text-center space-y-2">
-                <p>Nenhum computador com LouvorFlow Agent pareado nesta congregação.</p>
-                <p className="text-[11px] text-slate-400">
-                  Clique no botão abaixo para gerar o código temporário e conectar o computador da
-                  projeção.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {pairedAgents.map((agent) => {
-                  const isOnline = agent.status === 'ONLINE'
-                  const isHolyricsOk = Boolean(agent.holyrics_detected)
-
-                  return (
-                    <div
-                      key={agent.id}
-                      className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between gap-3 text-xs"
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                            <Monitor className="h-3.5 w-3.5 text-purple-600" />
-                            {agent.name}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
-                              isOnline
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-rose-100 text-rose-800'
-                            }`}
-                          >
-                            {isOnline ? '🟢 Online' : '🔴 Offline'}
-                          </span>
-                        </div>
-
-                        <div className="text-[11px] text-slate-500 space-y-0.5 font-mono">
-                          <div>Máquina: {agent.machine_name || 'Desconhecida'}</div>
-                          <div>
-                            Holyrics Local:{' '}
-                            {isHolyricsOk ? (
-                              <span className="text-emerald-700 font-bold">
-                                🟢 Detectado{' '}
-                                {agent.holyrics_version ? `(v${agent.holyrics_version})` : ''}
-                              </span>
-                            ) : (
-                              <span className="text-amber-700 font-semibold">
-                                ⚠️ Não detectado (porta {agent.api_port || 8091})
-                              </span>
-                            )}
-                          </div>
-                          {agent.last_seen_at && (
-                            <div className="text-[10px] text-slate-400">
-                              Visto por último:{' '}
-                              {new Date(agent.last_seen_at).toLocaleTimeString('pt-BR')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Botão de Testar Conexão Real */}
-                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={testingAgentId === agent.id || !isAdmin}
-                          onClick={() => handleTestAgent(agent)}
-                          className="h-7 text-xs font-semibold rounded-lg border-slate-300 w-full hover:bg-white"
-                        >
-                          <Radio
-                            className={`h-3 w-3 mr-1 text-purple-600 ${testingAgentId === agent.id ? 'animate-pulse' : ''}`}
-                          />
-                          {testingAgentId === agent.id ? 'Testando via Agent...' : 'Testar Conexão'}
-                        </Button>
-                      </div>
-
-                      {testResult && testResult.agentId === agent.id && (
-                        <div
-                          className={`p-2.5 rounded-lg border text-[11px] leading-relaxed font-medium ${
-                            testResult.success
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : 'bg-amber-50 text-amber-900 border-amber-200'
-                          }`}
-                        >
-                          {testResult.message}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* AÇÕES INFERIORES */}
-        <div className="pt-4 mt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs text-slate-500 flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span>
-              O token do Holyrics fica salvo <strong>exclusivamente</strong> no PC da igreja.
-            </span>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <a
-              href="/LouvorFlow-Agent-0.0.37.zip"
-              download="LouvorFlow-Agent-0.0.37.zip"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-purple-700 bg-slate-100 hover:bg-purple-50 rounded-xl transition-colors border border-slate-200"
-              title="Baixar pacote do LouvorFlow Agent para execução no computador local"
+              href={AGENT_DOWNLOAD}
+              download={`LouvorFlow-Agent-${AGENT_LATEST_VERSION}.zip`}
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:flex-none"
+              title={`Versão ${AGENT_LATEST_VERSION}`}
             >
-              <Download className="h-3.5 w-3.5" />
-              Baixar Agent (LouvorFlow-Agent-0.0.37.zip)
+              <Download className="h-4 w-4" />
+              Baixar Agent
             </a>
-
             {isAdmin && (
               <Button
                 onClick={handleOpenPairModal}
-                className="w-full sm:w-auto rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-xs gap-1.5 shadow-sm px-4"
+                className="h-9 flex-1 gap-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800 sm:flex-none"
               >
-                <Laptop className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
                 Conectar computador
               </Button>
             )}
           </div>
         </div>
-      </div>
 
-      {/* MODAL: Gerar Código de Pareamento */}
+        {/* Filtros */}
+        {agents.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-5 py-2.5">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  filter === f.key
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100',
+                )}
+              >
+                {f.label}
+                <span
+                  className={cn('ml-1.5', filter === f.key ? 'text-slate-300' : 'text-slate-400')}
+                >
+                  {f.count}
+                </span>
+              </button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchAgents}
+              className="ml-auto h-7 gap-1 text-xs text-slate-500"
+            >
+              <RefreshCw className={cn('h-3 w-3', isLoading && 'animate-spin')} />
+              Atualizar
+            </Button>
+          </div>
+        )}
+
+        {/* Barra de seleção */}
+        {isAdmin && selected.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-red-100 bg-red-50/60 px-5 py-2.5">
+            <span className="text-sm font-medium text-slate-800">
+              {selected.length === 1 ? '1 selecionado' : `${selected.length} selecionados`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="text-xs font-medium text-slate-500 hover:text-slate-800"
+            >
+              Limpar seleção
+            </button>
+            <Button
+              size="sm"
+              onClick={() => setToDelete(selectedAgents)}
+              className="ml-auto h-8 gap-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Excluir selecionados
+            </Button>
+          </div>
+        )}
+
+        {/* Lista */}
+        {isLoading && agents.length === 0 ? (
+          <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando computadores…
+          </div>
+        ) : agents.length === 0 ? (
+          <EmptyState
+            icon={Monitor}
+            title="Nenhum computador conectado"
+            description="Instale o LouvorFlow Agent no computador do Holyrics e conecte com um código de 6 dígitos."
+            action={
+              isAdmin && (
+                <Button
+                  onClick={handleOpenPairModal}
+                  className="gap-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800"
+                >
+                  <Plus className="h-4 w-4" />
+                  Conectar computador
+                </Button>
+              )
+            }
+          />
+        ) : visible.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-slate-500">
+            Nenhum computador neste filtro.
+          </p>
+        ) : (
+          <div>
+            <div className="hidden grid-cols-[28px_minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto] items-center gap-4 border-b border-slate-100 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
+              {isAdmin ? (
+                <Checkbox
+                  checked={allVisibleSelected}
+                  onCheckedChange={toggleAllVisible}
+                  aria-label="Selecionar todos"
+                />
+              ) : (
+                <span />
+              )}
+              <span>Computador</span>
+              <span>Situação</span>
+              <span>Último contato</span>
+              <span>Versão</span>
+              <span className="w-[150px]" />
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {visible.map((agent) => {
+                const state = agentState(agent)
+                const outdated = isOutdatedVersion(agent.version)
+                const isSelected = selected.includes(agent.id)
+                const sub = [agent.machine_name, platformLabel(agent.platform)]
+                  .filter(Boolean)
+                  .join(' · ')
+                return (
+                  <li
+                    key={agent.id}
+                    className={cn(
+                      'grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-5 py-3.5 md:grid-cols-[28px_minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto] md:gap-x-4',
+                      isSelected && 'bg-teal-50/40',
+                    )}
+                  >
+                    {isAdmin ? (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleOne(agent.id)}
+                        aria-label={`Selecionar ${agentDisplayName(agent)}`}
+                      />
+                    ) : (
+                      <span />
+                    )}
+
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={cn(
+                          'grid h-9 w-9 shrink-0 place-items-center rounded-lg',
+                          state.key === 'online'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-slate-100 text-slate-500',
+                        )}
+                      >
+                        <Monitor className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {agentDisplayName(agent)}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {sub || 'Ainda não identificado'}
+                          {state.key === 'online' && (
+                            <span
+                              className={cn(
+                                'ml-1.5',
+                                agent.holyrics_detected ? 'text-emerald-700' : 'text-amber-700',
+                              )}
+                            >
+                              ·{' '}
+                              {agent.holyrics_detected
+                                ? 'Holyrics aberto'
+                                : 'Holyrics não encontrado'}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Situação/contato/versão: linha própria no celular */}
+                    <div className="col-span-3 col-start-2 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 md:hidden">
+                      <Chip tone={state.tone}>{state.label}</Chip>
+                      {agent.last_seen_at && <span>{timeAgo(agent.last_seen_at)}</span>}
+                      {agent.version && (
+                        <span className={cn(outdated && 'text-amber-700')}>
+                          v{agent.version}
+                          {outdated && ' · atualizar'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="hidden md:block">
+                      <Chip tone={state.tone}>{state.label}</Chip>
+                    </div>
+                    <span className="hidden text-sm text-slate-600 md:block">
+                      {agent.last_seen_at ? timeAgo(agent.last_seen_at) : '—'}
+                    </span>
+                    <div className="hidden items-center gap-1.5 md:flex">
+                      {agent.version ? (
+                        <>
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
+                            {agent.version}
+                          </span>
+                          {outdated && (
+                            <span
+                              className="text-[11px] font-medium text-amber-700"
+                              title={`Versão mais nova: ${AGENT_LATEST_VERSION}`}
+                            >
+                              Atualizar
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-sm text-slate-400">—</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1 md:w-[150px]">
+                      {state.key === 'online' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={testingAgentId === agent.id || !isAdmin}
+                          onClick={() => handleTestAgent(agent)}
+                          className="h-8 gap-1.5 px-2 text-xs text-slate-600"
+                        >
+                          {testingAgentId === agent.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Radio className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Testar</span>
+                        </Button>
+                      )}
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-500"
+                              aria-label="Mais ações"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setRenaming(agent)
+                                setRenameValue(agentDisplayName(agent))
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Renomear
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setToDelete([agent])}
+                              className="text-red-600 focus:text-red-700"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1.5 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs text-slate-500">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+          A senha do Holyrics fica só no computador da igreja. Nenhuma porta do roteador precisa ser
+          aberta.
+        </div>
+      </section>
+
+      {/* Confirmar exclusão */}
+      <ConfirmDialog
+        open={toDelete.length > 0}
+        onOpenChange={(open) => !open && setToDelete([])}
+        title={deleteTitle}
+        description={`${deleteNames} ${toDelete.length === 1 ? 'será desconectado' : 'serão desconectados'} do LouvorFlow.`}
+        confirmLabel={toDelete.length === 1 ? 'Excluir computador' : 'Excluir computadores'}
+        destructive
+        onConfirm={handleDelete}
+      >
+        <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
+          {deletingOnline.length > 0 && (
+            <li className="font-medium text-amber-700">
+              {deletingOnline.length === 1
+                ? toDelete.length === 1
+                  ? 'Ele está online agora e para de receber envios na hora.'
+                  : `"${agentDisplayName(deletingOnline[0])}" está online agora e para de receber envios na hora.`
+                : `${deletingOnline.length} deles estão online agora e param de receber envios na hora.`}
+            </li>
+          )}
+          <li>O acesso do Agent nesse computador deixa de funcionar.</li>
+          <li>O histórico de envios ao Holyrics é mantido.</li>
+          <li>Para usar de novo, basta conectar com um novo código.</li>
+        </ul>
+      </ConfirmDialog>
+
+      {/* Renomear */}
+      <Dialog
+        open={Boolean(renaming)}
+        onOpenChange={(o) => !o && !isRenamingSaving && setRenaming(null)}
+      >
+        <DialogContent className="rounded-xl sm:max-w-sm">
+          <form onSubmit={handleRename}>
+            <DialogHeader>
+              <DialogTitle>Renomear computador</DialogTitle>
+              <DialogDescription>
+                Um nome que a equipe reconheça, como "Projeção nave".
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                maxLength={80}
+                autoFocus
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRenaming(null)}
+                disabled={isRenamingSaving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={!renameValue.trim() || isRenamingSaving}
+                className="bg-teal-700 text-white hover:bg-teal-800"
+              >
+                {isRenamingSaving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gerar código de pareamento */}
       <Dialog open={isPairingModalOpen} onOpenChange={setIsPairingModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="rounded-xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Laptop className="h-5 w-5 text-purple-700" />
-              Conectar Computador ao LouvorFlow
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              Conecte o computador da projeção onde o Holyrics está instalado através do LouvorFlow
-              Agent.
+            <DialogTitle>Conectar computador</DialogTitle>
+            <DialogDescription>
+              Use no computador da projeção, onde o Holyrics está instalado.
             </DialogDescription>
           </DialogHeader>
 
           {!pairingData ? (
-            <form onSubmit={handleGenerateCode} className="space-y-4 py-2">
+            <form onSubmit={handleGenerateCode} className="space-y-4 py-1">
               <div className="space-y-1.5">
-                <Label htmlFor="agent-name" className="text-xs font-semibold text-slate-700">
-                  Nome de identificação do computador
-                </Label>
+                <Label htmlFor="agent-name">Nome do computador</Label>
                 <Input
                   id="agent-name"
                   value={agentNameInput}
                   onChange={(e) => setAgentNameInput(e.target.value)}
-                  placeholder="Ex: PC Projeção - Nave Principal"
-                  className="rounded-xl text-xs"
+                  placeholder="Ex: Projeção nave"
                   required
                 />
-                <p className="text-[11px] text-slate-500">
-                  Ajuda a identificar a máquina caso sua congregação use múltiplos computadores.
-                </p>
               </div>
 
-              <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 text-xs text-purple-900 space-y-1">
-                <p className="font-bold flex items-center gap-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-purple-700" />
-                  Como funciona:
-                </p>
-                <ol className="list-decimal list-inside text-[11px] space-y-0.5 text-purple-800 pl-1">
-                  <li>Será gerado um código numérico de 6 dígitos temporário (10 minutos).</li>
-                  <li>
-                    Abra o LouvorFlow Agent no computador do Holyrics (http://localhost:8765).
+              <ol className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-sm text-slate-600">
+                {[
+                  'Gere um código de 6 dígitos (vale por 10 minutos).',
+                  'No computador do Holyrics, abra o Agent em localhost:8765.',
+                  'Digite o código e clique em Conectar.',
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-2.5">
+                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-teal-700 text-[11px] font-semibold text-white">
+                      {i + 1}
+                    </span>
+                    {step}
                   </li>
-                  <li>Digite o código e clique em Conectar. Pronto!</li>
-                </ol>
-              </div>
+                ))}
+              </ol>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <DialogFooter className="gap-2 sm:gap-0">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setIsPairingModalOpen(false)}
-                  className="rounded-xl text-xs"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={isGeneratingCode}
-                  className="rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-xs"
+                  className="bg-teal-700 text-white hover:bg-teal-800"
                 >
-                  {isGeneratingCode ? 'Gerando...' : 'Gerar Código de Pareamento'}
+                  {isGeneratingCode && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                  Gerar código
                 </Button>
-              </div>
+              </DialogFooter>
             </form>
           ) : (
-            <div className="space-y-5 py-3">
-              <div className="text-center space-y-2">
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Código de Pareamento
+            <div className="space-y-4 py-1">
+              <div className="flex items-center justify-center gap-4 rounded-xl bg-slate-900 px-6 py-5">
+                <span className="font-mono text-3xl font-bold tracking-widest text-emerald-400">
+                  {pairingData.code}
                 </span>
-                <div className="bg-slate-900 text-white py-4 px-6 rounded-2xl flex items-center justify-center gap-4">
-                  <span className="text-3xl font-extrabold tracking-widest font-mono text-emerald-400">
-                    {pairingData.code}
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleCopyCode}
-                    className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-800"
-                    title="Copiar código"
-                  >
-                    {copiedCode ? (
-                      <Check className="h-4 w-4 text-emerald-400" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                <div className="flex items-center justify-center gap-1 text-[11px] text-amber-600 font-medium">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>Código de uso único válido por 10 minutos</span>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2">
-                <p className="font-bold text-slate-900">Passos no computador do Holyrics:</p>
-                <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1">
-                  <li>
-                    No computador da igreja, abra o painel do Agent:{' '}
-                    <strong>http://localhost:8765</strong>
-                  </li>
-                  <li>
-                    No campo <em>"Código de Pareamento"</em>, digite os 6 dígitos acima.
-                  </li>
-                  <li>
-                    Clique em <strong>[Conectar]</strong>. O LouvorFlow detectará a conexão
-                    automaticamente.
-                  </li>
-                </ol>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
                 <Button
                   type="button"
-                  onClick={() => {
-                    setIsPairingModalOpen(false)
-                    fetchAgents()
-                  }}
-                  className="w-full rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs"
+                  size="icon"
+                  variant="ghost"
+                  onClick={handleCopyCode}
+                  className="h-8 w-8 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  aria-label="Copiar código"
                 >
-                  Concluir e fechar
+                  {copiedCode ? (
+                    <Check className="h-4 w-4 text-emerald-400" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
+              <p className="flex items-center justify-center gap-1.5 text-xs text-amber-700">
+                <Clock className="h-3.5 w-3.5" />
+                Use uma vez, em até 10 minutos.
+              </p>
+              <p className="text-sm text-slate-600">
+                No computador da igreja, abra <strong>localhost:8765</strong>, digite o código e
+                clique em <strong>Conectar</strong>. O computador aparece nesta lista sozinho.
+              </p>
+              <Button
+                type="button"
+                onClick={() => {
+                  setIsPairingModalOpen(false)
+                  fetchAgents()
+                }}
+                className="w-full bg-slate-900 text-white hover:bg-slate-800"
+              >
+                Concluir
+              </Button>
             </div>
           )}
         </DialogContent>

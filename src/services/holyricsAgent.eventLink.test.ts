@@ -574,7 +574,8 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
   })
 
   it('18. [MOCK] Data diferente (dia/mês/ano) não casa mesmo com horário igual', () => {
-    const { matched } = matchScheduleCandidates(schedulesFixture, '2025-08-17', '19:00')
+    // A fixture tem cultos em 10/08 e 17/08 às 19:00; 24/08 no mesmo horário não pode casar
+    const { matched } = matchScheduleCandidates(schedulesFixture, '2025-08-24', '19:00')
     expect(matched.length).toBe(0)
   })
 
@@ -619,8 +620,10 @@ describe('Etapa 3A — Resolução de vínculo (casamento data/hora, evento vs s
         },
       },
     ]
-    const { matched, ids } = matchScheduleCandidates(missingId, '2026-10-25', '17:00')
-    expect(matched.length).toBe(1)
+    const { matched, ids, audit } = matchScheduleCandidates(missingId, '2026-10-25', '17:00')
+    // O hook descarta o candidato sem ID de ocorrência (REJECTED_MISSING_ID)
+    expect(matched.length).toBe(0)
+    expect(audit[0].decision).toBe('REJECTED_MISSING_ID')
     // NUNCA pode ter pego '1791842350987'
     expect(ids).toEqual([])
   })

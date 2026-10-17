@@ -1,30 +1,29 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import type { EventItem, EventMember, Song, EventTask, MediaAsset } from '@/types'
+import type { EventItem, EventMember, EventSong } from '@/types'
 import { listEventTasks } from '@/services/tasks'
 import { listAllChurchMedia } from '@/services/media'
+import { computeEventReadiness, countPendencies } from '@/lib/eventReadiness'
 import {
   CalendarDays,
   Music2,
   Users,
-  Clock,
-  ArrowRight,
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Sparkles,
   ChevronRight,
-  Send,
-  Calendar,
+  Plus,
+  LayoutList,
+  ImageIcon,
+  CalendarCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
-import { formatCalendarDateDisplay, getLocalTodayYMD } from '@/lib/dateUtils'
+import { cn } from '@/lib/utils'
+import { formatCalendarDateDisplay, getLocalTodayYMD, parseCalendarDate } from '@/lib/dateUtils'
 import {
   Dialog,
   DialogContent,
@@ -36,21 +35,156 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
+const MONTHS_SHORT = [
+  'JAN',
+  'FEV',
+  'MAR',
+  'ABR',
+  'MAI',
+  'JUN',
+  'JUL',
+  'AGO',
+  'SET',
+  'OUT',
+  'NOV',
+  'DEZ',
+]
+
+interface EventSummary {
+  event: EventItem
+  totalMembers: number
+  confirmedMembers: number
+  songsCount: number
+  /** 0–100, mesma regra da Central do Culto. */
+  readiness: number
+  pendencies: number
+}
+
+function daysUntil(dateStr: string): number {
+  const target = parseCalendarDate(dateStr)
+  const today = parseCalendarDate(getLocalTodayYMD())
+  if (!target || !today) return 0
+  const t = Date.UTC(target.year, target.month - 1, target.day)
+  const n = Date.UTC(today.year, today.month - 1, today.day)
+  return Math.round((t - n) / 86_400_000)
+}
+
+function countdownLabel(days: number): string {
+  if (days <= 0) return 'Hoje'
+  if (days === 1) return 'Amanhã'
+  return `${days} dias`
+}
+
+function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+function readinessColor(value: number): string {
+  if (value >= 70) return 'bg-teal-600'
+  if (value >= 40) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function MiniDate({ date }: { date: string }) {
+  const parts = parseCalendarDate(date)
+  return (
+    <div className="w-11 shrink-0 rounded-lg border border-slate-200 bg-slate-50 py-1 text-center">
+      <div className="text-[10px] font-bold text-teal-700">
+        {parts ? MONTHS_SHORT[parts.month - 1] : '--'}
+      </div>
+      <div className="text-[17px] font-extrabold leading-tight text-slate-900">
+        {parts ? String(parts.day).padStart(2, '0') : '--'}
+      </div>
+    </div>
+  )
+}
+
+function Chip({
+  tone,
+  children,
+}: {
+  tone: 'ok' | 'warn' | 'danger' | 'teal' | 'neutral'
+  children: React.ReactNode
+}) {
+  const tones = {
+    ok: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    warn: 'bg-amber-50 text-amber-700 ring-amber-200',
+    danger: 'bg-red-50 text-red-700 ring-red-200',
+    teal: 'bg-teal-50 text-teal-700 ring-teal-200',
+    neutral: 'bg-white text-slate-600 ring-slate-200',
+  }
+  const dot = {
+    ok: 'bg-emerald-500',
+    warn: 'bg-amber-500',
+    danger: 'bg-red-500',
+    teal: 'bg-teal-500',
+    neutral: 'bg-slate-400',
+  }
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
+        tones[tone],
+      )}
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', dot[tone])} />
+      {children}
+    </span>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  iconClass,
+  label,
+  value,
+  hint,
+  isLoading,
+}: {
+  icon: React.ElementType
+  iconClass: string
+  label: string
+  value: React.ReactNode
+  hint: string
+  isLoading: boolean
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">
+      <div className="flex items-center gap-2.5 text-[13px] font-medium text-slate-600">
+        <span className={cn('grid h-8 w-8 place-items-center rounded-lg', iconClass)}>
+          <Icon className="h-4 w-4" />
+        </span>
+        {label}
+      </div>
+      <div className="mt-3 text-[26px] font-bold tracking-tight text-slate-900">
+        {isLoading ? <Skeleton className="h-8 w-12" /> : value}
+      </div>
+      <div className="text-xs text-slate-500">{hint}</div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { currentChurch, currentMember, user, isAdmin, isLeader, isMaster } = useAuth()
   const { toast } = useToast()
-  const navigate = useNavigate()
 
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalSongs: 0,
-    scheduledMusicians: 0,
-    pendingConfirmations: 0,
-    upcomingEventsCount: 0,
+    activeMembers: null as number | null,
+    eventsThisMonth: 0,
+    eventsLeftThisMonth: 0,
     pendingMedias: 0,
     pendingTasks: 0,
   })
-  const [nextEvent, setNextEvent] = useState<EventItem | null>(null)
+  const [upcomingEvents, setUpcomingEvents] = useState<EventSummary[]>([])
   const [myUpcomingScales, setMyUpcomingScales] = useState<EventMember[]>([])
   const [recentActivities, setRecentActivities] = useState<EventMember[]>([])
 
@@ -65,73 +199,108 @@ export default function Dashboard() {
     setIsLoading(true)
 
     try {
-      // 1. Total de músicas
-      const songsRes = await pb.collection('songs').getList(1, 1, {
-        filter: `church_id = "${currentChurch.id}"`,
+      const churchFilter = `church_id = "${currentChurch.id}"`
+      const today = getLocalTodayYMD()
+      const monthStart = `${today.slice(0, 7)}-01`
+      const [y, m] = today.split('-').map(Number)
+      const nextMonthStart =
+        m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+
+      // 1. Acervo de músicas
+      const songsRes = await pb.collection('songs').getList(1, 1, { filter: churchFilter })
+
+      // 2. Próximos cultos (a partir de hoje, sem os cancelados)
+      const eventsRes = await pb.collection('events').getList<EventItem>(1, 6, {
+        filter: `${churchFilter} && date >= "${today}" && status != "Cancelado"`,
+        sort: 'date,start_time',
       })
+      const upcoming = eventsRes.items.slice(0, 4)
 
-      // 2. Eventos futuros
-      const now = new Date().toISOString()
-      const eventsRes = await pb.collection('events').getList<EventItem>(1, 5, {
-        filter: `church_id = "${currentChurch.id}"`,
-        sort: 'date',
-      })
-
-      const upcoming = eventsRes.items.filter((e) => e.status !== 'Cancelado')
-      const firstUpcoming = upcoming[0] || null
-      setNextEvent(firstUpcoming)
-
-      // 3. Se houver próximo evento, pega contagem de músicos e confirmações pendentes
-      let totalMembersScheduled = 0
-      let pendingCount = 0
-
-      if (firstUpcoming) {
-        const membersList = await pb.collection('event_members').getFullList<EventMember>({
-          filter: `church_id = "${currentChurch.id}" && event_id = "${firstUpcoming.id}"`,
+      // 3. Equipe, repertório, mídias e tarefas dos próximos cultos
+      const idsFilter = upcoming.map((e) => `event_id = "${e.id}"`).join(' || ')
+      const [members, songs, churchMedias, tasksByEvent] = await Promise.all([
+        upcoming.length
+          ? pb.collection('event_members').getFullList<EventMember>({
+              filter: `${churchFilter} && (${idsFilter})`,
+            })
+          : Promise.resolve([] as EventMember[]),
+        upcoming.length
+          ? pb.collection('event_songs').getFullList<EventSong>({
+              filter: `${churchFilter} && (${idsFilter})`,
+              fields: 'id,event_id,holyrics_status',
+            })
+          : Promise.resolve([] as EventSong[]),
+        listAllChurchMedia(currentChurch.id).catch(() => []),
+        Promise.all(upcoming.map((e) => listEventTasks(currentChurch.id, e.id).catch(() => []))),
+      ])
+      const summaries: EventSummary[] = upcoming.map((event, index) => {
+        const evMembers = members.filter((mb) => mb.event_id === event.id)
+        const evSongs = songs.filter((sg) => sg.event_id === event.id)
+        const readiness = computeEventReadiness({
+          members: evMembers,
+          songs: evSongs,
+          medias: churchMedias.filter((md) => md.event_id === event.id),
+          tasks: tasksByEvent[index],
         })
-        totalMembersScheduled = membersList.length
-        pendingCount = membersList.filter((m) => m.status === 'PENDENTE').length
+        return {
+          event,
+          totalMembers: evMembers.length,
+          confirmedMembers: readiness.team.done,
+          songsCount: evSongs.length,
+          readiness: readiness.score,
+          pendencies: countPendencies(readiness),
+        }
+      })
+      setUpcomingEvents(summaries)
+
+      // 4. Cultos deste mês
+      const monthRes = await pb.collection('events').getList<EventItem>(1, 1, {
+        filter: `${churchFilter} && date >= "${monthStart}" && date < "${nextMonthStart}" && status != "Cancelado"`,
+      })
+      const monthLeftRes = await pb.collection('events').getList<EventItem>(1, 1, {
+        filter: `${churchFilter} && date >= "${today}" && date < "${nextMonthStart}" && status != "Cancelado"`,
+      })
+
+      // 5. Membros ativos (nem todo papel pode ler a lista)
+      let activeMembers: number | null = null
+      try {
+        const membersRes = await pb.collection('church_members').getList(1, 1, {
+          filter: `${churchFilter} && is_active = true`,
+        })
+        activeMembers = membersRes.totalItems
+      } catch {
+        /* sem permissão: o card mostra "—" */
       }
 
-      let pendingMedias = 0
-      let pendingTasks = 0
-      try {
-        const churchMedias = await listAllChurchMedia(currentChurch.id)
-        pendingMedias = churchMedias.filter(
-          (m) => m.status !== 'CONCLUIDA' && m.status !== 'IMPORTADA_HOLYRICS',
-        ).length
-        if (firstUpcoming) {
-          const tasks = await listEventTasks(currentChurch.id, firstUpcoming.id)
-          pendingTasks = tasks.filter(
-            (t) => t.status === 'PENDENTE' || t.status === 'EM_ANDAMENTO',
-          ).length
-        }
-      } catch {
-        /* intentionally ignored */
-      }
+      const pendingMedias = churchMedias.filter(
+        (md) => md.status !== 'CONCLUIDA' && md.status !== 'IMPORTADA_HOLYRICS',
+      ).length
+      const pendingTasks = (tasksByEvent[0] || []).filter(
+        (t) => t.status === 'PENDENTE' || t.status === 'EM_ANDAMENTO',
+      ).length
 
       setStats({
         totalSongs: songsRes.totalItems,
-        scheduledMusicians: totalMembersScheduled,
-        pendingConfirmations: pendingCount,
-        upcomingEventsCount: upcoming.length,
+        activeMembers,
+        eventsThisMonth: monthRes.totalItems,
+        eventsLeftThisMonth: monthLeftRes.totalItems,
         pendingMedias,
         pendingTasks,
       })
 
-      // 4. Próximas escalas do usuário logado
+      // 6. Próximas escalas do usuário logado
       if (currentMember) {
         const myScales = await pb.collection('event_members').getList<EventMember>(1, 5, {
-          filter: `church_id = "${currentChurch.id}" && member_id = "${currentMember.id}"`,
+          filter: `${churchFilter} && member_id = "${currentMember.id}" && event_id.date >= "${today}"`,
           expand: 'event_id,role_id',
-          sort: '-created',
+          sort: 'event_id.date',
         })
         setMyUpcomingScales(myScales.items)
       }
 
-      // 5. Atividades recentes (últimas confirmações ou escalas na igreja)
+      // 7. Atividades recentes (últimas confirmações ou escalas na igreja)
       const activities = await pb.collection('event_members').getList<EventMember>(1, 5, {
-        filter: `church_id = "${currentChurch.id}"`,
+        filter: churchFilter,
         expand: 'event_id,member_id.user_id,role_id',
         sort: '-updated',
       })
@@ -204,389 +373,432 @@ export default function Dashboard() {
     }
   }
 
-  const formatDateDisplay = (dateStr: string) => {
-    return formatCalendarDateDisplay(dateStr, 'short')
-  }
-
   const todayDisplay = formatCalendarDateDisplay(getLocalTodayYMD(), 'full')
+  const canManage = isAdmin || isLeader
+  const next = upcomingEvents[0]
+  const nextDays = next ? daysUntil(next.event.date) : 0
+  const nextPendencies = next?.pendencies ?? 0
+  const myPendingScales = myUpcomingScales.filter((s) => s.status === 'PENDENTE').length
 
   return (
-    <div className="space-y-8">
-      {/* Header com boas-vindas */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-700">
-            <Sparkles className="h-4 w-4" />
-            <span>{todayDisplay}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Olá, {user?.name?.split(' ')[0] || 'Músico'}! 👋
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            {greeting()}, {user?.name?.split(' ')[0] || 'Músico'}
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Bem-vindo ao painel da {currentChurch?.name || 'sua igreja'}.
+          <p className="mt-0.5 text-sm text-slate-500">
+            {capitalizeFirst(todayDisplay)}
+            {currentChurch?.name ? ` · ${currentChurch.name}` : ''}
           </p>
         </div>
 
-        {(isAdmin || isLeader) && (
-          <div className="flex items-center gap-2">
+        {canManage && (
+          <Button
+            asChild
+            className="h-10 gap-2 self-start rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800 sm:self-auto"
+          >
             <Link to="/events/new">
-              <Button className="h-10 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs sm:text-sm gap-2 shadow-sm">
-                <Calendar className="h-4 w-4" />
-                Novo Culto / Evento
-              </Button>
+              <Plus className="h-4 w-4" />
+              Novo culto
             </Link>
-          </div>
+          </Button>
         )}
       </div>
 
-      {/* Próximo Evento em Destaque */}
+      {/* Próximo culto */}
       {isLoading ? (
-        <Skeleton className="h-44 w-full rounded-2xl" />
-      ) : nextEvent ? (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-800 via-teal-700 to-slate-900 text-white p-6 sm:p-8 shadow-xl">
-          <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-white/5 blur-2xl" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-teal-500/20 px-3 py-1 text-xs font-semibold text-teal-200 backdrop-blur-xs border border-teal-400/30">
-                <CalendarDays className="h-3.5 w-3.5" />
-                <span>Próximo Culto Programado</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                {nextEvent.title}
-              </h2>
-              <p className="text-sm text-teal-100/80 line-clamp-2">
-                {nextEvent.description || 'Culto de louvor e adoração congregacional.'}
-              </p>
-              <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-teal-100 pt-2">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4 text-teal-300" />
-                  <span>{formatDateDisplay(nextEvent.date)}</span>
-                </div>
-                {nextEvent.start_time && (
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-teal-300" />
-                    <span>
-                      {nextEvent.start_time}
-                      {nextEvent.end_time ? ` às ${nextEvent.end_time}` : ''}
-                    </span>
-                  </div>
-                )}
-                <Badge variant="outline" className="border-teal-400/40 text-teal-200">
-                  {nextEvent.status}
-                </Badge>
-              </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
+      ) : next ? (
+        <div className="grid overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs md:grid-cols-[1fr_280px]">
+          <div className="p-5 sm:p-6">
+            <div className="text-xs font-bold uppercase tracking-wider text-teal-700">
+              Próximo culto
+            </div>
+            <h2 className="mt-1.5 text-xl font-bold tracking-tight text-slate-900 sm:text-[22px]">
+              {next.event.title}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {capitalizeFirst(formatCalendarDateDisplay(next.event.date, 'full'))}
+              {next.event.start_time && (
+                <span>
+                  {' · '}
+                  {next.event.start_time}
+                  {next.event.end_time ? ` – ${next.event.end_time}` : ''}
+                </span>
+              )}
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {next.totalMembers > 0 ? (
+                <Chip tone={next.confirmedMembers === next.totalMembers ? 'ok' : 'warn'}>
+                  {next.confirmedMembers} de {next.totalMembers} confirmados
+                </Chip>
+              ) : (
+                <Chip tone="danger">Equipe não escalada</Chip>
+              )}
+              {next.songsCount > 0 ? (
+                <Chip tone="teal">
+                  {next.songsCount} {next.songsCount === 1 ? 'música' : 'músicas'}
+                </Chip>
+              ) : (
+                <Chip tone="danger">Repertório vazio</Chip>
+              )}
+              {stats.pendingTasks > 0 && (
+                <Chip tone="warn">
+                  {stats.pendingTasks}{' '}
+                  {stats.pendingTasks === 1 ? 'tarefa aberta' : 'tarefas abertas'}
+                </Chip>
+              )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <Link to={`/events/${nextEvent.id}/escala`}>
-                <Button className="h-11 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold gap-2 shadow-lg shadow-violet-900/30 hover:scale-105 transition-transform">
-                  Ver Escala & Repertório
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                asChild
+                className="h-10 gap-2 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
+              >
+                <Link to={`/events/${next.event.id}/escala`}>
+                  <LayoutList className="h-4 w-4" />
+                  Abrir central do culto
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                className="h-10 rounded-lg font-semibold text-slate-700"
+              >
+                <Link to="/events">Ver agenda</Link>
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-center gap-1.5 bg-gradient-to-br from-teal-700 to-cyan-900 p-5 text-white sm:p-6">
+            <div className="text-[13px] text-teal-100">{nextDays <= 0 ? 'É' : 'Começa em'}</div>
+            <div className="text-4xl font-extrabold tracking-tight">{countdownLabel(nextDays)}</div>
+            <div className="text-[13px] text-teal-100">
+              Prontidão {next.readiness}%
+              {nextPendencies > 0
+                ? ` · ${nextPendencies} ${nextPendencies === 1 ? 'pendência' : 'pendências'}`
+                : ' · tudo certo'}
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-teal-300 transition-all"
+                style={{ width: `${next.readiness}%` }}
+              />
             </div>
           </div>
         </div>
       ) : (
-        <Card className="rounded-2xl border-dashed border-2 border-slate-200 bg-white/50 p-8 text-center">
+        <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 text-center">
           <CalendarDays className="mx-auto h-10 w-10 text-slate-400" />
-          <h3 className="mt-3 text-base font-semibold text-slate-800">
-            Nenhum evento futuro agendado
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            Crie novos cultos e ensaios para montar repertórios e escalar sua equipe.
+          <h3 className="mt-3 text-base font-semibold text-slate-800">Nenhum culto agendado</h3>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+            Crie cultos e ensaios para montar repertórios e escalar sua equipe.
           </p>
-          {(isAdmin || isLeader) && (
-            <Link to="/events/new" className="mt-4 inline-block">
-              <Button size="sm" className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white">
-                Criar Primeiro Evento
-              </Button>
-            </Link>
+          {canManage && (
+            <Button
+              asChild
+              size="sm"
+              className="mt-4 rounded-lg bg-teal-700 text-white hover:bg-teal-800"
+            >
+              <Link to="/events/new">Criar primeiro culto</Link>
+            </Button>
           )}
-        </Card>
+        </div>
       )}
 
-      {/* Row de 4 estatísticas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Músicas */}
-        <Card className="rounded-2xl border-slate-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">Total de Músicas</p>
-              <h4 className="text-2xl font-extrabold text-slate-900 mt-1">
-                {isLoading ? <Skeleton className="h-8 w-12" /> : stats.totalSongs}
-              </h4>
-              <p className="text-[11px] text-teal-700 font-medium mt-1">Acervo cadastrado</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700 shrink-0">
-              <Music2 className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Músicos Escalados */}
-        <Card className="rounded-2xl border-slate-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">Músicos no Próx. Culto</p>
-              <h4 className="text-2xl font-extrabold text-slate-900 mt-1">
-                {isLoading ? <Skeleton className="h-8 w-12" /> : stats.scheduledMusicians}
-              </h4>
-              <p className="text-[11px] text-slate-500 font-medium mt-1">Instrumentos / voz</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-violet-50 flex items-center justify-center text-violet-700 shrink-0">
-              <Users className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Mídias ou Confirmações dependendo do papel */}
-        <Card className="rounded-2xl border-slate-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">
-                {isMaster || isAdmin ? 'Mídias Pendentes' : 'Confirmações Pendentes'}
-              </p>
-              <h4 className="text-2xl font-extrabold text-amber-600 mt-1">
-                {isLoading ? (
-                  <Skeleton className="h-8 w-12" />
-                ) : isMaster || isAdmin ? (
-                  stats.pendingMedias
-                ) : (
-                  stats.pendingConfirmations
-                )}
-              </h4>
-              <p className="text-[11px] text-amber-600 font-medium mt-1">
-                {isMaster || isAdmin ? 'Para download/Holyrics' : 'Aguardando resposta'}
-              </p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
-              <AlertCircle className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Próximos Eventos */}
-        <Card className="rounded-2xl border-slate-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">Próximos Cultos</p>
-              <h4 className="text-2xl font-extrabold text-slate-900 mt-1">
-                {isLoading ? <Skeleton className="h-8 w-12" /> : stats.upcomingEventsCount}
-              </h4>
-              <p className="text-[11px] text-slate-500 font-medium mt-1">Planejados na agenda</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700 shrink-0">
-              <CalendarDays className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Números */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard
+          icon={CalendarDays}
+          iconClass="bg-teal-50 text-teal-700"
+          label="Cultos este mês"
+          value={stats.eventsThisMonth}
+          hint={`${stats.eventsLeftThisMonth} ainda por vir`}
+          isLoading={isLoading}
+        />
+        <StatCard
+          icon={Users}
+          iconClass="bg-sky-50 text-sky-700"
+          label="Membros ativos"
+          value={stats.activeMembers ?? '—'}
+          hint="Na equipe da igreja"
+          isLoading={isLoading}
+        />
+        <StatCard
+          icon={Music2}
+          iconClass="bg-violet-50 text-violet-700"
+          label="Músicas no acervo"
+          value={stats.totalSongs}
+          hint="Cadastradas"
+          isLoading={isLoading}
+        />
+        {isMaster || isAdmin ? (
+          <StatCard
+            icon={ImageIcon}
+            iconClass="bg-amber-50 text-amber-700"
+            label="Mídias pendentes"
+            value={stats.pendingMedias}
+            hint="Para baixar ou importar"
+            isLoading={isLoading}
+          />
+        ) : (
+          <StatCard
+            icon={CalendarCheck}
+            iconClass="bg-amber-50 text-amber-700"
+            label="Escalas a confirmar"
+            value={myPendingScales}
+            hint="Aguardando sua resposta"
+            isLoading={isLoading}
+          />
+        )}
       </div>
 
-      {/* Grid com Minhas Escalas e Notificações Recentes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Minhas Próximas Escalas */}
-        <Card className="rounded-2xl border-slate-200 shadow-xs flex flex-col">
-          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-bold text-slate-900">
-                Minhas Próximas Escalas
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Escalas designadas para você neste ministério
-              </CardDescription>
+      <div className="grid items-start gap-5 lg:grid-cols-[1.3fr_1fr]">
+        {/* Próximos cultos */}
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+            <h3 className="text-[15px] font-semibold text-slate-900">Próximos cultos</h3>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs font-semibold text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+            >
+              <Link to="/events">
+                Ver agenda <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
+          {isLoading ? (
+            <div className="space-y-3 p-5">
+              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-lg" />
             </div>
-            <Link to="/minhas-escalas">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50"
-              >
-                Ver todas <ChevronRight className="h-3.5 w-3.5 ml-1" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="p-4 flex-1">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-16 w-full rounded-xl" />
-                <Skeleton className="h-16 w-full rounded-xl" />
-              </div>
-            ) : myUpcomingScales.length === 0 ? (
-              <div className="py-8 text-center text-slate-500">
-                <CheckCircle2 className="mx-auto h-8 w-8 text-teal-600/60 mb-2" />
-                <p className="text-sm font-semibold text-slate-700">Nenhuma escala pendente</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Você não possui escalas ativas no momento.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {myUpcomingScales.map((scale) => {
-                  const ev = scale.expand?.event_id
-                  const ro = scale.expand?.role_id
-                  return (
-                    <div
-                      key={scale.id}
-                      className="p-3.5 rounded-xl border border-slate-200/80 bg-white hover:border-teal-200 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h5 className="text-sm font-bold text-slate-900 truncate">
-                            {ev?.title || 'Culto'}
-                          </h5>
-                          {ro && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] font-semibold bg-teal-50 text-teal-800 border-teal-200"
-                            >
-                              {ro.name}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                          <span>{ev ? formatDateDisplay(ev.date) : ''}</span>
-                          {ev?.start_time && <span>• {ev.start_time}</span>}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {scale.status === 'PENDENTE' ? (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => handleConfirmScale(scale.id)}
-                              disabled={isUpdatingScale}
-                              className="h-8 px-3 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold gap-1"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Confirmar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenDeclineModal(scale)}
-                              disabled={isUpdatingScale}
-                              className="h-8 px-3 rounded-lg border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold gap-1"
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              Recusar
-                            </Button>
-                          </>
-                        ) : scale.status === 'CONFIRMADO' ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100 text-xs">
-                            Confirmado
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100 text-xs">
-                            Recusado
-                          </Badge>
+          ) : upcomingEvents.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-500">
+              Nenhum culto nos próximos dias.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {upcomingEvents.map((s) => (
+                <li key={s.event.id}>
+                  <Link
+                    to={`/events/${s.event.id}/escala`}
+                    className="flex items-center gap-3.5 px-5 py-3 transition-colors hover:bg-slate-50"
+                  >
+                    <MiniDate date={s.event.date} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-slate-900">{s.event.title}</div>
+                      <div className="truncate text-xs text-slate-500">
+                        {capitalizeFirst(
+                          formatCalendarDateDisplay(s.event.date, 'short')
+                            .split(',')[0]
+                            .replace('.', ''),
                         )}
+                        {s.event.start_time ? ` · ${s.event.start_time}` : ''}
+                        {' · '}
+                        {s.songsCount > 0
+                          ? `${s.songsCount} ${s.songsCount === 1 ? 'música' : 'músicas'}`
+                          : 'repertório vazio'}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Notificações Recentes / Atividades da Igreja */}
-        <Card className="rounded-2xl border-slate-200 shadow-xs flex flex-col">
-          <CardHeader className="pb-3 border-b border-slate-100">
-            <CardTitle className="text-base font-bold text-slate-900">
-              Atividades Recentes
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Últimas atualizações e respostas de escala na equipe
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 flex-1">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full rounded-xl" />
-                <Skeleton className="h-12 w-full rounded-xl" />
-                <Skeleton className="h-12 w-full rounded-xl" />
-              </div>
-            ) : recentActivities.length === 0 ? (
-              <div className="py-8 text-center text-slate-500">
-                <p className="text-sm">Nenhuma atividade registrada ainda.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentActivities.map((act) => {
-                  const musicianName =
-                    act.expand?.member_id?.expand?.user_id?.name || 'Músico da equipe'
-                  const eventName = act.expand?.event_id?.title || 'Culto'
-                  const roleName = act.expand?.role_id?.name || 'Escala'
-
-                  return (
-                    <div
-                      key={act.id}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3 text-xs"
-                    >
-                      <div className="mt-0.5">
-                        {act.status === 'CONFIRMADO' ? (
-                          <div className="h-6 w-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          </div>
-                        ) : act.status === 'RECUSADO' ? (
-                          <div className="h-6 w-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
-                            <XCircle className="h-3.5 w-3.5" />
-                          </div>
-                        ) : (
-                          <div className="h-6 w-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                          </div>
-                        )}
+                    <div className="hidden w-28 sm:block">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={cn('h-full rounded-full', readinessColor(s.readiness))}
+                          style={{ width: `${Math.max(s.readiness, 4)}%` }}
+                        />
                       </div>
+                      <div className="mt-1 text-xs text-slate-500">{s.readiness}% pronto</div>
+                    </div>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
+                        s.totalMembers === 0
+                          ? 'text-slate-500 ring-slate-200'
+                          : s.confirmedMembers === s.totalMembers
+                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                            : 'bg-amber-50 text-amber-700 ring-amber-200',
+                      )}
+                      title="Confirmados / escalados"
+                    >
+                      {s.confirmedMembers}/{s.totalMembers}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900">
-                          {musicianName}{' '}
-                          <span className="font-normal text-slate-600">
-                            {act.status === 'CONFIRMADO'
-                              ? 'confirmou participação como'
-                              : act.status === 'RECUSADO'
-                                ? 'recusou a escala de'
-                                : 'foi escalado(a) como'}{' '}
-                            <strong className="text-slate-900">{roleName}</strong> no {eventName}.
-                          </span>
-                        </p>
-                        {act.decline_reason && (
-                          <p className="text-[11px] text-red-600 mt-1 italic">
-                            Motivo: "{act.decline_reason}"
-                          </p>
-                        )}
-                        <span className="text-[10px] text-slate-400 mt-1 block">
-                          {new Date(act.updated).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
+        {/* Minhas escalas */}
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+            <h3 className="text-[15px] font-semibold text-slate-900">Minhas escalas</h3>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs font-semibold text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+            >
+              <Link to="/minhas-escalas">
+                Ver todas <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
+          {isLoading ? (
+            <div className="space-y-3 p-5">
+              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-lg" />
+            </div>
+          ) : myUpcomingScales.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-teal-600/60" />
+              <p className="text-sm font-semibold text-slate-700">Nenhuma escala por vir</p>
+              <p className="mt-0.5 text-xs text-slate-500">Quando te escalarem, aparece aqui.</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {myUpcomingScales.map((scale) => {
+                const ev = scale.expand?.event_id
+                const ro = scale.expand?.role_id
+                return (
+                  <li key={scale.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                    {ev && <MiniDate date={ev.date} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-slate-900">
+                        {ev?.title || 'Culto'}
+                      </div>
+                      <div className="truncate text-xs text-slate-500">
+                        {ro?.name || 'Escala'}
+                        {ev?.start_time ? ` · ${ev.start_time}` : ''}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    {scale.status === 'PENDENTE' ? (
+                      <div className="flex w-full shrink-0 gap-1.5 pl-14 sm:w-auto sm:pl-0">
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirmScale(scale.id)}
+                          disabled={isUpdatingScale}
+                          className="h-8 gap-1 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Confirmar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenDeclineModal(scale)}
+                          disabled={isUpdatingScale}
+                          className="h-8 rounded-lg px-3 text-xs font-semibold text-slate-700"
+                        >
+                          Não posso
+                        </Button>
+                      </div>
+                    ) : scale.status === 'CONFIRMADO' ? (
+                      <Chip tone="ok">Confirmado</Chip>
+                    ) : (
+                      <Chip tone="danger">Recusado</Chip>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
       </div>
+
+      {/* Atividades recentes */}
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+        <div className="border-b border-slate-100 px-5 py-3.5">
+          <h3 className="text-[15px] font-semibold text-slate-900">Atividade recente da equipe</h3>
+        </div>
+        {isLoading ? (
+          <div className="space-y-3 p-5">
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        ) : recentActivities.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-slate-500">
+            Nenhuma atividade registrada ainda.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {recentActivities.map((act) => {
+              const musicianName =
+                act.expand?.member_id?.expand?.user_id?.name || 'Músico da equipe'
+              const eventName = act.expand?.event_id?.title || 'Culto'
+              const roleName = act.expand?.role_id?.name || 'Escala'
+              const Icon =
+                act.status === 'CONFIRMADO'
+                  ? CheckCircle2
+                  : act.status === 'RECUSADO'
+                    ? XCircle
+                    : AlertCircle
+              const iconClass =
+                act.status === 'CONFIRMADO'
+                  ? 'bg-emerald-50 text-emerald-600'
+                  : act.status === 'RECUSADO'
+                    ? 'bg-red-50 text-red-600'
+                    : 'bg-amber-50 text-amber-600'
+
+              return (
+                <li key={act.id} className="flex items-start gap-3 px-5 py-3 text-sm">
+                  <span
+                    className={cn(
+                      'mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full',
+                      iconClass,
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-slate-600">
+                      <span className="font-semibold text-slate-900">{musicianName}</span>{' '}
+                      {act.status === 'CONFIRMADO'
+                        ? 'confirmou participação como'
+                        : act.status === 'RECUSADO'
+                          ? 'recusou a escala de'
+                          : 'foi escalado(a) como'}{' '}
+                      <span className="font-medium text-slate-900">{roleName}</span> em {eventName}.
+                    </p>
+                    {act.decline_reason && (
+                      <p className="mt-0.5 text-xs italic text-red-600">
+                        Motivo: "{act.decline_reason}"
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {new Date(act.updated).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       {/* Modal de Motivo da Recusa */}
       <Dialog open={declineModalOpen} onOpenChange={setDeclineModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="rounded-xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900">Recusar Escala</DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              Informe ao líder da equipe o motivo pelo qual você não poderá participar deste culto.
+            <DialogTitle className="text-lg font-bold text-slate-900">
+              Não posso participar
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
+              Conte ao líder o motivo, para ele achar um substituto.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
+          <div className="space-y-2 py-2">
             <Label htmlFor="reason" className="text-xs font-semibold text-slate-700">
               Motivo da ausência
             </Label>
@@ -594,8 +806,8 @@ export default function Dashboard() {
               id="reason"
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
-              placeholder="Ex: Viagem de trabalho, compromisso familiar, imprevisto..."
-              className="rounded-xl border-slate-200 min-h-[90px]"
+              placeholder="Ex: viagem de trabalho, compromisso familiar, imprevisto..."
+              className="min-h-[90px] rounded-lg border-slate-200"
             />
           </div>
 
@@ -604,7 +816,7 @@ export default function Dashboard() {
               type="button"
               variant="outline"
               onClick={() => setDeclineModalOpen(false)}
-              className="rounded-xl"
+              className="rounded-lg"
             >
               Cancelar
             </Button>
@@ -612,9 +824,9 @@ export default function Dashboard() {
               type="button"
               onClick={handleConfirmDecline}
               disabled={isUpdatingScale}
-              className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              className="rounded-lg bg-red-600 text-white hover:bg-red-700"
             >
-              Confirmar Recusa
+              Confirmar recusa
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ExternalLink, Search, CheckCircle, Info } from 'lucide-react'
+import { ExternalLink, CheckCircle, Info } from 'lucide-react'
 
 interface CifraClubSearchModalProps {
   open: boolean

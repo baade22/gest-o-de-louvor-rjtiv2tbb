@@ -9,17 +9,16 @@ import {
   Check,
   RefreshCw,
   XCircle,
+  Trash2,
   Clock,
   ShieldCheck,
-  ExternalLink,
-  Crown,
   Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -36,10 +35,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 
 export default function InvitationsManagement() {
   const { currentChurch, isMaster, isAdmin } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [availableRoles, setAvailableRoles] = useState<Role[]>([])
@@ -216,7 +217,25 @@ export default function InvitationsManagement() {
     }
   }
 
-  const handleAction = async (action: 'resend' | 'cancel', invitationId: string) => {
+  const confirmCancel = (inv: Invitation) =>
+    confirm({
+      title: `Cancelar o convite de ${inv.name}?`,
+      description: 'O link enviado para essa pessoa para de funcionar. Dá para reenviar depois.',
+      confirmLabel: 'Cancelar convite',
+      destructive: true,
+      onConfirm: () => handleAction('cancel', inv.id),
+    })
+
+  const confirmDelete = (inv: Invitation) =>
+    confirm({
+      title: `Excluir o convite de ${inv.name}?`,
+      description: 'Ele sai desta lista de vez.',
+      confirmLabel: 'Excluir convite',
+      destructive: true,
+      onConfirm: () => handleAction('delete', inv.id),
+    })
+
+  const handleAction = async (action: 'resend' | 'cancel' | 'delete', invitationId: string) => {
     try {
       const res = await pb.send<{
         success: boolean
@@ -228,7 +247,12 @@ export default function InvitationsManagement() {
       })
 
       toast({
-        title: action === 'resend' ? 'Convite renovado!' : 'Convite cancelado',
+        title:
+          action === 'resend'
+            ? 'Convite renovado!'
+            : action === 'delete'
+              ? 'Convite excluído'
+              : 'Convite cancelado',
         description: res.message,
       })
 
@@ -438,7 +462,7 @@ export default function InvitationsManagement() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleAction('cancel', inv.id)}
+                        onClick={() => confirmCancel(inv)}
                         className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                       >
                         <XCircle className="h-3.5 w-3.5 mr-1" />
@@ -456,6 +480,19 @@ export default function InvitationsManagement() {
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       Reenviar Convite
+                    </Button>
+                  )}
+
+                  {(isExpired || isCancelled) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => confirmDelete(inv)}
+                      className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      aria-label="Excluir convite"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Excluir
                     </Button>
                   )}
                 </div>
@@ -679,6 +716,7 @@ export default function InvitationsManagement() {
           )}
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

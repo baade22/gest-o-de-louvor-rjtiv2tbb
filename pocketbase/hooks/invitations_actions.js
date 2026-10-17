@@ -1,6 +1,7 @@
-// Hook para gerenciar reenvio e cancelamento de convites
+// Hook para gerenciar reenvio, cancelamento e exclusão de convites
 // POST /backend/v1/invitations/actions
-// Body: { action: 'resend' | 'cancel', invitation_id: string }
+// Body: { action: 'resend' | 'cancel' | 'delete', invitation_id: string }
+// 'delete' só vale para convites expirados ou cancelados.
 // Permissão: MASTER ou ADMIN da congregação
 
 routerAdd(
@@ -58,6 +59,15 @@ routerAdd(
         inv.set('status', 'CANCELLED')
         $app.save(inv)
         return e.json(200, { success: true, message: 'Convite cancelado com sucesso.' })
+      } else if (action === 'delete') {
+        const status = inv.getString('status')
+        if (status !== 'EXPIRED' && status !== 'CANCELLED') {
+          return e.json(400, {
+            message: 'Só convites expirados ou cancelados podem ser excluídos.',
+          })
+        }
+        $app.delete(inv)
+        return e.json(200, { success: true, message: 'Convite excluído.' })
       } else if (action === 'resend') {
         // Gera novo token e renova expiração por mais 7 dias
         const newToken =

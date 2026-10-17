@@ -90,9 +90,12 @@ export class HolyricsClient {
           rawText: 'Request aborted due to timeout',
         }
       }
+      // O fetch do Node lança TypeError('fetch failed') com o código real em err.cause.code
+      const errCode = err.cause?.code || err.code || ''
+      const refused = /ECONNREFUSED|CONNECTION_REFUSED/.test(`${errCode} ${err.message || ''}`)
       return {
         status: 'error',
-        error: err.code || err.message || 'CONNECTION_REFUSED',
+        error: refused ? 'CONNECTION_REFUSED' : errCode || err.message || 'CONNECTION_REFUSED',
         httpStatus: 0,
         durationMs,
         rawText: err.message || String(err),

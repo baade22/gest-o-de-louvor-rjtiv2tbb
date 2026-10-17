@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
 import type { Role } from '@/types'
-import { Sliders, Plus, Trash2, Edit2, ShieldAlert } from 'lucide-react'
+import { Sliders, Plus, Trash2, Edit2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
@@ -17,10 +17,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 
 export default function RolesManagement() {
   const { currentChurch, isAdmin } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -117,24 +119,31 @@ export default function RolesManagement() {
     }
   }
 
-  const handleDelete = async (roleId: string, roleName: string) => {
-    if (!window.confirm(`Tem certeza que deseja remover a função "${roleName}"?`)) return
-
-    try {
-      await pb.collection('roles').delete(roleId)
-      toast({
-        title: 'Função removida',
-        description: `"${roleName}" foi excluída.`,
-      })
-      setRoles((prev) => prev.filter((r) => r.id !== roleId))
-    } catch (err) {
-      console.error(err)
-      toast({
-        title: 'Erro ao excluir',
-        description: 'Não foi possível excluir esta função.',
-        variant: 'destructive',
-      })
-    }
+  const handleDelete = (roleId: string, roleName: string) => {
+    confirm({
+      title: `Excluir a função "${roleName}"?`,
+      description:
+        'Ela sai do perfil dos membros, e as escalas feitas com essa função também são apagadas. Não dá para desfazer.',
+      confirmLabel: 'Excluir função',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await pb.collection('roles').delete(roleId)
+          toast({
+            title: 'Função removida',
+            description: `"${roleName}" foi excluída.`,
+          })
+          setRoles((prev) => prev.filter((r) => r.id !== roleId))
+        } catch (err) {
+          console.error(err)
+          toast({
+            title: 'Erro ao excluir',
+            description: 'Não foi possível excluir esta função.',
+            variant: 'destructive',
+          })
+        }
+      },
+    })
   }
 
   return (
@@ -315,6 +324,7 @@ export default function RolesManagement() {
           </form>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

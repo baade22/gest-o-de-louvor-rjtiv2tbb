@@ -18,7 +18,6 @@ import {
   Star,
   Trash2,
   Play,
-  Share2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +37,7 @@ import {
   getSemitoneDifference,
 } from '@/lib/transposition'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { YouTubeSearchModal } from '@/components/YouTubeSearchModal'
 import {
   getVideosForSong,
@@ -65,6 +65,7 @@ export default function SongDetail() {
   const { canManageContent, currentChurch } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [song, setSong] = useState<Song | null>(null)
   const [videos, setVideos] = useState<SongVideo[]>([])
@@ -220,18 +221,25 @@ export default function SongDetail() {
     }
   }
 
-  const handleRemoveVideo = async (videoId: string) => {
+  const handleRemoveVideo = (videoId: string) => {
     if (!song) return
-    if (!window.confirm('Remover este vídeo de referência da música?')) return
-    try {
-      await removeVideoFromSong(song.id, videoId)
-      toast({
-        title: 'Vídeo removido',
-      })
-      fetchSongData()
-    } catch (err) {
-      console.error(err)
-    }
+    confirm({
+      title: 'Remover este vídeo de referência?',
+      description: 'Só o vínculo com a música é apagado. O vídeo continua no YouTube.',
+      confirmLabel: 'Remover vídeo',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await removeVideoFromSong(song.id, videoId)
+          toast({
+            title: 'Vídeo removido',
+          })
+          fetchSongData()
+        } catch (err) {
+          console.error(err)
+        }
+      },
+    })
   }
 
   // Enviar música para o Holyrics via LouvorFlow Agent com polling automático
@@ -403,13 +411,13 @@ export default function SongDetail() {
   return (
     <div className="max-w-4xl mx-auto space-y-5 pb-20">
       {/* Back button & Admin Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/songs"
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar ao Repertório
+          Voltar para Músicas
         </Link>
 
         <div className="flex items-center gap-2">
@@ -949,6 +957,7 @@ export default function SongDetail() {
           </div>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }
