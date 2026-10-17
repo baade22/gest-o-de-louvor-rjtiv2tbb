@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import type { IntegrationItem } from '@/types'
 import {
   getChurchIntegrations,
@@ -49,6 +50,7 @@ function HolyricsIntegrationCard({
   onRefresh: () => void
 }) {
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [modalOpen, setModalOpen] = useState(false)
   const [serverUrl, setServerUrl] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -142,17 +144,24 @@ function HolyricsIntegrationCard({
     }
   }
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = () => {
     if (!currentChurch) return
-    if (!window.confirm('Deseja desativar a integração com o Holyrics?')) return
-    try {
-      await disconnectIntegration({ churchId: currentChurch.id, provider: 'holyrics' })
-      toast({ title: 'Desconectado', description: 'Integração Holyrics removida.' })
-      setModalOpen(false)
-      onRefresh()
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
+    confirm({
+      title: 'Desativar a integração com o Holyrics?',
+      description: 'O endereço salvo é apagado. Os computadores conectados continuam na lista.',
+      confirmLabel: 'Desativar',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await disconnectIntegration({ churchId: currentChurch.id, provider: 'holyrics' })
+          toast({ title: 'Desconectado', description: 'Integração Holyrics removida.' })
+          setModalOpen(false)
+          onRefresh()
+        } catch (err: any) {
+          toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+        }
+      },
+    })
   }
 
   return (
@@ -321,6 +330,7 @@ function HolyricsIntegrationCard({
           </form>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }
@@ -328,6 +338,7 @@ function HolyricsIntegrationCard({
 export default function IntegrationsSettings() {
   const { currentChurch, isAdmin } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -473,32 +484,36 @@ export default function IntegrationsSettings() {
   }
 
   // Desconectar / Desativar
-  const handleDisconnect = async () => {
+  const handleDisconnect = () => {
     if (!currentChurch) return
-    if (!window.confirm('Tem certeza de que deseja desconectar a integração com o YouTube?')) {
-      return
-    }
+    confirm({
+      title: 'Desconectar o YouTube?',
+      description: 'A chave da API é apagada e a busca de vídeos de referência para de funcionar.',
+      confirmLabel: 'Desconectar',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await disconnectIntegration({
+            churchId: currentChurch.id,
+            provider: 'youtube',
+          })
 
-    try {
-      await disconnectIntegration({
-        churchId: currentChurch.id,
-        provider: 'youtube',
-      })
+          toast({
+            title: 'Integração desconectada',
+            description: 'A chave foi removida para esta congregação.',
+          })
 
-      toast({
-        title: 'Integração desconectada',
-        description: 'A chave foi removida para esta congregação.',
-      })
-
-      setYoutubeModalOpen(false)
-      fetchIntegrations()
-    } catch (err: any) {
-      toast({
-        title: 'Erro ao desconectar',
-        description: err.message || 'Falha ao remover integração.',
-        variant: 'destructive',
-      })
-    }
+          setYoutubeModalOpen(false)
+          fetchIntegrations()
+        } catch (err: any) {
+          toast({
+            title: 'Erro ao desconectar',
+            description: err.message || 'Falha ao remover integração.',
+            variant: 'destructive',
+          })
+        }
+      },
+    })
   }
 
   if (!isAdmin) {
@@ -797,6 +812,7 @@ export default function IntegrationsSettings() {
           </form>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

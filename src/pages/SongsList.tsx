@@ -36,11 +36,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { AVAILABLE_KEYS } from '@/lib/transposition'
 
 export default function SongsList() {
   const { currentChurch, canManageContent } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [songs, setSongs] = useState<Song[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -72,24 +74,32 @@ export default function SongsList() {
     fetchSongs()
   }, [currentChurch])
 
-  const handleDeleteSong = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteSong = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Tem certeza que deseja excluir esta música da biblioteca?')) return
-    try {
-      await pb.collection('songs').delete(id)
-      toast({
-        title: 'Música removida',
-        description: 'A música foi excluída com sucesso.',
-      })
-      setSongs((prev) => prev.filter((s) => s.id !== id))
-    } catch (err) {
-      console.error(err)
-      toast({
-        title: 'Erro ao excluir',
-        description: 'Não foi possível excluir a música.',
-        variant: 'destructive',
-      })
-    }
+    confirm({
+      title: 'Excluir esta música do acervo?',
+      description:
+        'Ela também sai dos repertórios dos cultos em que aparece. Não dá para desfazer.',
+      confirmLabel: 'Excluir música',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await pb.collection('songs').delete(id)
+          toast({
+            title: 'Música removida',
+            description: 'A música foi excluída com sucesso.',
+          })
+          setSongs((prev) => prev.filter((s) => s.id !== id))
+        } catch (err) {
+          console.error(err)
+          toast({
+            title: 'Erro ao excluir',
+            description: 'Não foi possível excluir a música.',
+            variant: 'destructive',
+          })
+        }
+      },
+    })
   }
 
   const filteredSongs = songs.filter((song) => {
@@ -284,6 +294,7 @@ export default function SongsList() {
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

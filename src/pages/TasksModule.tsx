@@ -25,12 +25,14 @@ import { Textarea } from '@/components/ui/textarea'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import type { EventTask, EventItem, ChurchMember, TeamArea, TaskPriority } from '@/types'
 import { listEventTasks, saveEventTask, updateTaskStatus, deleteTask } from '@/services/tasks'
 
 export default function TasksModule() {
   const { currentChurch, currentMember, isAdmin, isLeader, isMaster } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [backendAllowed, setBackendAllowed] = useState<boolean | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
@@ -167,15 +169,22 @@ export default function TasksModule() {
     }
   }
 
-  const handleDelete = async (taskId: string) => {
-    if (!window.confirm('Excluir esta tarefa?')) return
-    try {
-      await deleteTask(taskId)
-      toast({ title: 'Tarefa excluída' })
-      loadTasks(selectedEventId, selectedAreaFilter)
-    } catch (err) {
-      console.error(err)
-    }
+  const handleDelete = (taskId: string) => {
+    confirm({
+      title: 'Excluir esta tarefa?',
+      description: 'Ela some da lista de todas as equipes.',
+      confirmLabel: 'Excluir tarefa',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteTask(taskId)
+          toast({ title: 'Tarefa excluída' })
+          loadTasks(selectedEventId, selectedAreaFilter)
+        } catch (err) {
+          console.error(err)
+        }
+      },
+    })
   }
 
   return (
@@ -490,6 +499,7 @@ export default function TasksModule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   )
 }

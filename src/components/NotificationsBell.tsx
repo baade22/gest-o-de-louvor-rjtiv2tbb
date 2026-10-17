@@ -8,6 +8,7 @@ import {
   Film,
   CheckSquare,
   Sparkles,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +20,7 @@ import {
   listNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  deleteNotifications,
 } from '@/services/notifications'
 
 export function NotificationsBell() {
@@ -54,6 +56,19 @@ export function NotificationsBell() {
       setUnreadCount(0)
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const readIds = notifications.filter((n) => n.read).map((n) => n.id)
+
+  const handleClearRead = async () => {
+    const ids = readIds
+    setNotifications((prev) => prev.filter((n) => !ids.includes(n.id)))
+    try {
+      await deleteNotifications(ids)
+    } catch (err) {
+      console.error(err)
+      fetchNotifs()
     }
   }
 
@@ -101,17 +116,30 @@ export function NotificationsBell() {
               </Badge>
             )}
           </div>
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleMarkAll}
-              className="h-7 text-xs text-slate-500 hover:text-slate-900 gap-1 px-2"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Marcar lidas
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleMarkAll}
+                className="h-7 text-xs text-slate-500 hover:text-slate-900 gap-1 px-2"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                Marcar lidas
+              </Button>
+            )}
+            {readIds.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearRead}
+                className="h-7 text-xs text-slate-500 hover:text-red-600 gap-1 px-2"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Limpar lidas
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 
 interface MusicianItem {
   id: string
@@ -34,6 +35,7 @@ interface MusicianItem {
 export default function MusiciansList() {
   const { currentChurch, isAdmin } = useAuth()
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [members, setMembers] = useState<MusicianItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -79,26 +81,32 @@ export default function MusiciansList() {
     fetchMusicians()
   }, [currentChurch])
 
-  const handleDeleteMember = async (memberId: string, e: React.MouseEvent) => {
+  const handleDeleteMember = (memberId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Tem certeza que deseja desvincular este músico da equipe da igreja?'))
-      return
-
-    try {
-      await removeMusician(memberId)
-      toast({
-        title: 'Membro removido',
-        description: 'O músico foi desvinculado com sucesso.',
-      })
-      fetchMusicians()
-    } catch (err) {
-      console.error(err)
-      toast({
-        title: 'Erro ao remover',
-        description: 'Não foi possível remover o membro.',
-        variant: 'destructive',
-      })
-    }
+    confirm({
+      title: 'Remover este membro da igreja?',
+      description:
+        'A pessoa sai das escalas e deixa de ver os cultos desta igreja. A conta continua existindo e pode ser convidada de novo.',
+      confirmLabel: 'Remover membro',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await removeMusician(memberId)
+          toast({
+            title: 'Membro removido',
+            description: 'O músico foi desvinculado com sucesso.',
+          })
+          fetchMusicians()
+        } catch (err) {
+          console.error(err)
+          toast({
+            title: 'Erro ao remover',
+            description: 'Não foi possível remover o membro.',
+            variant: 'destructive',
+          })
+        }
+      },
+    })
   }
 
   const filteredMembers = members.filter((m) => {
@@ -324,6 +332,7 @@ export default function MusiciansList() {
           })}
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }
