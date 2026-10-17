@@ -895,13 +895,13 @@ export class HolyricsClient {
   }
 
   /**
-   * RemoveFromMediaPlaylist: remove itens (pelo id do item na playlist) da playlist
-   * da ocorrência do culto no Holyrics.
+   * RemoveFromMediaPlaylist: remove itens da playlist da ocorrência do culto no Holyrics,
+   * pelo id do item na playlist (ids) ou pela posição (indexes, começa em zero).
    * POST /api/RemoveFromMediaPlaylist?token=...
-   * Body: { ids: string[], event_id: string }
+   * Body: { ids: string[], event_id: string } ou { indexes: number[], event_id: string }
    */
   public async removeFromMediaPlaylist(
-    ids: string[],
+    target: { ids?: string[]; indexes?: number[] },
     eventId: string,
   ): Promise<{ success: boolean; error?: string; error_code?: string }> {
     const cleanEventId = String(eventId || '').trim()
@@ -912,9 +912,15 @@ export class HolyricsClient {
         error_code: 'MISSING_EVENT_ID',
       }
     }
-    if (ids.length === 0) return { success: true }
+    const payload: Record<string, any> = { event_id: cleanEventId }
+    if (target.ids && target.ids.length > 0) payload.ids = target.ids
+    else if (target.indexes && target.indexes.length > 0) payload.indexes = target.indexes
+    else return { success: true }
 
-    const res = await this.request('RemoveFromMediaPlaylist', { ids, event_id: cleanEventId }, 5000)
+    const res = await this.request('RemoveFromMediaPlaylist', payload, 5000)
+    console.log(
+      `[Holyrics] RemoveFromMediaPlaylist ${JSON.stringify(payload)} -> HTTP ${res.httpStatus} ${String(res.rawText || '').slice(0, 300)}`,
+    )
     if (res.status === 'ok') return { success: true }
     const errStr =
       typeof res.error === 'string'

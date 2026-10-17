@@ -48,28 +48,33 @@ const normalizeName = (name: string) =>
     .toLowerCase()
 
 /**
- * IDs dos itens da playlist que correspondem às músicas (por song_id) e às mídias
- * (por nome de arquivo) informadas.
+ * Critério para achar na playlist as músicas (por song_id) e as mídias (por nome de arquivo).
+ */
+export function removalMatcher(
+  songIds: string[],
+  mediaNames: string[],
+): (item: PlaylistItem) => boolean {
+  const songSet = new Set(songIds.map((s) => String(s).trim()).filter(Boolean))
+  const nameSet = new Set(mediaNames.map(normalizeName).filter(Boolean))
+  return (item) => {
+    const songId = itemSongId(item)
+    if (songId) return songSet.has(songId)
+    return nameSet.has(normalizeName(item?.name || ''))
+  }
+}
+
+/**
+ * IDs dos itens da playlist que correspondem às músicas e às mídias informadas.
  */
 export function findItemIdsToRemove(
   playlist: PlaylistItem[],
   songIds: string[],
   mediaNames: string[],
 ): string[] {
-  const songSet = new Set(songIds.map((s) => String(s).trim()).filter(Boolean))
-  const nameSet = new Set(mediaNames.map(normalizeName).filter(Boolean))
-  const ids: string[] = []
-  for (const item of playlist) {
-    const itemId = String(item?.id || '').trim()
-    if (!itemId) continue
-    const songId = itemSongId(item)
-    if (songId) {
-      if (songSet.has(songId)) ids.push(itemId)
-      continue
-    }
-    if (nameSet.has(normalizeName(item.name || ''))) ids.push(itemId)
-  }
-  return ids
+  const matches = removalMatcher(songIds, mediaNames)
+  return playlist
+    .filter((item) => String(item?.id || '').trim() && matches(item))
+    .map((item) => String(item.id).trim())
 }
 
 export interface ReorderPlan {

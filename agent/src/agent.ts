@@ -9,9 +9,11 @@ import { HolyricsClient } from './holyricsClient.js'
 import { saveConfig } from './config.js'
 import {
   findEventSchedule,
-  findItemIdsToRemove,
   getMediaPlaylist,
+  itemSongId,
   planSongReorder,
+  removalMatcher,
+  type PlaylistItem,
 } from './eventPlaylist.js'
 
 export class LouvorFlowAgent {
@@ -116,7 +118,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.38',
+          version: '0.0.39',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -262,7 +264,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.38',
+          version: '0.0.39',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -660,6 +662,11 @@ export class LouvorFlowAgent {
         status,
         duration_ms: duration,
         error_code: errorCode || null,
+        error: errorMsg || undefined,
+        result:
+          cmd.action === 'REMOVE_FROM_EVENT_PLAYLIST' || cmd.action === 'REORDER_EVENT_SONGS'
+            ? resultPayload
+            : undefined,
       }),
     )
 
@@ -789,6 +796,71 @@ export class LouvorFlowAgent {
   }
 
   /**
+   * Remove da playlist do culto os itens que satisfazem `matches` e confere o resultado.
+   * O Holyrics responde "ok" mesmo quando não remove, então relê a playlist: se algum item
+   * continuar lá, tenta de novo pela posição (indexes) e, se ainda assim ficar, retorna erro.
+   */
+  private async removeMatchingItems(
+    payload: Record<string, any>,
+    matches: (item: PlaylistItem) => boolean,
+  ): Promise<{ success: boolean; removed: number; error?: string; error_code?: string }> {
+    const eventId = String(payload.event_id || '').trim()
+    const remaining = async () => {
+      const read = await this.readEventMediaPlaylist(payload)
+      if (!read.success) return { read, items: [] as Array<{ item: PlaylistItem; index: number }> }
+      const items = read.playlist
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => matches(item))
+      return { read, items }
+    }
+
+    let state = await remaining()
+    if (!state.read.success) {
+      return {
+        success: false,
+        removed: 0,
+        error: state.read.error,
+        error_code: state.read.error_code,
+      }
+    }
+    const total = state.items.length
+    if (total === 0) return { success: true, removed: 0 }
+
+    const attempts: Array<{ ids?: string[]; indexes?: number[] }> = [
+      { ids: state.items.map(({ item }) => String(item.id || '').trim()).filter(Boolean) },
+    ]
+    for (let attempt = 0; attempt < 2 && state.items.length > 0; attempt++) {
+      const target =
+        attempt === 0
+          ? attempts[0]
+          : { indexes: state.items.map(({ index }) => index).sort((x, y) => y - x) }
+      const res = await this.holyrics.removeFromMediaPlaylist(target, eventId)
+      if (!res.success) {
+        return { success: false, removed: 0, error: res.error, error_code: res.error_code }
+      }
+      state = await remaining()
+      if (!state.read.success) {
+        return {
+          success: false,
+          removed: 0,
+          error: state.read.error,
+          error_code: state.read.error_code,
+        }
+      }
+    }
+
+    if (state.items.length > 0) {
+      return {
+        success: false,
+        removed: total - state.items.length,
+        error: `O Holyrics respondeu ok ao RemoveFromMediaPlaylist, mas ${state.items.length} item(ns) continuam na playlist do culto #${eventId}.`,
+        error_code: 'REMOVE_NOT_APPLIED',
+      }
+    }
+    return { success: true, removed: total }
+  }
+
+  /**
    * REMOVE_FROM_EVENT_PLAYLIST: tira da playlist do culto as músicas (song_ids) e as
    * mídias (media: [{ media_type, file_name }]) que saíram do LouvorFlow. Com
    * delete_files: true, apaga também os arquivos que o Agent gravou na biblioteca.
@@ -808,26 +880,15 @@ export class LouvorFlowAgent {
       : []
     const mediaNames = media.map((m) => String(m?.file_name || '').trim()).filter(Boolean)
 
-    let removedIds: string[] = []
+    let removed = 0
     let playlistError = ''
     let playlistErrorCode = ''
-
     if (songIds.length > 0 || mediaNames.length > 0) {
-      const read = await this.readEventMediaPlaylist(payload)
-      if (!read.success) {
-        playlistError = read.error || ''
-        playlistErrorCode = read.error_code || ''
-      } else {
-        removedIds = findItemIdsToRemove(read.playlist, songIds, mediaNames)
-        const removeRes = await this.holyrics.removeFromMediaPlaylist(
-          removedIds,
-          String(payload.event_id),
-        )
-        if (!removeRes.success) {
-          playlistError = removeRes.error || ''
-          playlistErrorCode = removeRes.error_code || 'REMOVE_FROM_PLAYLIST_FAILED'
-          removedIds = []
-        }
+      const removeRes = await this.removeMatchingItems(payload, removalMatcher(songIds, mediaNames))
+      removed = removeRes.removed
+      if (!removeRes.success) {
+        playlistError = removeRes.error || ''
+        playlistErrorCode = removeRes.error_code || 'REMOVE_FROM_PLAYLIST_FAILED'
       }
     }
 
@@ -846,10 +907,7 @@ export class LouvorFlowAgent {
       }
     }
 
-    const result = {
-      removed_items: removedIds.length,
-      deleted_files: deletedFiles,
-    }
+    const result = { removed_items: removed, deleted_files: deletedFiles }
     if (playlistError) {
       return { success: false, result, error: playlistError, error_code: playlistErrorCode }
     }
@@ -874,9 +932,10 @@ export class LouvorFlowAgent {
   }
 
   /**
-   * REORDER_EVENT_SONGS: deixa as músicas do culto na ordem do repertório
-   * (song_ids em ordem). Como a API não move itens, remove as músicas fora de ordem e
-   * as reinsere nas mesmas posições, na ordem certa. Mídias não se movem.
+   * REORDER_EVENT_SONGS: deixa as músicas do culto iguais ao repertório (song_ids em ordem).
+   * Com remove_missing: true, tira antes as músicas que não estão mais no repertório.
+   * Como a API não move itens, remove as músicas do repertório e as reinsere nas mesmas
+   * posições, na ordem certa. Mídias não se movem. No fim, relê a playlist para conferir.
    */
   public async handleReorderEventSongs(cmd: AgentCommand): Promise<{
     success: boolean
@@ -889,16 +948,32 @@ export class LouvorFlowAgent {
     const songIds: string[] = Array.isArray(payload.song_ids)
       ? payload.song_ids.map((s: any) => String(s || '').trim()).filter(Boolean)
       : []
+    const wanted = new Set(songIds)
+
+    let removedMissing = 0
+    if (payload.remove_missing === true) {
+      const missingRes = await this.removeMatchingItems(payload, (item) => {
+        const songId = itemSongId(item)
+        return Boolean(songId) && !wanted.has(songId)
+      })
+      if (!missingRes.success) {
+        return { success: false, error: missingRes.error, error_code: missingRes.error_code }
+      }
+      removedMissing = missingRes.removed
+    }
 
     const read = await this.readEventMediaPlaylist(payload)
     if (!read.success) {
       return { success: false, error: read.error, error_code: read.error_code }
     }
-
     const plan = planSongReorder(read.playlist, songIds)
-    if (!plan) return { success: true, result: { reordered: false } }
+    if (!plan) {
+      return { success: true, result: { reordered: false, removed_missing: removedMissing } }
+    }
 
-    const removeRes = await this.holyrics.removeFromMediaPlaylist(plan.removeIds, eventId)
+    const removeRes = await this.removeMatchingItems(payload, (item) =>
+      wanted.has(itemSongId(item)),
+    )
     if (!removeRes.success) {
       return { success: false, error: removeRes.error, error_code: removeRes.error_code }
     }
@@ -917,7 +992,21 @@ export class LouvorFlowAgent {
         }
       }
     }
-    return { success: true, result: { reordered: true, moved: plan.inserts.length } }
+
+    const check = await this.readEventMediaPlaylist(payload)
+    if (check.success && planSongReorder(check.playlist, songIds)) {
+      return {
+        success: false,
+        result: { reordered: false },
+        error:
+          'As músicas foram reinseridas, mas a playlist do culto ainda não está na ordem do repertório.',
+        error_code: 'REORDER_NOT_APPLIED',
+      }
+    }
+    return {
+      success: true,
+      result: { reordered: true, moved: plan.inserts.length, removed_missing: removedMissing },
+    }
   }
 
   /**
