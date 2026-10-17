@@ -406,7 +406,7 @@ export default function Layout() {
 
       {/* ÁREA PRINCIPAL */}
       <div
-        className={`flex min-h-screen flex-1 flex-col pt-14 transition-[margin] duration-200 lg:pt-0 ${
+        className={`flex min-h-screen min-w-0 flex-1 flex-col pt-14 transition-[margin] duration-200 lg:pt-0 ${
           collapsed ? 'lg:ml-[76px]' : 'lg:ml-64'
         }`}
       >

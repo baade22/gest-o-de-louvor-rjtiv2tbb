@@ -5,6 +5,7 @@ import pb from '@/lib/pocketbase/client'
 import type { EventItem, EventMember, EventSong } from '@/types'
 import { listEventTasks } from '@/services/tasks'
 import { listAllChurchMedia } from '@/services/media'
+import { computeEventReadiness, countPendencies } from '@/lib/eventReadiness'
 import {
   CalendarDays,
   Music2,
@@ -53,10 +54,10 @@ interface EventSummary {
   event: EventItem
   totalMembers: number
   confirmedMembers: number
-  pendingMembers: number
   songsCount: number
-  /** 0–100: metade pela equipe confirmada, metade por ter repertório montado. */
+  /** 0–100, mesma regra da Central do Culto. */
   readiness: number
+  pendencies: number
 }
 
 function daysUntil(dateStr: string): number {
@@ -215,42 +216,41 @@ export default function Dashboard() {
       })
       const upcoming = eventsRes.items.slice(0, 4)
 
-      // 3. Equipe e repertório dos próximos cultos (uma consulta cada)
-      let summaries: EventSummary[] = upcoming.map((event) => ({
-        event,
-        totalMembers: 0,
-        confirmedMembers: 0,
-        pendingMembers: 0,
-        songsCount: 0,
-        readiness: 0,
-      }))
-      if (upcoming.length > 0) {
-        const idsFilter = upcoming.map((e) => `event_id = "${e.id}"`).join(' || ')
-        const [members, songs] = await Promise.all([
-          pb.collection('event_members').getFullList<EventMember>({
-            filter: `${churchFilter} && (${idsFilter})`,
-          }),
-          pb.collection('event_songs').getFullList<EventSong>({
-            filter: `${churchFilter} && (${idsFilter})`,
-            fields: 'id,event_id',
-          }),
-        ])
-        summaries = summaries.map((s) => {
-          const evMembers = members.filter((mb) => mb.event_id === s.event.id)
-          const confirmed = evMembers.filter((mb) => mb.status === 'CONFIRMADO').length
-          const pending = evMembers.filter((mb) => mb.status === 'PENDENTE').length
-          const songsCount = songs.filter((sg) => sg.event_id === s.event.id).length
-          const teamRatio = evMembers.length ? confirmed / evMembers.length : 0
-          return {
-            ...s,
-            totalMembers: evMembers.length,
-            confirmedMembers: confirmed,
-            pendingMembers: pending,
-            songsCount,
-            readiness: Math.round(((teamRatio + (songsCount > 0 ? 1 : 0)) / 2) * 100),
-          }
+      // 3. Equipe, repertório, mídias e tarefas dos próximos cultos
+      const idsFilter = upcoming.map((e) => `event_id = "${e.id}"`).join(' || ')
+      const [members, songs, churchMedias, tasksByEvent] = await Promise.all([
+        upcoming.length
+          ? pb.collection('event_members').getFullList<EventMember>({
+              filter: `${churchFilter} && (${idsFilter})`,
+            })
+          : Promise.resolve([] as EventMember[]),
+        upcoming.length
+          ? pb.collection('event_songs').getFullList<EventSong>({
+              filter: `${churchFilter} && (${idsFilter})`,
+              fields: 'id,event_id,holyrics_status',
+            })
+          : Promise.resolve([] as EventSong[]),
+        listAllChurchMedia(currentChurch.id).catch(() => []),
+        Promise.all(upcoming.map((e) => listEventTasks(currentChurch.id, e.id).catch(() => []))),
+      ])
+      const summaries: EventSummary[] = upcoming.map((event, index) => {
+        const evMembers = members.filter((mb) => mb.event_id === event.id)
+        const evSongs = songs.filter((sg) => sg.event_id === event.id)
+        const readiness = computeEventReadiness({
+          members: evMembers,
+          songs: evSongs,
+          medias: churchMedias.filter((md) => md.event_id === event.id),
+          tasks: tasksByEvent[index],
         })
-      }
+        return {
+          event,
+          totalMembers: evMembers.length,
+          confirmedMembers: readiness.team.done,
+          songsCount: evSongs.length,
+          readiness: readiness.score,
+          pendencies: countPendencies(readiness),
+        }
+      })
       setUpcomingEvents(summaries)
 
       // 4. Cultos deste mês
@@ -272,22 +272,12 @@ export default function Dashboard() {
         /* sem permissão: o card mostra "—" */
       }
 
-      let pendingMedias = 0
-      let pendingTasks = 0
-      try {
-        const churchMedias = await listAllChurchMedia(currentChurch.id)
-        pendingMedias = churchMedias.filter(
-          (md) => md.status !== 'CONCLUIDA' && md.status !== 'IMPORTADA_HOLYRICS',
-        ).length
-        if (upcoming[0]) {
-          const tasks = await listEventTasks(currentChurch.id, upcoming[0].id)
-          pendingTasks = tasks.filter(
-            (t) => t.status === 'PENDENTE' || t.status === 'EM_ANDAMENTO',
-          ).length
-        }
-      } catch {
-        /* intentionally ignored */
-      }
+      const pendingMedias = churchMedias.filter(
+        (md) => md.status !== 'CONCLUIDA' && md.status !== 'IMPORTADA_HOLYRICS',
+      ).length
+      const pendingTasks = (tasksByEvent[0] || []).filter(
+        (t) => t.status === 'PENDENTE' || t.status === 'EM_ANDAMENTO',
+      ).length
 
       setStats({
         totalSongs: songsRes.totalItems,
@@ -387,9 +377,7 @@ export default function Dashboard() {
   const canManage = isAdmin || isLeader
   const next = upcomingEvents[0]
   const nextDays = next ? daysUntil(next.event.date) : 0
-  const nextPendencies = next
-    ? next.pendingMembers + (next.songsCount === 0 ? 1 : 0) + stats.pendingTasks
-    : 0
+  const nextPendencies = next?.pendencies ?? 0
   const myPendingScales = myUpcomingScales.filter((s) => s.status === 'PENDENTE').length
 
   return (
