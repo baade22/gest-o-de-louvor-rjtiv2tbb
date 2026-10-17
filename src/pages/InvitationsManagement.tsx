@@ -152,7 +152,8 @@ export default function InvitationsManagement() {
     if (formData.operational_roles.length === 0) {
       toast({
         title: 'Função operacional obrigatória',
-        description: 'Selecione pelo menos uma função (Músico, Som, Projeção, Mídia, Iluminação).',
+        description:
+          'Selecione pelo menos uma função (Músico, Som, Projeção, Mídia, Iluminação, Financeiro).',
         variant: 'destructive',
       })
       return
@@ -597,6 +598,7 @@ export default function InvitationsManagement() {
                     { key: 'PROJECAO', label: 'Projeção', desc: 'Slides e Holyrics' },
                     { key: 'MIDIA', label: 'Mídia & Comunicação', desc: 'Artes e tarefas' },
                     { key: 'ILUMINACAO', label: 'Iluminação', desc: 'Luzes cênicas e cenas' },
+                    { key: 'FINANCEIRO', label: 'Financeiro', desc: 'Dízimos, ofertas e contas' },
                   ].map((op) => {
                     const isSelected = formData.operational_roles.includes(
                       op.key as OperationalRole,

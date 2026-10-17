@@ -50,8 +50,9 @@ routerAdd(
         message: 'Nível de permissão inválido. Deve ser MASTER, ADMIN, LIDER ou MUSICO.',
       })
     }
-    // Se o usuário tiver papel MUSICO ou tiver instrumentos, valida roleIds apenas se for músico
-    const isMusicianProfile = operationalRoles.includes('MUSICO') || role === 'MUSICO'
+    // Instrumento só é obrigatório para quem tem a função operacional MUSICO
+    // (ex.: quem só cuida do financeiro não toca nada)
+    const isMusicianProfile = operationalRoles.includes('MUSICO')
     if (isMusicianProfile && roleIds.length === 0) {
       return e.json(400, { message: 'Selecione ao menos um instrumento ou função para o músico.' })
     }

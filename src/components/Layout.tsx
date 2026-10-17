@@ -25,6 +25,9 @@ import {
   ChevronsLeft,
   ChevronsRight,
   AudioLines,
+  Wallet,
+  ArrowLeftRight,
+  FolderCog,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -113,6 +116,7 @@ export default function Layout() {
   const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const canSeeMusicians = isMaster || isAdmin || isLeader
   const canSeeAdmin = isMaster || isAdmin
+  const canSeeFinance = isMaster || isAdmin || hasOperationalRole('FINANCEIRO')
 
   const sections: NavSection[] = [
     {
@@ -131,6 +135,30 @@ export default function Layout() {
         { to: '/midias', label: 'Mídias', icon: Images, allowed: canSeeMedia },
         { to: '/iluminacao', label: 'Iluminação', icon: LampCeiling, allowed: canSeeLighting },
         { to: '/tarefas', label: 'Tarefas', icon: ListChecks, allowed: canSeeTasks },
+      ],
+    },
+    {
+      label: 'Financeiro',
+      items: [
+        {
+          to: '/financeiro',
+          label: 'Painel financeiro',
+          icon: Wallet,
+          allowed: canSeeFinance,
+          end: true,
+        },
+        {
+          to: '/financeiro/lancamentos',
+          label: 'Lançamentos',
+          icon: ArrowLeftRight,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/cadastros',
+          label: 'Cadastros',
+          icon: FolderCog,
+          allowed: canSeeFinance,
+        },
       ],
     },
     {
@@ -163,7 +191,10 @@ export default function Layout() {
     navigate('/login')
   }
 
-  const roleLabel = role ? ROLE_LABELS[role] || role : ''
+  // Quem só cuida do financeiro aparece como "Financeiro", não como "Músico"
+  const onlyFinance =
+    role === 'MUSICO' && hasOperationalRole('FINANCEIRO') && !hasOperationalRole('MUSICO')
+  const roleLabel = onlyFinance ? 'Financeiro' : role ? ROLE_LABELS[role] || role : ''
   const userInitials = initials(user?.name)
   const churchInitials = initials(currentChurch?.name)
 
