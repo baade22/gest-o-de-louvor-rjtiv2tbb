@@ -259,6 +259,8 @@ export interface MediaAsset {
   downloaded_by?: string
   imported_at?: string
   imported_by?: string
+  /** Momento do roteiro em que a mídia entra. */
+  moment_id?: string
   created: string
   updated: string
   expand?: {
@@ -310,11 +312,43 @@ export interface EventSong {
   holyrics_synced_at?: string
   holyrics_error?: string
   holyrics_playlist_order?: number
+  /** Membro (church_members) que puxa a música neste culto. */
+  lead_vocal?: string
+  /** Momento do roteiro em que a música entra. */
+  moment_id?: string
   created: string
   updated: string
   expand?: {
     song_id?: Song
+    lead_vocal?: ChurchMember & { expand?: { user_id?: User } }
   }
+}
+
+export type EventMomentKind =
+  | 'ABERTURA'
+  | 'LOUVOR'
+  | 'AVISOS'
+  | 'OFERTA'
+  | 'PALAVRA'
+  | 'MINISTRACAO'
+  | 'ENCERRAMENTO'
+  | 'OUTRO'
+
+/** Um momento do roteiro do culto (a ordem que todas as equipes seguem). */
+export interface EventMoment {
+  id: string
+  church_id: string
+  event_id: string
+  title: string
+  kind: EventMomentKind
+  /** "HH:MM" */
+  start_time?: string
+  duration_min?: number
+  responsible?: string
+  notes?: string
+  order: number
+  created: string
+  updated: string
 }
 
 export type EventMemberStatus = 'PENDENTE' | 'CONFIRMADO' | 'RECUSADO'
