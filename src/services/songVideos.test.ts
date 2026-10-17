@@ -14,8 +14,8 @@ describe('Serviço de Gestão de Vídeos da Música (song_videos)', () => {
 
   it('lista vídeos de uma música ordenando por principal', async () => {
     const mockList = [
-      { id: 'v1', song_id: 's1', youtube_video_id: 'vid1', is_primary: true },
-      { id: 'v2', song_id: 's1', youtube_video_id: 'vid2', is_primary: false },
+      { id: 'v1', song_id: 's1', youtube_video_id: 'dQw4w9WgXcQ', is_primary: true },
+      { id: 'v2', song_id: 's1', youtube_video_id: '9bZkp7q19f0', is_primary: false },
     ]
 
     const collectionSpy = vi.spyOn(pb, 'collection').mockReturnValue({
@@ -33,7 +33,7 @@ describe('Serviço de Gestão de Vídeos da Música (song_videos)', () => {
       id: 'v1',
       church_id: 'c1',
       song_id: 's1',
-      youtube_video_id: 'vid1',
+      youtube_video_id: 'dQw4w9WgXcQ',
       is_primary: true,
     })
 
@@ -56,7 +56,7 @@ describe('Serviço de Gestão de Vídeos da Música (song_videos)', () => {
     const created = await addVideoToSong({
       church_id: 'c1',
       song_id: 's1',
-      youtube_video_id: 'vid1',
+      youtube_video_id: 'dQw4w9WgXcQ',
       title: 'Versão Acústica',
       channel_name: 'Canal',
     })
@@ -65,15 +65,15 @@ describe('Serviço de Gestão de Vídeos da Música (song_videos)', () => {
     expect(createSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         is_primary: true,
-        youtube_video_id: 'vid1',
+        youtube_video_id: 'dQw4w9WgXcQ',
       }),
     )
   })
 
   it('define outro vídeo como principal e sincroniza com a música', async () => {
     const existingVideos = [
-      { id: 'v1', song_id: 's1', youtube_video_id: 'vid1', is_primary: true },
-      { id: 'v2', song_id: 's1', youtube_video_id: 'vid2', is_primary: false },
+      { id: 'v1', song_id: 's1', youtube_video_id: 'dQw4w9WgXcQ', is_primary: true },
+      { id: 'v2', song_id: 's1', youtube_video_id: '9bZkp7q19f0', is_primary: false },
     ]
 
     const videoUpdateSpy = vi.fn().mockResolvedValue({})
@@ -101,14 +101,14 @@ describe('Serviço de Gestão de Vídeos da Música (song_videos)', () => {
     expect(videoUpdateSpy).toHaveBeenCalledWith('v1', { is_primary: false })
     // Deve atualizar a tabela songs com o novo videoId
     expect(songUpdateSpy).toHaveBeenCalledWith('s1', {
-      youtube_url: 'https://www.youtube.com/watch?v=vid2',
+      youtube_url: 'https://www.youtube.com/watch?v=9bZkp7q19f0',
     })
   })
 
   it('remove vídeo e promove o remanescente se o removido era o principal', async () => {
     const existingVideos = [
-      { id: 'v1', song_id: 's1', youtube_video_id: 'vid1', is_primary: true },
-      { id: 'v2', song_id: 's1', youtube_video_id: 'vid2', is_primary: false },
+      { id: 'v1', song_id: 's1', youtube_video_id: 'dQw4w9WgXcQ', is_primary: true },
+      { id: 'v2', song_id: 's1', youtube_video_id: '9bZkp7q19f0', is_primary: false },
     ]
 
     const deleteSpy = vi.fn().mockResolvedValue(true)

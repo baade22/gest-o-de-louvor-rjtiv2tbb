@@ -44,22 +44,12 @@ describe('Validação de Correções P1, P2 e P3 - LouvorFlow ↔ Holyrics Agent
     const agent = new LouvorFlowAgent(agentConfig)
     const audioContent = 'ID3\x03\x00\x00\x00\x00\x00\x00fake_mp3_payload_stream'
 
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-length': String(audioContent.length) }),
-      body: {
-        getReader() {
-          let done = false
-          return {
-            async read() {
-              if (done) return { done: true, value: undefined }
-              done = true
-              return { done: false, value: Buffer.from(audioContent) }
-            },
-          }
-        },
-      },
-    } as any)
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(audioContent, {
+          headers: { 'content-length': String(Buffer.byteLength(audioContent)) },
+        }),
+    )
 
     vi.spyOn(agent as any, 'validateFileContent').mockReturnValue({ valid: true })
 
@@ -161,6 +151,14 @@ describe('Validação de Correções P1, P2 e P3 - LouvorFlow ↔ Holyrics Agent
   it('P3.2: SYNC_MEDIA_PLAYLIST ordena por presentation_order e verifica pós-operação via GetPlaylist', async () => {
     const agent = new LouvorFlowAgent(agentConfig)
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+      success: true,
+      schedules: [],
+    })
+    vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
+      recognized: true,
+      methodUsed: 'GetFile',
+    })
 
     // Cria arquivos locais
     fs.writeFileSync(path.join(agentConfig.holyricsMediaPath, 'video', 'Video2.mp4'), 'v2')

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HolyricsClient } from '../../agent/src/holyricsClient.js'
 import { syncEventRepertoireWithHolyrics } from './holyricsAgent.js'
 import pb from '../lib/pocketbase/client.js'
+import { withTextBody } from '../test/fetchMock.js'
 
 describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicação', () => {
   beforeEach(() => {
@@ -101,7 +102,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
       }
     })
 
-    globalThis.fetch = fetchMock
+    globalThis.fetch = withTextBody(fetchMock)
 
     // Executa métodos do client
     const step1 = await client.getSongs()
@@ -166,7 +167,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
         json: async () => ({ status: 'ok' }),
       }
     })
-    globalThis.fetch = fetchMock
+    globalThis.fetch = withTextBody(fetchMock)
 
     // Simula verificação: ID já é conhecido '1790728009858'
     const playlist = await client.getSongPlaylist()
@@ -203,7 +204,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
       }
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
     })
-    globalThis.fetch = fetchMock
+    globalThis.fetch = withTextBody(fetchMock)
 
     const res = await client.getSongs()
     expect(res.success).toBe(true)
@@ -228,34 +229,32 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
     expect(createCalled).toBe(false)
   })
 
-  // 4. Música existente fora da playlist: GetSongs encontra, AddLyricsToPlaylist com index do repertório, confirmação.
+  // 4. Música existente fora da playlist: AddToPlaylist (Etapa 3B) com index do repertório e event_id, confirmação.
   it('4. Música existente fora da playlist: adicionada na posição correta e confirmada', async () => {
     const client = new HolyricsClient('127.0.0.1', 8091, 'test_token')
 
-    let playlistChecked = false
+    let added = false
     const fetchMock = vi.fn().mockImplementation(async (url: string, opts: any) => {
       if (url.includes('GetSongPlaylist')) {
-        if (!playlistChecked) {
-          playlistChecked = true
-          return { ok: true, status: 200, json: async () => ({ status: 'ok', data: [] }) }
-        }
         return {
           ok: true,
           status: 200,
           json: async () => ({
             status: 'ok',
-            data: [{ id: '1790729773014', title: 'LouvorFlow TESTE 001' }],
+            data: added ? [{ id: '1790729773014', title: 'LouvorFlow TESTE 001' }] : [],
           }),
         }
       }
-      if (url.includes('AddLyricsToPlaylist')) {
+      if (url.includes('AddToPlaylist')) {
         const body = JSON.parse(opts.body)
         expect(body.index).toBe(1) // segunda música do culto
+        expect(body.event_id).toBe('evt_holyrics_rep')
+        added = true
         return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
       }
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
     })
-    globalThis.fetch = fetchMock
+    globalThis.fetch = withTextBody(fetchMock)
 
     const addRes = await client.addToPlaylist('1790729773014', {
       eventId: 'evt_holyrics_rep',
@@ -295,7 +294,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
       }
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
     })
-    globalThis.fetch = fetchMock
+    globalThis.fetch = withTextBody(fetchMock)
 
     // CreateSong falha
     const createRes = await client.createSong({ title: 'Grande é o Senhor', slides: [] })
@@ -323,7 +322,7 @@ describe('Holyrics Repertoire Sync v0.0.26 - Regras Definitivas & Zero Duplicaç
       }
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }
     })
-    globalThis.fetch = fetchMock
+    globalThis.fetch = withTextBody(fetchMock)
 
     const addRes = await client.addToPlaylist('1790728009858', { eventId: 'evt_holyrics_rep' })
     expect(addRes.success).toBe(true)
