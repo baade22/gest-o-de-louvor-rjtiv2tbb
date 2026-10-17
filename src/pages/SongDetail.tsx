@@ -412,13 +412,13 @@ export default function SongDetail() {
   return (
     <div className="max-w-4xl mx-auto space-y-5 pb-20">
       {/* Back button & Admin Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/songs"
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar ao Repertório
+          Voltar para Músicas
         </Link>
 
         <div className="flex items-center gap-2">

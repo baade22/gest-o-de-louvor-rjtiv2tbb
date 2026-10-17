@@ -188,12 +188,16 @@ export function EventHeader({
                   : `Holyrics offline${lastSeen ? ` · visto ${timeAgo(lastSeen)}` : ''}`}
               </span>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full gap-2 sm:w-auto sm:flex-wrap">
               {canEdit && (
-                <Button asChild variant="outline" className="h-9 gap-1.5 rounded-lg font-semibold">
-                  <Link to={`/events/${event.id}/edit`}>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-9 shrink-0 gap-1.5 rounded-lg px-2.5 font-semibold sm:px-4"
+                >
+                  <Link to={`/events/${event.id}/edit`} aria-label="Editar culto">
                     <Pencil className="h-4 w-4" />
-                    Editar
+                    <span className="hidden sm:inline">Editar</span>
                   </Link>
                 </Button>
               )}
@@ -206,7 +210,7 @@ export function EventHeader({
                       ? 'Adicione músicas ao repertório primeiro'
                       : 'Envia as músicas, na ordem do repertório, para a playlist do Holyrics'
                   }
-                  className="h-9 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
+                  className="h-9 flex-1 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800 sm:flex-none"
                 >
                   {isSyncing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -222,7 +226,7 @@ export function EventHeader({
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 rounded-lg"
+                      className="h-9 w-9 shrink-0 rounded-lg"
                       aria-label="Mais ações"
                     >
                       <MoreHorizontal className="h-4 w-4" />
