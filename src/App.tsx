@@ -32,6 +32,9 @@ import TasksModule from '@/pages/TasksModule'
 import InvitationsManagement from '@/pages/InvitationsManagement'
 import InviteAccept from '@/pages/InviteAccept'
 import NotFound from '@/pages/NotFound'
+import FinancePanel from '@/pages/finance/FinancePanel'
+import FinanceTransactions from '@/pages/finance/FinanceTransactions'
+import FinanceRegistry from '@/pages/finance/FinanceRegistry'
 
 const App = () => (
   <BrowserRouter>
@@ -187,6 +190,32 @@ const App = () => (
               element={
                 <RequireAuth requireModule="lighting">
                   <LightingModule />
+                </RequireAuth>
+              }
+            />
+
+            {/* Financeiro: MASTER, ADMIN (leitura) e função FINANCEIRO */}
+            <Route
+              path="/financeiro"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinancePanel />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/lancamentos"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceTransactions />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/cadastros"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceRegistry />
                 </RequireAuth>
               }
             />

@@ -133,6 +133,8 @@ routerAdd(
       'holyrics.view',
       'holyrics.sync',
       'church.settings',
+      'finance.view',
+      'finance.edit',
     ]
 
     let permissionsSet = {}
@@ -163,6 +165,8 @@ routerAdd(
         permissionsSet['holyrics.view'] = true
         permissionsSet['holyrics.sync'] = true
         permissionsSet['church.settings'] = true
+        // ADMIN acompanha o financeiro; lançar e editar exige a função FINANCEIRO
+        permissionsSet['finance.view'] = true
       } else if (isLider) {
         permissionsSet['music.view'] = true
         permissionsSet['music.edit'] = true
@@ -204,6 +208,10 @@ routerAdd(
           permissionsSet['lighting.edit'] = true
           permissionsSet['events.view'] = true
         }
+        if (op === 'FINANCEIRO') {
+          permissionsSet['finance.view'] = true
+          permissionsSet['finance.edit'] = true
+        }
       }
     }
 
@@ -224,6 +232,7 @@ routerAdd(
     if (permissionsSet['roles.view']) modules.push('roles')
     if (permissionsSet['integrations.view']) modules.push('integrations')
     if (permissionsSet['church.settings']) modules.push('settings')
+    if (permissionsSet['finance.view']) modules.push('finance')
 
     return e.json(200, {
       church_id: churchId,
