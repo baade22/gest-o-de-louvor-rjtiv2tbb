@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import { User, Phone, Mail, Lock, Shield, Church as ChurchIcon, Save } from 'lucide-react'
+import { Lock, Shield, Church as ChurchIcon, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

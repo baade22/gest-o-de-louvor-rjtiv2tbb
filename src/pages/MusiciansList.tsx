@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import pb from '@/lib/pocketbase/client'
 import { listMusicians, removeMusician } from '@/services/musicians'
 import type { Role } from '@/types'
 import { Users, Search, Plus, Phone, Mail, Edit, Trash2, MoreVertical } from 'lucide-react'

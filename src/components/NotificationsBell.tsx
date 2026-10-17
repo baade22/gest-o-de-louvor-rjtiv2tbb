@@ -1,18 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Bell,
-  CheckCheck,
-  CalendarDays,
-  ExternalLink,
-  Film,
-  CheckSquare,
-  Sparkles,
-  Trash2,
-} from 'lucide-react'
+import { Bell, CheckCheck, Film, CheckSquare, Sparkles, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAuth } from '@/contexts/AuthContext'
 import type { InternalNotification } from '@/types'

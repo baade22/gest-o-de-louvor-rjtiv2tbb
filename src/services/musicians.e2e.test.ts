@@ -1,11 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import {
-  saveMusician,
-  getMusician,
-  listMusicians,
-  removeMusician,
-  type MusicianPayload,
-} from './musicians'
+import { type MusicianPayload } from './musicians'
 
 // Teste de validação lógica e de contrato para o fluxo end-to-end de músicos
 describe('Musicians E2E Contract & Business Rules Validation', () => {
