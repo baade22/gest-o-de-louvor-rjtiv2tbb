@@ -22,7 +22,12 @@ const song = (itemId: string, songId: string): PlaylistItem => ({
 const video = (itemId: string, name: string): PlaylistItem => ({ id: itemId, type: 'video', name })
 
 // Simula a playlist de um culto no Holyrics: GetSchedules, RemoveFromMediaPlaylist e AddToPlaylist
-function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
+// removeBy: o que o Holyrics simulado aceita para remover ('ids', 'indexes' ou nada)
+function fakeHolyrics(
+  agent: LouvorFlowAgent,
+  initial: PlaylistItem[],
+  removeBy: Array<'ids' | 'indexes'> = ['ids', 'indexes'],
+) {
   const playlist = [...initial]
   let seq = 0
   const holyrics = (agent as any).holyrics
@@ -35,10 +40,15 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
   }))
   const removeSpy = vi
     .spyOn(holyrics, 'removeFromMediaPlaylist')
-    .mockImplementation(async (ids: any) => {
-      for (const id of ids as string[]) {
-        const i = playlist.findIndex((p) => p.id === id)
-        if (i >= 0) playlist.splice(i, 1)
+    .mockImplementation(async (target: any) => {
+      if (target.ids && removeBy.includes('ids')) {
+        for (const id of target.ids as string[]) {
+          const i = playlist.findIndex((p) => p.id === id)
+          if (i >= 0) playlist.splice(i, 1)
+        }
+      } else if (target.indexes && removeBy.includes('indexes')) {
+        const sorted = [...(target.indexes as number[])].sort((a, b) => b - a)
+        for (const i of sorted) playlist.splice(i, 1)
       }
       return { success: true }
     })
@@ -143,7 +153,7 @@ describe('Agent: comandos de remoção e ordem na playlist do culto', () => {
     const res = await agent.handleReorderEventSongs(
       cmd('REORDER_EVENT_SONGS', { song_ids: ['100', '200'] }),
     )
-    expect(res.result).toEqual({ reordered: false })
+    expect(res.result).toEqual({ reordered: false, removed_missing: 0 })
     expect(fake.removeSpy).not.toHaveBeenCalled()
     expect(fake.addSpy).not.toHaveBeenCalled()
   })
@@ -171,6 +181,50 @@ describe('Agent: comandos de remoção e ordem na playlist do culto', () => {
     expect(fake.playlist.map((p) => p.id)).toEqual(['z2'])
     expect(fs.existsSync(path.join(tmpDir, 'media', 'video', fileName))).toBe(false)
     expect(fs.existsSync(outside)).toBe(true)
+  })
+
+  it('REMOVE_FROM_EVENT_PLAYLIST tenta pela posição quando o Holyrics ignora os ids', async () => {
+    const fake = fakeHolyrics(agent, [song('z1', '100'), song('z2', '200')], ['indexes'])
+    const res = await agent.handleRemoveFromEventPlaylist(
+      cmd('REMOVE_FROM_EVENT_PLAYLIST', { song_ids: ['200'] }),
+    )
+    expect(res.success).toBe(true)
+    expect(fake.playlist.map((p) => p.song_id)).toEqual(['100'])
+    expect(fake.removeSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('REMOVE_FROM_EVENT_PLAYLIST avisa o erro quando o item continua na playlist', async () => {
+    fakeHolyrics(agent, [song('z1', '100')], [])
+    const res = await agent.handleRemoveFromEventPlaylist(
+      cmd('REMOVE_FROM_EVENT_PLAYLIST', { song_ids: ['100'] }),
+    )
+    expect(res.success).toBe(false)
+    expect(res.error_code).toBe('REMOVE_NOT_APPLIED')
+  })
+
+  it('REORDER_EVENT_SONGS com remove_missing tira músicas fora do repertório e ordena', async () => {
+    const fake = fakeHolyrics(agent, [
+      song('z1', '100'),
+      song('z9', '999'),
+      video('zV', 'v.mp4'),
+      song('z3', '300'),
+      song('z2', '200'),
+    ])
+    const res = await agent.handleReorderEventSongs(
+      cmd('REORDER_EVENT_SONGS', { song_ids: ['100', '200', '300'], remove_missing: true }),
+    )
+    expect(res.success).toBe(true)
+    expect(res.result?.removed_missing).toBe(1)
+    expect(fake.playlist.map((p) => p.song_id || p.name)).toEqual(['100', 'v.mp4', '200', '300'])
+  })
+
+  it('REORDER_EVENT_SONGS avisa o erro quando o Holyrics não remove', async () => {
+    fakeHolyrics(agent, [song('z2', '200'), song('z1', '100')], [])
+    const res = await agent.handleReorderEventSongs(
+      cmd('REORDER_EVENT_SONGS', { song_ids: ['100', '200'] }),
+    )
+    expect(res.success).toBe(false)
+    expect(res.error_code).toBe('REMOVE_NOT_APPLIED')
   })
 
   it('REMOVE_FROM_EVENT_PLAYLIST avisa quando o culto não está na programação', async () => {

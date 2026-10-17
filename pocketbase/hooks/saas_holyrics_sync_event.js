@@ -1485,8 +1485,9 @@ routerAdd(
       }
     }
 
-    // ETAPA 7: Ordem da playlist. Músicas que já estavam na playlist ficam onde estavam e as novas
-    // entram no fim, então o Agent (0.0.38+) reposiciona as músicas na ordem do repertório.
+    // ETAPA 7: Playlist igual ao repertório. Músicas que já estavam na playlist ficam onde estavam e
+    // as novas entram no fim, então o Agent (0.0.38+) reposiciona as músicas na ordem do repertório.
+    // Com remove_missing (Agent 0.0.39+), tira também as músicas que saíram do repertório.
     const orderedSongIds = results
       .filter((r) => r.status === 'SUCCESS' && r.holyrics_song_id)
       .sort((a, b) => a.order - b.order)
@@ -1505,7 +1506,7 @@ routerAdd(
     }
     let orderNote = ''
     let playlistOrder = { status: 'SKIPPED' }
-    if (orderedSongIds.length > 1) {
+    if (orderedSongIds.length > 0) {
       if (!versionAtLeast(agentRecord.getString('version'), '0.0.38')) {
         playlistOrder = { status: 'AGENT_OUTDATED' }
         orderNote =
@@ -1520,13 +1521,17 @@ routerAdd(
             month: eventMonth,
             year: eventYear,
             song_ids: orderedSongIds,
+            remove_missing: true,
           },
-          20000,
+          30000,
         )
         const reorderResult = unwrapCommandResult(reorderRes.result) || {}
         if (reorderRes.status === 'DONE') {
           playlistOrder = { status: reorderResult.reordered ? 'REORDERED' : 'ALREADY_ORDERED' }
           if (reorderResult.reordered) orderNote = ' Ordem da playlist ajustada ao repertório.'
+          if (reorderResult.removed_missing > 0) {
+            orderNote += ` ${reorderResult.removed_missing} música(s) que saíram do repertório foram tiradas da playlist.`
+          }
         } else {
           playlistOrder = { status: 'ERROR', error: reorderRes.error || reorderRes.status }
           orderNote =
