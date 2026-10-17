@@ -16,7 +16,8 @@
 //    estrita (normalizeTitle/normalizeArtist). Se a música já existir, salva o ID e continua para a playlist. Se não existir,
 //    reporta erro técnico real da etapa. Nunca repete CreateSong cegamente.
 // 4. Exclusão mútua / Lock por church_id + song_id: impede dois cliques simultâneos de criarem músicas duplicadas.
-// 5. Playlist: GetSongPlaylist compara exclusivamente por ID (nunca por título). Se já estiver -> ALREADY_IN_PLAYLIST.
+// 5. Playlist: lê a playlist do culto (GetSchedules do mês, lyrics_playlist da ocorrência) e compara
+//    exclusivamente por ID (nunca por título). GetSongPlaylist (lista aberta na tela) é só reserva. Se já estiver -> ALREADY_IN_PLAYLIST.
 //    Se ausente -> AddToPlaylist com event_id do culto no Holyrics (events.holyrics_event_id), index -1 e ignore_duplicates:true.
 //    Depois consulta GetSongPlaylist novamente: só marca ADDED_TO_PLAYLIST se o ID aparecer; se não aparecer -> ERROR
 //    com mensagem técnica real: "AddToPlaylist retornou OK, mas a música não foi localizada na playlist após a confirmação."// 6. Payloads mínimos à API do Holyrics em tudo (evita bugs de lista vazia no Holyrics).
@@ -492,25 +493,88 @@ routerAdd(
     }
 
     // Consulta GetSongPlaylist
-    const fetchHolyricsPlaylist = () => {
+    const unwrapCommandResult = (raw) => {
+      let resData = raw
+      if (typeof resData === 'string') {
+        try {
+          resData = JSON.parse(resData)
+        } catch (_) {}
+      } else if (Array.isArray(resData) && resData.length > 0 && typeof resData[0] === 'number') {
+        try {
+          resData = JSON.parse(decodeUtf8Bytes(resData))
+        } catch (_) {}
+      }
+      return resData
+    }
+
+    // Data civil do culto (YYYY-MM-DD), usada para buscar a programação do mês no Holyrics
+    const eventDateMatch = String(eventRecord.getString('date') || '').match(/^(\d{4})-(\d{2})/)
+    const eventYear = eventDateMatch ? Number(eventDateMatch[1]) : 0
+    const eventMonth = eventDateMatch ? Number(eventDateMatch[2]) : 0
+
+    const scheduleOccurrenceId = (item) => {
+      if (!item || typeof item !== 'object') return ''
+      const meta = item.metadata
+      if (meta && typeof meta === 'object' && meta.event && typeof meta.event === 'object') {
+        const occId = String(meta.event.id || '').trim()
+        if (occId) return occId
+      }
+      if (item.event && typeof item.event === 'object') {
+        const nestedId = String(item.event.id || '').trim()
+        if (nestedId) return nestedId
+      }
+      return String(item.id || '').trim()
+    }
+
+    // Lê a playlist da ocorrência do culto no Holyrics (a mesma que recebe o AddToPlaylist
+    // com event_id). GetSongPlaylist não aceita event_id: ele devolve a lista aberta na tela
+    // do Holyrics, que pode ser de outro culto. Por isso a fonte é GetSchedules do mês,
+    // juntando lyrics_playlist e as músicas de media_playlist.
+    // Retorna null quando não consegue ler a programação do culto.
+    const fetchEventSchedulePlaylist = () => {
+      if (!eventYear || !eventMonth) return null
+      const schedRes = runCommandSync(
+        'GET_SCHEDULES',
+        { month: eventMonth, year: eventYear },
+        12000,
+      )
+      if (schedRes.status !== 'DONE' || !schedRes.result) return null
+      const resData = unwrapCommandResult(schedRes.result)
+      const schedules = Array.isArray(resData?.schedules)
+        ? resData.schedules
+        : Array.isArray(resData)
+          ? resData
+          : Array.isArray(resData?.data)
+            ? resData.data
+            : []
+      let schedule = null
+      for (let i = 0; i < schedules.length; i++) {
+        if (scheduleOccurrenceId(schedules[i]) === holyricsEventId) {
+          schedule = schedules[i]
+          break
+        }
+      }
+      if (!schedule) return null
+      const items = []
+      const lyrics = Array.isArray(schedule.lyrics_playlist) ? schedule.lyrics_playlist : []
+      for (let i = 0; i < lyrics.length; i++) items.push(lyrics[i])
+      const media = Array.isArray(schedule.media_playlist) ? schedule.media_playlist : []
+      for (let i = 0; i < media.length; i++) {
+        const t = String((media[i] && media[i].type) || '').toLowerCase()
+        if (t === 'song' || t === 'lyrics') items.push(media[i])
+      }
+      return items
+    }
+
+    // Playlist aberta na tela do Holyrics (comportamento antigo), usada só como reserva
+    const fetchActivePlaylist = () => {
       const playlistCmdRes = runCommandSync(
         'GET_SONG_PLAYLIST',
         { church_id: churchId, agent_id: agentId, event_id: eventId },
         8000,
       )
       if (playlistCmdRes.status === 'DONE' && playlistCmdRes.result) {
-        let resData = playlistCmdRes.result
-        if (typeof resData === 'string') {
-          try {
-            resData = JSON.parse(resData)
-          } catch (_) {}
-        } else if (Array.isArray(resData) && resData.length > 0 && typeof resData[0] === 'number') {
-          try {
-            const s = decodeUtf8Bytes(resData)
-            resData = JSON.parse(s)
-          } catch (_) {}
-        }
-
+        const resData = unwrapCommandResult(playlistCmdRes.result)
         const pItems = Array.isArray(resData?.items)
           ? resData.items
           : Array.isArray(resData)
@@ -519,6 +583,12 @@ routerAdd(
         return pItems
       }
       return null
+    }
+
+    const fetchHolyricsPlaylist = () => {
+      const eventItems = fetchEventSchedulePlaylist()
+      if (eventItems !== null) return eventItems
+      return fetchActivePlaylist()
     }
 
     // Busca inicial da playlist
