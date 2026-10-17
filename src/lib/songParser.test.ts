@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   parseSongContent,
   isSectionMarker,
-  stripInlineChords,
   extractSectionsFromText,
   serializeSections,
 } from './songParser'

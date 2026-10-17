@@ -3,21 +3,11 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
 import type { EventMember } from '@/types'
-import {
-  CalendarCheck2,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  ArrowRight,
-  Music2,
-  Check,
-} from 'lucide-react'
+import { CalendarCheck2, Calendar, Clock, XCircle, ArrowRight, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,

@@ -165,42 +165,16 @@ const agentDir = path.resolve(process.cwd(), 'agent')
 const files = collectFiles(agentDir)
 const zipBuf = buildZip(files)
 
-const outPublic37 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.37.zip')
-fs.writeFileSync(outPublic37, zipBuf)
-
-const outPublic36 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.36.zip')
-fs.writeFileSync(outPublic36, zipBuf)
-
-const outPublic35 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.35.zip')
-fs.writeFileSync(outPublic35, zipBuf)
-
-const outPublic34 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.34.zip')
-fs.writeFileSync(outPublic34, zipBuf)
-
-const outPublic33 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.33.zip')
-fs.writeFileSync(outPublic33, zipBuf)
-
-const outPublic32 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.32.zip')
-fs.writeFileSync(outPublic32, zipBuf)
-
-const outPublic31 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.31.zip')
-fs.writeFileSync(outPublic31, zipBuf)
-
-const outPublic30 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.30.zip')
-fs.writeFileSync(outPublic30, zipBuf)
-
-const outPublicGeneral = path.resolve(process.cwd(), 'public/LouvorFlow-Agent.zip')
-fs.writeFileSync(outPublicGeneral, zipBuf)
-
-const outPublic26 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.26.zip')
-fs.writeFileSync(outPublic26, zipBuf)
-const outPublic25 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.25.zip')
-fs.writeFileSync(outPublic25, zipBuf)
-const outPublic24 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.24.zip')
-fs.writeFileSync(outPublic24, zipBuf)
-const outPublic15 = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.15.zip')
-fs.writeFileSync(outPublic15, zipBuf)
+// Versão vem do agent/package.json. Gera só o pacote da versão atual e o
+// link estável LouvorFlow-Agent.zip (versões antigas não ficam mais em public/).
+const agentVersion = JSON.parse(
+  fs.readFileSync(path.join(agentDir, 'package.json'), 'utf-8'),
+).version
+const outVersioned = path.resolve(process.cwd(), `public/LouvorFlow-Agent-${agentVersion}.zip`)
+const outLatest = path.resolve(process.cwd(), 'public/LouvorFlow-Agent.zip')
+fs.writeFileSync(outVersioned, zipBuf)
+fs.writeFileSync(outLatest, zipBuf)
 
 console.log(
-  `[ZIP Prebuild] LouvorFlow-Agent-0.0.37.zip gerado com sucesso em ${outPublic37} (${zipBuf.length} bytes, ${files.length} arquivos)`,
+  `[ZIP Prebuild] LouvorFlow-Agent-${agentVersion}.zip gerado com sucesso em ${outVersioned} (${zipBuf.length} bytes, ${files.length} arquivos)`,
 )

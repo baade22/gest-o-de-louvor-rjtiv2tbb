@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 describe('Invitations & Account Activation Flow E2E Tests', () => {
   const mockChurchId = '8minai50ybqzkek'
