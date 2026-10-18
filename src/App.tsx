@@ -37,6 +37,7 @@ import FinanceTransactions from '@/pages/finance/FinanceTransactions'
 import FinanceRegistry from '@/pages/finance/FinanceRegistry'
 import FinanceCounts from '@/pages/finance/FinanceCounts'
 import FinanceBills from '@/pages/finance/FinanceBills'
+import FinanceReconcile from '@/pages/finance/FinanceReconcile'
 
 const App = () => (
   <BrowserRouter>
@@ -226,6 +227,14 @@ const App = () => (
               element={
                 <RequireAuth requireModule="finance">
                   <FinanceBills />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/conciliacao"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceReconcile />
                 </RequireAuth>
               }
             />

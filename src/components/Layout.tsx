@@ -30,6 +30,7 @@ import {
   FolderCog,
   HandCoins,
   CalendarClock,
+  Landmark,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -165,6 +166,12 @@ export default function Layout() {
           to: '/financeiro/contas',
           label: 'Contas a pagar e receber',
           icon: CalendarClock,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/conciliacao',
+          label: 'Conciliação bancária',
+          icon: Landmark,
           allowed: canSeeFinance,
         },
         {

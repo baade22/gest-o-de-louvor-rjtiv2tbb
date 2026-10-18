@@ -3,8 +3,11 @@
 
 import pb from '@/lib/pocketbase/client'
 import { DEFAULT_CATEGORIES, addMonthsToDate, monthRange } from '@/lib/financeSummary'
+import type { OfxStatement } from '@/lib/ofx'
 import type {
   FinAccount,
+  FinBankImport,
+  FinBankLine,
   FinBill,
   FinBillKind,
   FinCategory,
@@ -319,4 +322,109 @@ export async function settleBill(id: string, input: SettleInput) {
 export async function openBillAttachment(bill: FinBill) {
   const token = await pb.files.getToken()
   window.open(pb.files.getURL(bill, bill.attachment || '', { token }), '_blank', 'noopener')
+}
+
+// ---- Conciliação do extrato ----
+
+export async function listBankLines(churchId: string, accountId: string) {
+  return pb.collection('fin_bank_lines').getFullList<FinBankLine>({
+    filter: pb.filter('church_id = {:churchId} && account_id = {:accountId}', {
+      churchId,
+      accountId,
+    }),
+    sort: '-date,-created',
+    expand: 'transaction_id,transaction_id.category_id,transaction_id.person_id',
+  })
+}
+
+export async function listBankImports(churchId: string, accountId: string) {
+  return pb.collection('fin_bank_imports').getList<FinBankImport>(1, 10, {
+    filter: pb.filter('church_id = {:churchId} && account_id = {:accountId}', {
+      churchId,
+      accountId,
+    }),
+    sort: '-end_date,-created',
+  })
+}
+
+/** Lançamentos da conta ainda não conciliados, num período (para as sugestões). */
+export async function listUnreconciled(
+  churchId: string,
+  accountId: string,
+  from: string,
+  to: string,
+) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter(
+      "church_id = {:churchId} && (account_id = {:accountId} || to_account_id = {:accountId}) && status = 'CONFIRMADO' && bank_line_id = '' && date >= {:from} && date <= {:to}",
+      { churchId, accountId, from: `${from} 00:00:00`, to: `${to} 23:59:59` },
+    ),
+    sort: 'date',
+    expand: EXPAND,
+  })
+}
+
+export async function importStatement(
+  accountId: string,
+  fileName: string,
+  st: OfxStatement,
+): Promise<{ created: number; skipped: number }> {
+  return pb.send('/backend/v1/finance/bank/import', {
+    method: 'POST',
+    body: {
+      account_id: accountId,
+      file_name: fileName,
+      start_date: st.startDate,
+      end_date: st.endDate,
+      balance_cents: st.balanceCents,
+      balance_date: st.balanceDate,
+      lines: st.lines,
+    },
+  })
+}
+
+export interface ReconcileCreate {
+  category_id?: string
+  cost_center_id?: string
+  person_id?: string
+  is_anonymous?: boolean
+  supplier_id?: string
+  description?: string
+  payment_method?: string
+  /** Outra conta, quando o movimento é uma transferência. */
+  transfer_account_id?: string
+}
+
+export type ReconcileTarget =
+  | { transaction_id: string }
+  | { bill_id: string; payment_method?: string }
+  | { create: ReconcileCreate }
+
+export async function reconcileLine(lineId: string, target: ReconcileTarget) {
+  return pb.send('/backend/v1/finance/bank/reconcile', {
+    method: 'POST',
+    body: { line_id: lineId, ...target },
+  })
+}
+
+export async function unreconcileLine(lineId: string) {
+  return pb.send('/backend/v1/finance/bank/unreconcile', {
+    method: 'POST',
+    body: { line_id: lineId },
+  })
+}
+
+/** Movimentos ainda não conciliados, só a conta de cada um (para o painel). */
+export async function listPendingLines(churchId: string) {
+  return pb.collection('fin_bank_lines').getFullList<FinBankLine>({
+    filter: pb.filter("church_id = {:churchId} && status = 'PENDENTE'", { churchId }),
+    fields: 'id,account_id',
+  })
+}
+
+/** Ignorar: o movimento sai das pendências sem gerar lançamento (e pode voltar). */
+export async function setLineIgnored(lineId: string, ignored: boolean) {
+  return pb
+    .collection('fin_bank_lines')
+    .update<FinBankLine>(lineId, { status: ignored ? 'IGNORADO' : 'PENDENTE' })
 }

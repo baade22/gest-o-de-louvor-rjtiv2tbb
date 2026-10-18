@@ -28,7 +28,13 @@ import {
   onlyAccounts,
   periodTotals,
 } from '@/lib/financeSummary'
-import { listAccounts, listCategories, listLedger, listOpenBills } from '@/services/finance'
+import {
+  listAccounts,
+  listCategories,
+  listLedger,
+  listOpenBills,
+  listPendingLines,
+} from '@/services/finance'
 import type {
   FinAccount,
   FinAccountKind,
@@ -102,6 +108,8 @@ export default function FinancePanel() {
   const [categories, setCategories] = useState<FinCategory[]>([])
   const [ledger, setLedger] = useState<FinTransaction[]>([])
   const [openBills, setOpenBills] = useState<FinBill[]>([])
+  // Movimentos do extrato a conciliar, por conta
+  const [pendingByAccount, setPendingByAccount] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   // '' = todas as congregações
   const [congregation, setCongregation] = useState('')
@@ -115,12 +123,16 @@ export default function FinancePanel() {
       listLedger(churchId),
       // Contas a pagar e receber não podem derrubar o painel
       listOpenBills(churchId).catch(() => [] as FinBill[]),
+      listPendingLines(churchId).catch(() => []),
     ])
-      .then(([a, c, l, b]) => {
+      .then(([a, c, l, b, p]) => {
         setAccounts(a)
         setCategories(c)
         setLedger(l)
         setOpenBills(b)
+        const byAccount: Record<string, number> = {}
+        for (const line of p) byAccount[line.account_id] = (byAccount[line.account_id] || 0) + 1
+        setPendingByAccount(byAccount)
       })
       .catch((err) => console.error('Erro ao carregar o painel financeiro:', err))
       .finally(() => setLoading(false))
@@ -440,8 +452,17 @@ export default function FinancePanel() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold text-slate-900">{a.name}</div>
                       <div className="truncate text-xs text-slate-500">
-                        {[a.bank_name, a.account_number].filter(Boolean).join(' · ') ||
-                          (a.is_active ? '' : 'Arquivada')}
+                        {pendingByAccount[a.id] ? (
+                          <Link
+                            to="/financeiro/conciliacao"
+                            className="font-semibold text-amber-700"
+                          >
+                            {pendingByAccount[a.id]} a conciliar
+                          </Link>
+                        ) : (
+                          [a.bank_name, a.account_number].filter(Boolean).join(' · ') ||
+                          (a.is_active ? '' : 'Arquivada')
+                        )}
                       </div>
                     </div>
                     <div

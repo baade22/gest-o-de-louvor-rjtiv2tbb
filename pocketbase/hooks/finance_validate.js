@@ -1,6 +1,7 @@
 // Validação dos registros do Financeiro antes de salvar (criação e edição)
 // As regras da API só enxergam os valores antigos numa edição; aqui conferimos os valores
-// novos: tudo o que um lançamento, uma contagem ou uma conta a pagar/receber aponta precisa ser da mesma igreja, e a
+// novos: tudo o que um lançamento, uma contagem, uma conta a pagar/receber
+// ou um movimento do extrato aponta precisa ser da mesma igreja, e a
 // transferência precisa de uma conta de destino diferente da origem.
 
 onRecordValidate(
@@ -18,6 +19,7 @@ onRecordValidate(
         event_id: 'events',
         count_id: 'fin_counts',
         bill_id: 'fin_bills',
+        bank_line_id: 'fin_bank_lines',
       },
       fin_counts: {
         account_id: 'fin_accounts',
@@ -31,6 +33,11 @@ onRecordValidate(
         person_id: 'people',
         account_id: 'fin_accounts',
         paid_account_id: 'fin_accounts',
+        transaction_id: 'fin_transactions',
+      },
+      fin_bank_lines: {
+        account_id: 'fin_accounts',
+        import_id: 'fin_bank_imports',
         transaction_id: 'fin_transactions',
       },
     }[rec.collection().name]
@@ -63,6 +70,22 @@ onRecordValidate(
       if (!isTransfer && to) {
         rec.set('to_account_id', '')
       }
+      // Lançamento conciliado com o extrato: valor, conta e tipo só mudam depois de desfazer
+      const lineId = rec.getString('bank_line_id')
+      if (lineId && !rec.isNew()) {
+        const old = rec.original()
+        if (
+          old.getString('bank_line_id') === lineId &&
+          (old.getInt('amount_cents') !== rec.getInt('amount_cents') ||
+            old.getString('account_id') !== rec.getString('account_id') ||
+            old.getString('to_account_id') !== rec.getString('to_account_id') ||
+            old.getString('type') !== rec.getString('type'))
+        ) {
+          throw new BadRequestError(
+            'Lançamento conciliado com o extrato: desfaça a conciliação para mudar valor ou conta.',
+          )
+        }
+      }
     }
 
     e.next()
@@ -70,4 +93,5 @@ onRecordValidate(
   'fin_transactions',
   'fin_counts',
   'fin_bills',
+  'fin_bank_lines',
 )

@@ -76,6 +76,7 @@ function detail(tx: FinTransaction) {
   if (tx.expand?.event_id) parts.push(tx.expand.event_id.title)
   if (tx.count_id) parts.push('contagem do culto')
   if (tx.bill_id) parts.push(tx.type === 'SAIDA' ? 'conta a pagar' : 'conta a receber')
+  if (tx.bank_line_id) parts.push('conciliado')
   return parts.filter(Boolean).join(' · ')
 }
 
@@ -155,7 +156,9 @@ export default function FinanceTransactions() {
       title: 'Lançamento estornado',
       description: voiding.bill_id
         ? 'Ele sai dos saldos e a conta volta para em aberto.'
-        : 'Ele continua no histórico, fora dos saldos.',
+        : voiding.bank_line_id
+          ? 'Ele sai dos saldos e o movimento do extrato volta para a conciliação.'
+          : 'Ele continua no histórico, fora dos saldos.',
     })
     load()
   }

@@ -78,6 +78,8 @@ export interface FinTransaction extends BaseRecord {
   count_id?: string
   /** Conta a pagar ou a receber que o lançamento quitou. */
   bill_id?: string
+  /** Movimento do extrato com que o lançamento foi conciliado. */
+  bank_line_id?: string
   category_id?: string
   cost_center_id?: string
   payment_method?: FinPaymentMethod | ''
@@ -175,4 +177,37 @@ export interface FinBill extends BaseRecord {
     account_id?: FinAccount
     paid_account_id?: FinAccount
   }
+}
+
+export type FinBankLineStatus = 'PENDENTE' | 'CONCILIADO' | 'IGNORADO'
+
+/** Movimento do extrato bancário importado (OFX). Valor positivo entrou, negativo saiu. */
+export interface FinBankLine extends BaseRecord {
+  account_id: string
+  import_id?: string
+  fitid: string
+  date: string
+  amount_cents: number
+  description?: string
+  status: FinBankLineStatus
+  transaction_id?: string
+  reconciled_at?: string
+  reconciled_by_name?: string
+  expand?: {
+    transaction_id?: FinTransaction
+  }
+}
+
+/** Arquivo de extrato importado. */
+export interface FinBankImport extends BaseRecord {
+  account_id: string
+  file_name?: string
+  start_date?: string
+  end_date?: string
+  balance_cents?: number
+  balance_date?: string
+  has_balance?: boolean
+  lines_created?: number
+  lines_skipped?: number
+  imported_by_name?: string
 }
