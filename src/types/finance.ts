@@ -76,6 +76,8 @@ export interface FinTransaction extends BaseRecord {
   to_account_id?: string
   /** Contagem do culto que gerou o lançamento. */
   count_id?: string
+  /** Conta a pagar ou a receber que o lançamento quitou. */
+  bill_id?: string
   category_id?: string
   cost_center_id?: string
   payment_method?: FinPaymentMethod | ''
@@ -127,5 +129,50 @@ export interface FinCount extends BaseRecord {
   expand?: {
     account_id?: FinAccount
     event_id?: { id: string; title: string; date: string }
+  }
+}
+
+export type FinBillKind = 'PAGAR' | 'RECEBER'
+export type FinBillStatus = 'ABERTO' | 'PAGO' | 'CANCELADO'
+export type FinBillDocumentType =
+  | 'BOLETO'
+  | 'NOTA_FISCAL'
+  | 'RECIBO'
+  | 'FATURA'
+  | 'CONTRATO'
+  | 'OUTRO'
+
+/** Conta a pagar (fornecedor) ou a receber (pessoa), com vencimento. A baixa gera o lançamento. */
+export interface FinBill extends BaseRecord {
+  kind: FinBillKind
+  description: string
+  amount_cents: number
+  due_date: string
+  issue_date?: string
+  category_id?: string
+  cost_center_id?: string
+  supplier_id?: string
+  person_id?: string
+  /** Conta prevista para pagar ou receber. */
+  account_id?: string
+  document_type?: FinBillDocumentType | ''
+  document_number?: string
+  attachment?: string
+  notes?: string
+  /** Contas criadas juntas pela repetição mensal dividem o mesmo grupo. */
+  recurrence_group?: string
+  installment?: number
+  installments?: number
+  status: FinBillStatus
+  paid_at?: string
+  paid_amount_cents?: number
+  paid_account_id?: string
+  transaction_id?: string
+  expand?: {
+    category_id?: FinCategory
+    supplier_id?: FinSupplier
+    person_id?: Person
+    account_id?: FinAccount
+    paid_account_id?: FinAccount
   }
 }

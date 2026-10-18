@@ -75,6 +75,7 @@ function detail(tx: FinTransaction) {
     parts.push(tx.description)
   if (tx.expand?.event_id) parts.push(tx.expand.event_id.title)
   if (tx.count_id) parts.push('contagem do culto')
+  if (tx.bill_id) parts.push(tx.type === 'SAIDA' ? 'conta a pagar' : 'conta a receber')
   return parts.filter(Boolean).join(' · ')
 }
 
@@ -152,7 +153,9 @@ export default function FinanceTransactions() {
     await voidTransaction(voiding.id, voidReason.trim())
     toast({
       title: 'Lançamento estornado',
-      description: 'Ele continua no histórico, fora dos saldos.',
+      description: voiding.bill_id
+        ? 'Ele sai dos saldos e a conta volta para em aberto.'
+        : 'Ele continua no histórico, fora dos saldos.',
     })
     load()
   }

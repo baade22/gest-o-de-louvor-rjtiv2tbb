@@ -2,9 +2,11 @@
 // (migração 0035); aqui só montamos as consultas.
 
 import pb from '@/lib/pocketbase/client'
-import { DEFAULT_CATEGORIES, monthRange } from '@/lib/financeSummary'
+import { DEFAULT_CATEGORIES, addMonthsToDate, monthRange } from '@/lib/financeSummary'
 import type {
   FinAccount,
+  FinBill,
+  FinBillKind,
   FinCategory,
   FinCount,
   FinCountEnvelope,
@@ -207,4 +209,114 @@ export async function approveCount(id: string) {
     method: 'POST',
     body: { count_id: id },
   })
+}
+
+// ---- Contas a pagar e a receber ----
+
+const BILL_EXPAND = 'category_id,supplier_id,person_id,account_id,paid_account_id'
+
+/** Todas as contas de um tipo (em aberto de qualquer data e o histórico recente). */
+export async function listBills(churchId: string, kind?: FinBillKind) {
+  return pb.collection('fin_bills').getFullList<FinBill>({
+    filter: kind
+      ? pb.filter('church_id = {:churchId} && kind = {:kind}', { churchId, kind })
+      : byChurch(churchId),
+    sort: 'due_date,created',
+    expand: BILL_EXPAND,
+  })
+}
+
+/** Contas em aberto, só com o que o painel precisa. */
+export async function listOpenBills(churchId: string) {
+  return pb.collection('fin_bills').getFullList<FinBill>({
+    filter: pb.filter("church_id = {:churchId} && status = 'ABERTO'", { churchId }),
+    fields: 'id,kind,description,amount_cents,due_date,status',
+    sort: 'due_date',
+  })
+}
+
+export interface BillInput {
+  kind: FinBillKind
+  description: string
+  amount_cents: number
+  due_date: string // YYYY-MM-DD
+  issue_date?: string // YYYY-MM-DD
+  category_id?: string
+  cost_center_id?: string
+  supplier_id?: string
+  person_id?: string
+  account_id?: string
+  document_type?: string
+  document_number?: string
+  notes?: string
+  attachment?: File | null
+}
+
+function billForm(input: BillInput, extra: Record<string, string | number> = {}) {
+  const form = new FormData()
+  const { attachment, due_date, issue_date, ...rest } = input
+  form.append('due_date', toPbDate(due_date))
+  form.append('issue_date', issue_date ? toPbDate(issue_date) : '')
+  for (const [key, value] of Object.entries({ ...rest, ...extra })) {
+    if (value === undefined || value === null) continue
+    form.append(key, String(value))
+  }
+  if (attachment) form.append('attachment', attachment)
+  return form
+}
+
+/**
+ * Cria a conta. Com `repeat` > 1, cria uma por mês com o mesmo dia de vencimento (1/12, 2/12...);
+ * o anexo fica só na primeira.
+ */
+export async function createBills(churchId: string, input: BillInput, repeat = 1) {
+  const times = Math.max(1, Math.min(60, Math.floor(repeat)))
+  const group =
+    times > 1 ? `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` : ''
+  const created: FinBill[] = []
+  for (let i = 0; i < times; i++) {
+    const form = billForm(
+      {
+        ...input,
+        due_date: addMonthsToDate(input.due_date, i),
+        attachment: i === 0 ? input.attachment : null,
+      },
+      {
+        church_id: churchId,
+        status: 'ABERTO',
+        ...(group ? { recurrence_group: group, installment: i + 1, installments: times } : {}),
+      },
+    )
+    created.push(await pb.collection('fin_bills').create<FinBill>(form))
+  }
+  return created
+}
+
+export async function updateBill(id: string, input: BillInput) {
+  return pb.collection('fin_bills').update<FinBill>(id, billForm(input))
+}
+
+/** Cancelar não apaga: a conta sai das pendências e fica no histórico. */
+export async function cancelBill(id: string) {
+  return pb.collection('fin_bills').update<FinBill>(id, { status: 'CANCELADO' })
+}
+
+export interface SettleInput {
+  date: string // YYYY-MM-DD
+  account_id: string
+  amount_cents: number
+  payment_method: string
+}
+
+/** Baixa: o servidor cria o lançamento e marca a conta como paga, numa transação só. */
+export async function settleBill(id: string, input: SettleInput) {
+  return pb.send('/backend/v1/finance/bills/settle', {
+    method: 'POST',
+    body: { bill_id: id, ...input },
+  })
+}
+
+export async function openBillAttachment(bill: FinBill) {
+  const token = await pb.files.getToken()
+  window.open(pb.files.getURL(bill, bill.attachment || '', { token }), '_blank', 'noopener')
 }

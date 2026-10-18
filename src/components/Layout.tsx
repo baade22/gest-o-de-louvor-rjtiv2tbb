@@ -29,6 +29,7 @@ import {
   ArrowLeftRight,
   FolderCog,
   HandCoins,
+  CalendarClock,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -158,6 +159,12 @@ export default function Layout() {
           to: '/financeiro/contagem',
           label: 'Contagem do culto',
           icon: HandCoins,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/contas',
+          label: 'Contas a pagar e receber',
+          icon: CalendarClock,
           allowed: canSeeFinance,
         },
         {

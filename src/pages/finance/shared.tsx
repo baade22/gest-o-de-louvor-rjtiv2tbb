@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import type { FinAccountKind, FinPaymentMethod } from '@/types/finance'
+import type { FinAccountKind, FinBillDocumentType, FinPaymentMethod } from '@/types/finance'
 
 /**
  * Quem vê o Financeiro: MASTER, ADMIN e quem tem a função FINANCEIRO.
@@ -42,6 +42,15 @@ export const PAYMENT_METHOD_LABELS: Record<FinPaymentMethod, string> = {
   TRANSFERENCIA: 'Transferência',
   BOLETO: 'Boleto',
   CHEQUE: 'Cheque',
+  OUTRO: 'Outro',
+}
+
+export const DOCUMENT_TYPE_LABELS: Record<FinBillDocumentType, string> = {
+  BOLETO: 'Boleto',
+  NOTA_FISCAL: 'Nota fiscal',
+  RECIBO: 'Recibo',
+  FATURA: 'Fatura',
+  CONTRATO: 'Contrato',
   OUTRO: 'Outro',
 }
 

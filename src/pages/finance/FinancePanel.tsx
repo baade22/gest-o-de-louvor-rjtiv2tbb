@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownLeft,
+  AlertTriangle,
   ArrowUpRight,
   Banknote,
+  CalendarClock,
   ChevronRight,
   Landmark,
   PiggyBank,
@@ -18,14 +20,22 @@ import { formatCents } from '@/lib/money'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
 import {
   accountBalances,
+  billTotals,
   contributorStats,
+  daysBetween,
   monthOf,
   monthlySeries,
   onlyAccounts,
   periodTotals,
 } from '@/lib/financeSummary'
-import { listAccounts, listCategories, listLedger } from '@/services/finance'
-import type { FinAccount, FinAccountKind, FinCategory, FinTransaction } from '@/types/finance'
+import { listAccounts, listCategories, listLedger, listOpenBills } from '@/services/finance'
+import type {
+  FinAccount,
+  FinAccountKind,
+  FinBill,
+  FinCategory,
+  FinTransaction,
+} from '@/types/finance'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -43,6 +53,7 @@ import {
   monthLabel,
   monthShort,
   primaryButtonClass,
+  shortDate,
   useFinanceAccess,
 } from './shared'
 
@@ -90,6 +101,7 @@ export default function FinancePanel() {
   const [accounts, setAccounts] = useState<FinAccount[]>([])
   const [categories, setCategories] = useState<FinCategory[]>([])
   const [ledger, setLedger] = useState<FinTransaction[]>([])
+  const [openBills, setOpenBills] = useState<FinBill[]>([])
   const [loading, setLoading] = useState(true)
   // '' = todas as congregações
   const [congregation, setCongregation] = useState('')
@@ -97,11 +109,18 @@ export default function FinancePanel() {
   useEffect(() => {
     if (!churchId) return
     setLoading(true)
-    Promise.all([listAccounts(churchId), listCategories(churchId), listLedger(churchId)])
-      .then(([a, c, l]) => {
+    Promise.all([
+      listAccounts(churchId),
+      listCategories(churchId),
+      listLedger(churchId),
+      // Contas a pagar e receber não podem derrubar o painel
+      listOpenBills(churchId).catch(() => [] as FinBill[]),
+    ])
+      .then(([a, c, l, b]) => {
         setAccounts(a)
         setCategories(c)
         setLedger(l)
+        setOpenBills(b)
       })
       .catch((err) => console.error('Erro ao carregar o painel financeiro:', err))
       .finally(() => setLoading(false))
@@ -136,6 +155,26 @@ export default function FinancePanel() {
     ? Math.round((totals.contributions / totals.income) * 100)
     : 0
   const visibleAccounts = scopedAccounts.filter((a) => a.is_active || balances[a.id])
+
+  const today = getLocalTodayYMD()
+  const payTotals = useMemo(
+    () =>
+      billTotals(
+        openBills.filter((b) => b.kind === 'PAGAR'),
+        today,
+      ),
+    [openBills, today],
+  )
+  const receiveTotals = useMemo(
+    () =>
+      billTotals(
+        openBills.filter((b) => b.kind === 'RECEBER'),
+        today,
+      ),
+    [openBills, today],
+  )
+  // Vencidas e as dos próximos 7 dias, das mais antigas para as mais novas
+  const upcoming = openBills.filter((b) => daysBetween(today, b.due_date) <= 7).slice(0, 6)
 
   const needsSetup = !loading && (accounts.length === 0 || categories.length === 0)
 
@@ -252,6 +291,78 @@ export default function FinancePanel() {
               totals.income ? `Dízimos e ofertas: ${contributionShare}% das entradas` : undefined
             }
           />
+        </div>
+      )}
+
+      {!loading && openBills.length > 0 && (
+        <div className={cn(cardClass, 'min-w-0')}>
+          <div className="flex items-center border-b border-slate-200 px-5 py-4">
+            <h3 className="font-semibold text-slate-900">Contas a pagar e receber</h3>
+            <Link
+              to="/financeiro/contas"
+              className="ml-auto flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800"
+            >
+              Ver todas <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200 border-b border-slate-200 text-sm">
+            {[
+              { label: 'A pagar', t: payTotals, to: '/financeiro/contas' },
+              { label: 'A receber', t: receiveTotals, to: '/financeiro/contas?tipo=receber' },
+            ].map(({ label, t, to }) => (
+              <Link key={label} to={to} className="min-w-0 px-5 py-3 hover:bg-slate-50">
+                <div className="text-xs text-slate-500">{label}, próximos 7 dias</div>
+                <div className="font-bold tabular-nums text-slate-900">
+                  {formatCents(t.next7.cents)}
+                </div>
+                {t.overdue.count > 0 && (
+                  <div className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-rose-700">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {t.overdue.count} {t.overdue.count === 1 ? 'vencida' : 'vencidas'} ·{' '}
+                      {formatCents(t.overdue.cents)}
+                    </span>
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="px-5 py-6 text-center text-sm text-slate-500">
+              Nada vence nos próximos 7 dias.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {upcoming.map((b) => {
+                const days = daysBetween(today, b.due_date)
+                return (
+                  <li key={b.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                    <CalendarClock
+                      className={cn(
+                        'h-4 w-4 shrink-0',
+                        days < 0 ? 'text-rose-600' : 'text-amber-600',
+                      )}
+                    />
+                    <span className="w-12 shrink-0 tabular-nums text-slate-500">
+                      {shortDate(b.due_date)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
+                      {b.description}
+                    </span>
+                    <span
+                      className={cn(
+                        'shrink-0 font-semibold tabular-nums',
+                        b.kind === 'PAGAR' ? 'text-rose-700' : 'text-emerald-700',
+                      )}
+                    >
+                      {b.kind === 'PAGAR' ? '− ' : ''}
+                      {formatCents(b.amount_cents)}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
       )}
 

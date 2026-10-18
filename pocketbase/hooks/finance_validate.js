@@ -1,6 +1,6 @@
 // Validação dos registros do Financeiro antes de salvar (criação e edição)
 // As regras da API só enxergam os valores antigos numa edição; aqui conferimos os valores
-// novos: tudo o que um lançamento ou uma contagem aponta precisa ser da mesma igreja, e a
+// novos: tudo o que um lançamento, uma contagem ou uma conta a pagar/receber aponta precisa ser da mesma igreja, e a
 // transferência precisa de uma conta de destino diferente da origem.
 
 onRecordValidate(
@@ -17,11 +17,21 @@ onRecordValidate(
         supplier_id: 'fin_suppliers',
         event_id: 'events',
         count_id: 'fin_counts',
+        bill_id: 'fin_bills',
       },
       fin_counts: {
         account_id: 'fin_accounts',
         offering_category_id: 'fin_categories',
         event_id: 'events',
+      },
+      fin_bills: {
+        category_id: 'fin_categories',
+        cost_center_id: 'fin_cost_centers',
+        supplier_id: 'fin_suppliers',
+        person_id: 'people',
+        account_id: 'fin_accounts',
+        paid_account_id: 'fin_accounts',
+        transaction_id: 'fin_transactions',
       },
     }[rec.collection().name]
 
@@ -59,4 +69,5 @@ onRecordValidate(
   },
   'fin_transactions',
   'fin_counts',
+  'fin_bills',
 )

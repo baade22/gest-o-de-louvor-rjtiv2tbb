@@ -130,6 +130,62 @@ export function onlyAccounts<T extends TxLike>(txs: T[], accountIds: Set<string>
   )
 }
 
+/**
+ * Mesma data N meses depois; quando o dia não existe no mês (31 em fevereiro), usa o último dia.
+ * addMonthsToDate("2026-01-31", 1) → "2026-02-28"
+ */
+export function addMonthsToDate(ymd: string, months: number): string {
+  const ym = shiftMonth(ymd.slice(0, 7), months)
+  const [y, m] = ym.split('-').map(Number)
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const day = Math.min(Number(ymd.slice(8, 10)), lastDay)
+  return `${ym}-${String(day).padStart(2, '0')}`
+}
+
+/** Diferença em dias entre duas datas de calendário (b − a). */
+export function daysBetween(a: string, b: string): number {
+  const toUtc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))
+  return Math.round((toUtc(b.slice(0, 10)) - toUtc(a.slice(0, 10))) / 86400000)
+}
+
+interface BillLike {
+  amount_cents: number
+  due_date: string
+  status: string
+  paid_at?: string
+  paid_amount_cents?: number
+}
+
+export interface BillTotals {
+  overdue: { count: number; cents: number }
+  next7: { count: number; cents: number }
+  /** Em aberto que vencem no mês de `today` (inclui as vencidas deste mês). */
+  openMonth: { count: number; cents: number }
+  paidMonth: { count: number; cents: number }
+}
+
+/** Resumo das contas a pagar (ou a receber) para os cartões: vencidas, próximos 7 dias, mês. */
+export function billTotals(bills: BillLike[], today: string): BillTotals {
+  const zero = () => ({ count: 0, cents: 0 })
+  const out: BillTotals = { overdue: zero(), next7: zero(), openMonth: zero(), paidMonth: zero() }
+  const add = (b: { count: number; cents: number }, cents: number) => {
+    b.count += 1
+    b.cents += cents
+  }
+  const month = today.slice(0, 7)
+  for (const bill of bills) {
+    if (bill.status === 'ABERTO') {
+      const days = daysBetween(today, bill.due_date)
+      if (days < 0) add(out.overdue, bill.amount_cents)
+      else if (days <= 7) add(out.next7, bill.amount_cents)
+      if (monthOf(bill.due_date) === month) add(out.openMonth, bill.amount_cents)
+    } else if (bill.status === 'PAGO' && monthOf(bill.paid_at || '') === month) {
+      add(out.paidMonth, bill.paid_amount_cents || bill.amount_cents)
+    }
+  }
+  return out
+}
+
 /** Plano de contas sugerido para uma igreja que está começando. */
 export const DEFAULT_CATEGORIES: {
   name: string

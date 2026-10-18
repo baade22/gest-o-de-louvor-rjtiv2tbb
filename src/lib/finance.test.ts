@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { formatCents, parseMoneyToCents, centsToInput } from './money'
 import {
   accountBalances,
+  addMonthsToDate,
+  billTotals,
+  daysBetween,
   contributorStats,
   monthRange,
   onlyAccounts,
@@ -188,5 +191,42 @@ describe('transferências e contribuintes', () => {
   it('filtra por conta, mantendo transferências que tocam a conta', () => {
     expect(onlyAccounts(txs, new Set(['banco'])).length).toBe(2)
     expect(onlyAccounts(txs, null).length).toBe(5)
+  })
+})
+
+describe('contas a pagar e receber', () => {
+  it('repete a data mês a mês sem pular fim de mês', () => {
+    expect(addMonthsToDate('2026-01-31', 1)).toBe('2026-02-28')
+    expect(addMonthsToDate('2026-11-10', 2)).toBe('2027-01-10')
+    expect(addMonthsToDate('2028-01-31', 1)).toBe('2028-02-29')
+  })
+
+  it('conta dias entre datas', () => {
+    expect(daysBetween('2026-10-18', '2026-10-25 12:00:00.000Z')).toBe(7)
+    expect(daysBetween('2026-10-18', '2026-10-17')).toBe(-1)
+  })
+
+  it('separa vencidas, próximos 7 dias e pagas no mês', () => {
+    const t = billTotals(
+      [
+        { amount_cents: 100, due_date: '2026-10-10', status: 'ABERTO' },
+        { amount_cents: 200, due_date: '2026-10-25', status: 'ABERTO' },
+        { amount_cents: 400, due_date: '2026-10-30', status: 'ABERTO' },
+        { amount_cents: 800, due_date: '2026-09-30', status: 'ABERTO' },
+        {
+          amount_cents: 1000,
+          due_date: '2026-10-05',
+          status: 'PAGO',
+          paid_at: '2026-10-04',
+          paid_amount_cents: 990,
+        },
+        { amount_cents: 5000, due_date: '2026-10-19', status: 'CANCELADO' },
+      ],
+      '2026-10-18',
+    )
+    expect(t.overdue).toEqual({ count: 2, cents: 900 })
+    expect(t.next7).toEqual({ count: 1, cents: 200 })
+    expect(t.openMonth).toEqual({ count: 3, cents: 700 })
+    expect(t.paidMonth).toEqual({ count: 1, cents: 990 })
   })
 })
