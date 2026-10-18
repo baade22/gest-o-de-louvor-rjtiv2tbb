@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-18T23:01:16.099Z",
+  "generatedAt": "2026-10-18T23:28:50.606Z",
   "collections": [
     {
       "name": "users",
@@ -53,8 +53,8 @@
       "name": "churches",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
         "create": null,
         "update": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
         "delete": null
