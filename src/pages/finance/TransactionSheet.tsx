@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, EyeOff, Loader2, Paperclip, UserRound, X } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  EyeOff,
+  Loader2,
+  Paperclip,
+  UserRound,
+  X,
+} from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -32,9 +41,9 @@ import type {
   FinAccount,
   FinCategory,
   FinCostCenter,
-  FinDirection,
   FinSupplier,
   FinTransaction,
+  FinTransactionType,
   Person,
 } from '@/types/finance'
 import { PAYMENT_METHOD_LABELS, SearchPicker, errorMessage, shortDate } from './shared'
@@ -62,15 +71,25 @@ interface Props {
 
 const NONE = '__none__'
 
-const emptyForm = (type: FinDirection = 'ENTRADA') => ({
+const defaultMethod = (type: FinTransactionType) =>
+  type === 'ENTRADA' ? 'DINHEIRO' : type === 'SAIDA' ? 'PIX' : 'TRANSFERENCIA'
+
+const TYPE_OPTIONS = [
+  { type: 'ENTRADA', label: 'Entrada', icon: ArrowDownLeft, tone: 'text-emerald-700' },
+  { type: 'SAIDA', label: 'Saída', icon: ArrowUpRight, tone: 'text-rose-700' },
+  { type: 'TRANSFERENCIA', label: 'Transferência', icon: ArrowLeftRight, tone: 'text-indigo-700' },
+] as const
+
+const emptyForm = (type: FinTransactionType = 'ENTRADA') => ({
   type,
   date: getLocalTodayYMD(),
   amount: '',
   description: '',
   account_id: '',
+  to_account_id: '',
   category_id: '',
   cost_center_id: '',
-  payment_method: type === 'ENTRADA' ? 'DINHEIRO' : 'PIX',
+  payment_method: defaultMethod(type),
   person_id: '',
   is_anonymous: false,
   supplier_id: '',
@@ -107,6 +126,7 @@ export function TransactionSheet({
         amount: centsToInput(editing.amount_cents),
         description: editing.description || '',
         account_id: editing.account_id,
+        to_account_id: editing.to_account_id || '',
         category_id: editing.category_id || '',
         cost_center_id: editing.cost_center_id || '',
         payment_method: editing.payment_method || '',
@@ -133,19 +153,21 @@ export function TransactionSheet({
     [lookups.categories, form.type, form.category_id],
   )
   const category = lookups.categories.find((c) => c.id === form.category_id)
+  const isTransfer = form.type === 'TRANSFERENCIA'
   const isContribution = form.type === 'ENTRADA' && Boolean(category?.is_contribution)
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
 
-  const switchType = (type: FinDirection) => {
+  const switchType = (type: FinTransactionType) => {
     if (type === form.type) return
     set({
       type,
       category_id: '',
+      to_account_id: '',
       person_id: '',
       is_anonymous: false,
       supplier_id: '',
-      payment_method: type === 'ENTRADA' ? 'DINHEIRO' : 'PIX',
+      payment_method: defaultMethod(type),
     })
   }
 
@@ -172,7 +194,11 @@ export function TransactionSheet({
       toast({ title: 'Escolha a conta', variant: 'destructive' })
       return
     }
-    if (!form.category_id) {
+    if (isTransfer && (!form.to_account_id || form.to_account_id === form.account_id)) {
+      toast({ title: 'Escolha a conta de destino', variant: 'destructive' })
+      return
+    }
+    if (!isTransfer && !form.category_id) {
       toast({ title: 'Escolha a categoria', variant: 'destructive' })
       return
     }
@@ -191,13 +217,14 @@ export function TransactionSheet({
       amount_cents: cents,
       description: form.description.trim(),
       account_id: form.account_id,
-      category_id: form.category_id,
-      cost_center_id: form.cost_center_id,
+      to_account_id: isTransfer ? form.to_account_id : '',
+      category_id: isTransfer ? '' : form.category_id,
+      cost_center_id: isTransfer ? '' : form.cost_center_id,
       payment_method: form.payment_method,
       person_id: isContribution && !form.is_anonymous ? form.person_id : '',
       is_anonymous: isContribution && form.is_anonymous,
       supplier_id: form.type === 'SAIDA' ? form.supplier_id : '',
-      event_id: form.event_id,
+      event_id: isTransfer ? '' : form.event_id,
       notes: form.notes.trim(),
       attachment: file,
     }
@@ -244,31 +271,28 @@ export function TransactionSheet({
           <SheetDescription>
             {editing
               ? `Lançado em ${shortDate(editing.created, true)}`
-              : 'Entrada ou saída de dinheiro.'}
+              : 'Entrada, saída ou transferência entre contas.'}
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={(e) => handleSave(e)} className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-            {(['ENTRADA', 'SAIDA'] as const).map((t) => (
+          <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+            {TYPE_OPTIONS.map(({ type, label, icon: Icon, tone }) => (
               <button
-                key={t}
+                key={type}
                 type="button"
-                onClick={() => switchType(t)}
+                // Lançamento de um tipo não vira transferência (e vice-versa) na edição
+                disabled={
+                  !!editing && (type === 'TRANSFERENCIA') !== (editing.type === 'TRANSFERENCIA')
+                }
+                onClick={() => switchType(type)}
                 className={cn(
-                  'flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-colors',
-                  form.type === t
-                    ? 'bg-white shadow-xs ' +
-                        (t === 'ENTRADA' ? 'text-emerald-700' : 'text-rose-700')
-                    : 'text-slate-500',
+                  'flex items-center justify-center gap-1.5 rounded-md py-2 text-[13px] font-semibold transition-colors disabled:opacity-40',
+                  form.type === type ? 'bg-white shadow-xs ' + tone : 'text-slate-500',
                 )}
               >
-                {t === 'ENTRADA' ? (
-                  <ArrowDownLeft className="h-4 w-4" />
-                ) : (
-                  <ArrowUpRight className="h-4 w-4" />
-                )}
-                {t === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                <Icon className="h-4 w-4" />
+                {label}
               </button>
             ))}
           </div>
@@ -302,27 +326,67 @@ export function TransactionSheet({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className={fieldLabel}>Categoria</Label>
-            <Select value={form.category_id} onValueChange={(v) => set({ category_id: v })}>
-              <SelectTrigger className="h-10 rounded-lg">
-                <SelectValue placeholder="Escolha a categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {categories.length === 0 && (
-              <p className="text-xs text-amber-700">
-                Nenhuma categoria de {form.type === 'ENTRADA' ? 'entrada' : 'saída'}. Cadastre em
-                Cadastros.
+          {isTransfer ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className={fieldLabel}>Sai da conta</Label>
+                <Select value={form.account_id} onValueChange={(v) => set({ account_id: v })}>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue placeholder="Origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className={fieldLabel}>Vai para a conta</Label>
+                <Select value={form.to_account_id} onValueChange={(v) => set({ to_account_id: v })}>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue placeholder="Destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeAccounts
+                      .filter((a) => a.id !== form.account_id)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="col-span-2 text-xs text-slate-500">
+                Ex.: depósito do dinheiro do caixa no banco. Não conta como entrada nem saída.
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label className={fieldLabel}>Categoria</Label>
+              <Select value={form.category_id} onValueChange={(v) => set({ category_id: v })}>
+                <SelectTrigger className="h-10 rounded-lg">
+                  <SelectValue placeholder="Escolha a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categories.length === 0 && (
+                <p className="text-xs text-amber-700">
+                  Nenhuma categoria de {form.type === 'ENTRADA' ? 'entrada' : 'saída'}. Cadastre em
+                  Cadastros.
+                </p>
+              )}
+            </div>
+          )}
 
           {isContribution && (
             <div className="space-y-2 rounded-xl border border-teal-100 bg-teal-50/50 p-3">
@@ -380,88 +444,92 @@ export function TransactionSheet({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className={fieldLabel}>
-                {form.type === 'ENTRADA' ? 'Entrou na conta' : 'Saiu da conta'}
-              </Label>
-              <Select value={form.account_id} onValueChange={(v) => set({ account_id: v })}>
-                <SelectTrigger className="h-10 rounded-lg">
-                  <SelectValue placeholder="Conta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className={fieldLabel}>Forma</Label>
-              <Select
-                value={form.payment_method || NONE}
-                onValueChange={(v) => set({ payment_method: v === NONE ? '' : v })}
-              >
-                <SelectTrigger className="h-10 rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Não informar</SelectItem>
-                  {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className={cn('grid gap-3', activeCostCenters.length > 1 && 'grid-cols-2')}>
-            <div className="space-y-1.5">
-              <Label className={fieldLabel}>Culto (opcional)</Label>
-              <Select
-                value={form.event_id || NONE}
-                onValueChange={(v) => set({ event_id: v === NONE ? '' : v })}
-              >
-                <SelectTrigger className="h-10 rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Nenhum</SelectItem>
-                  {lookups.events.map((ev) => (
-                    <SelectItem key={ev.id} value={ev.id}>
-                      {shortDate(ev.date)} · {ev.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Centro de custo só aparece quando a igreja usa mais de um */}
-            {activeCostCenters.length > 1 && (
+          {!isTransfer && (
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className={fieldLabel}>Centro de custo</Label>
-                <Select
-                  value={form.cost_center_id || NONE}
-                  onValueChange={(v) => set({ cost_center_id: v === NONE ? '' : v })}
-                >
+                <Label className={fieldLabel}>
+                  {form.type === 'ENTRADA' ? 'Entrou na conta' : 'Saiu da conta'}
+                </Label>
+                <Select value={form.account_id} onValueChange={(v) => set({ account_id: v })}>
                   <SelectTrigger className="h-10 rounded-lg">
-                    <SelectValue />
+                    <SelectValue placeholder="Conta" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>Geral</SelectItem>
-                    {activeCostCenters.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
+                    {activeAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-          </div>
+              <div className="space-y-1.5">
+                <Label className={fieldLabel}>Forma</Label>
+                <Select
+                  value={form.payment_method || NONE}
+                  onValueChange={(v) => set({ payment_method: v === NONE ? '' : v })}
+                >
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Não informar</SelectItem>
+                    {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {!isTransfer && (
+            <div className={cn('grid gap-3', activeCostCenters.length > 1 && 'grid-cols-2')}>
+              <div className="space-y-1.5">
+                <Label className={fieldLabel}>Culto (opcional)</Label>
+                <Select
+                  value={form.event_id || NONE}
+                  onValueChange={(v) => set({ event_id: v === NONE ? '' : v })}
+                >
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Nenhum</SelectItem>
+                    {lookups.events.map((ev) => (
+                      <SelectItem key={ev.id} value={ev.id}>
+                        {shortDate(ev.date)} · {ev.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Centro de custo só aparece quando a igreja usa mais de um */}
+              {activeCostCenters.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className={fieldLabel}>Centro de custo</Label>
+                  <Select
+                    value={form.cost_center_id || NONE}
+                    onValueChange={(v) => set({ cost_center_id: v === NONE ? '' : v })}
+                  >
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Geral</SelectItem>
+                      {activeCostCenters.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="fin-desc" className={fieldLabel}>
@@ -473,7 +541,9 @@ export function TransactionSheet({
               placeholder={
                 form.type === 'ENTRADA'
                   ? 'Ex.: Oferta do culto de domingo'
-                  : 'Ex.: Conta de luz de outubro'
+                  : isTransfer
+                    ? 'Ex.: Depósito do caixa'
+                    : 'Ex.: Conta de luz de outubro'
               }
               value={form.description}
               onChange={(e) => set({ description: e.target.value })}

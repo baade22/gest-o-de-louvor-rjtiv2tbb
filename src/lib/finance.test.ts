@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { formatCents, parseMoneyToCents, centsToInput } from './money'
 import {
   accountBalances,
+  contributorStats,
   monthRange,
+  onlyAccounts,
   monthlySeries,
   periodTotals,
   shiftMonth,
@@ -102,5 +104,89 @@ describe('saldos e totais', () => {
       { month: '2026-09', income: 100, expense: 0 },
       { month: '2026-10', income: 0, expense: 40 },
     ])
+  })
+})
+
+describe('transferências e contribuintes', () => {
+  const d = '2026-10-12 12:00:00.000Z'
+  const txs = [
+    {
+      type: 'ENTRADA' as const,
+      amount_cents: 1000,
+      account_id: 'caixa',
+      status: 'CONFIRMADO' as const,
+      date: d,
+      category_id: 'diz',
+      person_id: 'joao',
+    },
+    {
+      type: 'ENTRADA' as const,
+      amount_cents: 500,
+      account_id: 'caixa',
+      status: 'CONFIRMADO' as const,
+      date: d,
+      category_id: 'diz',
+      person_id: 'joao',
+    },
+    {
+      type: 'ENTRADA' as const,
+      amount_cents: 300,
+      account_id: 'caixa',
+      status: 'CONFIRMADO' as const,
+      date: d,
+      category_id: 'ofe',
+      is_anonymous: true,
+    },
+    {
+      type: 'TRANSFERENCIA' as const,
+      amount_cents: 800,
+      account_id: 'caixa',
+      to_account_id: 'banco',
+      status: 'CONFIRMADO' as const,
+      date: d,
+    },
+    {
+      type: 'TRANSFERENCIA' as const,
+      amount_cents: 99,
+      account_id: 'caixa',
+      to_account_id: 'banco',
+      status: 'ESTORNADO' as const,
+      date: d,
+    },
+  ]
+  const categories = [
+    { id: 'diz', is_contribution: true },
+    { id: 'ofe', is_contribution: true },
+  ]
+
+  it('transferência tira de uma conta e põe na outra', () => {
+    const balances = accountBalances(
+      [
+        { id: 'caixa', opening_balance_cents: 0 },
+        { id: 'banco', opening_balance_cents: 100 },
+      ],
+      txs,
+    )
+    expect(balances).toEqual({ caixa: 1000, banco: 900 })
+  })
+
+  it('transferência não conta como entrada nem saída', () => {
+    const t = periodTotals(txs, categories)
+    expect(t.income).toBe(1800)
+    expect(t.expense).toBe(0)
+    expect(monthlySeries(txs, '2026-10', 1)[0]).toEqual({
+      month: '2026-10',
+      income: 1800,
+      expense: 0,
+    })
+  })
+
+  it('conta contribuintes com nome uma vez e anônimos por contribuição', () => {
+    expect(contributorStats(txs, categories)).toEqual({ named: 1, anonymous: 1 })
+  })
+
+  it('filtra por conta, mantendo transferências que tocam a conta', () => {
+    expect(onlyAccounts(txs, new Set(['banco'])).length).toBe(2)
+    expect(onlyAccounts(txs, null).length).toBe(5)
   })
 })

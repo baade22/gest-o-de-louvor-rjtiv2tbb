@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   EyeOff,
   MoreHorizontal,
@@ -43,17 +44,19 @@ import {
   useFinanceAccess,
 } from './shared'
 
-type Filter = 'TODOS' | 'ENTRADA' | 'SAIDA' | 'CONTRIBUICAO'
+type Filter = 'TODOS' | 'ENTRADA' | 'SAIDA' | 'TRANSFERENCIA' | 'CONTRIBUICAO'
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'TODOS', label: 'Todos' },
   { value: 'ENTRADA', label: 'Entradas' },
   { value: 'SAIDA', label: 'Saídas' },
+  { value: 'TRANSFERENCIA', label: 'Transferências' },
   { value: 'CONTRIBUICAO', label: 'Dízimos e ofertas' },
 ]
 
 /** Quem ou o quê: pessoa, anônimo, fornecedor ou descrição. */
 function counterpart(tx: FinTransaction) {
+  if (tx.type === 'TRANSFERENCIA') return tx.description || 'Transferência entre contas'
   if (tx.is_anonymous) return 'Anônimo'
   return (
     tx.expand?.person_id?.name ||
@@ -65,10 +68,13 @@ function counterpart(tx: FinTransaction) {
 }
 
 function detail(tx: FinTransaction) {
+  if (tx.type === 'TRANSFERENCIA')
+    return `${tx.expand?.account_id?.name || 'Conta'} → ${tx.expand?.to_account_id?.name || 'Conta'}`
   const parts = [tx.expand?.category_id?.name]
   if ((tx.is_anonymous || tx.person_id || tx.supplier_id) && tx.description)
     parts.push(tx.description)
   if (tx.expand?.event_id) parts.push(tx.expand.event_id.title)
+  if (tx.count_id) parts.push('contagem do culto')
   return parts.filter(Boolean).join(' · ')
 }
 
@@ -122,6 +128,7 @@ export default function FinanceTransactions() {
     return txs.filter((tx) => {
       if (filter === 'ENTRADA' && tx.type !== 'ENTRADA') return false
       if (filter === 'SAIDA' && tx.type !== 'SAIDA') return false
+      if (filter === 'TRANSFERENCIA' && tx.type !== 'TRANSFERENCIA') return false
       if (filter === 'CONTRIBUICAO' && !tx.expand?.category_id?.is_contribution) return false
       if (!term) return true
       return `${counterpart(tx)} ${detail(tx)} ${tx.expand?.account_id?.name || ''}`
@@ -152,7 +159,10 @@ export default function FinanceTransactions() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Lançamentos" subtitle="Entradas e saídas de todas as contas">
+      <PageHeader
+        title="Lançamentos"
+        subtitle="Entradas, saídas e transferências de todas as contas"
+      >
         <MonthSwitcher value={month} onChange={setMonth} />
         {canEdit && (
           <Button onClick={openNew} className={primaryButtonClass}>
@@ -214,6 +224,8 @@ export default function FinanceTransactions() {
             {visible.map((tx) => {
               const voided = tx.status === 'ESTORNADO'
               const isIn = tx.type === 'ENTRADA'
+              const isTransfer = tx.type === 'TRANSFERENCIA'
+              const Icon = isIn ? ArrowDownLeft : isTransfer ? ArrowLeftRight : ArrowUpRight
               return (
                 <li
                   key={tx.id}
@@ -222,14 +234,14 @@ export default function FinanceTransactions() {
                   <div
                     className={cn(
                       'grid h-9 w-9 shrink-0 place-items-center rounded-lg',
-                      isIn ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700',
+                      isIn
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : isTransfer
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'bg-rose-50 text-rose-700',
                     )}
                   >
-                    {isIn ? (
-                      <ArrowDownLeft className="h-4 w-4" />
-                    ) : (
-                      <ArrowUpRight className="h-4 w-4" />
-                    )}
+                    <Icon className="h-4 w-4" />
                   </div>
                   <div className="w-12 shrink-0 text-sm tabular-nums text-slate-500">
                     {shortDate(tx.date)}
@@ -263,10 +275,12 @@ export default function FinanceTransactions() {
                         ? 'text-slate-400 line-through'
                         : isIn
                           ? 'text-emerald-700'
-                          : 'text-rose-700',
+                          : isTransfer
+                            ? 'text-slate-700'
+                            : 'text-rose-700',
                     )}
                   >
-                    {isIn ? '' : '− '}
+                    {isIn || isTransfer ? '' : '− '}
                     {formatCents(tx.amount_cents)}
                   </div>
                   <DropdownMenu>

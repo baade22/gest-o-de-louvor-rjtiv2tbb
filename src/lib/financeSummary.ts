@@ -4,12 +4,12 @@
 import type { FinAccount, FinCategory, FinDirection, FinTransaction } from '@/types/finance'
 
 type TxLike = Pick<FinTransaction, 'type' | 'amount_cents' | 'account_id' | 'status' | 'date'> &
-  Partial<Pick<FinTransaction, 'category_id' | 'is_anonymous'>>
+  Partial<Pick<FinTransaction, 'category_id' | 'is_anonymous' | 'person_id' | 'to_account_id'>>
 
 const counts = (tx: TxLike) => tx.status !== 'ESTORNADO'
 const signed = (tx: TxLike) => (tx.type === 'SAIDA' ? -tx.amount_cents : tx.amount_cents)
 
-/** Saldo de cada conta = saldo inicial + entradas - saídas. */
+/** Saldo de cada conta = saldo inicial + entradas - saídas ± transferências. */
 export function accountBalances(
   accounts: Pick<FinAccount, 'id' | 'opening_balance_cents'>[],
   txs: TxLike[],
@@ -17,8 +17,14 @@ export function accountBalances(
   const balances: Record<string, number> = {}
   for (const a of accounts) balances[a.id] = a.opening_balance_cents || 0
   for (const tx of txs) {
-    if (!counts(tx) || !(tx.account_id in balances)) continue
-    balances[tx.account_id] += signed(tx)
+    if (!counts(tx)) continue
+    if (tx.type === 'TRANSFERENCIA') {
+      if (tx.account_id in balances) balances[tx.account_id] -= tx.amount_cents
+      if (tx.to_account_id && tx.to_account_id in balances)
+        balances[tx.to_account_id] += tx.amount_cents
+      continue
+    }
+    if (tx.account_id in balances) balances[tx.account_id] += signed(tx)
   }
   return balances
 }
@@ -63,7 +69,7 @@ export function periodTotals(
         totals.contributions += tx.amount_cents
         if (tx.is_anonymous) totals.anonymous += tx.amount_cents
       }
-    } else {
+    } else if (tx.type === 'SAIDA') {
       totals.expense += tx.amount_cents
     }
   }
@@ -87,9 +93,41 @@ export function monthlySeries(
     const bucket = counts(tx) ? byMonth.get(monthOf(tx.date)) : undefined
     if (!bucket) continue
     if (tx.type === 'ENTRADA') bucket.income += tx.amount_cents
-    else bucket.expense += tx.amount_cents
+    else if (tx.type === 'SAIDA') bucket.expense += tx.amount_cents
   }
   return series
+}
+
+/**
+ * Contribuintes de um período: quantas pessoas diferentes contribuíram com nome e quantas
+ * contribuições vieram sem nome (cada envelope ou oferta anônima conta uma vez).
+ */
+export function contributorStats(
+  txs: TxLike[],
+  categories: Pick<FinCategory, 'id' | 'is_contribution'>[],
+): { named: number; anonymous: number } {
+  const contributionIds = new Set(categories.filter((c) => c.is_contribution).map((c) => c.id))
+  const people = new Set<string>()
+  let anonymous = 0
+  for (const tx of txs) {
+    if (!counts(tx) || tx.type !== 'ENTRADA') continue
+    if (!tx.category_id || !contributionIds.has(tx.category_id)) continue
+    if (tx.person_id) people.add(tx.person_id)
+    else if (tx.is_anonymous) anonymous++
+  }
+  return { named: people.size, anonymous }
+}
+
+/**
+ * Lançamentos que tocam as contas escolhidas (filtro por congregação). Transferência entre uma
+ * conta de dentro e uma de fora continua, porque mexe no saldo da conta de dentro.
+ */
+export function onlyAccounts<T extends TxLike>(txs: T[], accountIds: Set<string> | null): T[] {
+  if (!accountIds) return txs
+  return txs.filter(
+    (tx) =>
+      accountIds.has(tx.account_id) || (!!tx.to_account_id && accountIds.has(tx.to_account_id)),
+  )
 }
 
 /** Plano de contas sugerido para uma igreja que está começando. */

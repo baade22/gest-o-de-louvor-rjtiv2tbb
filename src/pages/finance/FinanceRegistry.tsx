@@ -88,6 +88,12 @@ const TABS: TabConfig[] = [
         type: 'select',
         options: Object.entries(ACCOUNT_KIND_LABELS).map(([value, label]) => ({ value, label })),
       },
+      {
+        key: 'congregation',
+        label: 'Congregação',
+        placeholder: 'Ex.: Aldeia',
+        hint: 'Deixe em branco se a conta é da igreja toda. O painel filtra por congregação.',
+      },
       { key: 'bank_name', label: 'Banco', placeholder: 'Ex.: Banco do Brasil' },
       { key: 'agency', label: 'Agência' },
       { key: 'account_number', label: 'Conta' },
@@ -103,6 +109,7 @@ const TABS: TabConfig[] = [
     summary: (r) =>
       [
         ACCOUNT_KIND_LABELS[r.kind as keyof typeof ACCOUNT_KIND_LABELS],
+        r.congregation,
         r.bank_name,
         r.account_number,
       ]

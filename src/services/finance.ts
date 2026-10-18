@@ -6,6 +6,8 @@ import { DEFAULT_CATEGORIES, monthRange } from '@/lib/financeSummary'
 import type {
   FinAccount,
   FinCategory,
+  FinCount,
+  FinCountEnvelope,
   FinCostCenter,
   FinSupplier,
   FinTransaction,
@@ -60,7 +62,7 @@ export async function seedDefaultCategories(churchId: string) {
 /** Data de calendário (YYYY-MM-DD) gravada ao meio-dia UTC, para não mudar de dia com o fuso. */
 export const toPbDate = (ymd: string) => `${ymd} 12:00:00.000Z`
 
-const EXPAND = 'account_id,category_id,cost_center_id,person_id,supplier_id,event_id'
+const EXPAND = 'account_id,to_account_id,category_id,cost_center_id,person_id,supplier_id,event_id'
 
 export async function listTransactionsOfMonth(churchId: string, ym: string) {
   const { start, end } = monthRange(ym)
@@ -79,7 +81,8 @@ export async function listTransactionsOfMonth(churchId: string, ym: string) {
 export async function listLedger(churchId: string) {
   return pb.collection('fin_transactions').getFullList<FinTransaction>({
     filter: byChurch(churchId),
-    fields: 'id,type,amount_cents,account_id,category_id,is_anonymous,status,date',
+    fields:
+      'id,type,amount_cents,account_id,to_account_id,category_id,person_id,is_anonymous,status,date',
     sort: 'date',
   })
 }
@@ -90,6 +93,7 @@ export interface TransactionInput {
   amount_cents: number
   description?: string
   account_id: string
+  to_account_id?: string
   category_id?: string
   cost_center_id?: string
   payment_method?: string
@@ -148,5 +152,59 @@ export async function listRecentEvents(churchId: string) {
     filter: byChurch(churchId),
     sort: '-date',
     fields: 'id,title,date',
+  })
+}
+
+// ---- Contagem do culto ----
+
+export async function listCounts(churchId: string) {
+  return pb.collection('fin_counts').getList<FinCount>(1, 60, {
+    filter: byChurch(churchId),
+    sort: '-date,-created',
+    expand: 'account_id,event_id',
+  })
+}
+
+export interface CountInput {
+  date: string // YYYY-MM-DD
+  event_id: string
+  account_id: string
+  cash_cents: number
+  offering_category_id: string
+  envelopes: FinCountEnvelope[]
+  notes: string
+}
+
+/** Quem registra a contagem fica como quem contou; a aprovação é sempre de outra pessoa. */
+export async function createCount(churchId: string, input: CountInput) {
+  return pb.collection('fin_counts').create<FinCount>({
+    ...input,
+    date: toPbDate(input.date),
+    church_id: churchId,
+    status: 'CONTADO',
+    counted_by: pb.authStore.record?.id || '',
+  })
+}
+
+/** Corrigir a contagem limpa a diferença apontada, e ela volta para conferência. */
+export async function updateCount(id: string, input: CountInput) {
+  return pb
+    .collection('fin_counts')
+    .update<FinCount>(id, { ...input, date: toPbDate(input.date), difference_note: '' })
+}
+
+export async function pointCountDifference(id: string, note: string) {
+  return pb.collection('fin_counts').update<FinCount>(id, { difference_note: note })
+}
+
+export async function cancelCount(id: string) {
+  return pb.collection('fin_counts').update<FinCount>(id, { status: 'CANCELADO' })
+}
+
+/** Aprova e cria os lançamentos (servidor, numa transação só). */
+export async function approveCount(id: string) {
+  return pb.send('/backend/v1/finance/counts/approve', {
+    method: 'POST',
+    body: { count_id: id },
   })
 }

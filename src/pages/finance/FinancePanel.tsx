@@ -16,11 +16,25 @@ import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
-import { accountBalances, monthOf, monthlySeries, periodTotals } from '@/lib/financeSummary'
+import {
+  accountBalances,
+  contributorStats,
+  monthOf,
+  monthlySeries,
+  onlyAccounts,
+  periodTotals,
+} from '@/lib/financeSummary'
 import { listAccounts, listCategories, listLedger } from '@/services/finance'
 import type { FinAccount, FinAccountKind, FinCategory, FinTransaction } from '@/types/finance'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   MonthSwitcher,
   PageHeader,
@@ -77,6 +91,8 @@ export default function FinancePanel() {
   const [categories, setCategories] = useState<FinCategory[]>([])
   const [ledger, setLedger] = useState<FinTransaction[]>([])
   const [loading, setLoading] = useState(true)
+  // '' = todas as congregações
+  const [congregation, setCongregation] = useState('')
 
   useEffect(() => {
     if (!churchId) return
@@ -91,16 +107,35 @@ export default function FinancePanel() {
       .finally(() => setLoading(false))
   }, [churchId])
 
-  const balances = useMemo(() => accountBalances(accounts, ledger), [accounts, ledger])
+  const congregations = useMemo(
+    () => [...new Set(accounts.map((a) => (a.congregation || '').trim()).filter(Boolean))].sort(),
+    [accounts],
+  )
+  const scopedAccounts = useMemo(
+    () =>
+      congregation
+        ? accounts.filter((a) => (a.congregation || '').trim() === congregation)
+        : accounts,
+    [accounts, congregation],
+  )
+  const scopedLedger = useMemo(
+    () => onlyAccounts(ledger, congregation ? new Set(scopedAccounts.map((a) => a.id)) : null),
+    [ledger, scopedAccounts, congregation],
+  )
+  const balances = useMemo(() => accountBalances(scopedAccounts, ledger), [scopedAccounts, ledger])
   const total = Object.values(balances).reduce((sum, v) => sum + v, 0)
-  const monthTxs = useMemo(() => ledger.filter((tx) => monthOf(tx.date) === month), [ledger, month])
+  const monthTxs = useMemo(
+    () => scopedLedger.filter((tx) => monthOf(tx.date) === month),
+    [scopedLedger, month],
+  )
   const totals = useMemo(() => periodTotals(monthTxs, categories), [monthTxs, categories])
-  const series = useMemo(() => monthlySeries(ledger, month, 6), [ledger, month])
+  const contributors = useMemo(() => contributorStats(monthTxs, categories), [monthTxs, categories])
+  const series = useMemo(() => monthlySeries(scopedLedger, month, 6), [scopedLedger, month])
   const maxBar = Math.max(1, ...series.flatMap((s) => [s.income, s.expense]))
   const contributionShare = totals.income
     ? Math.round((totals.contributions / totals.income) * 100)
     : 0
-  const visibleAccounts = accounts.filter((a) => a.is_active || balances[a.id])
+  const visibleAccounts = scopedAccounts.filter((a) => a.is_active || balances[a.id])
 
   const needsSetup = !loading && (accounts.length === 0 || categories.length === 0)
 
@@ -111,10 +146,32 @@ export default function FinancePanel() {
         subtitle={
           <span>
             {monthLabel(month)}
-            {currentChurch?.name ? ` · ${currentChurch.name}` : ''}
+            {congregation
+              ? ` · ${congregation}`
+              : currentChurch?.name
+                ? ` · ${currentChurch.name}`
+                : ''}
           </span>
         }
       >
+        {congregations.length > 0 && (
+          <Select
+            value={congregation || '__all__'}
+            onValueChange={(v) => setCongregation(v === '__all__' ? '' : v)}
+          >
+            <SelectTrigger className="h-10 w-44 rounded-lg bg-white" aria-label="Congregação">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas as congregações</SelectItem>
+              {congregations.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <MonthSwitcher value={month} onChange={setMonth} />
         {canEdit && !needsSetup && (
           <Button asChild className={primaryButtonClass}>
@@ -171,7 +228,11 @@ export default function FinancePanel() {
             tone="bg-emerald-50 text-emerald-700"
             label="Entradas no mês"
             value={formatCents(totals.income)}
-            hint={totals.anonymous ? `${formatCents(totals.anonymous)} anônimos` : undefined}
+            hint={
+              contributors.named || contributors.anonymous
+                ? `${contributors.named} ${contributors.named === 1 ? 'contribuinte' : 'contribuintes'} com nome · ${contributors.anonymous} ${contributors.anonymous === 1 ? 'anônima' : 'anônimas'}`
+                : undefined
+            }
           />
           <Stat
             icon={ArrowUpRight}

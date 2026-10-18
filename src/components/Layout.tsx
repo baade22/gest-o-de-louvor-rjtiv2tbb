@@ -28,6 +28,7 @@ import {
   Wallet,
   ArrowLeftRight,
   FolderCog,
+  HandCoins,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -151,6 +152,12 @@ export default function Layout() {
           to: '/financeiro/lancamentos',
           label: 'Lançamentos',
           icon: ArrowLeftRight,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/contagem',
+          label: 'Contagem do culto',
+          icon: HandCoins,
           allowed: canSeeFinance,
         },
         {
