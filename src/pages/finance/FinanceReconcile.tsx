@@ -330,7 +330,8 @@ export default function FinanceReconcile() {
             <input
               ref={fileRef}
               type="file"
-              accept=".ofx,.OFX,application/x-ofx,application/vnd.intu.qfx,text/plain"
+              // Sem "accept": o .ofx não tem tipo registrado e alguns navegadores (celular,
+              // Safari) passam a liberar só .txt. O conteúdo é conferido na leitura.
               className="hidden"
               aria-label="Arquivo OFX"
               onChange={(e) => {
