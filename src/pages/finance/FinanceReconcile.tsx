@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   CheckCheck,
   CheckCircle2,
+  ListChecks,
   EyeOff,
   FileUp,
   Landmark,
@@ -50,6 +51,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -131,10 +133,14 @@ export default function FinanceReconcile() {
   const [bulk, setBulk] = useState(false)
   const [creating, setCreating] = useState<FinBankLine | null>(null)
   const [choosing, setChoosing] = useState<FinBankLine | null>(null)
+  // Movimentos marcados para lançar juntos
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!churchId || !accountId) return
     setLoading(true)
+    setSelected(new Set())
     try {
       const [ls, imps, open, led] = await Promise.all([
         listBankLines(churchId, accountId),
@@ -287,6 +293,61 @@ export default function FinanceReconcile() {
     load()
   }
 
+  const selectable = status === 'PENDENTE' && canEdit
+  const selectedLines = visible.filter((l) => selected.has(l.id))
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const selectSide = (credit: boolean) =>
+    setSelected(new Set(visible.filter((l) => l.amount_cents > 0 === credit).map((l) => l.id)))
+  const visibleCredits = visible.filter((l) => l.amount_cents > 0).length
+
+  /**
+   * Lança os marcados de uma vez: cada movimento vira um lançamento com o histórico do banco.
+   * Quem já tem lançamento correspondente é só ligado a ele, para não lançar duas vezes.
+   */
+  const launchSelected = async (choice: BulkChoice) => {
+    setBulk(true)
+    let ok = 0
+    const failed: string[] = []
+    for (const line of selectedLines) {
+      const credit = line.amount_cents > 0
+      const match = suggestions.get(line.id)?.tx
+      const categoryId = credit ? choice.creditCategoryId : choice.debitCategoryId
+      const category = lookups.categories.find((c) => c.id === categoryId)
+      try {
+        await reconcileLine(
+          line.id,
+          match
+            ? { transaction_id: match.id }
+            : {
+                create: {
+                  category_id: categoryId,
+                  is_anonymous: credit && Boolean(category?.is_contribution),
+                  description: (line.description || '').slice(0, 200),
+                  payment_method: choice.method,
+                },
+              },
+        )
+        ok++
+      } catch (err) {
+        console.error(err)
+        failed.push(line.description || shortDate(line.date))
+      }
+    }
+    setBulk(false)
+    toast({
+      title: `${ok} ${ok === 1 ? 'movimento lançado' : 'movimentos lançados'} e conciliados`,
+      description: failed.length ? `Não deu certo: ${failed.slice(0, 3).join(', ')}` : undefined,
+      variant: failed.length && !ok ? 'destructive' : undefined,
+    })
+    load()
+  }
+
   const statusChips: { value: StatusFilter; label: string }[] = [
     { value: 'PENDENTE', label: 'A conciliar' },
     { value: 'CONCILIADO', label: 'Conciliados' },
@@ -421,7 +482,10 @@ export default function FinanceReconcile() {
               <button
                 key={f.value}
                 type="button"
-                onClick={() => setStatus(f.value)}
+                onClick={() => {
+                  setStatus(f.value)
+                  setSelected(new Set())
+                }}
                 className={cn(
                   'h-8 rounded-full border px-3 text-[12.5px] font-semibold transition-colors',
                   status === f.value
@@ -462,6 +526,40 @@ export default function FinanceReconcile() {
           </div>
         </div>
 
+        {selectable && !loading && visible.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-50/70 px-4 py-2 text-[13px]">
+            <span className="flex items-center gap-1.5 font-semibold text-slate-600">
+              <ListChecks className="h-4 w-4" /> Marcar:
+            </span>
+            <button
+              type="button"
+              onClick={() => selectSide(true)}
+              disabled={visibleCredits === 0}
+              className="font-semibold text-emerald-700 hover:underline disabled:opacity-40"
+            >
+              Todos os créditos ({visibleCredits})
+            </button>
+            <button
+              type="button"
+              onClick={() => selectSide(false)}
+              disabled={visible.length - visibleCredits === 0}
+              className="font-semibold text-rose-700 hover:underline disabled:opacity-40"
+            >
+              Todos os débitos ({visible.length - visibleCredits})
+            </button>
+            {selected.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="text-slate-500 hover:underline"
+              >
+                Desmarcar
+              </button>
+            )}
+            <span className="text-slate-400">ou marque um por um</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
@@ -496,9 +594,21 @@ export default function FinanceReconcile() {
               return (
                 <li
                   key={line.id}
-                  className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center"
+                  className={cn(
+                    'flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center',
+                    selected.has(line.id) && 'bg-teal-50/60',
+                  )}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {selectable && (
+                      <Checkbox
+                        checked={selected.has(line.id)}
+                        onCheckedChange={() => toggle(line.id)}
+                        disabled={bulk}
+                        aria-label={`Marcar ${line.description || 'movimento'}`}
+                        className="shrink-0"
+                      />
+                    )}
                     <div
                       className={cn(
                         'grid h-9 w-9 shrink-0 place-items-center rounded-lg',
@@ -673,6 +783,31 @@ export default function FinanceReconcile() {
         )}
       </div>
 
+      {selectable && selectedLines.length > 0 && (
+        <div className="sticky bottom-3 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-lg">
+          <div className="min-w-0 flex-1 text-sm">
+            <div className="font-semibold text-slate-900">
+              {selectedLines.length}{' '}
+              {selectedLines.length === 1 ? 'movimento marcado' : 'movimentos marcados'}
+            </div>
+            <div className="text-xs text-slate-500">
+              {[
+                selectedLines.some((l) => l.amount_cents > 0) &&
+                  `créditos ${formatCents(selectedLines.filter((l) => l.amount_cents > 0).reduce((t, l) => t + l.amount_cents, 0))}`,
+                selectedLines.some((l) => l.amount_cents < 0) &&
+                  `débitos ${formatCents(-selectedLines.filter((l) => l.amount_cents < 0).reduce((t, l) => t + l.amount_cents, 0))}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+          </div>
+          <Button onClick={() => setBulkOpen(true)} disabled={bulk} className={primaryButtonClass}>
+            {bulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Lançar marcados
+          </Button>
+        </div>
+      )}
+
       {status === 'CONCILIADO' && counts.CONCILIADO > 0 && (
         <p className="text-xs text-slate-500">
           Desfazer a conciliação não apaga o lançamento. Para tirar um lançamento dos saldos,
@@ -695,6 +830,18 @@ export default function FinanceReconcile() {
           onDone={(target) => creating && reconcile(creating, target, 'Lançado e conciliado')}
         />
       )}
+
+      <BulkLaunchDialog
+        open={bulkOpen}
+        lines={selectedLines}
+        matched={selectedLines.filter((l) => suggestions.get(l.id)?.tx).length}
+        lookups={lookups}
+        onClose={() => setBulkOpen(false)}
+        onConfirm={(choice) => {
+          setBulkOpen(false)
+          launchSelected(choice)
+        }}
+      />
 
       <ChooseTransactionDialog
         line={choosing}
@@ -1111,6 +1258,184 @@ function ChooseTransactionDialog({
             ))}
           </ul>
         )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---- Lançar vários movimentos de uma vez ----
+
+interface BulkChoice {
+  creditCategoryId: string
+  debitCategoryId: string
+  method: string
+}
+
+function BulkLaunchDialog({
+  open,
+  lines,
+  matched,
+  lookups,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean
+  lines: FinBankLine[]
+  /** Quantos já têm lançamento correspondente (são só ligados a ele). */
+  matched: number
+  lookups: FinanceLookups
+  onClose: () => void
+  onConfirm: (choice: BulkChoice) => void
+}) {
+  const credits = lines.filter((l) => l.amount_cents > 0)
+  const debits = lines.filter((l) => l.amount_cents < 0)
+  const [creditCategoryId, setCreditCategoryId] = useState('')
+  const [debitCategoryId, setDebitCategoryId] = useState('')
+  const [method, setMethod] = useState('PIX')
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (!open) return
+    const dizimo = lookups.categories.find(
+      (c) => c.direction === 'ENTRADA' && c.is_active && /d[ií]zimo/i.test(c.name),
+    )
+    setCreditCategoryId(dizimo?.id || '')
+    setDebitCategoryId('')
+    setMethod('PIX')
+    // Só ao abrir
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const sum = (ls: FinBankLine[]) => ls.reduce((t, l) => t + Math.abs(l.amount_cents), 0)
+  const fieldLabel = 'text-xs font-semibold text-slate-600'
+
+  const group = (
+    credit: boolean,
+    list: FinBankLine[],
+    value: string,
+    onChange: (v: string) => void,
+  ) => {
+    const categories = lookups.categories.filter(
+      (c) => c.direction === (credit ? 'ENTRADA' : 'SAIDA') && c.is_active,
+    )
+    // Atalhos: dízimo, oferta e outros créditos; tarifas nos débitos
+    const shortcuts = categories.filter((c) =>
+      credit ? /d[ií]zimo|oferta$|outr/i.test(c.name) : /tarifa/i.test(c.name),
+    )
+    const chosen = categories.find((c) => c.id === value)
+    return (
+      <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className={cn('text-sm font-semibold', credit ? 'text-emerald-700' : 'text-rose-700')}
+          >
+            {list.length}{' '}
+            {credit
+              ? list.length === 1
+                ? 'crédito'
+                : 'créditos'
+              : list.length === 1
+                ? 'débito'
+                : 'débitos'}
+          </span>
+          <span className="text-sm font-bold tabular-nums">{formatCents(sum(list))}</span>
+        </div>
+        <Label className={fieldLabel}>{credit ? 'O que foi?' : 'Categoria'}</Label>
+        {shortcuts.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {shortcuts.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onChange(c.id)}
+                className={cn(
+                  'h-8 rounded-full border px-3 text-xs font-semibold',
+                  value === c.id
+                    ? 'border-teal-200 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 text-slate-600',
+                )}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger className="h-10 rounded-lg">
+            <SelectValue placeholder="Escolha a categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {credit && chosen?.is_contribution && (
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <EyeOff className="h-3.5 w-3.5" /> Lançados como anônimos, com o nome que veio do banco.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const submit = () => {
+    if ((credits.length && !creditCategoryId) || (debits.length && !debitCategoryId)) {
+      toast({ title: 'Escolha a categoria', variant: 'destructive' })
+      return
+    }
+    onConfirm({ creditCategoryId, debitCategoryId, method })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Lançar {lines.length} movimentos</DialogTitle>
+          <DialogDescription>
+            Cada movimento vira um lançamento com a data, o valor e o histórico do banco.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {credits.length > 0 && group(true, credits, creditCategoryId, setCreditCategoryId)}
+          {debits.length > 0 && group(false, debits, debitCategoryId, setDebitCategoryId)}
+          <div className="space-y-1.5">
+            <Label className={fieldLabel}>Forma</Label>
+            <Select value={method || NONE} onValueChange={(v) => setMethod(v === NONE ? '' : v)}>
+              <SelectTrigger className="h-10 rounded-lg">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Não informar</SelectItem>
+                {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {matched > 0 && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {matched} {matched === 1 ? 'deles já tem lançamento' : 'deles já têm lançamento'}{' '}
+              correspondente: {matched === 1 ? 'vai ser ligado a ele' : 'vão ser ligados a eles'},
+              sem lançar de novo.
+            </p>
+          )}
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={onClose} className="rounded-lg">
+            Voltar
+          </Button>
+          <Button
+            onClick={submit}
+            className="rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
+          >
+            Lançar e conciliar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
