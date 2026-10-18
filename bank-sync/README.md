@@ -33,7 +33,7 @@ lugar para guardar chave privada de banco. Então:
 1. No LouvorFlow, em **Financeiro > Saldos e extratos**, conecte cada conta: escolha o banco,
    o ambiente (Teste ou Produção) e, no Bradesco, a agência e a conta sem o dígito.
 2. No servidor do LouvorFlow, crie a variável de ambiente `BANK_SYNC_TOKEN` com um valor
-   aleatório de pelo menos 24 caracteres (é a senha entre o conector e o servidor).
+   aleatório de pelo menos 32 caracteres (ex.: `openssl rand -hex 32`) (é a senha entre o conector e o servidor).
 3. No GitHub, em *Settings > Secrets and variables > Actions*, crie os segredos:
 
    | Segredo | Conteúdo |

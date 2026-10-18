@@ -3,7 +3,8 @@
 // Os bancos exigem certificado digital do cliente (mTLS) em cada chamada, e o $http.send do
 // PocketBase não envia certificado. Por isso quem fala com o banco é o conector bancário
 // (pasta bank-sync/ do repositório), que guarda as credenciais e conversa com estas rotas
-// usando o cabeçalho x-bank-sync-token = variável de ambiente BANK_SYNC_TOKEN do servidor.
+// usando o cabeçalho x-bank-sync-token = variável de ambiente BANK_SYNC_TOKEN do servidor
+// (no mínimo 32 caracteres aleatórios).
 //
 // GET  /backend/v1/finance/bank-sync/connections     (conector) contas ativas e o período a buscar
 // POST /backend/v1/finance/bank-sync/push            (conector) entrega o resultado de uma conta:
@@ -18,10 +19,11 @@
 
 routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
   const expected = $os.getenv('BANK_SYNC_TOKEN') || ''
-  if (expected.length < 24) {
+  if (expected.length < 32) {
     return e.json(503, { message: 'BANK_SYNC_TOKEN não configurado no servidor.' })
   }
-  if (e.request.header.get('x-bank-sync-token') !== expected) {
+  // Comparação em tempo constante, para o tempo de resposta não revelar o token
+  if (!$security.equal(e.request.header.get('x-bank-sync-token') || '', expected)) {
     return e.json(401, { message: 'Token do conector inválido.' })
   }
   const ymd = (ms) => new Date(ms).toISOString().slice(0, 10)
@@ -65,10 +67,11 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
 
 routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   const expected = $os.getenv('BANK_SYNC_TOKEN') || ''
-  if (expected.length < 24) {
+  if (expected.length < 32) {
     return e.json(503, { message: 'BANK_SYNC_TOKEN não configurado no servidor.' })
   }
-  if (e.request.header.get('x-bank-sync-token') !== expected) {
+  // Comparação em tempo constante, para o tempo de resposta não revelar o token
+  if (!$security.equal(e.request.header.get('x-bank-sync-token') || '', expected)) {
     return e.json(401, { message: 'Token do conector inválido.' })
   }
   const body = e.requestInfo().body || {}

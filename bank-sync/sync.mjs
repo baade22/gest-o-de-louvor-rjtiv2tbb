@@ -91,7 +91,23 @@ function request(url, { method = 'GET', headers = {}, body, cert, key } = {}) {
   })
 }
 
-const short = (r) => `${r.status} ${(r.text || '').slice(0, 200)}`.trim()
+// O texto de erro do banco vai para o log do GitHub e para a tela: tira dele qualquer
+// segredo do conector e qualquer coisa com cara de token
+const secretValues = () =>
+  Object.entries(process.env)
+    .filter(([k, v]) => /^(CORA_|BRADESCO_|BANK_SYNC_TOKEN)/.test(k) && v && v.length >= 6)
+    .flatMap(([, v]) =>
+      v
+        .split('\n')
+        .map((x) => x.trim())
+        .filter((x) => x.length >= 6),
+    )
+function redact(text) {
+  let out = String(text || '')
+  for (const v of secretValues()) out = out.split(v).join('***')
+  return out.replace(/[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}/g, '***')
+}
+const short = (r) => redact(`${r.status} ${(r.text || '').slice(0, 200)}`.trim())
 
 async function syncCora(conn, cred) {
   const base = HOSTS.CORA[conn.environment]
@@ -227,11 +243,11 @@ async function main() {
       )
     } catch (err) {
       failures++
-      console.error(`${name}: ${err.message}`)
+      console.error(`${name}: ${redact(err.message)}`)
       await louvorflow('/backend/v1/finance/bank-sync/push', {
         connection_id: conn.id,
         ok: false,
-        error: err.message,
+        error: redact(err.message),
       }).catch((e) => console.error(`Não foi possível avisar o LouvorFlow: ${e.message}`))
     }
   }
