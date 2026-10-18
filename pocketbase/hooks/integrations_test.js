@@ -3,12 +3,27 @@
 // Body: { church_id, provider, apiKey? }
 // Realiza teste REAL na YouTube Data API v3 (ex: search com limit 1 de "louvor")
 // Atualiza status e last_tested_at no banco
+
 // Mensagens amigáveis em pt-BR
 
 routerAdd(
   'POST',
   '/backend/v1/integrations/test',
   (e) => {
+    // Criptografia em repouso das credenciais (auditoria 2026-10-18). Lê tanto o
+    // formato antigo em texto puro quanto o cifrado ({enc:'v1',data:...}).
+    // (Definido dentro do handler: o runtime do PocketBase o executa isolado.)
+    const lfUnwrapCred = (creds) => {
+      try {
+        if (creds && typeof creds === 'object' && creds.enc === 'v1' && typeof creds.data === 'string') {
+          const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+          if (k.length !== 32) return creds
+          return JSON.parse($security.decrypt(creds.data, k))
+        }
+      } catch (_) {}
+      return creds
+    }
+
     const authRecord = e.auth
     if (!authRecord) {
       return e.json(401, { message: 'Não autorizado' })
@@ -102,6 +117,8 @@ routerAdd(
               }
             } catch (_) {}
           }
+
+          creds = lfUnwrapCred(creds)
 
           if (creds && typeof creds === 'object') {
             if (creds.apiKey) {
