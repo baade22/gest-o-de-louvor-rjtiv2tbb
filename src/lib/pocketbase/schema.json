@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T23:24:05.590Z",
+  "generatedAt": "2026-10-18T23:01:16.099Z",
   "collections": [
     {
       "name": "users",
@@ -7,7 +7,7 @@
       "apiRules": {
         "list": "id = @request.auth.id",
         "view": "id = @request.auth.id",
-        "create": "",
+        "create": null,
         "update": "id = @request.auth.id",
         "delete": "id = @request.auth.id"
       },
@@ -53,10 +53,10 @@
       "name": "churches",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": null,
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
         "delete": null
       },
       "fields": [
@@ -118,11 +118,11 @@
       "name": "roles",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -258,11 +258,11 @@
       "name": "member_roles",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -316,11 +316,11 @@
       "name": "songs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -437,11 +437,11 @@
       "name": "events",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -529,11 +529,11 @@
       "name": "event_songs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -655,11 +655,11 @@
       "name": "event_members",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -756,11 +756,11 @@
       "name": "song_videos",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -1042,11 +1042,11 @@
       "name": "event_tasks",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -1176,11 +1176,11 @@
       "name": "media_assets",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true"
       },
       "fields": [
         {
@@ -1366,7 +1366,7 @@
       "apiRules": {
         "list": "@request.auth.id != '' && user_id = @request.auth.id",
         "view": "@request.auth.id != '' && user_id = @request.auth.id",
-        "create": "@request.auth.id != ''",
+        "create": null,
         "update": "@request.auth.id != '' && user_id = @request.auth.id",
         "delete": "@request.auth.id != '' && user_id = @request.auth.id"
       },
@@ -1463,9 +1463,9 @@
       "name": "audit_logs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
+        "create": null,
         "update": null,
         "delete": null
       },

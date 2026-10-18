@@ -11,7 +11,12 @@ routerAdd(
     // (Definido dentro do handler: o runtime do PocketBase o executa isolado.)
     const lfUnwrapCred = (creds) => {
       try {
-        if (creds && typeof creds === 'object' && creds.enc === 'v1' && typeof creds.data === 'string') {
+        if (
+          creds &&
+          typeof creds === 'object' &&
+          creds.enc === 'v1' &&
+          typeof creds.data === 'string'
+        ) {
           const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
           if (k.length !== 32) return creds
           return JSON.parse($security.decrypt(creds.data, k))
