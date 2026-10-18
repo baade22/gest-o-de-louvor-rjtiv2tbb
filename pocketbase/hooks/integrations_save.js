@@ -7,6 +7,30 @@ routerAdd(
   'POST',
   '/backend/v1/integrations/save',
   (e) => {
+    // Criptografia em repouso das credenciais (auditoria 2026-10-18).
+    // Ativa somente quando LOUVORFLOW_CREDENTIALS_KEY (32 caracteres) estiver
+    // definido no ambiente. Sem a chave, mantém o comportamento atual (objeto em
+    // texto puro), então nada quebra até a chave ser configurada.
+    // (Definido dentro do handler: o runtime do PocketBase executa cada handler
+    // isolado, sem acesso a funções declaradas no escopo do arquivo.)
+    const lfCredKey = () => {
+      try {
+        const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+        return k.length === 32 ? k : ''
+      } catch (_) {
+        return ''
+      }
+    }
+    const lfWrapCred = (obj) => {
+      const key = lfCredKey()
+      if (!key) return obj
+      try {
+        return { enc: 'v1', data: $security.encrypt(JSON.stringify(obj), key) }
+      } catch (_) {
+        return obj
+      }
+    }
+
     const authRecord = e.auth
     if (!authRecord) {
       return e.json(401, { message: 'Não autorizado' })
@@ -75,7 +99,7 @@ routerAdd(
       // Atualiza credentials se fornecido apiKey (armazenado como objeto JSON canônico)
       if (apiKey) {
         const cleanKey = String(apiKey).trim()
-        record.set('credentials', { apiKey: cleanKey })
+        record.set('credentials', lfWrapCred({ apiKey: cleanKey }))
       }
       if (configuration) {
         record.set('configuration', configuration)
