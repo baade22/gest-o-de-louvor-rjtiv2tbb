@@ -159,7 +159,10 @@ export default function FinancePanel() {
             value={congregation || '__all__'}
             onValueChange={(v) => setCongregation(v === '__all__' ? '' : v)}
           >
-            <SelectTrigger className="h-10 w-44 rounded-lg bg-white" aria-label="Congregação">
+            <SelectTrigger
+              className="h-10 w-full rounded-lg bg-white sm:w-52"
+              aria-label="Congregação"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -253,8 +256,8 @@ export default function FinancePanel() {
       )}
 
       <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-        <div className={cardClass}>
-          <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+        <div className={cn(cardClass, 'min-w-0')}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 px-5 py-4">
             <h3 className="font-semibold text-slate-900">Entradas e saídas</h3>
             <span className="text-xs text-slate-400">últimos 6 meses</span>
             <div className="ml-auto flex gap-3 text-xs text-slate-600">
@@ -300,7 +303,7 @@ export default function FinancePanel() {
           </div>
         </div>
 
-        <div className={cardClass}>
+        <div className={cn(cardClass, 'min-w-0')}>
           <div className="flex items-center border-b border-slate-200 px-5 py-4">
             <h3 className="font-semibold text-slate-900">Saldo por conta</h3>
             <Link
