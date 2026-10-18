@@ -9,8 +9,15 @@ import type { AgentStatusInfo } from './types.js'
  */
 export function startAgentWebServer(agent: LouvorFlowAgent, port = 8765) {
   const server = http.createServer(async (req, res) => {
-    // Configura headers CORS para requisições locais
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    // CORS restrito: o painel é servido pelo próprio Agent e acessado apenas
+    // deste computador. Liberar '*' permitiria que qualquer site aberto no
+    // navegador do operador reconfigurasse o Agent (token do Holyrics, saas_url)
+    // ou disparasse o pareamento. Só a própria origem local é permitida.
+    const origin = String(req.headers.origin || '')
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+    }
+    res.setHeader('Vary', 'Origin')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
@@ -138,7 +145,11 @@ export function startAgentWebServer(agent: LouvorFlowAgent, port = 8765) {
     res.end('Not Found')
   })
 
-  server.listen(port, '0.0.0.0', () => {
+  // Escuta SOMENTE em loopback (127.0.0.1). Antes o Agent ouvia em 0.0.0.0, o que
+  // expunha o painel sem autenticação para qualquer dispositivo da rede da igreja,
+  // permitindo ler o status e sobrescrever a configuração (token do Holyrics,
+  // saas_url) ou refazer o pareamento remotamente.
+  server.listen(port, '127.0.0.1', () => {
     console.log(`[Agent Web] Painel local disponível em http://localhost:${port}`)
   })
 

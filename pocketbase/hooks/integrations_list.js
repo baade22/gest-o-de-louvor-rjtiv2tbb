@@ -5,6 +5,21 @@ routerAdd(
   'GET',
   '/backend/v1/integrations',
   (e) => {
+    // Criptografia em repouso das credenciais (auditoria 2026-10-18). Lê tanto o
+    // formato antigo em texto puro quanto o cifrado ({enc:'v1',data:...}). A
+    // decifração só acontece com LOUVORFLOW_CREDENTIALS_KEY (32 caracteres).
+    // (Definido dentro do handler: o runtime do PocketBase o executa isolado.)
+    const lfUnwrapCred = (creds) => {
+      try {
+        if (creds && typeof creds === 'object' && creds.enc === 'v1' && typeof creds.data === 'string') {
+          const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+          if (k.length !== 32) return creds
+          return JSON.parse($security.decrypt(creds.data, k))
+        }
+      } catch (_) {}
+      return creds
+    }
+
     const authRecord = e.auth
     if (!authRecord) {
       return e.json(401, { message: 'Não autorizado' })
@@ -102,6 +117,8 @@ routerAdd(
         let hasApiKey = false
         let maskedApiKey = ''
         let foundKey = ''
+
+        creds = lfUnwrapCred(creds)
 
         if (creds && typeof creds === 'object') {
           if (creds.apiKey) {
