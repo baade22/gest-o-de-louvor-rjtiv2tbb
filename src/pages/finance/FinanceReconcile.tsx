@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -26,8 +26,10 @@ import { formatCents } from '@/lib/money'
 import { decodeOfx, parseOfx } from '@/lib/ofx'
 import { accountBalances, daysBetween } from '@/lib/financeSummary'
 import { sameSide, suggestMatches } from '@/lib/reconcile'
+import { brtDay } from '@/lib/bankStatement'
 import {
   importStatement,
+  listBankConnections,
   listBankImports,
   listBankLines,
   listLedger,
@@ -40,6 +42,7 @@ import {
   type ReconcileTarget,
 } from '@/services/finance'
 import type {
+  FinBankConnection,
   FinBankImport,
   FinBankLine,
   FinBill,
@@ -115,13 +118,15 @@ export default function FinanceReconcile() {
     const banks = active.filter((a) => a.kind !== 'CAIXA')
     return banks.length ? banks : active
   }, [lookups.accounts])
-  const [accountId, setAccountId] = useState('')
+  const [params] = useSearchParams()
+  const [accountId, setAccountId] = useState(params.get('conta') || '')
   useEffect(() => {
     if (!accountId && bankAccounts.length) setAccountId(bankAccounts[0].id)
   }, [accountId, bankAccounts])
 
   const [lines, setLines] = useState<FinBankLine[]>([])
   const [imports, setImports] = useState<FinBankImport[]>([])
+  const [connection, setConnection] = useState<FinBankConnection | undefined>()
   const [candidates, setCandidates] = useState<FinTransaction[]>([])
   const [bills, setBills] = useState<FinBill[]>([])
   const [ledger, setLedger] = useState<FinTransaction[]>([])
@@ -142,11 +147,12 @@ export default function FinanceReconcile() {
     setLoading(true)
     setSelected(new Set())
     try {
-      const [ls, imps, open, led] = await Promise.all([
+      const [ls, imps, open, led, conns] = await Promise.all([
         listBankLines(churchId, accountId),
         listBankImports(churchId, accountId).then((r) => r.items),
         listOpenBills(churchId),
         listLedger(churchId),
+        listBankConnections(churchId).catch(() => [] as FinBankConnection[]),
       ])
       const pending = ls.filter((l) => l.status === 'PENDENTE').map((l) => l.date.slice(0, 10))
       let txs: FinTransaction[] = []
@@ -165,6 +171,7 @@ export default function FinanceReconcile() {
       }
       setLines(ls)
       setImports(imps)
+      setConnection(conns.find((c) => c.account_id === accountId))
       setBills(open)
       setLedger(led)
       setCandidates(txs)
@@ -188,9 +195,16 @@ export default function FinanceReconcile() {
   )
   const withTx = pendingLines.filter((l) => suggestions.get(l.id)?.tx)
 
-  // Saldo do banco (último arquivo com saldo) x saldo no LouvorFlow na mesma data
-  const lastBalance = imports.find((i) => i.has_balance)
-  const balanceDate = (lastBalance?.balance_date || lastBalance?.end_date || '').slice(0, 10)
+  // Saldo do banco (o mais recente entre a busca pela API e o último arquivo com saldo) x
+  // saldo no LouvorFlow na mesma data
+  const lastFile = imports.find((i) => i.has_balance)
+  const fileDate = (lastFile?.balance_date || lastFile?.end_date || '').slice(0, 10)
+  const apiDate = connection?.has_balance ? brtDay(connection.balance_at || '') : ''
+  const lastBalance =
+    apiDate && (!lastFile || apiDate >= fileDate)
+      ? { balance_cents: connection?.balance_cents || 0 }
+      : lastFile
+  const balanceDate = apiDate && lastBalance !== lastFile ? apiDate : fileDate
   const systemBalance = useMemo(() => {
     if (!account) return 0
     const upTo = balanceDate ? ledger.filter((tx) => tx.date.slice(0, 10) <= balanceDate) : ledger

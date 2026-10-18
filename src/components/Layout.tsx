@@ -30,6 +30,7 @@ import {
   FolderCog,
   HandCoins,
   CalendarClock,
+  Coins,
   Landmark,
   type LucideIcon,
 } from 'lucide-react'
@@ -166,6 +167,12 @@ export default function Layout() {
           to: '/financeiro/contas',
           label: 'Contas a pagar e receber',
           icon: CalendarClock,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/saldos',
+          label: 'Saldos e extratos',
+          icon: Coins,
           allowed: canSeeFinance,
         },
         {

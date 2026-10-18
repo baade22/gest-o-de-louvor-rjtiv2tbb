@@ -3,7 +3,8 @@
 //
 // import      { account_id, file_name, start_date, end_date, balance_cents?, balance_date?,
 //               lines: [{ fitid, date: 'YYYY-MM-DD', amount_cents, description }] }
-//             Grava o arquivo e as linhas novas; um FITID já importado na conta é pulado.
+//             Grava o arquivo e as linhas novas; um FITID já importado na conta é pulado, e
+//             também o movimento que já entrou pela API do banco (finance_bank_sync.js).
 // reconcile   { line_id, transaction_id }   liga a linha a um lançamento que já existe
 //             { line_id, bill_id, payment_method? }   dá baixa numa conta a pagar/receber
 //             { line_id, create: { category_id, person_id, is_anonymous, supplier_id,
@@ -114,6 +115,22 @@ routerAdd(
               exists = true
             } catch (_) {}
             if (exists) {
+              skipped++
+              continue
+            }
+            // Movimento que já veio pela API do banco (com outro FITID): cada linha da API no
+            // mesmo dia e valor "cobre" uma linha do arquivo
+            const same = txApp.findRecordsByFilter(
+              'fin_bank_lines',
+              'account_id = {:a} && date = {:d} && amount_cents = {:v}',
+              '',
+              0,
+              0,
+              { a: account.id, d: l.date + ' 12:00:00.000Z', v: Number(l.amount_cents) },
+            )
+            let fromApi = 0
+            for (const s of same) if (s.getString('fitid').indexOf('api:') === 0) fromApi++
+            if (fromApi > same.length - fromApi) {
               skipped++
               continue
             }

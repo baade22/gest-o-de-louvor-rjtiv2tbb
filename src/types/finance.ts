@@ -211,3 +211,31 @@ export interface FinBankImport extends BaseRecord {
   lines_skipped?: number
   imported_by_name?: string
 }
+
+export type FinBankProvider = 'CORA' | 'BRADESCO'
+export type FinBankEnvironment = 'PRODUCAO' | 'TESTE'
+
+/** Conta ligada à API do banco. As credenciais ficam no conector bancário, não aqui. */
+export interface FinBankConnection extends BaseRecord {
+  account_id: string
+  provider: FinBankProvider
+  environment: FinBankEnvironment
+  branch?: string
+  account_number?: string
+  account_type?: 'CC' | 'CP' | ''
+  credential_key?: string
+  enabled: boolean
+  auto_reconcile: boolean
+  initial_days?: number
+  // Situação, gravada só pelo servidor
+  last_sync_at?: string
+  last_status?: 'OK' | 'ERRO' | ''
+  last_error?: string
+  balance_cents?: number
+  available_cents?: number
+  balance_at?: string
+  has_balance?: boolean
+  last_created?: number
+  last_auto_reconciled?: number
+  sync_requested_at?: string
+}

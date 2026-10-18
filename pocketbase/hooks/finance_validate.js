@@ -40,6 +40,9 @@ onRecordValidate(
         import_id: 'fin_bank_imports',
         transaction_id: 'fin_transactions',
       },
+      fin_bank_connections: {
+        account_id: 'fin_accounts',
+      },
     }[rec.collection().name]
 
     for (const field in relations) {
@@ -59,6 +62,15 @@ onRecordValidate(
         const user = e.app.findRecordById('_pb_users_auth_', rec.getString('counted_by'))
         rec.set('counted_by_name', user.getString('name') || user.getString('email'))
       } catch (_) {}
+    }
+
+    if (rec.collection().name === 'fin_bank_connections') {
+      if (
+        rec.getString('provider') === 'BRADESCO' &&
+        (!rec.getString('branch') || !rec.getString('account_number'))
+      ) {
+        throw new BadRequestError('Informe a agência e a conta do Bradesco, sem o dígito.')
+      }
     }
 
     if (rec.collection().name === 'fin_transactions') {
@@ -94,4 +106,5 @@ onRecordValidate(
   'fin_counts',
   'fin_bills',
   'fin_bank_lines',
+  'fin_bank_connections',
 )

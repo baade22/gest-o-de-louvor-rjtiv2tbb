@@ -6,6 +6,7 @@ import { DEFAULT_CATEGORIES, addMonthsToDate, monthRange } from '@/lib/financeSu
 import type { OfxStatement } from '@/lib/ofx'
 import type {
   FinAccount,
+  FinBankConnection,
   FinBankImport,
   FinBankLine,
   FinBill,
@@ -427,4 +428,73 @@ export async function setLineIgnored(lineId: string, ignored: boolean) {
   return pb
     .collection('fin_bank_lines')
     .update<FinBankLine>(lineId, { status: ignored ? 'IGNORADO' : 'PENDENTE' })
+}
+
+// ---- Saldos e extratos (API do banco) ----
+
+export async function listBankConnections(churchId: string) {
+  return pb.collection('fin_bank_connections').getFullList<FinBankConnection>({
+    filter: pb.filter('church_id = {:churchId}', { churchId }),
+    sort: 'created',
+  })
+}
+
+export type BankConnectionInput = Pick<
+  FinBankConnection,
+  | 'account_id'
+  | 'provider'
+  | 'environment'
+  | 'branch'
+  | 'account_number'
+  | 'account_type'
+  | 'credential_key'
+  | 'enabled'
+  | 'auto_reconcile'
+  | 'initial_days'
+>
+
+export async function saveBankConnection(
+  churchId: string,
+  input: BankConnectionInput,
+  id?: string,
+) {
+  const col = pb.collection('fin_bank_connections')
+  return id
+    ? col.update<FinBankConnection>(id, input)
+    : col.create<FinBankConnection>({ ...input, church_id: churchId })
+}
+
+export async function deleteBankConnection(id: string) {
+  return pb.collection('fin_bank_connections').delete(id)
+}
+
+/** "Atualizar agora": pede ao conector bancário uma busca fora do horário agendado. */
+export async function requestBankSync(churchId: string): Promise<{ dispatched: boolean }> {
+  return pb.send('/backend/v1/finance/bank-sync/request', {
+    method: 'POST',
+    body: { church_id: churchId },
+  })
+}
+
+/** Movimentos do extrato de uma conta num período (YYYY-MM-DD a YYYY-MM-DD). */
+export async function listStatement(churchId: string, accountId: string, from: string, to: string) {
+  return pb.collection('fin_bank_lines').getFullList<FinBankLine>({
+    filter: pb.filter(
+      'church_id = {:churchId} && account_id = {:accountId} && date >= {:from} && date <= {:to}',
+      { churchId, accountId, from: `${from} 00:00:00`, to: `${to} 23:59:59` },
+    ),
+    sort: 'date,created',
+    expand: 'transaction_id,transaction_id.category_id',
+  })
+}
+
+/** Último arquivo ou busca de cada conta que trouxe saldo do banco. */
+export async function listLatestBankBalances(churchId: string) {
+  const rows = await pb.collection('fin_bank_imports').getList<FinBankImport>(1, 200, {
+    filter: pb.filter('church_id = {:churchId} && has_balance = true', { churchId }),
+    sort: '-balance_date,-created',
+  })
+  const out: Record<string, FinBankImport> = {}
+  for (const r of rows.items) if (!out[r.account_id]) out[r.account_id] = r
+  return out
 }
