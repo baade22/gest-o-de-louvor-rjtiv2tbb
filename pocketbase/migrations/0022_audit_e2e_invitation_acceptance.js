@@ -1,5 +1,13 @@
 migrate(
   (app) => {
+    // Segurança (auditoria 2026-10-18): migração de teste E2E que cria/apaga
+    // usuários e convites com senha fixa. Só roda quando explicitamente autorizada
+    // via variável de ambiente, para NUNCA executar em produção.
+    if ($os.getenv('LOUVORFLOW_ALLOW_DEMO_SEED') !== 'true') {
+      console.log('[MIGRATION 0022] Teste E2E ignorado (LOUVORFLOW_ALLOW_DEMO_SEED != true).')
+      return
+    }
+
     console.log('[MIGRATION 0022] INICIANDO AUDITORIA E TESTES E2E DE ATIVAÇÃO DE CONVITES...')
 
     const churchesCol = app.findCollectionByNameOrId('churches')

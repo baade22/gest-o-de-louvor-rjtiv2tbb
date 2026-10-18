@@ -1,5 +1,13 @@
 migrate(
   (app) => {
+    // Segurança (auditoria 2026-10-18): migração de teste E2E que cria/apaga
+    // registros com senha fixa. Só roda quando explicitamente autorizada via
+    // variável de ambiente, para NUNCA executar em produção.
+    if ($os.getenv('LOUVORFLOW_ALLOW_DEMO_SEED') !== 'true') {
+      console.log('[MIGRATION 0018] Teste E2E ignorado (LOUVORFLOW_ALLOW_DEMO_SEED != true).')
+      return
+    }
+
     // 1. Localiza igreja e role GUITARRA existentes
     const church = app.findFirstRecordByData('churches', 'slug', 'nova-alianca')
     const roleGuitarra = app.findFirstRecordByData('roles', 'name', 'GUITARRA')
