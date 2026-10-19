@@ -101,6 +101,7 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
     else if (requireModule === 'media')
       hasAccess = hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
     else if (requireModule === 'lighting') hasAccess = hasOperationalRole('ILUMINACAO')
+    else if (requireModule === 'finance') hasAccess = hasOperationalRole('FINANCEIRO')
     else if (requireModule === 'tasks') hasAccess = hasOperationalRole('MIDIA') || isLeader
     else if (requireModule === 'songs') hasAccess = hasOperationalRole('MUSICO') || isLeader
     else if (requireModule === 'events') {
