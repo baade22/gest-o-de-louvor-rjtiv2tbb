@@ -105,7 +105,10 @@ const secretValues = () =>
 function redact(text) {
   let out = String(text || '')
   for (const v of secretValues()) out = out.split(v).join('***')
-  return out.replace(/[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}/g, '***')
+  return out
+    .replace(/bearer\s+\S+/gi, 'Bearer ***')
+    .replace(/[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}/g, '***')
+    .replace(/("?(access_token|client_secret|token)"?\s*[:=]\s*"?)[^"&,\s}]+/gi, '$1***')
 }
 const short = (r) => redact(`${r.status} ${(r.text || '').slice(0, 200)}`.trim())
 

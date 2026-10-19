@@ -360,12 +360,18 @@ export default function MusicianForm() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {OPERATIONAL_ROLE_OPTIONS.map((op) => {
                 const isSelected = formData.operational_roles.includes(op.key)
+                // Só o MASTER dá ou tira a função Financeiro (o servidor confere também)
+                const locked = op.key === 'FINANCEIRO' && !isMaster
                 return (
                   <button
                     key={op.key}
                     type="button"
+                    disabled={locked}
+                    title={
+                      locked ? 'Só o MASTER da igreja pode dar ou tirar esta função' : undefined
+                    }
                     onClick={() => toggleOperationalRole(op.key)}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                       isSelected
                         ? 'bg-teal-50 border-teal-600 text-teal-900 shadow-xs'
                         : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'

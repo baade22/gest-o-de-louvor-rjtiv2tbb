@@ -42,8 +42,25 @@ routerAdd(
       return e.json(400, { message: 'Informe um formato de e-mail válido.' })
     }
     const operationalRoles = Array.isArray(body.operational_roles)
-      ? body.operational_roles
+      ? body.operational_roles.map((r) => String(r))
       : ['MUSICO']
+    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO']
+    for (const op of operationalRoles) {
+      if (knownOps.indexOf(op) === -1) {
+        return e.json(400, { message: 'Função operacional inválida: ' + op })
+      }
+    }
+    const wantsFinance = operationalRoles.indexOf('FINANCEIRO') !== -1
+    const hasFinance = (rec) => {
+      let ops = []
+      try {
+        ops = JSON.parse(rec.getString('operational_roles') || '[]') || []
+      } catch (_) {}
+      return ops.indexOf('FINANCEIRO') !== -1
+    }
+    const financeOnlyMaster = {
+      message: 'Só o MASTER da igreja pode dar ou tirar a função Financeiro.',
+    }
 
     if (!['MASTER', 'ADMIN', 'LIDER', 'MUSICO'].includes(role)) {
       return e.json(400, {
@@ -60,6 +77,7 @@ routerAdd(
     // 2. Validação Multi-tenant & Autorização (MASTER ou ADMIN)
     // PROTEÇÃO CRÍTICA DO MASTER:
     // Nenhum usuário operacional ou ADMIN comum pode criar MASTER, promover outro para MASTER ou promover a si mesmo.
+    let callerRole = ''
     try {
       const callerMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -76,7 +94,7 @@ routerAdd(
         })
       }
 
-      const callerRole = callerMemberships[0].getString('role')
+      callerRole = callerMemberships[0].getString('role')
       if (callerRole !== 'ADMIN' && callerRole !== 'MASTER') {
         return e.json(403, {
           message: 'Apenas administradores desta igreja podem cadastrar ou editar membros.',
@@ -91,6 +109,10 @@ routerAdd(
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente para esta congregação.' })
+    }
+
+    if (!memberId && wantsFinance && callerRole !== 'MASTER') {
+      return e.json(403, financeOnlyMaster)
     }
 
     // 3. Execução: Criação ou Edição
@@ -142,6 +164,10 @@ routerAdd(
         $app.save(userRecord)
 
         // Atualizar church_members
+        // Financeiro dá escrita no dinheiro da igreja: só o MASTER concede ou retira
+        if (hasFinance(memberRecord) !== wantsFinance && callerRole !== 'MASTER') {
+          return e.json(403, financeOnlyMaster)
+        }
         memberRecord.set('role', role)
         memberRecord.set('operational_roles', operationalRoles)
         memberRecord.set('phone', phone || null)
@@ -216,6 +242,9 @@ routerAdd(
         if (existingMember.length > 0) {
           // Reativa ou atualiza membro existente
           newMember = existingMember[0]
+          if (hasFinance(newMember) !== wantsFinance && callerRole !== 'MASTER') {
+            return e.json(403, financeOnlyMaster)
+          }
           newMember.set('role', role)
           newMember.set('operational_roles', operationalRoles)
           newMember.set('phone', phone || null)

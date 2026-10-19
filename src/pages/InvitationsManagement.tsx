@@ -603,12 +603,16 @@ export default function InvitationsManagement() {
                     const isSelected = formData.operational_roles.includes(
                       op.key as OperationalRole,
                     )
+                    // Só o MASTER convida com a função Financeiro (o servidor confere também)
+                    const locked = op.key === 'FINANCEIRO' && !isMaster
                     return (
                       <button
                         key={op.key}
                         type="button"
+                        disabled={locked}
+                        title={locked ? 'Só o MASTER da igreja pode dar esta função' : undefined}
                         onClick={() => toggleOpRole(op.key as OperationalRole)}
-                        className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                        className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                           isSelected
                             ? 'bg-teal-50 border-teal-600 text-teal-900 font-semibold shadow-xs'
                             : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'

@@ -21,8 +21,14 @@ routerAdd(
     const name = String(body.name || '').trim()
     const role = String(body.role || 'MUSICO').trim()
     const operationalRoles = Array.isArray(body.operational_roles)
-      ? body.operational_roles
+      ? body.operational_roles.map((r) => String(r))
       : ['MUSICO']
+    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO']
+    for (const op of operationalRoles) {
+      if (knownOps.indexOf(op) === -1) {
+        return e.json(400, { message: 'Função operacional inválida: ' + op })
+      }
+    }
     const rawRoleIds = Array.isArray(body.role_ids) ? body.role_ids : []
     const roleIds = []
     for (let r = 0; r < rawRoleIds.length; r++) {
@@ -80,6 +86,12 @@ routerAdd(
       if (role === 'MASTER' && callerRole !== 'MASTER') {
         return e.json(403, {
           message: 'Apenas o perfil MASTER pode convidar outro usuário com nível MASTER.',
+        })
+      }
+      // Financeiro dá escrita no dinheiro da igreja: só o MASTER convida com essa função
+      if (operationalRoles.indexOf('FINANCEIRO') !== -1 && callerRole !== 'MASTER') {
+        return e.json(403, {
+          message: 'Só o MASTER da igreja pode convidar alguém com a função Financeiro.',
         })
       }
     } catch (err) {

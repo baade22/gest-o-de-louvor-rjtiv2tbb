@@ -89,7 +89,12 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
 
   if (body.ok !== true) {
     conn.set('last_status', 'ERRO')
-    conn.set('last_error', String(body.error || 'Erro desconhecido').slice(0, 500))
+    // O conector já tira os segredos; aqui tira de novo o que tiver cara de token
+    const clean = String(body.error || 'Erro desconhecido')
+      .replace(/bearer\s+\S+/gi, 'Bearer ***')
+      .replace(/[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/g, '***')
+      .replace(/("?(access_token|client_secret|token)"?\s*[:=]\s*"?)[^"&,\s}]+/gi, '$1***')
+    conn.set('last_error', clean.slice(0, 500))
     conn.set('sync_requested_at', '')
     $app.save(conn)
     return e.json(200, { success: true })
