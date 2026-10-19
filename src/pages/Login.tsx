@@ -15,8 +15,8 @@ import {
 import { useToast } from '@/hooks/use-toast'
 
 export default function Login() {
-  const [email, setEmail] = useState('pedro_baade@hotmail.com')
-  const [password, setPassword] = useState('Skip@Pass')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -107,6 +107,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="exemplo@igreja.com.br"
@@ -138,6 +139,7 @@ export default function Login() {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -173,37 +175,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-
-          {/* Seed demo quick logins */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              Acesso Demo Rápido:
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setEmail('pedro_baade@hotmail.com')
-                  setPassword('Skip@Pass')
-                }}
-                className="text-xs h-8 justify-start border-slate-200 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200"
-              >
-                Admin (Pedro)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setEmail('joao.santos@demo.louvorflow.com')
-                  setPassword('Skip@Pass')
-                }}
-                className="text-xs h-8 justify-start border-slate-200 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-200"
-              >
-                Músico (João)
-              </Button>
-            </div>
-          </div>
 
           <div className="mt-6 pt-4 text-center border-t border-slate-100">
             <p className="text-xs text-slate-500">
