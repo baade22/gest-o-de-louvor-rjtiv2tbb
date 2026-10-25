@@ -89,7 +89,7 @@ export interface PeopleFilter {
   congregation?: string
 }
 
-function normalize(text: string): string {
+export function normalize(text: string): string {
   return text
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -147,11 +147,7 @@ function celebrationsOf(person: Person): Array<Omit<Celebration, 'years'> & { si
 }
 
 /** Aniversários (nascimento e casamento) de um mês, em ordem de dia. */
-export function celebrationsInMonth(
-  people: Person[],
-  month: number,
-  year: number,
-): Celebration[] {
+export function celebrationsInMonth(people: Person[], month: number, year: number): Celebration[] {
   return people
     .filter((p) => isActiveStatus(p.status))
     .flatMap(celebrationsOf)
@@ -452,7 +448,9 @@ export function buildTimeline(
       person.admission_date,
       'ADMISSAO',
       'Admissão como membro',
-      person.admission_type ? `Por ${ADMISSION_TYPE_LABELS[person.admission_type].toLowerCase()}` : undefined,
+      person.admission_type
+        ? `Por ${ADMISSION_TYPE_LABELS[person.admission_type].toLowerCase()}`
+        : undefined,
     ],
     [person.wedding_date, 'CASAMENTO', 'Casamento'],
   ]
@@ -475,7 +473,9 @@ export function buildTimeline(
     })
   }
 
-  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.key.localeCompare(b.key)))
+  return out.sort((a, b) =>
+    a.date < b.date ? 1 : a.date > b.date ? -1 : a.key.localeCompare(b.key),
+  )
 }
 
 // ---------- Painel ----------

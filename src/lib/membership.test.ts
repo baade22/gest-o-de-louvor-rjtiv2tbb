@@ -178,7 +178,9 @@ describe('ficha', () => {
   it('aponta o que falta e calcula o preenchimento', () => {
     const p = person({ status: 'MEMBRO', phone: '81 9999', congregation: 'Aldeia' })
     expect(missingEssentials(p)).toEqual(['nascimento', 'batismo'])
-    expect(missingEssentials(person({ status: 'VISITANTE', phone: '1', birth_date: '2000-01-01' }))).toEqual([])
+    expect(
+      missingEssentials(person({ status: 'VISITANTE', phone: '1', birth_date: '2000-01-01' })),
+    ).toEqual([])
     expect(profileCompleteness(p)).toBe(18) // 2 de 11
   })
 })
@@ -194,10 +196,28 @@ describe('linha do tempo', () => {
     const list = buildTimeline(
       p,
       [
-        event({ id: 'a', date: '2008-03-09 00:00:00.000Z', from_status: 'VISITANTE', to_status: 'MEMBRO' }),
-        event({ id: 'b', kind: 'CONTATO', date: '2025-02-01', title: 'Ligação', description: 'Pediu oração' }),
+        event({
+          id: 'a',
+          date: '2008-03-09 00:00:00.000Z',
+          from_status: 'VISITANTE',
+          to_status: 'MEMBRO',
+        }),
+        event({
+          id: 'b',
+          kind: 'CONTATO',
+          date: '2025-02-01',
+          title: 'Ligação',
+          description: 'Pediu oração',
+        }),
       ],
-      [{ id: 's1', date: '2026-10-12 00:00:00.000Z', eventTitle: 'Culto de Celebração', role: 'Vocal' }],
+      [
+        {
+          id: 's1',
+          date: '2026-10-12 00:00:00.000Z',
+          eventTitle: 'Culto de Celebração',
+          role: 'Vocal',
+        },
+      ],
     )
     expect(list.map((e) => [e.date, e.kind])).toEqual([
       ['2026-10-12', 'ESCALA'],
@@ -221,7 +241,13 @@ describe('painel', () => {
         event({ id: '1', from_status: 'CONGREGADO', to_status: 'MEMBRO' }),
         event({ id: '2', from_status: 'VISITANTE', to_status: 'MEMBRO' }),
         event({ id: '3', from_status: 'MEMBRO', to_status: 'FALECIDO', title: 'Falecimento' }),
-        event({ id: '4', from_status: 'MEMBRO', to_status: 'AFASTADO', title: 'Afastamento', date: '2025-05-01' }),
+        event({
+          id: '4',
+          from_status: 'MEMBRO',
+          to_status: 'AFASTADO',
+          title: 'Afastamento',
+          date: '2025-05-01',
+        }),
         event({ id: '5', kind: 'NOTA', title: 'x' }),
       ],
       2026,
@@ -232,7 +258,11 @@ describe('painel', () => {
 
   it('agrupa por idade, com quem não tem nascimento à parte', () => {
     const b = ageBuckets(
-      [person({ id: 'a', birth_date: '2020-01-01' }), person({ id: 'b', birth_date: '1950-01-01' }), person({ id: 'c' })],
+      [
+        person({ id: 'a', birth_date: '2020-01-01' }),
+        person({ id: 'b', birth_date: '1950-01-01' }),
+        person({ id: 'c' }),
+      ],
       '2026-10-25',
     )
     expect(b.map((x) => [x.label, x.count])).toEqual([
@@ -247,7 +277,10 @@ describe('painel', () => {
 
   it('conta cadastros recentes pela data de criação', () => {
     const list = recentlyAdded(
-      [person({ id: 'a', created: '2026-10-20 12:00:00.000Z' }), person({ id: 'b', created: '2026-08-01 12:00:00.000Z' })],
+      [
+        person({ id: 'a', created: '2026-10-20 12:00:00.000Z' }),
+        person({ id: 'b', created: '2026-08-01 12:00:00.000Z' }),
+      ],
       '2026-10-25',
       30,
     )

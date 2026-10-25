@@ -1,19 +1,17 @@
 // QR Code do PIX (desenhado em SVG no navegador) e o cartaz para imprimir com a chave da igreja.
 
 import { useMemo } from 'react'
-import qrcode from 'qrcode-generator'
+import QRCode from 'qrcode'
 import { normalizePixKey, type PixKeyType } from '@/lib/pix'
 import { cn } from '@/lib/utils'
 
 /** Caminho SVG dos módulos escuros do QR. */
 function qrPath(text: string) {
-  const qr = qrcode(0, 'M')
-  qr.addData(text)
-  qr.make()
-  const n = qr.getModuleCount()
+  const { modules } = QRCode.create(text, { errorCorrectionLevel: 'M' })
+  const n = modules.size
   let d = ''
   for (let r = 0; r < n; r++)
-    for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`
+    for (let c = 0; c < n; c++) if (modules.get(r, c)) d += `M${c} ${r}h1v1h-1z`
   return { n, d }
 }
 

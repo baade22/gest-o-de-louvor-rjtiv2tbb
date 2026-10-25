@@ -11,7 +11,7 @@ import {
   type Celebration,
 } from '@/lib/membership'
 import { getLocalTodayYMD, parseCalendarDate } from '@/lib/dateUtils'
-import { ArrowLeft, Cake, ChevronLeft, ChevronRight, Heart, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Cake, ChevronLeft, ChevronRight, Heart, MessageSquareText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -23,19 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PersonAvatar, errorMessage, usePhotoToken } from './shared'
-
-/** Link do WhatsApp com uma mensagem pronta (telefones brasileiros sem DDI ganham 55). */
-function whatsappLink(c: Celebration): string {
-  let digits = (c.person.phone || '').replace(/\D/g, '')
-  if (!digits) return ''
-  if (digits.length <= 11) digits = `55${digits}`
-  const firstName = c.person.name.split(/\s+/)[0]
-  const text =
-    c.kind === 'NASCIMENTO'
-      ? `Feliz aniversário, ${firstName}! Que Deus abençoe sua vida ricamente.`
-      : `Feliz aniversário de casamento, ${firstName}! Que Deus abençoe a família de vocês.`
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
-}
+import { GreetButton, GreetingSettingsDialog, useGreetings } from './Greetings'
 
 function describe(c: Celebration): string {
   if (c.kind === 'NASCIMENTO') return c.years !== null ? `Faz ${c.years} anos` : 'Aniversário'
@@ -48,13 +36,14 @@ function CelebrationRow({
   token,
   dateLabel,
   highlight,
+  greet,
 }: {
   c: Celebration
   token: string
   dateLabel: string
   highlight?: boolean
+  greet: { message: string; sent: boolean; onSend: (c: Celebration) => void }
 }) {
-  const wa = whatsappLink(c)
   return (
     <div
       className={`flex items-center justify-between gap-3 rounded-2xl border p-3 sm:p-4 bg-white ${
@@ -68,7 +57,7 @@ function CelebrationRow({
         <PersonAvatar person={c.person} token={token} size="sm" />
         <div className="min-w-0">
           <Link
-            to={`/membros/${c.person.id}/editar`}
+            to={`/membros/${c.person.id}`}
             className="text-sm font-bold text-slate-900 hover:text-teal-800 truncate block"
           >
             {c.person.name}
@@ -80,18 +69,13 @@ function CelebrationRow({
               <Heart className="h-3.5 w-3.5 text-rose-500" />
             )}
             {describe(c)}
-            {c.person.congregation && <span className="text-slate-400">· {c.person.congregation}</span>}
+            {c.person.congregation && (
+              <span className="text-slate-400">· {c.person.congregation}</span>
+            )}
           </p>
         </div>
       </div>
-      {wa && (
-        <a href={wa} target="_blank" rel="noopener noreferrer" className="shrink-0">
-          <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1.5">
-            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">Parabenizar</span>
-          </Button>
-        </a>
-      )}
+      <GreetButton c={c} {...greet} />
     </div>
   )
 }
@@ -108,6 +92,13 @@ export default function Birthdays() {
   const [month, setMonth] = useState(todayParts.month)
   const [year, setYear] = useState(todayParts.year)
   const [congregation, setCongregation] = useState('TODAS')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const greetings = useGreetings(currentChurch?.id, today)
+  const greetProps = (c: Celebration) => ({
+    message: greetings.message(c),
+    sent: greetings.isSent(c),
+    onSend: greetings.markSent,
+  })
 
   useEffect(() => {
     if (!currentChurch) return
@@ -165,19 +156,30 @@ export default function Birthdays() {
             Aniversários de nascimento e de casamento de membros, congregados e visitantes
           </p>
         </div>
-        <Select value={congregation} onValueChange={setCongregation}>
-          <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white sm:w-52">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="TODAS">Toda a igreja</SelectItem>
-            {congregationOptions.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="h-10 rounded-xl gap-1.5"
+            onClick={() => setSettingsOpen(true)}
+            disabled={!greetings.church}
+          >
+            <MessageSquareText className="h-4 w-4 text-emerald-600" />
+            Mensagens
+          </Button>
+          <Select value={congregation} onValueChange={setCongregation}>
+            <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white flex-1 sm:w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODAS">Toda a igreja</SelectItem>
+              {congregationOptions.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (
@@ -204,6 +206,7 @@ export default function Birthdays() {
                   key={`${c.person.id}-${c.kind}`}
                   c={c}
                   token={photoToken}
+                  greet={greetProps(c)}
                   highlight={c.inDays === 0}
                   dateLabel={
                     c.inDays === 0
@@ -251,8 +254,11 @@ export default function Birthdays() {
                   key={`${c.person.id}-${c.kind}`}
                   c={c}
                   token={photoToken}
+                  greet={greetProps(c)}
                   highlight={
-                    month === todayParts.month && year === todayParts.year && c.day === todayParts.day
+                    month === todayParts.month &&
+                    year === todayParts.year &&
+                    c.day === todayParts.day
                   }
                   dateLabel={String(c.day).padStart(2, '0')}
                 />
@@ -260,6 +266,14 @@ export default function Birthdays() {
             )}
           </section>
         </>
+      )}
+      {greetings.church && (
+        <GreetingSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          church={greetings.church}
+          onSaved={greetings.setChurch}
+        />
       )}
     </div>
   )

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { listPeople, listStatusChanges } from '@/services/people'
+import { countPendingSignups } from '@/services/signups'
 import type { Person, PersonEvent } from '@/types'
 import {
   CONGREGATIONS,
@@ -18,10 +19,11 @@ import {
 import { getLocalTodayYMD, parseCalendarDate } from '@/lib/dateUtils'
 import {
   Cake,
+  ChevronRight,
   FileWarning,
   Heart,
   HeartHandshake,
-  MessageCircle,
+  Inbox,
   UserPlus,
   UserRoundPlus,
   Users,
@@ -31,6 +33,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PersonAvatar, errorMessage, usePhotoToken } from './shared'
+import { GreetButton, useGreetings } from './Greetings'
 
 function Stat({
   icon: Icon,
@@ -112,17 +115,11 @@ function BucketBars({
   )
 }
 
-function whatsappLink(phone: string | undefined, text: string): string {
-  let digits = (phone || '').replace(/\D/g, '')
-  if (!digits) return ''
-  if (digits.length <= 11) digits = `55${digits}`
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
-}
-
 export default function MembershipDashboard() {
   const { currentChurch } = useAuth()
   const photoToken = usePhotoToken()
   const today = getLocalTodayYMD()
+  const greetings = useGreetings(currentChurch?.id, today)
   const year = parseCalendarDate(today)!.year
 
   const [people, setPeople] = useState<Person[]>([])
@@ -131,6 +128,15 @@ export default function MembershipDashboard() {
   const [loadError, setLoadError] = useState('')
   const [congregation, setCongregation] = useState('TODAS')
   const [view, setView] = useState<'idade' | 'tempo' | 'sexo'>('idade')
+  const [pendingSignups, setPendingSignups] = useState(0)
+
+  useEffect(() => {
+    if (!currentChurch) return
+    // Sem a coleção no servidor (backend antigo) o aviso só não aparece
+    countPendingSignups(currentChurch.id)
+      .then(setPendingSignups)
+      .catch(() => setPendingSignups(0))
+  }, [currentChurch])
 
   useEffect(() => {
     if (!currentChurch) return
@@ -172,7 +178,10 @@ export default function MembershipDashboard() {
     view === 'idade'
       ? ageBuckets(active, today)
       : view === 'tempo'
-        ? tenureBuckets(active.filter((p) => p.status === 'MEMBRO'), today)
+        ? tenureBuckets(
+            active.filter((p) => p.status === 'MEMBRO'),
+            today,
+          )
         : genderBuckets(active)
 
   const chip = (on: boolean) =>
@@ -191,7 +200,12 @@ export default function MembershipDashboard() {
         </div>
         <div className="lg:ml-auto flex flex-wrap items-center gap-2">
           {['TODAS', ...congregationOptions].map((c) => (
-            <button key={c} type="button" className={chip(congregation === c)} onClick={() => setCongregation(c)}>
+            <button
+              key={c}
+              type="button"
+              className={chip(congregation === c)}
+              onClick={() => setCongregation(c)}
+            >
               {c === 'TODAS' ? 'Toda a igreja' : c}
             </button>
           ))}
@@ -204,6 +218,21 @@ export default function MembershipDashboard() {
         </div>
       </div>
 
+      {pendingSignups > 0 && (
+        <Link
+          to="/membros/cadastros"
+          className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100 transition-colors"
+        >
+          <Inbox className="h-5 w-5 shrink-0" />
+          <span>
+            <strong>{pendingSignups}</strong>{' '}
+            {pendingSignups === 1 ? 'cadastro pelo QR code aguardando' : 'cadastros pelo QR code aguardando'}{' '}
+            aprovação
+          </span>
+          <ChevronRight className="h-4 w-4 ml-auto" />
+        </Link>
+      )}
+
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
@@ -211,14 +240,22 @@ export default function MembershipDashboard() {
           ))}
         </div>
       ) : loadError ? (
-        <Card className="rounded-2xl border-red-200 bg-red-50 p-6 text-sm text-red-800">{loadError}</Card>
+        <Card className="rounded-2xl border-red-200 bg-red-50 p-6 text-sm text-red-800">
+          {loadError}
+        </Card>
       ) : people.length === 0 ? (
         <Card className="rounded-2xl border-dashed border-2 border-slate-200 bg-white/50 p-12 text-center">
           <Users className="mx-auto h-12 w-12 text-slate-400" />
-          <h3 className="mt-3 text-lg font-bold text-slate-900">O painel aparece com as primeiras fichas</h3>
-          <p className="text-sm text-slate-500 mt-1">Cadastre os membros para ver idade, tempo de igreja e aniversariantes.</p>
+          <h3 className="mt-3 text-lg font-bold text-slate-900">
+            O painel aparece com as primeiras fichas
+          </h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Cadastre os membros para ver idade, tempo de igreja e aniversariantes.
+          </p>
           <Link to="/membros/novo" className="mt-5 inline-block">
-            <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">Cadastrar primeiro membro</Button>
+            <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">
+              Cadastrar primeiro membro
+            </Button>
           </Link>
         </Card>
       ) : (
@@ -262,13 +299,34 @@ export default function MembershipDashboard() {
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Composição da igreja</h2>
                   <p className="text-xs text-slate-500">
-                    {view === 'tempo' ? 'Só membros, pela data de admissão' : 'Membros, congregados e visitantes'} · toque numa barra para ver os nomes
+                    {view === 'tempo'
+                      ? 'Só membros, pela data de admissão'
+                      : 'Membros, congregados e visitantes'}{' '}
+                    · toque numa barra para ver os nomes
                   </p>
                 </div>
                 <div className="ml-auto flex gap-1.5">
-                  <button type="button" className={chip(view === 'idade')} onClick={() => setView('idade')}>Idade</button>
-                  <button type="button" className={chip(view === 'tempo')} onClick={() => setView('tempo')}>Tempo de igreja</button>
-                  <button type="button" className={chip(view === 'sexo')} onClick={() => setView('sexo')}>Sexo</button>
+                  <button
+                    type="button"
+                    className={chip(view === 'idade')}
+                    onClick={() => setView('idade')}
+                  >
+                    Idade
+                  </button>
+                  <button
+                    type="button"
+                    className={chip(view === 'tempo')}
+                    onClick={() => setView('tempo')}
+                  >
+                    Tempo de igreja
+                  </button>
+                  <button
+                    type="button"
+                    className={chip(view === 'sexo')}
+                    onClick={() => setView('sexo')}
+                  >
+                    Sexo
+                  </button>
                 </div>
               </div>
               <div className="p-5">
@@ -280,42 +338,53 @@ export default function MembershipDashboard() {
               <section className="bg-white rounded-2xl border border-slate-200">
                 <div className="flex items-center px-5 py-4 border-b border-slate-100">
                   <h2 className="text-base font-bold text-slate-900">Aniversariantes da semana</h2>
-                  <Link to="/membros/aniversarios" className="ml-auto text-xs font-semibold text-teal-700 hover:underline">
+                  <Link
+                    to="/membros/aniversarios"
+                    className="ml-auto text-xs font-semibold text-teal-700 hover:underline"
+                  >
                     Ver todos
                   </Link>
                 </div>
                 {birthdays.length === 0 ? (
-                  <p className="px-5 py-6 text-sm text-slate-500">Nenhum aniversário nos próximos 7 dias.</p>
+                  <p className="px-5 py-6 text-sm text-slate-500">
+                    Nenhum aniversário nos próximos 7 dias.
+                  </p>
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {birthdays.slice(0, 6).map((c) => {
-                      const first = c.person.name.split(/\s+/)[0]
-                      const wa = whatsappLink(
-                        c.person.phone,
-                        c.kind === 'NASCIMENTO'
-                          ? `Feliz aniversário, ${first}! Que Deus abençoe sua vida ricamente.`
-                          : `Feliz aniversário de casamento, ${first}! Que Deus abençoe a família de vocês.`,
-                      )
                       return (
-                        <li key={`${c.person.id}-${c.kind}`} className="flex items-center gap-3 px-5 py-2.5">
+                        <li
+                          key={`${c.person.id}-${c.kind}`}
+                          className="flex items-center gap-3 px-5 py-2.5"
+                        >
                           <PersonAvatar person={c.person} token={photoToken} size="sm" />
                           <div className="min-w-0 flex-1">
-                            <Link to={`/membros/${c.person.id}`} className="text-sm font-semibold text-slate-900 hover:text-teal-800 truncate block">
+                            <Link
+                              to={`/membros/${c.person.id}`}
+                              className="text-sm font-semibold text-slate-900 hover:text-teal-800 truncate block"
+                            >
                               {c.person.name}
                             </Link>
                             <p className="text-xs text-slate-500 flex items-center gap-1">
-                              {c.kind === 'NASCIMENTO' ? <Cake className="h-3 w-3 text-pink-500" /> : <Heart className="h-3 w-3 text-rose-500" />}
-                              {c.inDays === 0 ? 'Hoje' : `${String(c.day).padStart(2, '0')}/${String(c.month).padStart(2, '0')}`}
-                              {c.years !== null && ` · ${c.years} ${c.kind === 'NASCIMENTO' ? 'anos' : 'anos de casados'}`}
+                              {c.kind === 'NASCIMENTO' ? (
+                                <Cake className="h-3 w-3 text-pink-500" />
+                              ) : (
+                                <Heart className="h-3 w-3 text-rose-500" />
+                              )}
+                              {c.inDays === 0
+                                ? 'Hoje'
+                                : `${String(c.day).padStart(2, '0')}/${String(c.month).padStart(2, '0')}`}
+                              {c.years !== null &&
+                                ` · ${c.years} ${c.kind === 'NASCIMENTO' ? 'anos' : 'anos de casados'}`}
                             </p>
                           </div>
-                          {wa && (
-                            <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Parabenizar ${c.person.name}`}>
-                              <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg">
-                                <MessageCircle className="h-4 w-4 text-emerald-600" />
-                              </Button>
-                            </a>
-                          )}
+                          <GreetButton
+                            c={c}
+                            compact
+                            message={greetings.message(c)}
+                            sent={greetings.isSent(c)}
+                            onSend={greetings.markSent}
+                          />
                         </li>
                       )
                     })}
@@ -326,11 +395,14 @@ export default function MembershipDashboard() {
               <section className="bg-white rounded-2xl border border-slate-200">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h2 className="text-base font-bold text-slate-900">Movimentação em {year}</h2>
-                  <p className="text-xs text-slate-500">Entradas e saídas do rol registradas ao mudar a situação</p>
+                  <p className="text-xs text-slate-500">
+                    Entradas e saídas do rol registradas ao mudar a situação
+                  </p>
                 </div>
                 {movements.entradas.length + movements.saidas.length === 0 ? (
                   <p className="px-5 py-6 text-sm text-slate-500">
-                    Nenhuma mudança registrada este ano. Ao mudar a situação de alguém na ficha, o motivo aparece aqui.
+                    Nenhuma mudança registrada este ano. Ao mudar a situação de alguém na ficha, o
+                    motivo aparece aqui.
                   </p>
                 ) : (
                   <dl className="px-5 py-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm">
