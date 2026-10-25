@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { deletePerson, listPeople } from '@/services/people'
-import type { Person, PersonStatus } from '@/types'
+import type { Person, PersonSkill, PersonStatus } from '@/types'
 import {
   CONGREGATIONS,
   PERSON_STATUS_LABELS,
   PERSON_STATUS_ORDER,
+  SKILL_LABELS,
+  SKILL_ORDER,
   ageOn,
+  missingEssentials,
   filterPeople,
   summarizePeople,
 } from '@/lib/membership'
@@ -58,6 +61,10 @@ export default function PeopleList() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<PersonStatus | 'TODOS'>('TODOS')
   const [congregation, setCongregation] = useState('TODAS')
+  const [skill, setSkill] = useState<PersonSkill | 'TODAS'>('TODAS')
+  // ?incompletas=1 vem do painel: só fichas sem nascimento, telefone ou batismo
+  const [params, setParams] = useSearchParams()
+  const onlyIncomplete = params.get('incompletas') === '1'
 
   const fetchPeople = async () => {
     if (!currentChurch) return
@@ -80,8 +87,13 @@ export default function PeopleList() {
   const today = getLocalTodayYMD()
   const summary = useMemo(() => summarizePeople(people), [people])
   const filtered = useMemo(
-    () => filterPeople(people, { search, status, congregation }),
-    [people, search, status, congregation],
+    () =>
+      filterPeople(people, { search, status, congregation }).filter(
+        (p) =>
+          (skill === 'TODAS' || (p.skills || []).includes(skill)) &&
+          (!onlyIncomplete || missingEssentials(p).length > 0),
+      ),
+    [people, search, status, congregation, skill, onlyIncomplete],
   )
 
   // Congregações sugeridas + as que já aparecem nas fichas
@@ -114,7 +126,8 @@ export default function PeopleList() {
     })
   }
 
-  const hasFilters = !!search || status !== 'TODOS' || congregation !== 'TODAS'
+  const hasFilters =
+    !!search || status !== 'TODOS' || congregation !== 'TODAS' || skill !== 'TODAS' || onlyIncomplete
 
   return (
     <div className="space-y-6">
@@ -174,7 +187,7 @@ export default function PeopleList() {
             className="pl-10 h-10 rounded-xl border-slate-200 focus-visible:ring-teal-700 bg-white"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3 md:flex">
+        <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap">
           <Select value={status} onValueChange={(v) => setStatus(v as PersonStatus | 'TODOS')}>
             <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white md:w-44">
               <SelectValue placeholder="Situação" />
@@ -201,8 +214,37 @@ export default function PeopleList() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={skill} onValueChange={(v) => setSkill(v as PersonSkill | 'TODAS')}>
+            <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white md:w-48">
+              <SelectValue placeholder="Habilidade" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODAS">Qualquer habilidade</SelectItem>
+              {SKILL_ORDER.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {SKILL_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
+
+      {onlyIncomplete && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          Mostrando só fichas sem nascimento, telefone ou batismo.
+          <button
+            type="button"
+            className="text-xs font-semibold underline"
+            onClick={() => {
+              params.delete('incompletas')
+              setParams(params)
+            }}
+          >
+            Ver todas
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -245,7 +287,7 @@ export default function PeopleList() {
               return (
                 <div
                   key={person.id}
-                  onClick={() => navigate(`/membros/${person.id}/editar`)}
+                  onClick={() => navigate(`/membros/${person.id}`)}
                   className="group bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 hover:border-teal-300 hover:shadow-md transition-all flex items-center justify-between gap-4 cursor-pointer"
                 >
                   <div className="flex items-center gap-4 min-w-0">
