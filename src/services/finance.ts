@@ -15,6 +15,7 @@ import type {
   FinClosing,
   FinClosingCheck,
   FinBillKind,
+  FinBudget,
   FinCampaign,
   FinCategory,
   FinCount,
@@ -687,5 +688,39 @@ export async function listCampaignTransactions(churchId: string) {
     fields:
       'id,type,amount_cents,account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,bank_line_id,count_id,bill_id,campaign_id,created_by',
     sort: '-date,-created',
+  })
+}
+
+// ---- Orçamento (hook finance_budget.js) ----
+
+export async function listBudgets(churchId: string, years: number[]) {
+  return pb.collection('fin_budgets').getFullList<FinBudget>({
+    filter: pb.filter(
+      `church_id = {:churchId} && (${years.map((_, i) => `year = {:y${i}}`).join(' || ')})`,
+      { churchId, ...Object.fromEntries(years.map((y, i) => [`y${i}`, y])) },
+    ),
+  })
+}
+
+export const saveBudget = (
+  churchId: string,
+  year: number,
+  congregation: string,
+  lines: { category_id: string; amount_cents: number }[],
+) =>
+  pb.send<{ lines: number }>('/backend/v1/finance/budget', {
+    method: 'POST',
+    body: { church_id: churchId, year, congregation, lines },
+  })
+
+/** Lançamentos de um período (YYYY-MM-DD), só com o que o orçamento usa. */
+export async function listTransactionsBetween(churchId: string, from: string, to: string) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter('church_id = {:churchId} && date >= {:from} && date <= {:to}', {
+      churchId,
+      from: `${from} 00:00:00`,
+      to: `${to} 23:59:59`,
+    }),
+    fields: 'id,type,amount_cents,account_id,category_id,status,date',
   })
 }

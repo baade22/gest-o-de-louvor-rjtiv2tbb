@@ -40,6 +40,7 @@ import {
   TrendingUp,
   ShieldCheck,
   Flag,
+  Target,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -200,6 +201,12 @@ export default function Layout() {
           to: '/financeiro/campanhas',
           label: 'Campanhas',
           icon: Flag,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/orcamento',
+          label: 'Orçamento',
+          icon: Target,
           allowed: canSeeFinance,
         },
         {

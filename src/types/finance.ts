@@ -356,3 +356,12 @@ export interface FinCampaign extends BaseRecord {
   color?: FinCampaignColor | ''
   status: FinCampaignStatus
 }
+
+/** Linha do orçamento anual: previsto de uma categoria no ano (gravada só pelo hook). */
+export interface FinBudget extends BaseRecord {
+  year: number
+  /** Vazio = igreja toda. */
+  congregation?: string
+  category_id: string
+  amount_cents: number
+}

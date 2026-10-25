@@ -48,6 +48,7 @@ import FinanceClosing from '@/pages/finance/FinanceClosing'
 import FinanceReports from '@/pages/finance/FinanceReports'
 import FinanceStatements from '@/pages/finance/FinanceStatements'
 import FinanceCampaigns from '@/pages/finance/FinanceCampaigns'
+import FinanceBudget from '@/pages/finance/FinanceBudget'
 import FinanceCashFlow from '@/pages/finance/FinanceCashFlow'
 import FinanceAudit from '@/pages/finance/FinanceAudit'
 
@@ -271,6 +272,14 @@ const App = () => (
               element={
                 <RequireAuth requireModule="finance">
                   <FinanceCampaigns />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/orcamento"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceBudget />
                 </RequireAuth>
               }
             />
