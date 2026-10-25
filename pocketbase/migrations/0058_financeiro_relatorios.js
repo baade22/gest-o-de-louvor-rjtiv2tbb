@@ -1,4 +1,4 @@
-// Migração 0048: Financeiro, relatórios.
+// Migração 0058: Financeiro, relatórios.
 // - Código contábil (conta do plano do contador) nas categorias e nas contas, para a
 //   exportação contábil.
 // - fin_signers: quem assina os relatórios (nome e cargo, ex.: Tesoureira, Pastor presidente).

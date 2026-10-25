@@ -1,5 +1,5 @@
 // Acesso aos dados do Financeiro. As regras de quem lê e quem grava ficam no PocketBase
-// (migração 0035); aqui só montamos as consultas.
+// (migração 0051); aqui só montamos as consultas.
 
 import pb from '@/lib/pocketbase/client'
 import { DEFAULT_CATEGORIES, addMonthsToDate, monthRange } from '@/lib/financeSummary'

@@ -1,4 +1,4 @@
-// Migração 0050: Financeiro, auditoria do conselho fiscal.
+// Migração 0060: Financeiro, auditoria do conselho fiscal.
 // - Função operacional AUDITOR (Conselho fiscal): lê tudo do financeiro (como o ADMIN), não lança.
 //   As regras de leitura (list/view) das coleções fin_* e de people passam a aceitar a função.
 // - fin_audits: situação de cada lançamento auditado (aprovado, com ressalva, ressalva respondida).

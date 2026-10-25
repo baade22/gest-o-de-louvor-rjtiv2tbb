@@ -1,4 +1,4 @@
-// Migração 0049: Financeiro, fluxo de caixa.
+// Migração 0059: Financeiro, fluxo de caixa.
 // Saldo mínimo por conta: o fluxo de caixa avisa quando a projeção da congregação fica abaixo
 // da soma dos mínimos das contas dela.
 

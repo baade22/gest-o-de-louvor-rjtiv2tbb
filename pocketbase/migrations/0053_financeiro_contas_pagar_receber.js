@@ -1,4 +1,4 @@
-// Migração 0037: Financeiro, contas a pagar e a receber.
+// Migração 0053: Financeiro, contas a pagar e a receber.
 // - fin_bills: título com vencimento (a pagar para fornecedor, a receber de pessoa).
 //   Fica ABERTO até a baixa, que é feita pelo hook finance_bills.js: ele cria o lançamento
 //   (saída ou entrada) e marca o título como PAGO. Se o lançamento for estornado, o título
