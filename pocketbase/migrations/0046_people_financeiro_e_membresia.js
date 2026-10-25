@@ -89,12 +89,21 @@ migrate(
     const ADMIN =
       MEMBER +
       " && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')"
+    // Responsável pelo acompanhamento (Membresia, followup_owner): se o campo já existe,
+    // a regra que confere que ele é da mesma igreja continua valendo.
+    const followupCreate = has('followup_owner')
+      ? " && (@request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)"
+      : ''
+    const followupUpdate = has('followup_owner')
+      ? " && (@request.body.followup_owner:isset = false || @request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)"
+      : ''
     people.listRule = ADMIN_OR_FIN
     people.viewRule = ADMIN_OR_FIN
-    people.createRule = ADMIN_OR_FIN
+    people.createRule = ADMIN_OR_FIN + followupCreate
     people.updateRule =
       ADMIN_OR_FIN +
-      ' && (@request.body.church_id:isset = false || @request.body.church_id = church_id)'
+      ' && (@request.body.church_id:isset = false || @request.body.church_id = church_id)' +
+      followupUpdate
     people.deleteRule = ADMIN
     app.save(people)
 
