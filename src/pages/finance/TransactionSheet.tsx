@@ -39,6 +39,7 @@ import {
 } from '@/services/finance'
 import type {
   FinAccount,
+  FinCampaign,
   FinCategory,
   FinCostCenter,
   FinSupplier,
@@ -55,6 +56,7 @@ export interface FinanceLookups {
   suppliers: FinSupplier[]
   people: Person[]
   events: { id: string; title: string; date: string }[]
+  campaigns?: FinCampaign[]
 }
 
 interface Props {
@@ -89,6 +91,7 @@ const emptyForm = (type: FinTransactionType = 'ENTRADA') => ({
   to_account_id: '',
   category_id: '',
   cost_center_id: '',
+  campaign_id: '',
   payment_method: defaultMethod(type),
   person_id: '',
   is_anonymous: false,
@@ -115,6 +118,9 @@ export function TransactionSheet({
   const activeCostCenters = lookups.costCenters.filter(
     (c) => c.is_active || c.id === form.cost_center_id,
   )
+  const openCampaigns = (lookups.campaigns || []).filter(
+    (c) => c.status === 'ATIVA' || c.id === form.campaign_id,
+  )
 
   useEffect(() => {
     if (!open) return
@@ -129,6 +135,7 @@ export function TransactionSheet({
         to_account_id: editing.to_account_id || '',
         category_id: editing.category_id || '',
         cost_center_id: editing.cost_center_id || '',
+        campaign_id: editing.campaign_id || '',
         payment_method: editing.payment_method || '',
         person_id: editing.person_id || '',
         is_anonymous: editing.is_anonymous,
@@ -220,6 +227,7 @@ export function TransactionSheet({
       to_account_id: isTransfer ? form.to_account_id : '',
       category_id: isTransfer ? '' : form.category_id,
       cost_center_id: isTransfer ? '' : form.cost_center_id,
+      campaign_id: isTransfer ? '' : form.campaign_id,
       payment_method: form.payment_method,
       person_id: isContribution && !form.is_anonymous ? form.person_id : '',
       is_anonymous: isContribution && form.is_anonymous,
@@ -528,6 +536,28 @@ export function TransactionSheet({
                   </Select>
                 </div>
               )}
+            </div>
+          )}
+
+          {!isTransfer && openCampaigns.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className={fieldLabel}>Campanha (opcional)</Label>
+              <Select
+                value={form.campaign_id || NONE}
+                onValueChange={(v) => set({ campaign_id: v === NONE ? '' : v })}
+              >
+                <SelectTrigger className="h-10 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Nenhuma</SelectItem>
+                  {openCampaigns.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

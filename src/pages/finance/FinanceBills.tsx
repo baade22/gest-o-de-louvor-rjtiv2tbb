@@ -576,6 +576,7 @@ const emptyForm = () => ({
   issue_date: '',
   category_id: '',
   cost_center_id: '',
+  campaign_id: '',
   supplier_id: '',
   person_id: '',
   account_id: '',
@@ -624,6 +625,7 @@ function BillSheet({
         issue_date: (editing.issue_date || '').slice(0, 10),
         category_id: editing.category_id || '',
         cost_center_id: editing.cost_center_id || '',
+        campaign_id: editing.campaign_id || '',
         supplier_id: editing.supplier_id || '',
         person_id: editing.person_id || '',
         account_id: editing.account_id || '',
@@ -646,6 +648,9 @@ function BillSheet({
   )
   const accounts = lookups.accounts.filter((a) => a.is_active || a.id === form.account_id)
   const costCenters = lookups.costCenters.filter((c) => c.is_active || c.id === form.cost_center_id)
+  const openCampaigns = (lookups.campaigns || []).filter(
+    (c) => c.status === 'ATIVA' || c.id === form.campaign_id,
+  )
   const cents = parseMoneyToCents(form.amount) || 0
   const times = Math.max(2, Math.min(60, Number(form.times) || 0))
 
@@ -682,6 +687,7 @@ function BillSheet({
       issue_date: form.issue_date,
       category_id: form.category_id,
       cost_center_id: form.cost_center_id,
+      campaign_id: form.campaign_id,
       supplier_id: isPay ? form.supplier_id : '',
       person_id: isPay ? '' : form.person_id,
       account_id: form.account_id,
@@ -879,6 +885,28 @@ function BillSheet({
               </div>
             )}
           </div>
+
+          {openCampaigns.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className={fieldLabel}>Campanha (opcional)</Label>
+              <Select
+                value={form.campaign_id || NONE}
+                onValueChange={(v) => set({ campaign_id: v === NONE ? '' : v })}
+              >
+                <SelectTrigger className="h-10 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Nenhuma</SelectItem>
+                  {openCampaigns.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className={fieldLabel}>

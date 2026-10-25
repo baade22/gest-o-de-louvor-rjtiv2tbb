@@ -20,6 +20,7 @@ onRecordValidate(
         count_id: 'fin_counts',
         bill_id: 'fin_bills',
         bank_line_id: 'fin_bank_lines',
+        campaign_id: 'fin_campaigns',
       },
       fin_counts: {
         account_id: 'fin_accounts',
@@ -34,6 +35,7 @@ onRecordValidate(
         account_id: 'fin_accounts',
         paid_account_id: 'fin_accounts',
         transaction_id: 'fin_transactions',
+        campaign_id: 'fin_campaigns',
       },
       fin_bank_lines: {
         account_id: 'fin_accounts',

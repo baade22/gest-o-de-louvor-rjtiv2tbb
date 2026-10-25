@@ -83,6 +83,8 @@ export interface FinTransaction extends BaseRecord {
   bank_line_id?: string
   category_id?: string
   cost_center_id?: string
+  /** Campanha para a qual a entrada (ou saída) conta. */
+  campaign_id?: string
   payment_method?: FinPaymentMethod | ''
   person_id?: string
   is_anonymous: boolean
@@ -101,6 +103,7 @@ export interface FinTransaction extends BaseRecord {
     person_id?: Person
     supplier_id?: FinSupplier
     event_id?: { id: string; title: string; date: string }
+    campaign_id?: FinCampaign
   }
 }
 
@@ -156,6 +159,7 @@ export interface FinBill extends BaseRecord {
   cost_center_id?: string
   supplier_id?: string
   person_id?: string
+  campaign_id?: string
   /** Conta prevista para pagar ou receber. */
   account_id?: string
   document_type?: FinBillDocumentType | ''
@@ -335,4 +339,20 @@ export interface FinSettings extends BaseRecord {
   city?: string
   /** Texto do rodapé do informe. */
   statement_note?: string
+}
+
+export type FinCampaignStatus = 'ATIVA' | 'ENCERRADA'
+export type FinCampaignColor = 'TEAL' | 'INDIGO' | 'ORANGE' | 'ROSE' | 'SKY' | 'AMBER'
+
+/** Campanha: arrecadação com meta e prazo (reforma, missões, congresso). */
+export interface FinCampaign extends BaseRecord {
+  name: string
+  description?: string
+  goal_cents?: number
+  start_date?: string
+  end_date?: string
+  /** Vazio = a igreja toda. */
+  congregation?: string
+  color?: FinCampaignColor | ''
+  status: FinCampaignStatus
 }

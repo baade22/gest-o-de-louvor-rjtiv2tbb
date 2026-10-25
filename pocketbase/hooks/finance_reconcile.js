@@ -8,7 +8,7 @@
 // reconcile   { line_id, transaction_id }   liga a linha a um lançamento que já existe
 //             { line_id, bill_id, payment_method? }   dá baixa numa conta a pagar/receber
 //             { line_id, create: { category_id, person_id, is_anonymous, supplier_id,
-//               cost_center_id, description, payment_method, transfer_account_id } }
+//               cost_center_id, campaign_id, description, payment_method, transfer_account_id } }
 //             cria o lançamento a partir da linha (transferência quando vier transfer_account_id)
 // unreconcile { line_id }   desfaz a ligação; o lançamento continua como está
 //
@@ -291,6 +291,7 @@ routerAdd(
           tx.set('account_id', accountId)
           tx.set('category_id', bill.getString('category_id'))
           tx.set('cost_center_id', bill.getString('cost_center_id'))
+          tx.set('campaign_id', bill.getString('campaign_id'))
           tx.set('payment_method', methods.indexOf(method) !== -1 ? method : '')
           tx.set('supplier_id', isCredit ? '' : bill.getString('supplier_id'))
           tx.set('person_id', isCredit ? bill.getString('person_id') : '')
@@ -326,6 +327,7 @@ routerAdd(
             tx.set('account_id', accountId)
             tx.set('category_id', String(create.category_id || ''))
             tx.set('cost_center_id', String(create.cost_center_id || ''))
+            tx.set('campaign_id', String(create.campaign_id || ''))
             if (isCredit) {
               const anonymous = create.is_anonymous === true
               tx.set('is_anonymous', anonymous)

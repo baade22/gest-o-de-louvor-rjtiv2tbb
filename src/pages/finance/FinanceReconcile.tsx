@@ -890,6 +890,7 @@ function CreateFromLineDialog({
   const [mode, setMode] = useState<'LANCAMENTO' | 'TRANSFERENCIA'>('LANCAMENTO')
   const [categoryId, setCategoryId] = useState('')
   const [costCenterId, setCostCenterId] = useState('')
+  const [campaignId, setCampaignId] = useState('')
   const [personId, setPersonId] = useState('')
   const [anonymous, setAnonymous] = useState(false)
   const [supplierId, setSupplierId] = useState('')
@@ -904,6 +905,7 @@ function CreateFromLineDialog({
     setMode('LANCAMENTO')
     setCategoryId('')
     setCostCenterId('')
+    setCampaignId('')
     setPersonId(suggestedPerson?.id || '')
     setAnonymous(false)
     setSupplierId('')
@@ -919,6 +921,7 @@ function CreateFromLineDialog({
   const category = lookups.categories.find((c) => c.id === categoryId)
   const isContribution = credit && Boolean(category?.is_contribution)
   const costCenters = lookups.costCenters.filter((c) => c.is_active)
+  const openCampaigns = (lookups.campaigns || []).filter((c) => c.status === 'ATIVA')
   // Atalhos para o que mais aparece no extrato
   const shortcuts = categories.filter((c) =>
     credit ? /d[ií]zimo|rendiment/i.test(c.name) : /tarifa/i.test(c.name),
@@ -962,6 +965,7 @@ function CreateFromLineDialog({
             : {
                 category_id: categoryId,
                 cost_center_id: costCenterId,
+                campaign_id: campaignId,
                 person_id: isContribution && !anonymous ? personId : '',
                 is_anonymous: isContribution && anonymous,
                 supplier_id: credit ? '' : supplierId,
@@ -1172,6 +1176,28 @@ function CreateFromLineDialog({
                   </div>
                 )}
               </div>
+
+              {openCampaigns.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className={fieldLabel}>Campanha (opcional)</Label>
+                  <Select
+                    value={campaignId || NONE}
+                    onValueChange={(v) => setCampaignId(v === NONE ? '' : v)}
+                  >
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Nenhuma</SelectItem>
+                      {openCampaigns.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </>
           )}
 

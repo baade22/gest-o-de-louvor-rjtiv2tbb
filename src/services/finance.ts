@@ -15,6 +15,7 @@ import type {
   FinClosing,
   FinClosingCheck,
   FinBillKind,
+  FinCampaign,
   FinCategory,
   FinCount,
   FinCountEnvelope,
@@ -76,7 +77,8 @@ export async function seedDefaultCategories(churchId: string) {
 /** Data de calendário (YYYY-MM-DD) gravada ao meio-dia UTC, para não mudar de dia com o fuso. */
 export const toPbDate = (ymd: string) => `${ymd} 12:00:00.000Z`
 
-const EXPAND = 'account_id,to_account_id,category_id,cost_center_id,person_id,supplier_id,event_id'
+const EXPAND =
+  'account_id,to_account_id,category_id,cost_center_id,person_id,supplier_id,event_id,campaign_id'
 
 export async function listTransactionsOfMonth(churchId: string, ym: string) {
   const { start, end } = monthRange(ym)
@@ -110,6 +112,7 @@ export interface TransactionInput {
   to_account_id?: string
   category_id?: string
   cost_center_id?: string
+  campaign_id?: string
   payment_method?: string
   person_id?: string
   is_anonymous?: boolean
@@ -255,6 +258,7 @@ export interface BillInput {
   issue_date?: string // YYYY-MM-DD
   category_id?: string
   cost_center_id?: string
+  campaign_id?: string
   supplier_id?: string
   person_id?: string
   account_id?: string
@@ -395,6 +399,7 @@ export async function importStatement(
 export interface ReconcileCreate {
   category_id?: string
   cost_center_id?: string
+  campaign_id?: string
   person_id?: string
   is_anonymous?: boolean
   supplier_id?: string
@@ -646,4 +651,41 @@ export async function saveFinSettings(
 ) {
   if (current) return pb.collection('fin_settings').update<FinSettings>(current.id, data)
   return pb.collection('fin_settings').create<FinSettings>({ ...data, church_id: churchId })
+}
+
+// ---- Campanhas ----
+
+export async function listCampaigns(churchId: string) {
+  return pb.collection('fin_campaigns').getFullList<FinCampaign>({
+    filter: byChurch(churchId),
+    sort: '-start_date,name',
+  })
+}
+
+export type CampaignInput = Pick<
+  FinCampaign,
+  'name' | 'description' | 'goal_cents' | 'congregation' | 'color' | 'status'
+> & { start_date: string; end_date: string }
+
+export async function saveCampaign(churchId: string, id: string | null, input: CampaignInput) {
+  const data = {
+    ...input,
+    start_date: input.start_date ? toPbDate(input.start_date) : '',
+    end_date: input.end_date ? toPbDate(input.end_date) : '',
+  }
+  if (id) return pb.collection('fin_campaigns').update<FinCampaign>(id, data)
+  return pb.collection('fin_campaigns').create<FinCampaign>({ ...data, church_id: churchId })
+}
+
+export const setCampaignStatus = (id: string, status: FinCampaign['status']) =>
+  pb.collection('fin_campaigns').update<FinCampaign>(id, { status })
+
+/** Lançamentos ligados a alguma campanha, para os totais e a lista de cada uma. */
+export async function listCampaignTransactions(churchId: string) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter("church_id = {:churchId} && campaign_id != ''", { churchId }),
+    fields:
+      'id,type,amount_cents,account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,bank_line_id,count_id,bill_id,campaign_id,created_by',
+    sort: '-date,-created',
+  })
 }

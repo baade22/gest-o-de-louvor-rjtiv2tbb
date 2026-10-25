@@ -93,6 +93,7 @@ routerAdd(
         tx.set('account_id', accountId)
         tx.set('category_id', fresh.getString('category_id'))
         tx.set('cost_center_id', fresh.getString('cost_center_id'))
+        tx.set('campaign_id', fresh.getString('campaign_id'))
         tx.set('payment_method', method)
         tx.set('supplier_id', isPay ? fresh.getString('supplier_id') : '')
         tx.set('person_id', isPay ? '' : fresh.getString('person_id'))

@@ -39,6 +39,7 @@ import {
   FileBarChart,
   TrendingUp,
   ShieldCheck,
+  Flag,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -193,6 +194,12 @@ export default function Layout() {
           to: '/financeiro/fluxo-de-caixa',
           label: 'Fluxo de caixa',
           icon: TrendingUp,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/campanhas',
+          label: 'Campanhas',
+          icon: Flag,
           allowed: canSeeFinance,
         },
         {

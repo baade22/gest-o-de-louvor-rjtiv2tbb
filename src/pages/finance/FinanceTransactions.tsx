@@ -74,6 +74,7 @@ function detail(tx: FinTransaction) {
   if ((tx.is_anonymous || tx.person_id || tx.supplier_id) && tx.description)
     parts.push(tx.description)
   if (tx.expand?.event_id) parts.push(tx.expand.event_id.title)
+  if (tx.expand?.campaign_id) parts.push(`campanha ${tx.expand.campaign_id.name}`)
   if (tx.count_id) parts.push('contagem do culto')
   if (tx.bill_id) parts.push(tx.type === 'SAIDA' ? 'conta a pagar' : 'conta a receber')
   if (tx.bank_line_id) parts.push('conciliado')
