@@ -5,6 +5,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
   FileText,
+  FileUser,
   HandCoins,
   Landmark,
   Loader2,
@@ -13,6 +14,7 @@ import {
   Scale,
   Wallet,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -80,6 +82,7 @@ import {
   shortDate,
   useFinanceAccess,
 } from './shared'
+import { download, printSheet } from './print'
 
 type ReportKey = 'dre' | 'contributions' | 'counts' | 'trial' | 'ledger' | 'availability' | 'bills'
 
@@ -132,41 +135,6 @@ function periodLabel(from: string, to: string) {
 }
 
 const pct = (value: number) => `${Math.round(value)}%`
-
-function download(name: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
-/** Imprime só a folha do relatório, num iframe com os estilos da página. */
-function printSheet(sheet: HTMLElement, title: string) {
-  const frame = document.createElement('iframe')
-  frame.setAttribute('aria-hidden', 'true')
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
-  document.body.appendChild(frame)
-  const doc = frame.contentDocument!
-  const styles = [...document.querySelectorAll('style, link[rel="stylesheet"]')]
-    .map((el) => el.outerHTML)
-    .join('')
-  doc.open()
-  doc.write(
-    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${title}</title>${styles}` +
-      '<style>@page{size:A4;margin:14mm}body{background:#fff}</style></head>' +
-      `<body>${sheet.outerHTML}</body></html>`,
-  )
-  doc.close()
-  const go = () => {
-    frame.contentWindow?.focus()
-    frame.contentWindow?.print()
-    setTimeout(() => frame.remove(), 1000)
-  }
-  // Espera as folhas de estilo externas carregarem antes de imprimir.
-  setTimeout(go, 400)
-}
 
 // ---- Peças da folha ----
 
@@ -808,6 +776,20 @@ export default function FinanceReports() {
               </button>
             )
           })}
+          <Link
+            to="/financeiro/informes"
+            className="flex w-full items-center gap-3 border-t border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
+          >
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-500">
+              <FileUser className="h-4 w-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-slate-900">Informes anuais</span>
+              <span className="block truncate text-xs text-slate-500">
+                Total doado por pessoa, para o IR
+              </span>
+            </span>
+          </Link>
         </nav>
 
         <div className="flex min-w-0 flex-col gap-4">

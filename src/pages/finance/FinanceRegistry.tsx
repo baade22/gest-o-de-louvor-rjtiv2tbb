@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Archive, ArchiveRestore, Loader2, Pencil, Plus, Sparkles } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { centsToInput, formatCents, parseMoneyToCents } from '@/lib/money'
 import {
+  getFinSettings,
   listRegistry,
+  saveFinSettings,
   saveRegistry,
   seedDefaultCategories,
   toPbDate,
@@ -15,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -40,6 +44,8 @@ import {
   primaryButtonClass,
   useFinanceAccess,
 } from './shared'
+import { DEFAULT_STATEMENT_NOTE } from './AnnualStatementSheet'
+import type { FinSettings } from '@/types/finance'
 
 type Row = Record<string, any> & { id: string; name: string; is_active: boolean }
 
@@ -537,10 +543,121 @@ function RegistryTab({
   )
 }
 
+const SETTINGS_FIELDS: { key: keyof FinSettings; label: string; placeholder?: string }[] = [
+  { key: 'legal_name', label: 'Razão social', placeholder: 'Como está no cartão do CNPJ' },
+  { key: 'cnpj', label: 'CNPJ', placeholder: '00.000.000/0000-00' },
+  { key: 'address', label: 'Endereço', placeholder: 'Rua, número, bairro' },
+  { key: 'city', label: 'Cidade', placeholder: 'Ex.: Recife/PE' },
+]
+
+/** Dados da igreja que saem no cabeçalho e no rodapé do informe anual de contribuições. */
+function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boolean }) {
+  const { toast } = useToast()
+  const [current, setCurrent] = useState<FinSettings | null>(null)
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    getFinSettings(churchId)
+      .then((row) => {
+        setCurrent(row)
+        setValues({
+          legal_name: row?.legal_name || '',
+          cnpj: row?.cnpj || '',
+          address: row?.address || '',
+          city: row?.city || '',
+          statement_note: row?.statement_note || '',
+        })
+      })
+      .catch((err) =>
+        toast({
+          title: 'Erro ao carregar os dados da igreja',
+          description: errorMessage(err, 'Tente de novo.'),
+          variant: 'destructive',
+        }),
+      )
+      .finally(() => setLoading(false))
+  }, [churchId, toast])
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const data = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim()]))
+      setCurrent(await saveFinSettings(churchId, current, data))
+      toast({ title: 'Dados da igreja salvos' })
+    } catch (err) {
+      toast({
+        title: 'Não foi possível salvar',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <Skeleton className="h-72 w-full" />
+
+  return (
+    <form onSubmit={save} className={cn(cardClass, 'max-w-2xl space-y-4 p-5')}>
+      <p className="text-sm text-slate-600">
+        Saem no informe anual de contribuições que cada membro recebe.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {SETTINGS_FIELDS.map((f) => (
+          <div key={f.key} className={cn('space-y-1.5', f.key === 'legal_name' && 'sm:col-span-2')}>
+            <Label htmlFor={`fs-${f.key}`} className="text-xs font-semibold text-slate-600">
+              {f.label}
+            </Label>
+            <Input
+              id={`fs-${f.key}`}
+              value={values[f.key] ?? ''}
+              placeholder={f.placeholder}
+              disabled={!canEdit}
+              onChange={(e) => setValues((s) => ({ ...s, [f.key]: e.target.value }))}
+              className="h-10 rounded-lg"
+            />
+          </div>
+        ))}
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="fs-note" className="text-xs font-semibold text-slate-600">
+            Texto no fim do informe
+          </Label>
+          <Textarea
+            id="fs-note"
+            rows={3}
+            value={values.statement_note ?? ''}
+            placeholder={DEFAULT_STATEMENT_NOTE}
+            disabled={!canEdit}
+            onChange={(e) => setValues((s) => ({ ...s, statement_note: e.target.value }))}
+          />
+          <p className="text-xs text-slate-500">Em branco, sai o texto de exemplo acima.</p>
+        </div>
+      </div>
+      {canEdit && (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={saving} className={cn(primaryButtonClass, 'h-9')}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Salvar
+          </Button>
+        </div>
+      )}
+    </form>
+  )
+}
+
+const CHURCH_TAB = 'igreja'
+
 export default function FinanceRegistry() {
   const { currentChurch } = useAuth()
   const { canEdit } = useFinanceAccess()
-  const [tab, setTab] = useState<string>(TABS[0].key)
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState<string>(
+    params.get('aba') === CHURCH_TAB ? CHURCH_TAB : TABS[0].key,
+  )
   if (!currentChurch) return null
 
   return (
@@ -557,12 +674,16 @@ export default function FinanceRegistry() {
               {t.label}
             </TabsTrigger>
           ))}
+          <TabsTrigger value={CHURCH_TAB}>Dados da igreja</TabsTrigger>
         </TabsList>
         {TABS.map((t) => (
           <TabsContent key={t.key} value={t.key} className="mt-4">
             <RegistryTab config={t} churchId={currentChurch.id} canEdit={canEdit} />
           </TabsContent>
         ))}
+        <TabsContent value={CHURCH_TAB} className="mt-4">
+          <ChurchDataTab churchId={currentChurch.id} canEdit={canEdit} />
+        </TabsContent>
       </Tabs>
     </div>
   )

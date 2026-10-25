@@ -19,6 +19,7 @@ import type {
   FinCount,
   FinCountEnvelope,
   FinCostCenter,
+  FinSettings,
   FinSigner,
   FinSupplier,
   FinTransaction,
@@ -601,3 +602,48 @@ export const auditTransactions = (
       body: { church_id: churchId, action, transaction_ids: transactionIds, text },
     },
   )
+
+// ---- Contribuições por pessoa e informe anual ----
+
+const GIVING_FIELDS =
+  'id,type,amount_cents,account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,bank_line_id,count_id'
+
+/** Entradas com o nome da pessoa (nunca as anônimas), da mais recente para a mais antiga. */
+export async function listPersonGiving(churchId: string, personId: string) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter(
+      "church_id = {:churchId} && person_id = {:personId} && type = 'ENTRADA' && is_anonymous = false",
+      { churchId, personId },
+    ),
+    fields: GIVING_FIELDS,
+    sort: '-date,-created',
+  })
+}
+
+/** Entradas com nome de um ano inteiro, para os informes de todos os contribuintes. */
+export async function listYearGiving(churchId: string, year: number) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter(
+      "church_id = {:churchId} && type = 'ENTRADA' && is_anonymous = false && person_id != '' && date >= {:from} && date <= {:to}",
+      { churchId, from: `${year}-01-01 00:00:00`, to: `${year}-12-31 23:59:59` },
+    ),
+    fields: GIVING_FIELDS,
+    sort: 'date',
+  })
+}
+
+export async function getFinSettings(churchId: string) {
+  const rows = await pb.collection('fin_settings').getList<FinSettings>(1, 1, {
+    filter: byChurch(churchId),
+  })
+  return rows.items[0] || null
+}
+
+export async function saveFinSettings(
+  churchId: string,
+  current: FinSettings | null,
+  data: Partial<FinSettings>,
+) {
+  if (current) return pb.collection('fin_settings').update<FinSettings>(current.id, data)
+  return pb.collection('fin_settings').create<FinSettings>({ ...data, church_id: churchId })
+}

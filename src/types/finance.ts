@@ -326,3 +326,13 @@ export interface FinAuditComment extends BaseRecord {
   author_name: string
   author_role: string
 }
+
+/** Dados da igreja que saem no informe anual de contribuições (um registro por igreja). */
+export interface FinSettings extends BaseRecord {
+  legal_name?: string
+  cnpj?: string
+  address?: string
+  city?: string
+  /** Texto do rodapé do informe. */
+  statement_note?: string
+}
