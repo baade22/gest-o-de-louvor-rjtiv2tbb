@@ -602,13 +602,10 @@ export const auditTransactions = (
   transactionIds: string[],
   text = '',
 ) =>
-  pb.send<{ approved: number; skipped_own: number; status: string }>(
-    '/backend/v1/finance/audit',
-    {
-      method: 'POST',
-      body: { church_id: churchId, action, transaction_ids: transactionIds, text },
-    },
-  )
+  pb.send<{ approved: number; skipped_own: number; status: string }>('/backend/v1/finance/audit', {
+    method: 'POST',
+    body: { church_id: churchId, action, transaction_ids: transactionIds, text },
+  })
 
 // ---- Contribuições por pessoa e informe anual ----
 

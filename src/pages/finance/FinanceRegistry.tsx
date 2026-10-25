@@ -136,8 +136,8 @@ const TABS: TabConfig[] = [
       ]
         .filter(Boolean)
         .join(' · ') +
-        ` · saldo inicial ${formatCents(r.opening_balance_cents || 0)}` +
-        (r.min_balance_cents ? ` · mínimo ${formatCents(r.min_balance_cents)}` : ''),
+      ` · saldo inicial ${formatCents(r.opening_balance_cents || 0)}` +
+      (r.min_balance_cents ? ` · mínimo ${formatCents(r.min_balance_cents)}` : ''),
   },
   {
     key: 'fin_categories',
