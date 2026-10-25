@@ -116,7 +116,14 @@ export default function Layout() {
   // MÚSICO (somente): Início, Minhas Escalas, Músicas, Meu Perfil
   // SOM / PROJEÇÃO / MÍDIA / ILUMINAÇÃO: Agenda + o módulo da sua equipe
   // Usuário com várias funções operacionais vê a união dos módulos
-  const canSeeSongs = isMaster || isAdmin || isLeader || hasOperationalRole('MUSICO')
+  // Som e Projeção também veem músicas/letras (só leitura; editar exige gestor)
+  const canSeeSongs =
+    isMaster ||
+    isAdmin ||
+    isLeader ||
+    hasOperationalRole('MUSICO') ||
+    hasOperationalRole('SOM') ||
+    hasOperationalRole('PROJECAO')
   const canSeeEvents =
     isMaster ||
     isAdmin ||
@@ -133,8 +140,10 @@ export default function Layout() {
   const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const canSeeMusicians = isMaster || isAdmin || isLeader
   const canSeeAdmin = isMaster || isAdmin
+  // Financeiro é delegado pelo MASTER: só o MASTER ou quem recebeu FINANCEIRO/AUDITOR.
+  // ADMIN não vê por padrão (precisa receber a função), igual à Membresia.
   const canSeeFinance =
-    isMaster || isAdmin || hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
+    isMaster || hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
   // Membresia é delegada pelo MASTER: só o MASTER ou quem recebeu a função MEMBRESIA.
   // ADMIN não vê por padrão (precisa receber a função), coerente com o acesso delegado.
   const canSeeMembership = isMaster || hasOperationalRole('MEMBRESIA')

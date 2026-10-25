@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 
 interface RouteGuardProps {
   children: React.ReactNode
-  requireRole?: 'MASTER' | 'ADMIN' | 'LIDER' | 'CONTENT_MANAGER' | 'MEMBERSHIP'
+  requireRole?: 'MASTER' | 'ADMIN' | 'LIDER' | 'CONTENT_MANAGER' | 'MEMBERSHIP' | 'FINANCE'
   requireModule?: string
 }
 
@@ -97,6 +97,34 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
     )
   }
 
+  // Financeiro é delegado pelo MASTER: só o MASTER ou quem recebeu FINANCEIRO/AUDITOR.
+  // ADMIN não entra por padrão (precisa da função), igual à Membresia.
+  if (
+    requireRole === 'FINANCE' &&
+    !isMaster &&
+    !hasOperationalRole('FINANCEIRO') &&
+    !hasOperationalRole('AUDITOR')
+  ) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+          <ShieldAlert className="h-8 w-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900">Acesso ao Financeiro</h2>
+        <p className="mt-2 max-w-md text-sm text-slate-600">
+          Esta área é restrita. Peça ao MASTER da igreja a função Financeiro ou Conselho fiscal
+          para acessá-la.
+        </p>
+        <Link to="/dashboard" className="mt-6">
+          <Button variant="outline" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao Início
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
   if (requireRole === 'CONTENT_MANAGER' && !isAdmin && !isLeader) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
@@ -127,7 +155,12 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
     else if (requireModule === 'finance')
       hasAccess = hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
     else if (requireModule === 'tasks') hasAccess = hasOperationalRole('MIDIA') || isLeader
-    else if (requireModule === 'songs') hasAccess = hasOperationalRole('MUSICO') || isLeader
+    else if (requireModule === 'songs')
+      hasAccess =
+        hasOperationalRole('MUSICO') ||
+        hasOperationalRole('SOM') ||
+        hasOperationalRole('PROJECAO') ||
+        isLeader
     else if (requireModule === 'events') {
       hasAccess =
         hasOperationalRole('SOM') ||
