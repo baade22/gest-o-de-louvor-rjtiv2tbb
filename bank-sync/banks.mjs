@@ -1,0 +1,152 @@
+// Leitura das respostas das APIs de saldo e extrato da Cora e do Bradesco.
+// Tudo aqui é função pura (sem rede) para poder testar com os exemplos das documentações.
+// Cada movimento vira { id, date: 'YYYY-MM-DD', amount_cents (positivo = entrou), description }.
+
+/** 'YYYY-MM-DD' → 'DDMMAAAA' (formato do Bradesco) */
+export function ddmmyyyy(ymd) {
+  const [y, m, d] = ymd.split('-')
+  return `${d}${m}${y}`
+}
+
+/** '17/01/2025' → '2025-01-17' */
+export function brDate(s) {
+  const m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
+}
+
+/** '6.759,00' → 675900 */
+export function brlToCents(s) {
+  const t = String(s || '').trim()
+  if (!/^\d{1,3}(\.?\d{3})*(,\d{1,2})?$/.test(t)) return null
+  const [int, dec = ''] = t.replace(/\./g, '').split(',')
+  return Number(int) * 100 + Number((dec + '00').slice(0, 2))
+}
+
+/** Data (dia) de Brasília de um instante ISO, aceitando o '+00' que a Cora manda. */
+export function brtDate(iso) {
+  const s = String(iso || '').replace(/([+-]\d{2})$/, '$1:00')
+  const t = Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z')
+  if (Number.isNaN(t)) return ''
+  return new Date(t - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+// ---------------- Cora ----------------
+
+/**
+ * Movimentos do extrato da Cora (GET /bank-statement/statement).
+ * BLOCK e UNBLOCK são bloqueios de saldo, não entram nem saem da conta: ficam de fora.
+ */
+export function coraLines(entries) {
+  const out = []
+  for (const en of entries || []) {
+    if (en.type !== 'CREDIT' && en.type !== 'DEBIT') continue
+    const amount = Number(en.amount)
+    if (!en.id || !Number.isInteger(amount) || amount === 0) continue
+    const date = brtDate(en.createdAt)
+    if (!date) continue
+    const tr = en.transaction || {}
+    const who = tr.counterParty?.name || ''
+    const what = tr.description || TRANSACTION_TYPES[tr.type] || tr.type || 'Movimento'
+    const description = [what, who && !what.toUpperCase().includes(who.toUpperCase()) ? who : '']
+      .filter(Boolean)
+      .join(' · ')
+    out.push({
+      id: String(en.id),
+      date,
+      amount_cents: en.type === 'CREDIT' ? Math.abs(amount) : -Math.abs(amount),
+      description,
+    })
+  }
+  return out
+}
+
+const TRANSACTION_TYPES = {
+  TRANSFER: 'Transferência',
+  PAYMENT: 'Pagamento',
+  PIX: 'Pix',
+  FEE: 'Tarifa',
+  BANK_DOMICILE: 'Domicílio bancário',
+  CARD: 'Cartão',
+}
+
+// ---------------- Bradesco ----------------
+
+const lastLine = (s) => String(s || '').trim()
+
+/**
+ * Movimentos do extrato do Bradesco (GET /v1/fornecimento-extratos-contas/extratos).
+ * Junta "Últimos Lançamentos" (D-1), "Lançamentos Dia" (D0) e o extrato por período;
+ * pula "Saldo Anterior" e os lançamentos futuros (ainda não aconteceram).
+ * O Bradesco não manda um id do movimento: montamos um com data, documento, código e valor,
+ * numerando os iguais. O mesmo movimento pode vir em mais de uma lista, então cada id conta
+ * no máximo tantas vezes quanto aparece na lista em que mais aparece.
+ */
+export function bradescoLines(json) {
+  const lists = []
+  const recent = json?.extratoUltimosLancamentos?.listaLancamentos || {}
+  for (const key of Object.keys(recent)) {
+    if (/saldo anterior/i.test(key) || /futur/i.test(key)) continue
+    if (Array.isArray(recent[key])) lists.push(recent[key])
+  }
+  const period = json?.extratoPorPeriodo?.lstLancamentoMensal
+  if (Array.isArray(period)) lists.push(period)
+
+  const out = []
+  const emitted = new Map()
+  for (const list of lists) {
+    const inList = new Map()
+    for (const r of list) {
+      const desc = lastLine(r.descritivoLancamentoCompleto || r.descritivoLancamentoAbreviado)
+      if (/^saldo anterior$/i.test(desc) || r.codigoLancamento === '00000') continue
+      const cents = brlToCents(r.valorLancamento)
+      const date = brDate(r.dataLancamento)
+      if (!cents || !date) continue
+      const amount = r.sinalLancamento === '-' ? -cents : cents
+      const key = [date, lastLine(r.numeroDocumento), lastLine(r.codigoLancamento), amount].join(
+        '|',
+      )
+      const n = (inList.get(key) || 0) + 1
+      inList.set(key, n)
+      if ((emitted.get(key) || 0) >= n) continue
+      emitted.set(key, n)
+      const second = lastLine(r.segundaLinhalLancamento)
+      out.push({
+        id: `${key}|${n}`,
+        date,
+        amount_cents: amount,
+        description: [desc.replace(/\*$/, ''), second].filter(Boolean).join(' · ') || 'Movimento',
+      })
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+}
+
+/**
+ * Saldo do Bradesco (GET /v1/fornecimento-saldos-contas/saldos): SALDO TOTAL (984) e
+ * DISPONÍVEL (999) da conta-corrente (ou poupança). Valores em centavos, com sinal.
+ */
+export function bradescoBalance(json) {
+  const block = json?.saldoCC || json?.saldoCP
+  const list = block?.lstLancamentosSaldos || []
+  const pick = (code) => {
+    const it = list.find((x) => Number(x.codigoProduto) === code)
+    const cents = it ? brlToCents(it.valorLancamento) : null
+    return cents === null ? null : it.sinalSaldo === '-' ? -cents : cents
+  }
+  const total = pick(984)
+  const available = pick(999)
+  return { balance_cents: total ?? available, available_cents: available ?? total }
+}
+
+/** Erro do Bradesco no corpo (codigoRetorno diferente de 00/01), ou null. */
+export function bradescoError(json) {
+  for (const key of Object.keys(json || {})) {
+    const b = json[key]
+    if (b && typeof b === 'object' && 'codigoRetorno' in b) {
+      if (b.codigoRetorno !== '00' && b.codigoRetorno !== '01') {
+        return `${b.codigoRetorno} ${lastLine(b.mensagem)}`.trim()
+      }
+    }
+  }
+  return null
+}

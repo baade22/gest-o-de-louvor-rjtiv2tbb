@@ -42,16 +42,37 @@ routerAdd(
       return e.json(400, { message: 'Informe um formato de e-mail válido.' })
     }
     const operationalRoles = Array.isArray(body.operational_roles)
-      ? body.operational_roles
+      ? body.operational_roles.map((r) => String(r))
       : ['MUSICO']
+    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO', 'AUDITOR']
+    for (const op of operationalRoles) {
+      if (knownOps.indexOf(op) === -1) {
+        return e.json(400, { message: 'Função operacional inválida: ' + op })
+      }
+    }
+    // Funções que mexem com o dinheiro (Financeiro e Conselho fiscal): só o MASTER dá ou tira.
+    const moneyRoles = (ops) =>
+      ['FINANCEIRO', 'AUDITOR'].filter((r) => ops.indexOf(r) !== -1).join(',')
+    const wantsFinance = moneyRoles(operationalRoles)
+    const hasFinance = (rec) => {
+      let ops = []
+      try {
+        ops = JSON.parse(rec.getString('operational_roles') || '[]') || []
+      } catch (_) {}
+      return moneyRoles(ops)
+    }
+    const financeOnlyMaster = {
+      message: 'Só o MASTER da igreja pode dar ou tirar as funções Financeiro e Conselho fiscal.',
+    }
 
     if (!['MASTER', 'ADMIN', 'LIDER', 'MUSICO'].includes(role)) {
       return e.json(400, {
         message: 'Nível de permissão inválido. Deve ser MASTER, ADMIN, LIDER ou MUSICO.',
       })
     }
-    // Se o usuário tiver papel MUSICO ou tiver instrumentos, valida roleIds apenas se for músico
-    const isMusicianProfile = operationalRoles.includes('MUSICO') || role === 'MUSICO'
+    // Instrumento só é obrigatório para quem tem a função operacional MUSICO
+    // (ex.: quem só cuida do financeiro não toca nada)
+    const isMusicianProfile = operationalRoles.includes('MUSICO')
     if (isMusicianProfile && roleIds.length === 0) {
       return e.json(400, { message: 'Selecione ao menos um instrumento ou função para o músico.' })
     }
@@ -91,6 +112,10 @@ routerAdd(
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente para esta congregação.' })
+    }
+
+    if (!memberId && wantsFinance && callerRole !== 'MASTER') {
+      return e.json(403, financeOnlyMaster)
     }
 
     // 3. Execução: Criação ou Edição
@@ -151,6 +176,10 @@ routerAdd(
         $app.save(userRecord)
 
         // Atualizar church_members
+        // Financeiro dá escrita no dinheiro da igreja: só o MASTER concede ou retira
+        if (hasFinance(memberRecord) !== wantsFinance && callerRole !== 'MASTER') {
+          return e.json(403, financeOnlyMaster)
+        }
         memberRecord.set('role', role)
         memberRecord.set('operational_roles', operationalRoles)
         memberRecord.set('phone', phone || null)
@@ -231,6 +260,9 @@ routerAdd(
             return e.json(403, {
               message: 'Apenas o perfil MASTER pode editar outro MASTER.',
             })
+          }
+          if (hasFinance(newMember) !== wantsFinance && callerRole !== 'MASTER') {
+            return e.json(403, financeOnlyMaster)
           }
           newMember.set('role', role)
           newMember.set('operational_roles', operationalRoles)

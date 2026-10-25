@@ -74,6 +74,7 @@ import {
   Users,
   HandHeart,
   Contact,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -100,6 +101,8 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { PersonAvatar, StatusBadge, errorMessage, usePhotoToken } from './shared'
+import { useFinanceAccess } from '@/pages/finance/shared'
+import PersonFinanceTab from '@/pages/finance/PersonFinanceTab'
 
 const TIMELINE_STYLE: Record<TimelineKind, { icon: LucideIcon; className: string }> = {
   SITUACAO: { icon: UserRound, className: 'bg-emerald-50 text-emerald-700' },
@@ -155,6 +158,7 @@ export default function PersonProfile() {
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const photoToken = usePhotoToken()
+  const { canView: canSeeFinance } = useFinanceAccess()
   const today = getLocalTodayYMD()
 
   const [person, setPerson] = useState<Person | null>(null)
@@ -442,6 +446,7 @@ export default function PersonProfile() {
               ['familia', 'Família', Users, family.length],
               ['servir', 'Servir', HandHeart, myGroups.length + (person.skills || []).length],
               ['ficha', 'Ficha', Contact, 0],
+              ...(canSeeFinance ? [['financeiro', 'Financeiro', Wallet, 0]] : []),
             ].map(([value, label, Icon, count]) => {
               const I = Icon as LucideIcon
               return (
@@ -710,6 +715,17 @@ export default function PersonProfile() {
             )}
           </Panel>
         </TabsContent>
+
+        {canSeeFinance && currentChurch && (
+          <TabsContent value="financeiro" className="mt-4">
+            <PersonFinanceTab
+              person={person}
+              churchId={currentChurch.id}
+              churchName={currentChurch.name}
+              today={today}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       <EventDialog
