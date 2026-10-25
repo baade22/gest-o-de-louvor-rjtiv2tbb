@@ -105,6 +105,12 @@ const TABS: TabConfig[] = [
         hint: 'Quanto havia na conta no dia em que você começou a usar o LouvorFlow.',
       },
       { key: 'opening_date', label: 'Data do saldo inicial', type: 'date', createOnly: true },
+      {
+        key: 'accounting_code',
+        label: 'Código contábil (opcional)',
+        placeholder: 'Ex.: 1.1.1.02',
+        hint: 'Conta no plano do contador. Vai na exportação contábil dos relatórios.',
+      },
     ],
     summary: (r) =>
       [
@@ -141,6 +147,12 @@ const TABS: TabConfig[] = [
         type: 'switch',
         hint: 'Use para dízimo, ofertas e missões.',
       },
+      {
+        key: 'accounting_code',
+        label: 'Código contábil (opcional)',
+        placeholder: 'Ex.: 3.1.01',
+        hint: 'Conta no plano do contador. Vai na exportação contábil dos relatórios.',
+      },
     ],
     group: (r) => (r.direction === 'ENTRADA' ? 'Entradas' : 'Saídas'),
     summary: (r) => (r.is_contribution ? 'Contribuição: pessoa ou anônimo' : ''),
@@ -169,6 +181,19 @@ const TABS: TabConfig[] = [
     ],
     summary: (r) =>
       [r.document, r.pix_key && `PIX ${r.pix_key}`, r.phone].filter(Boolean).join(' · '),
+  },
+  {
+    key: 'fin_signers',
+    label: 'Quem assina',
+    singular: 'quem assina',
+    male: true,
+    empty: 'Quem assina os relatórios: tesoureiro, pastor, presidente do conselho fiscal...',
+    fields: [
+      { key: 'name', label: 'Nome', required: true },
+      { key: 'title', label: 'Cargo', placeholder: 'Ex.: Tesoureira' },
+      { key: 'document', label: 'CPF (opcional)' },
+    ],
+    summary: (r) => [r.title, r.document && `CPF ${r.document}`].filter(Boolean).join(' · '),
   },
   {
     key: 'people',

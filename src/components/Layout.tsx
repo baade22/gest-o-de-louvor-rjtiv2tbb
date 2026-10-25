@@ -36,6 +36,7 @@ import {
   Contact,
   Cake,
   PieChart,
+  FileBarChart,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -189,6 +190,12 @@ export default function Layout() {
           to: '/financeiro/fechamento',
           label: 'Fechamento do mês',
           icon: LockKeyhole,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/relatorios',
+          label: 'Relatórios',
+          icon: FileBarChart,
           allowed: canSeeFinance,
         },
         {

@@ -17,6 +17,7 @@ import type {
   FinCount,
   FinCountEnvelope,
   FinCostCenter,
+  FinSigner,
   FinSupplier,
   FinTransaction,
   Person,
@@ -27,6 +28,7 @@ export type RegistryCollection =
   | 'fin_categories'
   | 'fin_cost_centers'
   | 'fin_suppliers'
+  | 'fin_signers'
   | 'people'
 
 const byChurch = (churchId: string) => pb.filter('church_id = {:churchId}', { churchId })
@@ -43,6 +45,7 @@ export const listCostCenters = (churchId: string) =>
 export const listSuppliers = (churchId: string) =>
   listRegistry<FinSupplier>('fin_suppliers', churchId)
 export const listPeople = (churchId: string) => listRegistry<Person>('people', churchId)
+export const listSigners = (churchId: string) => listRegistry<FinSigner>('fin_signers', churchId)
 
 export async function saveRegistry<T>(
   collection: RegistryCollection,
@@ -532,3 +535,30 @@ export const closeMonth = (churchId: string, month: string, notes: string) =>
 
 export const reopenMonth = (churchId: string, reason: string) =>
   closing<{ reopened: string; locked_until: string }>(churchId, { action: 'reopen', reason })
+
+// ---- Relatórios ----
+
+/** Lançamentos até uma data (YYYY-MM-DD), com o que os relatórios mostram. */
+export async function listReportTransactions(churchId: string, to: string) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter('church_id = {:churchId} && date <= {:to}', {
+      churchId,
+      to: `${to} 23:59:59`,
+    }),
+    fields:
+      'id,type,amount_cents,account_id,to_account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,event_id,supplier_id',
+    sort: 'date',
+  })
+}
+
+/** Contagens aprovadas num período, para o relatório de fechamento do culto. */
+export async function listApprovedCounts(churchId: string, from: string, to: string) {
+  return pb.collection('fin_counts').getFullList<FinCount>({
+    filter: pb.filter(
+      "church_id = {:churchId} && status = 'APROVADO' && date >= {:from} && date <= {:to}",
+      { churchId, from: `${from} 00:00:00`, to: `${to} 23:59:59` },
+    ),
+    sort: '-date',
+    expand: 'account_id,event_id',
+  })
+}

@@ -36,6 +36,8 @@ export interface FinAccount extends BaseRecord {
   opening_date?: string
   /** Congregação dona da conta (ex.: Aldeia); vazio = da igreja toda. */
   congregation?: string
+  /** Conta no plano do contador, para a exportação contábil. */
+  accounting_code?: string
   is_active: boolean
 }
 
@@ -44,6 +46,8 @@ export interface FinCategory extends BaseRecord {
   direction: FinDirection
   parent_id?: string
   is_contribution: boolean
+  /** Conta no plano do contador, para a exportação contábil. */
+  accounting_code?: string
   is_active: boolean
 }
 
@@ -287,4 +291,12 @@ export interface FinClosingCheck {
   problems: string[]
   items: FinClosingItem[]
   summary: FinClosingSummary
+}
+
+/** Quem assina os relatórios (ex.: Tesoureira, Pastor presidente). */
+export interface FinSigner extends BaseRecord {
+  name: string
+  title?: string
+  document?: string
+  is_active: boolean
 }
