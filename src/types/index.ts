@@ -416,6 +416,10 @@ export interface Person {
   church_office?: string
   notes?: string
   user_id?: string
+  /** CPF, usado no informe de contribuições do Financeiro. */
+  document?: string
+  /** false = arquivada no Financeiro (some das listas de contribuinte). */
+  is_active?: boolean
   created: string
   updated: string
 }

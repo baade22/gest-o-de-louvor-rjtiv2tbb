@@ -1,5 +1,7 @@
 // Tipos do módulo Financeiro. Valores sempre em centavos (inteiros).
 
+import type { Person as MemberPerson } from './index'
+
 export type FinDirection = 'ENTRADA' | 'SAIDA'
 /** Transferência tira de uma conta e põe em outra; não é entrada nem saída. */
 export type FinTransactionType = FinDirection | 'TRANSFERENCIA'
@@ -21,15 +23,8 @@ interface BaseRecord {
   updated: string
 }
 
-export interface Person extends BaseRecord {
-  name: string
-  phone?: string
-  email?: string
-  document?: string
-  user_id?: string
-  notes?: string
-  is_active: boolean
-}
+/** Pessoa da igreja: a mesma ficha da Membresia; o Financeiro usa o CPF e o arquivamento. */
+export type Person = MemberPerson & { document?: string; is_active: boolean }
 
 export interface FinAccount extends BaseRecord {
   name: string
@@ -238,4 +233,58 @@ export interface FinBankConnection extends BaseRecord {
   last_created?: number
   last_auto_reconciled?: number
   sync_requested_at?: string
+}
+
+export type FinClosingStatus = 'FECHADO' | 'REABERTO'
+
+export interface FinClosingAccount {
+  id: string
+  name: string
+  kind: FinAccountKind
+  congregation?: string
+  opening_cents: number
+  income_cents: number
+  expense_cents: number
+  closing_cents: number
+}
+
+export interface FinClosingSummary {
+  accounts: FinClosingAccount[]
+  totals: { opening: number; income: number; expense: number; closing: number }
+}
+
+/** Item da conferência do fechamento: blocking impede fechar; warning só avisa. */
+export interface FinClosingItem {
+  key: string
+  level: 'ok' | 'warning' | 'blocking' | 'info'
+  title: string
+  detail: string
+  count: number
+  link?: string
+}
+
+export interface FinClosing extends BaseRecord {
+  month: string
+  status: FinClosingStatus
+  notes?: string
+  summary?: FinClosingSummary
+  checklist?: FinClosingItem[]
+  closed_by?: string
+  closed_by_name?: string
+  closed_at?: string
+  reopened_by_name?: string
+  reopened_at?: string
+  reopen_reason?: string
+}
+
+export interface FinClosingCheck {
+  month: string
+  /** Primeiro mês conferido (o seguinte ao último fechado); vazio = desde o início. */
+  from_month: string
+  /** Último mês fechado; vazio = nenhum. */
+  locked_until: string
+  can_close: boolean
+  problems: string[]
+  items: FinClosingItem[]
+  summary: FinClosingSummary
 }

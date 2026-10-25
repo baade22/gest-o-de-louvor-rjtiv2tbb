@@ -8,6 +8,7 @@ import {
   CalendarClock,
   ChevronRight,
   Landmark,
+  LockKeyholeOpen,
   PiggyBank,
   Plus,
   Scale,
@@ -27,13 +28,16 @@ import {
   monthlySeries,
   onlyAccounts,
   periodTotals,
+  shiftMonth,
 } from '@/lib/financeSummary'
 import {
   listAccounts,
   listCategories,
+  listClosings,
   listLedger,
   listOpenBills,
   listPendingLines,
+  lockedUntil,
 } from '@/services/finance'
 import type {
   FinAccount,
@@ -113,6 +117,8 @@ export default function FinancePanel() {
   const [loading, setLoading] = useState(true)
   // '' = todas as congregações
   const [congregation, setCongregation] = useState('')
+  // Último mês fechado ('' = nenhum; null = não carregou)
+  const [locked, setLocked] = useState<string | null>(null)
 
   useEffect(() => {
     if (!churchId) return
@@ -124,8 +130,10 @@ export default function FinancePanel() {
       // Contas a pagar e receber não podem derrubar o painel
       listOpenBills(churchId).catch(() => [] as FinBill[]),
       listPendingLines(churchId).catch(() => []),
+      listClosings(churchId).catch(() => null),
     ])
-      .then(([a, c, l, b, p]) => {
+      .then(([a, c, l, b, p, closings]) => {
+        setLocked(closings ? lockedUntil(closings) : null)
         setAccounts(a)
         setCategories(c)
         setLedger(l)
@@ -189,6 +197,15 @@ export default function FinancePanel() {
   const upcoming = openBills.filter((b) => daysBetween(today, b.due_date) <= 7).slice(0, 6)
 
   const needsSetup = !loading && (accounts.length === 0 || categories.length === 0)
+  // Mês passado (ou anterior) com lançamentos e ainda sem fechamento
+  const lastMonth = shiftMonth(today.slice(0, 7), -1)
+  const unclosed =
+    canEdit && locked !== null && locked < lastMonth
+      ? ledger
+          .map((tx) => monthOf(tx.date))
+          .filter((m) => m > locked && m <= lastMonth)
+          .sort()[0]
+      : undefined
 
   return (
     <div className="space-y-5">
@@ -238,6 +255,19 @@ export default function FinancePanel() {
       </PageHeader>
 
       {!canEdit && <ReadOnlyNotice />}
+
+      {unclosed && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center">
+          <LockKeyholeOpen className="h-4 w-4 shrink-0 text-amber-700" />
+          <p className="flex-1">
+            <b>{monthLabel(unclosed)} ainda não foi fechado.</b> Confira os saldos com o banco e
+            feche o mês para ninguém alterar o que já teve prestação de contas.
+          </p>
+          <Button asChild variant="outline" size="sm" className="bg-white">
+            <Link to="/financeiro/fechamento">Fechar o mês</Link>
+          </Button>
+        </div>
+      )}
 
       {needsSetup && (
         <div className="flex flex-col gap-3 rounded-xl border border-teal-200 bg-teal-50 p-4 sm:flex-row sm:items-center">

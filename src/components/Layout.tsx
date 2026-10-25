@@ -32,6 +32,7 @@ import {
   CalendarClock,
   Coins,
   Landmark,
+  LockKeyhole,
   Contact,
   Cake,
   type LucideIcon,
@@ -181,6 +182,12 @@ export default function Layout() {
           to: '/financeiro/conciliacao',
           label: 'Conciliação bancária',
           icon: Landmark,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/fechamento',
+          label: 'Fechamento do mês',
+          icon: LockKeyhole,
           allowed: canSeeFinance,
         },
         {

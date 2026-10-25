@@ -10,6 +10,8 @@ import type {
   FinBankImport,
   FinBankLine,
   FinBill,
+  FinClosing,
+  FinClosingCheck,
   FinBillKind,
   FinCategory,
   FinCount,
@@ -498,3 +500,35 @@ export async function listLatestBankBalances(churchId: string) {
   for (const r of rows.items) if (!out[r.account_id]) out[r.account_id] = r
   return out
 }
+
+// ---- Fechamento do mês (hook finance_closing.js) ----
+
+export async function listClosings(churchId: string) {
+  return pb.collection('fin_closings').getFullList<FinClosing>({
+    filter: byChurch(churchId),
+    sort: '-month,-created',
+  })
+}
+
+/** Último mês fechado (AAAA-MM) ou '' se nenhum. */
+export const lockedUntil = (closings: FinClosing[]) =>
+  closings
+    .filter((c) => c.status === 'FECHADO')
+    .map((c) => c.month)
+    .sort()
+    .pop() || ''
+
+const closing = <T>(churchId: string, body: Record<string, unknown>) =>
+  pb.send<T>('/backend/v1/finance/closing', {
+    method: 'POST',
+    body: { church_id: churchId, ...body },
+  })
+
+export const checkClosing = (churchId: string, month: string) =>
+  closing<FinClosingCheck>(churchId, { action: 'check', month })
+
+export const closeMonth = (churchId: string, month: string, notes: string) =>
+  closing<FinClosingCheck>(churchId, { action: 'close', month, notes })
+
+export const reopenMonth = (churchId: string, reason: string) =>
+  closing<{ reopened: string; locked_until: string }>(churchId, { action: 'reopen', reason })
