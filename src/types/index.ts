@@ -17,6 +17,15 @@ export interface Church {
   logo?: string
   is_active: boolean
   subscription_plan?: string
+  /** Dados que saem nos documentos da membresia (cartas, certificado, carteirinha). */
+  doc_signer_name?: string
+  doc_signer_title?: string
+  doc_city?: string
+  doc_address?: string
+  doc_cnpj?: string
+  /** Mensagens de parabéns pelo WhatsApp; vazias usam o texto padrão. */
+  greeting_birthday?: string
+  greeting_wedding?: string
   created: string
   updated: string
 }
@@ -435,9 +444,15 @@ export interface Person {
   roll_number?: string
   skills?: PersonSkill[]
   user_id?: string
+  followup_stage?: FollowupStage | ''
+  /** Ficha de quem acompanha esta pessoa. */
+  followup_owner?: string
+  followup_since?: string
   created: string
   updated: string
 }
+
+export type FollowupStage = 'PRIMEIRA_VISITA' | 'CONTATO' | 'RETORNO' | 'INTEGRADO' | 'ENCERRADO'
 
 export type PersonEventKind = 'SITUACAO' | 'CARGO' | 'VISITA' | 'CONTATO' | 'NOTA'
 
@@ -467,6 +482,126 @@ export interface PersonRelation {
   relative_id: string
   kind: RelationKind
   lives_together: boolean
+  created: string
+  updated: string
+}
+
+/** Link de autocadastro (QR code) da igreja. */
+export interface SignupLink {
+  id: string
+  church_id: string
+  title: string
+  congregation?: string
+  key: string
+  active: boolean
+  created_by?: string
+  created: string
+  updated: string
+}
+
+export type SignupRelationship = 'VISITANTE' | 'FREQUENTA' | 'MEMBRO'
+export type SignupStatus = 'PENDENTE' | 'APROVADO' | 'RECUSADO'
+
+/** Ficha enviada pelo formulário público, aguardando aprovação (people_signups). */
+export interface PersonSignup {
+  id: string
+  church_id: string
+  link_id?: string
+  name: string
+  birth_date?: string
+  gender?: PersonGender | ''
+  marital_status?: MaritalStatus | ''
+  phone?: string
+  email?: string
+  address?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  congregation?: string
+  relationship: SignupRelationship
+  baptized?: boolean
+  how_found?: string
+  prayer_request?: string
+  status: SignupStatus
+  person_id?: string
+  reviewed_by?: string
+  reviewed_at?: string
+  created: string
+  updated: string
+}
+
+/** Evento da igreja com inscrição (retiro, curso, batismo) — church_events. */
+export interface ChurchEvent {
+  id: string
+  church_id: string
+  title: string
+  description?: string
+  starts_on: string
+  ends_on?: string
+  start_time?: string
+  location?: string
+  congregation?: string
+  price?: number
+  capacity?: number
+  payment_info?: string
+  registration_open: boolean
+  public_key: string
+  created_by?: string
+  created: string
+  updated: string
+}
+
+export type PaymentMethod = 'PIX' | 'DINHEIRO' | 'CARTAO' | 'ISENTO' | 'OUTRO'
+
+/** Inscrito em um evento da igreja — church_event_registrations. */
+export interface EventRegistration {
+  id: string
+  church_id: string
+  event_id: string
+  person_id?: string
+  name: string
+  phone?: string
+  email?: string
+  notes?: string
+  source?: 'SECRETARIA' | 'LINK' | ''
+  paid: boolean
+  paid_amount?: number
+  payment_method?: PaymentMethod | ''
+  attended: boolean
+  created: string
+  updated: string
+}
+
+export type GroupKind = 'MINISTERIO' | 'DEPARTAMENTO' | 'GRUPO'
+export type GroupRole = 'LIDER' | 'AUXILIAR' | 'PARTICIPANTE'
+
+/** Ministério, departamento ou grupo pequeno — church_groups. */
+export interface ChurchGroup {
+  id: string
+  church_id: string
+  name: string
+  kind: GroupKind
+  description?: string
+  congregation?: string
+  meeting_info?: string
+  /** Ficha (people) de quem lidera. */
+  leader_id?: string
+  /** Habilidades que ajudam a sugerir voluntários. */
+  skills?: PersonSkill[]
+  active: boolean
+  created: string
+  updated: string
+}
+
+/** Participação de uma ficha em um grupo — church_group_members. */
+export interface GroupMember {
+  id: string
+  church_id: string
+  group_id: string
+  person_id: string
+  role?: GroupRole | ''
+  since?: string
   created: string
   updated: string
 }

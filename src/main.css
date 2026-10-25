@@ -302,3 +302,34 @@
     animation: spotlight 2s ease forwards;
   }
 }
+
+/* Documentos da membresia (cartas, certificado, carteirinhas): a tela mostra a
+   folha com sombra; na impressão sai só a folha, sem margem do navegador. */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .no-print,
+  [role='region'][aria-label^='Notifications'],
+  #skip-badge {
+    display: none !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    break-after: page;
+  }
+  .print-sheet:last-child {
+    break-after: auto;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

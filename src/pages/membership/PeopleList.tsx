@@ -18,6 +18,7 @@ import { getLocalTodayYMD } from '@/lib/dateUtils'
 import {
   Cake,
   Edit,
+  IdCard,
   Mail,
   MapPin,
   MoreVertical,
@@ -152,6 +153,15 @@ export default function PeopleList() {
             >
               <Cake className="h-4 w-4" />
               Aniversariantes
+            </Button>
+          </Link>
+          <Link to="/membros/carteirinhas">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-slate-200 font-semibold gap-2"
+            >
+              <IdCard className="h-4 w-4" />
+              Carteirinhas
             </Button>
           </Link>
           <Link to="/membros/novo">

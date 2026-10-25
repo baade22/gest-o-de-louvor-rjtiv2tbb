@@ -28,6 +28,11 @@ import {
   Contact,
   Cake,
   PieChart,
+  Footprints,
+  FileBarChart,
+  Ticket,
+  QrCode,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -141,7 +146,12 @@ export default function Layout() {
       items: [
         { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeAdmin },
         { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeAdmin, end: true },
+        { to: '/membros/acompanhamento', label: 'Visitantes', icon: Footprints, allowed: canSeeAdmin },
+        { to: '/membros/grupos', label: 'Grupos e ministérios', icon: UsersRound, allowed: canSeeAdmin },
+        { to: '/membros/eventos', label: 'Eventos da igreja', icon: Ticket, allowed: canSeeAdmin },
         { to: '/membros/aniversarios', label: 'Aniversariantes', icon: Cake, allowed: canSeeAdmin },
+        { to: '/membros/cadastros', label: 'Cadastros (QR)', icon: QrCode, allowed: canSeeAdmin },
+        { to: '/membros/relatorios', label: 'Relatórios', icon: FileBarChart, allowed: canSeeAdmin },
       ],
     },
     {
@@ -330,7 +340,7 @@ export default function Layout() {
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
       {/* BARRA LATERAL (≥ 1024px) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col gap-4 bg-slate-950 py-4 transition-[width] duration-200 lg:flex ${
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col gap-4 bg-slate-950 py-4 transition-[width] duration-200 lg:flex print:!hidden ${
           collapsed ? 'w-[76px]' : 'w-64'
         }`}
       >
@@ -359,7 +369,7 @@ export default function Layout() {
       </aside>
 
       {/* BARRA SUPERIOR NO CELULAR (< 1024px) */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-3 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-3 lg:hidden print:hidden">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -417,11 +427,11 @@ export default function Layout() {
 
       {/* ÁREA PRINCIPAL */}
       <div
-        className={`flex min-h-screen min-w-0 flex-1 flex-col pt-14 transition-[margin] duration-200 lg:pt-0 ${
+        className={`flex min-h-screen min-w-0 flex-1 flex-col pt-14 transition-[margin] duration-200 lg:pt-0 print:!ml-0 print:!pt-0 ${
           collapsed ? 'lg:ml-[76px]' : 'lg:ml-64'
         }`}
       >
-        <header className="sticky top-0 z-20 hidden h-14 items-center justify-end gap-2 border-b border-slate-200 bg-white/80 px-8 backdrop-blur lg:flex">
+        <header className="sticky top-0 z-20 hidden h-14 items-center justify-end gap-2 border-b border-slate-200 bg-white/80 px-8 backdrop-blur lg:flex print:!hidden">
           <NotificationsBell />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-in p-4 sm:p-6 lg:p-8">
