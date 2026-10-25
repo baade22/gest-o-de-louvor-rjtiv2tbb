@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { Person, PersonStatus } from '@/types'
 import { getPhotoToken, personPhotoUrl } from '@/services/people'
-import { PERSON_STATUS_LABELS } from '@/lib/membership'
+import { PERSON_STATUS_LABELS, filterPeople } from '@/lib/membership'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 
 export const STATUS_BADGE_CLASSES: Record<PersonStatus, string> = {
   MEMBRO: 'bg-emerald-50 text-emerald-800 border-emerald-200',
@@ -104,6 +105,58 @@ export function SummaryCard({
       <p className="text-xs font-semibold text-slate-500">{label}</p>
       <p className="text-2xl font-extrabold text-slate-900 mt-1">{value}</p>
       {hint && <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>}
+    </div>
+  )
+}
+
+/** Busca de ficha pelo nome, telefone ou e-mail, com uma lista curta para escolher. */
+export function PersonPicker({
+  people,
+  exclude,
+  onPick,
+  id,
+  placeholder = 'Buscar ficha pelo nome',
+}: {
+  people: Person[]
+  exclude?: Set<string>
+  onPick: (person: Person) => void
+  id?: string
+  placeholder?: string
+}) {
+  const [search, setSearch] = useState('')
+  const candidates = useMemo(
+    () => filterPeople(people, { search }).filter((p) => !exclude?.has(p.id)).slice(0, 8),
+    [people, exclude, search],
+  )
+  return (
+    <div className="space-y-1.5">
+      <Input
+        id={id}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={placeholder}
+        className="rounded-xl border-slate-200"
+      />
+      <ul className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-100">
+        {candidates.length === 0 ? (
+          <li className="px-3 py-2 text-xs text-slate-500">
+            Nenhuma ficha encontrada. Cadastre a pessoa antes em Membros.
+          </li>
+        ) : (
+          candidates.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => onPick(p)}
+                className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-slate-50"
+              >
+                <span className="flex-1 truncate">{p.name}</span>
+                <span className="text-[11px] text-slate-400">{PERSON_STATUS_LABELS[p.status]}</span>
+              </button>
+            </li>
+          ))
+        )}
+      </ul>
     </div>
   )
 }

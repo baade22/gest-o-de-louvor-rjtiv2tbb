@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { listPeople, listStatusChanges } from '@/services/people'
+import { countPendingSignups } from '@/services/signups'
 import type { Person, PersonEvent } from '@/types'
 import {
   CONGREGATIONS,
@@ -18,10 +19,11 @@ import {
 import { getLocalTodayYMD, parseCalendarDate } from '@/lib/dateUtils'
 import {
   Cake,
+  ChevronRight,
   FileWarning,
   Heart,
   HeartHandshake,
-  MessageCircle,
+  Inbox,
   UserPlus,
   UserRoundPlus,
   Users,
@@ -31,6 +33,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PersonAvatar, errorMessage, usePhotoToken } from './shared'
+import { GreetButton, useGreetings } from './Greetings'
 
 function Stat({
   icon: Icon,
@@ -112,17 +115,11 @@ function BucketBars({
   )
 }
 
-function whatsappLink(phone: string | undefined, text: string): string {
-  let digits = (phone || '').replace(/\D/g, '')
-  if (!digits) return ''
-  if (digits.length <= 11) digits = `55${digits}`
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
-}
-
 export default function MembershipDashboard() {
   const { currentChurch } = useAuth()
   const photoToken = usePhotoToken()
   const today = getLocalTodayYMD()
+  const greetings = useGreetings(currentChurch?.id, today)
   const year = parseCalendarDate(today)!.year
 
   const [people, setPeople] = useState<Person[]>([])
@@ -131,6 +128,15 @@ export default function MembershipDashboard() {
   const [loadError, setLoadError] = useState('')
   const [congregation, setCongregation] = useState('TODAS')
   const [view, setView] = useState<'idade' | 'tempo' | 'sexo'>('idade')
+  const [pendingSignups, setPendingSignups] = useState(0)
+
+  useEffect(() => {
+    if (!currentChurch) return
+    // Sem a coleção no servidor (backend antigo) o aviso só não aparece
+    countPendingSignups(currentChurch.id)
+      .then(setPendingSignups)
+      .catch(() => setPendingSignups(0))
+  }, [currentChurch])
 
   useEffect(() => {
     if (!currentChurch) return
@@ -211,6 +217,21 @@ export default function MembershipDashboard() {
           </Link>
         </div>
       </div>
+
+      {pendingSignups > 0 && (
+        <Link
+          to="/membros/cadastros"
+          className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100 transition-colors"
+        >
+          <Inbox className="h-5 w-5 shrink-0" />
+          <span>
+            <strong>{pendingSignups}</strong>{' '}
+            {pendingSignups === 1 ? 'cadastro pelo QR code aguardando' : 'cadastros pelo QR code aguardando'}{' '}
+            aprovação
+          </span>
+          <ChevronRight className="h-4 w-4 ml-auto" />
+        </Link>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -331,13 +352,6 @@ export default function MembershipDashboard() {
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {birthdays.slice(0, 6).map((c) => {
-                      const first = c.person.name.split(/\s+/)[0]
-                      const wa = whatsappLink(
-                        c.person.phone,
-                        c.kind === 'NASCIMENTO'
-                          ? `Feliz aniversário, ${first}! Que Deus abençoe sua vida ricamente.`
-                          : `Feliz aniversário de casamento, ${first}! Que Deus abençoe a família de vocês.`,
-                      )
                       return (
                         <li
                           key={`${c.person.id}-${c.kind}`}
@@ -364,18 +378,13 @@ export default function MembershipDashboard() {
                                 ` · ${c.years} ${c.kind === 'NASCIMENTO' ? 'anos' : 'anos de casados'}`}
                             </p>
                           </div>
-                          {wa && (
-                            <a
-                              href={wa}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Parabenizar ${c.person.name}`}
-                            >
-                              <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg">
-                                <MessageCircle className="h-4 w-4 text-emerald-600" />
-                              </Button>
-                            </a>
-                          )}
+                          <GreetButton
+                            c={c}
+                            compact
+                            message={greetings.message(c)}
+                            sent={greetings.isSent(c)}
+                            onSend={greetings.markSent}
+                          />
                         </li>
                       )
                     })}

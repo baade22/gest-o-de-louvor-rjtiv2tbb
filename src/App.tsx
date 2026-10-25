@@ -36,6 +36,18 @@ import PersonForm from '@/pages/membership/PersonForm'
 import Birthdays from '@/pages/membership/Birthdays'
 import PersonProfile from '@/pages/membership/PersonProfile'
 import MembershipDashboard from '@/pages/membership/MembershipDashboard'
+import Signups from '@/pages/membership/Signups'
+import FollowUp from '@/pages/membership/FollowUp'
+import Reports from '@/pages/membership/Reports'
+import Groups from '@/pages/membership/Groups'
+import GroupDetail from '@/pages/membership/GroupDetail'
+import ChurchEvents from '@/pages/membership/ChurchEvents'
+import ChurchEventForm from '@/pages/membership/ChurchEventForm'
+import ChurchEventDetail from '@/pages/membership/ChurchEventDetail'
+import PublicEventSignup from '@/pages/membership/PublicEventSignup'
+import PersonDocuments from '@/pages/membership/documents/PersonDocuments'
+import MemberCards from '@/pages/membership/documents/MemberCards'
+import PublicSignup from '@/pages/membership/PublicSignup'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -50,6 +62,26 @@ const App = () => (
 
           {/* Rota pública de aceite de convite e definição de senha */}
           <Route path="/convite/:token" element={<InviteAccept />} />
+          <Route path="/cadastro/:key" element={<PublicSignup />} />
+          <Route path="/inscricao/:key" element={<PublicEventSignup />} />
+
+          {/* Documentos para imprimir: fora do Layout, para sair só a folha */}
+          <Route
+            path="/membros/:id/documentos"
+            element={
+              <RequireAuth requireRole="ADMIN">
+                <PersonDocuments />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/membros/carteirinhas"
+            element={
+              <RequireAuth requireRole="ADMIN">
+                <MemberCards />
+              </RequireAuth>
+            }
+          />
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>
@@ -236,6 +268,78 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <MembershipDashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/cadastros"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <Signups />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/acompanhamento"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <FollowUp />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/relatorios"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <Reports />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/grupos"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <Groups />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/grupos/:id"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <GroupDetail />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/eventos"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <ChurchEvents />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/eventos/novo"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <ChurchEventForm />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/eventos/:id"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <ChurchEventDetail />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/eventos/:id/editar"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <ChurchEventForm />
                 </RequireAuth>
               }
             />

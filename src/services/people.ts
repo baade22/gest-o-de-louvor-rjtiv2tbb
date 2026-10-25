@@ -1,6 +1,14 @@
 import pb from '@/lib/pocketbase/client'
-import type { EventMember, Person, PersonEvent, PersonRelation, RelationKind } from '@/types'
+import type {
+  EventMember,
+  FollowupStage,
+  Person,
+  PersonEvent,
+  PersonRelation,
+  RelationKind,
+} from '@/types'
 import type { ScaleEntry } from '@/lib/membership'
+import { getLocalTodayYMD } from '@/lib/dateUtils'
 
 /** Campos editáveis da ficha (tudo menos id/datas de sistema/foto). */
 export type PersonPayload = Omit<
@@ -161,4 +169,42 @@ export async function listPersonScales(
       role: m.expand?.role_id?.name,
       status: STATUS[m.status],
     }))
+}
+
+// ---------- Acompanhamento de visitantes ----------
+
+export interface FollowupChange {
+  stage: FollowupStage
+  ownerId: string
+  note?: string
+}
+
+/**
+ * Atualiza etapa e responsável. Mudança de etapa ou anotação entra na linha do
+ * tempo da pessoa, para ficar o histórico de quem falou com ela e quando.
+ */
+export async function updateFollowup(
+  person: Person,
+  change: FollowupChange,
+  stageLabel: string,
+): Promise<Person> {
+  const today = getLocalTodayYMD()
+  const stageChanged = change.stage !== (person.followup_stage || '')
+  const saved = await pb.collection('people').update<Person>(person.id, {
+    followup_stage: change.stage,
+    followup_owner: change.ownerId,
+    ...(stageChanged ? { followup_since: `${today} 00:00:00.000Z` } : {}),
+  })
+  const note = change.note?.trim()
+  if (stageChanged || note) {
+    await createPersonEvent({
+      church_id: person.church_id,
+      person_id: person.id,
+      kind: 'NOTA',
+      date: `${today} 00:00:00.000Z`,
+      title: stageChanged ? `Acompanhamento: ${stageLabel}` : 'Acompanhamento',
+      description: note || '',
+    })
+  }
+  return saved
 }

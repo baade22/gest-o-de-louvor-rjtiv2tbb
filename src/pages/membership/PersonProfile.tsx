@@ -14,7 +14,11 @@ import {
   updatePerson,
 } from '@/services/people'
 import { listMusicians } from '@/services/musicians'
+import { listGroups, listPersonGroupMembers } from '@/services/groups'
+import { GROUP_KIND_LABELS, GROUP_ROLE_LABELS, groupsOfPerson } from '@/lib/groups'
 import type {
+  ChurchGroup,
+  GroupMember,
   Person,
   PersonEvent,
   PersonEventKind,
@@ -41,6 +45,8 @@ import {
   type TimelineKind,
 } from '@/lib/membership'
 import { formatCalendarDateDisplay, getLocalTodayYMD } from '@/lib/dateUtils'
+import { waLink } from '@/lib/whatsapp'
+import { FOLLOWUP_LABELS, effectiveStage } from '@/lib/followup'
 import {
   ArrowLeft,
   Award,
@@ -49,7 +55,9 @@ import {
   DoorOpen,
   Droplets,
   Edit,
+  FileText,
   Flame,
+  Footprints,
   Heart,
   History,
   Home,
@@ -106,13 +114,6 @@ const TIMELINE_STYLE: Record<TimelineKind, { icon: LucideIcon; className: string
   ESCALA: { icon: Music2, className: 'bg-teal-50 text-teal-700' },
 }
 
-function waLink(phone?: string): string {
-  let digits = (phone || '').replace(/\D/g, '')
-  if (!digits) return ''
-  if (digits.length <= 11) digits = `55${digits}`
-  return `https://wa.me/${digits}`
-}
-
 function Meta({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1.5">
@@ -161,6 +162,8 @@ export default function PersonProfile() {
   const [scales, setScales] = useState<ScaleEntry[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [relations, setRelations] = useState<PersonRelation[]>([])
+  const [groups, setGroups] = useState<ChurchGroup[]>([])
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [accounts, setAccounts] = useState<Array<{ user_id: string; name: string }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [eventDialog, setEventDialog] = useState(false)
@@ -179,6 +182,13 @@ export default function PersonProfile() {
       setEvents(ev)
       setPeople(ppl)
       setRelations(rel)
+      // Grupos são opcionais: sem a coleção no servidor, a aba só fica vazia
+      const [g, gm] = await Promise.all([
+        listGroups(currentChurch.id).catch(() => []),
+        listPersonGroupMembers(id).catch(() => []),
+      ])
+      setGroups(g)
+      setGroupMembers(gm)
       setScales(
         p.user_id ? await listPersonScales(currentChurch.id, p.user_id).catch(() => []) : [],
       )
@@ -213,6 +223,10 @@ export default function PersonProfile() {
     () => (person ? familyOf(person.id, relations, peopleById) : []),
     [person, relations, peopleById],
   )
+  const myGroups = useMemo(
+    () => (person ? groupsOfPerson(person.id, groups, groupMembers) : []),
+    [person, groups, groupMembers],
+  )
   const timeline = useMemo(
     () => (person ? buildTimeline(person, events, scales) : []),
     [person, events, scales],
@@ -231,6 +245,7 @@ export default function PersonProfile() {
   const filled = profileCompleteness(person)
   const missing = missingEssentials(person)
   const wa = waLink(person.phone)
+  const followStage = effectiveStage(person)
   const linkedAccount = accounts.find((a) => a.user_id === person.user_id)
 
   const savePerson = async (data: Partial<Person>, okMessage: string) => {
@@ -370,6 +385,13 @@ export default function PersonProfile() {
                 Membro há {tenure} {tenure === 1 ? 'ano' : 'anos'}
               </Meta>
             )}
+            {followStage && followStage !== 'ENCERRADO' && (
+              <Meta icon={Footprints}>
+                <Link to="/membros/acompanhamento" className="hover:underline">
+                  Acompanhamento: {FOLLOWUP_LABELS[followStage]}
+                </Link>
+              </Meta>
+            )}
             {person.user_id && <Meta icon={KeyRound}>Tem login no LouvorFlow</Meta>}
           </div>
           {missing.length > 0 && (
@@ -393,6 +415,12 @@ export default function PersonProfile() {
                 </Button>
               </a>
             )}
+            <Link to={`/membros/${person.id}/documentos`} className="flex-1">
+              <Button variant="outline" size="sm" className="w-full rounded-xl gap-1.5">
+                <FileText className="h-4 w-4 text-slate-500" />
+                Documentos
+              </Button>
+            </Link>
             <Link to={`/membros/${person.id}/editar`} className="flex-1">
               <Button
                 size="sm"
@@ -412,7 +440,7 @@ export default function PersonProfile() {
             {[
               ['linha', 'Linha do tempo', History, timeline.length],
               ['familia', 'Família', Users, family.length],
-              ['servir', 'Servir', HandHeart, (person.skills || []).length],
+              ['servir', 'Servir', HandHeart, myGroups.length + (person.skills || []).length],
               ['ficha', 'Ficha', Contact, 0],
             ].map(([value, label, Icon, count]) => {
               const I = Icon as LucideIcon
@@ -565,6 +593,38 @@ export default function PersonProfile() {
         </TabsContent>
 
         <TabsContent value="servir" className="mt-4 space-y-4">
+          <Panel
+            title="Grupos e ministérios"
+            description="Onde a pessoa serve ou participa, além do louvor"
+            action={
+              <Link to="/membros/grupos">
+                <Button size="sm" variant="outline" className="rounded-xl">
+                  Ver grupos
+                </Button>
+              </Link>
+            }
+          >
+            {myGroups.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-slate-500 text-center">
+                Não participa de nenhum grupo ainda. Adicione pela página do grupo.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 p-5">
+                {myGroups.map(({ group, role }) => (
+                  <Link
+                    key={group.id}
+                    to={`/membros/grupos/${group.id}`}
+                    className="rounded-xl border border-slate-200 px-3 py-2 hover:border-teal-300"
+                  >
+                    <p className="text-sm font-semibold text-slate-900">{group.name}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {GROUP_KIND_LABELS[group.kind]} · {GROUP_ROLE_LABELS[role]}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
           <Panel
             title="Habilidades"
             description="Toque para marcar o que a pessoa sabe ou gosta de fazer"
