@@ -24,7 +24,6 @@ import {
   Heart,
   HeartHandshake,
   Inbox,
-  MessageCircle,
   UserPlus,
   UserRoundPlus,
   Users,
@@ -34,6 +33,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PersonAvatar, errorMessage, usePhotoToken } from './shared'
+import { GreetButton, useGreetings } from './Greetings'
 
 function Stat({
   icon: Icon,
@@ -115,17 +115,11 @@ function BucketBars({
   )
 }
 
-function whatsappLink(phone: string | undefined, text: string): string {
-  let digits = (phone || '').replace(/\D/g, '')
-  if (!digits) return ''
-  if (digits.length <= 11) digits = `55${digits}`
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
-}
-
 export default function MembershipDashboard() {
   const { currentChurch } = useAuth()
   const photoToken = usePhotoToken()
   const today = getLocalTodayYMD()
+  const greetings = useGreetings(currentChurch?.id, today)
   const year = parseCalendarDate(today)!.year
 
   const [people, setPeople] = useState<Person[]>([])
@@ -358,13 +352,6 @@ export default function MembershipDashboard() {
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {birthdays.slice(0, 6).map((c) => {
-                      const first = c.person.name.split(/\s+/)[0]
-                      const wa = whatsappLink(
-                        c.person.phone,
-                        c.kind === 'NASCIMENTO'
-                          ? `Feliz aniversário, ${first}! Que Deus abençoe sua vida ricamente.`
-                          : `Feliz aniversário de casamento, ${first}! Que Deus abençoe a família de vocês.`,
-                      )
                       return (
                         <li
                           key={`${c.person.id}-${c.kind}`}
@@ -391,18 +378,13 @@ export default function MembershipDashboard() {
                                 ` · ${c.years} ${c.kind === 'NASCIMENTO' ? 'anos' : 'anos de casados'}`}
                             </p>
                           </div>
-                          {wa && (
-                            <a
-                              href={wa}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Parabenizar ${c.person.name}`}
-                            >
-                              <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg">
-                                <MessageCircle className="h-4 w-4 text-emerald-600" />
-                              </Button>
-                            </a>
-                          )}
+                          <GreetButton
+                            c={c}
+                            compact
+                            message={greetings.message(c)}
+                            sent={greetings.isSent(c)}
+                            onSend={greetings.markSent}
+                          />
                         </li>
                       )
                     })}

@@ -23,6 +23,9 @@ export interface Church {
   doc_city?: string
   doc_address?: string
   doc_cnpj?: string
+  /** Mensagens de parabéns pelo WhatsApp; vazias usam o texto padrão. */
+  greeting_birthday?: string
+  greeting_wedding?: string
   created: string
   updated: string
 }
