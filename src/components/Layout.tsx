@@ -135,6 +135,9 @@ export default function Layout() {
   const canSeeAdmin = isMaster || isAdmin
   const canSeeFinance =
     isMaster || isAdmin || hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
+  // Membresia é delegada pelo MASTER: só o MASTER ou quem recebeu a função MEMBRESIA.
+  // ADMIN não vê por padrão (precisa receber a função), coerente com o acesso delegado.
+  const canSeeMembership = isMaster || hasOperationalRole('MEMBRESIA')
 
   const sections: NavSection[] = [
     {
@@ -242,28 +245,33 @@ export default function Layout() {
     {
       label: 'Membresia',
       items: [
-        { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeAdmin },
-        { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeAdmin, end: true },
+        { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeMembership },
+        { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeMembership, end: true },
         {
           to: '/membros/acompanhamento',
           label: 'Visitantes',
           icon: Footprints,
-          allowed: canSeeAdmin,
+          allowed: canSeeMembership,
         },
         {
           to: '/membros/grupos',
           label: 'Grupos e ministérios',
           icon: UsersRound,
-          allowed: canSeeAdmin,
+          allowed: canSeeMembership,
         },
-        { to: '/membros/eventos', label: 'Eventos da igreja', icon: Ticket, allowed: canSeeAdmin },
-        { to: '/membros/aniversarios', label: 'Aniversariantes', icon: Cake, allowed: canSeeAdmin },
-        { to: '/membros/cadastros', label: 'Cadastros (QR)', icon: QrCode, allowed: canSeeAdmin },
+        { to: '/membros/eventos', label: 'Eventos da igreja', icon: Ticket, allowed: canSeeMembership },
+        {
+          to: '/membros/aniversarios',
+          label: 'Aniversariantes',
+          icon: Cake,
+          allowed: canSeeMembership,
+        },
+        { to: '/membros/cadastros', label: 'Cadastros (QR)', icon: QrCode, allowed: canSeeMembership },
         {
           to: '/membros/relatorios',
           label: 'Relatórios',
           icon: FileBarChart,
-          allowed: canSeeAdmin,
+          allowed: canSeeMembership,
         },
       ],
     },

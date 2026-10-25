@@ -84,7 +84,7 @@ const App = () => (
           <Route
             path="/membros/:id/documentos"
             element={
-              <RequireAuth requireRole="ADMIN">
+              <RequireAuth requireRole="MEMBERSHIP">
                 <PersonDocuments />
               </RequireAuth>
             }
@@ -92,7 +92,7 @@ const App = () => (
           <Route
             path="/membros/carteirinhas"
             element={
-              <RequireAuth requireRole="ADMIN">
+              <RequireAuth requireRole="MEMBERSHIP">
                 <MemberCards />
               </RequireAuth>
             }
@@ -374,7 +374,7 @@ const App = () => (
             <Route
               path="/membros"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PeopleList />
                 </RequireAuth>
               }
@@ -382,7 +382,7 @@ const App = () => (
             <Route
               path="/membros/novo"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PersonForm />
                 </RequireAuth>
               }
@@ -390,7 +390,7 @@ const App = () => (
             <Route
               path="/membros/aniversarios"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Birthdays />
                 </RequireAuth>
               }
@@ -398,7 +398,7 @@ const App = () => (
             <Route
               path="/membros/painel"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <MembershipDashboard />
                 </RequireAuth>
               }
@@ -406,7 +406,7 @@ const App = () => (
             <Route
               path="/membros/cadastros"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Signups />
                 </RequireAuth>
               }
@@ -414,7 +414,7 @@ const App = () => (
             <Route
               path="/membros/acompanhamento"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <FollowUp />
                 </RequireAuth>
               }
@@ -422,7 +422,7 @@ const App = () => (
             <Route
               path="/membros/relatorios"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Reports />
                 </RequireAuth>
               }
@@ -430,7 +430,7 @@ const App = () => (
             <Route
               path="/membros/grupos"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Groups />
                 </RequireAuth>
               }
@@ -438,7 +438,7 @@ const App = () => (
             <Route
               path="/membros/grupos/:id"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <GroupDetail />
                 </RequireAuth>
               }
@@ -446,7 +446,7 @@ const App = () => (
             <Route
               path="/membros/eventos"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEvents />
                 </RequireAuth>
               }
@@ -454,7 +454,7 @@ const App = () => (
             <Route
               path="/membros/eventos/novo"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -462,7 +462,7 @@ const App = () => (
             <Route
               path="/membros/eventos/:id"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEventDetail />
                 </RequireAuth>
               }
@@ -470,7 +470,7 @@ const App = () => (
             <Route
               path="/membros/eventos/:id/editar"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -478,7 +478,7 @@ const App = () => (
             <Route
               path="/membros/:id"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PersonProfile />
                 </RequireAuth>
               }
@@ -486,7 +486,7 @@ const App = () => (
             <Route
               path="/membros/:id/editar"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PersonForm />
                 </RequireAuth>
               }
