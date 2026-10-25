@@ -29,6 +29,7 @@ import {
   Cake,
   PieChart,
   Footprints,
+  Ticket,
   QrCode,
   type LucideIcon,
 } from 'lucide-react'
@@ -144,6 +145,7 @@ export default function Layout() {
         { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeAdmin },
         { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeAdmin, end: true },
         { to: '/membros/acompanhamento', label: 'Visitantes', icon: Footprints, allowed: canSeeAdmin },
+        { to: '/membros/eventos', label: 'Eventos da igreja', icon: Ticket, allowed: canSeeAdmin },
         { to: '/membros/aniversarios', label: 'Aniversariantes', icon: Cake, allowed: canSeeAdmin },
         { to: '/membros/cadastros', label: 'Cadastros (QR)', icon: QrCode, allowed: canSeeAdmin },
       ],

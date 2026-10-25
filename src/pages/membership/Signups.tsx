@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import QRCode from 'qrcode'
 import { useAuth } from '@/contexts/AuthContext'
 import { listPeople } from '@/services/people'
 import {
@@ -69,32 +68,13 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
+import { QrCodeImage, downloadQrPng } from '@/components/QrCodeImage'
 import { StatusBadge, errorMessage } from './shared'
 
 const NONE = '__none__'
 
 function createdOn(signup: PersonSignup): string {
   return formatCalendarDateDisplay(signup.created.slice(0, 10))
-}
-
-function QrImage({ url, size = 160 }: { url: string; size?: number }) {
-  const [src, setSrc] = useState('')
-  useEffect(() => {
-    QRCode.toDataURL(url, { width: size * 2, margin: 1 }).then(setSrc).catch(() => setSrc(''))
-  }, [url, size])
-  if (!src) return <div style={{ width: size, height: size }} className="bg-slate-100 rounded-lg" />
-  return (
-    <img src={src} width={size} height={size} alt="QR code do cadastro" className="rounded-lg" />
-  )
-}
-
-async function downloadQr(link: SignupLink) {
-  const url = signupUrl(link.key)
-  const data = await QRCode.toDataURL(url, { width: 1024, margin: 2 })
-  const a = document.createElement('a')
-  a.href = data
-  a.download = `qr-cadastro-${link.title.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.png`
-  a.click()
 }
 
 function Info({ label, value }: { label: string; value?: string | null }) {
@@ -237,7 +217,7 @@ function LinkCard({
       }`}
     >
       <div className="self-center sm:self-start">
-        <QrImage url={url} />
+        <QrCodeImage url={url} alt="QR code do cadastro" />
       </div>
       <div className="flex-1 min-w-0 space-y-3">
         <div className="flex items-start gap-3">
@@ -260,7 +240,7 @@ function LinkCard({
             <Copy className="h-3.5 w-3.5" />
             Copiar link
           </Button>
-          <Button size="sm" variant="outline" className="rounded-lg gap-1.5" onClick={() => downloadQr(link)}>
+          <Button size="sm" variant="outline" className="rounded-lg gap-1.5" onClick={() => downloadQrPng(url, `cadastro ${link.title}`)}>
             <Download className="h-3.5 w-3.5" />
             Baixar QR code
           </Button>

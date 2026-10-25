@@ -521,3 +521,45 @@ export interface PersonSignup {
   created: string
   updated: string
 }
+
+/** Evento da igreja com inscrição (retiro, curso, batismo) — church_events. */
+export interface ChurchEvent {
+  id: string
+  church_id: string
+  title: string
+  description?: string
+  starts_on: string
+  ends_on?: string
+  start_time?: string
+  location?: string
+  congregation?: string
+  price?: number
+  capacity?: number
+  payment_info?: string
+  registration_open: boolean
+  public_key: string
+  created_by?: string
+  created: string
+  updated: string
+}
+
+export type PaymentMethod = 'PIX' | 'DINHEIRO' | 'CARTAO' | 'ISENTO' | 'OUTRO'
+
+/** Inscrito em um evento da igreja — church_event_registrations. */
+export interface EventRegistration {
+  id: string
+  church_id: string
+  event_id: string
+  person_id?: string
+  name: string
+  phone?: string
+  email?: string
+  notes?: string
+  source?: 'SECRETARIA' | 'LINK' | ''
+  paid: boolean
+  paid_amount?: number
+  payment_method?: PaymentMethod | ''
+  attended: boolean
+  created: string
+  updated: string
+}
