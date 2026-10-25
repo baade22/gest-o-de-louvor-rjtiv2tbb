@@ -23,7 +23,7 @@ routerAdd(
     const operationalRoles = Array.isArray(body.operational_roles)
       ? body.operational_roles.map((r) => String(r))
       : ['MUSICO']
-    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO']
+    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO', 'AUDITOR']
     for (const op of operationalRoles) {
       if (knownOps.indexOf(op) === -1) {
         return e.json(400, { message: 'Função operacional inválida: ' + op })
@@ -89,9 +89,14 @@ routerAdd(
         })
       }
       // Financeiro dá escrita no dinheiro da igreja: só o MASTER convida com essa função
-      if (operationalRoles.indexOf('FINANCEIRO') !== -1 && callerRole !== 'MASTER') {
+      if (
+        (operationalRoles.indexOf('FINANCEIRO') !== -1 ||
+          operationalRoles.indexOf('AUDITOR') !== -1) &&
+        callerRole !== 'MASTER'
+      ) {
         return e.json(403, {
-          message: 'Só o MASTER da igreja pode convidar alguém com a função Financeiro.',
+          message:
+            'Só o MASTER da igreja pode convidar alguém com a função Financeiro ou Conselho fiscal.',
         })
       }
     } catch (err) {

@@ -2,7 +2,7 @@
 //
 // POST /backend/v1/finance/closing
 // Body: { church_id, action: 'check' | 'close' | 'reopen', month?: 'AAAA-MM', notes?, reason? }
-// - check: conferência e resumo do mês (MASTER, ADMIN ou FINANCEIRO).
+// - check: conferência e resumo do mês (MASTER, ADMIN, FINANCEIRO ou AUDITOR).
 // - close: fecha o mês (MASTER ou FINANCEIRO). Trava tudo até o fim dele. Precisa ser um mês
 //   que já acabou, depois do último fechado, e sem pendências que bloqueiam (contagem sem
 //   2ª conferência e movimento do extrato sem conciliar).
@@ -46,7 +46,9 @@ routerAdd(
       opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
     } catch (_) {}
     const isFin = opRoles.indexOf('FINANCEIRO') !== -1
-    if (role !== 'MASTER' && role !== 'ADMIN' && !isFin) {
+    // O conselho fiscal (AUDITOR) confere, como o ADMIN; fechar continua com MASTER e FINANCEIRO
+    const isAuditor = opRoles.indexOf('AUDITOR') !== -1
+    if (role !== 'MASTER' && role !== 'ADMIN' && !isFin && !isAuditor) {
       return e.json(403, { message: 'Sem acesso ao financeiro desta igreja.' })
     }
 

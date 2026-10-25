@@ -38,6 +38,7 @@ import {
   PieChart,
   FileBarChart,
   TrendingUp,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -126,7 +127,8 @@ export default function Layout() {
   const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const canSeeMusicians = isMaster || isAdmin || isLeader
   const canSeeAdmin = isMaster || isAdmin
-  const canSeeFinance = isMaster || isAdmin || hasOperationalRole('FINANCEIRO')
+  const canSeeFinance =
+    isMaster || isAdmin || hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
 
   const sections: NavSection[] = [
     {
@@ -200,6 +202,12 @@ export default function Layout() {
           allowed: canSeeFinance,
         },
         {
+          to: '/financeiro/auditoria',
+          label: 'Auditoria',
+          icon: ShieldCheck,
+          allowed: canSeeFinance,
+        },
+        {
           to: '/financeiro/relatorios',
           label: 'Relatórios',
           icon: FileBarChart,
@@ -251,10 +259,21 @@ export default function Layout() {
     navigate('/login')
   }
 
-  // Quem só cuida do financeiro aparece como "Financeiro", não como "Músico"
+  // Quem só cuida do financeiro aparece como "Financeiro" (ou "Conselho fiscal"), não como "Músico"
   const onlyFinance =
     role === 'MUSICO' && hasOperationalRole('FINANCEIRO') && !hasOperationalRole('MUSICO')
-  const roleLabel = onlyFinance ? 'Financeiro' : role ? ROLE_LABELS[role] || role : ''
+  const onlyAudit =
+    role === 'MUSICO' &&
+    hasOperationalRole('AUDITOR') &&
+    !hasOperationalRole('FINANCEIRO') &&
+    !hasOperationalRole('MUSICO')
+  const roleLabel = onlyFinance
+    ? 'Financeiro'
+    : onlyAudit
+      ? 'Conselho fiscal'
+      : role
+        ? ROLE_LABELS[role] || role
+        : ''
   const userInitials = initials(user?.name)
   const churchInitials = initials(currentChurch?.name)
 

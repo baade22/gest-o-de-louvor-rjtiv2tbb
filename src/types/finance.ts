@@ -302,3 +302,27 @@ export interface FinSigner extends BaseRecord {
   document?: string
   is_active: boolean
 }
+
+export type FinAuditStatus = 'APROVADO' | 'RESSALVA' | 'RESPONDIDA'
+
+/** Auditoria de um lançamento pelo conselho fiscal (gravada só pelo hook finance_audit.js). */
+export interface FinAudit extends BaseRecord {
+  transaction_id: string
+  month: string
+  status: FinAuditStatus
+  approved_by?: string
+  approved_by_name?: string
+  approved_at?: string
+  /** "updated" do lançamento na aprovação; se mudou depois, a aprovação não vale mais. */
+  tx_updated?: string
+}
+
+export interface FinAuditComment extends BaseRecord {
+  audit_id: string
+  month: string
+  kind: 'RESSALVA' | 'RESPOSTA' | 'APROVACAO'
+  text: string
+  author_id: string
+  author_name: string
+  author_role: string
+}

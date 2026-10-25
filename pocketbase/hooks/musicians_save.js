@@ -44,22 +44,25 @@ routerAdd(
     const operationalRoles = Array.isArray(body.operational_roles)
       ? body.operational_roles.map((r) => String(r))
       : ['MUSICO']
-    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO']
+    const knownOps = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO', 'FINANCEIRO', 'AUDITOR']
     for (const op of operationalRoles) {
       if (knownOps.indexOf(op) === -1) {
         return e.json(400, { message: 'Função operacional inválida: ' + op })
       }
     }
-    const wantsFinance = operationalRoles.indexOf('FINANCEIRO') !== -1
+    // Funções que mexem com o dinheiro (Financeiro e Conselho fiscal): só o MASTER dá ou tira.
+    const moneyRoles = (ops) =>
+      ['FINANCEIRO', 'AUDITOR'].filter((r) => ops.indexOf(r) !== -1).join(',')
+    const wantsFinance = moneyRoles(operationalRoles)
     const hasFinance = (rec) => {
       let ops = []
       try {
         ops = JSON.parse(rec.getString('operational_roles') || '[]') || []
       } catch (_) {}
-      return ops.indexOf('FINANCEIRO') !== -1
+      return moneyRoles(ops)
     }
     const financeOnlyMaster = {
-      message: 'Só o MASTER da igreja pode dar ou tirar a função Financeiro.',
+      message: 'Só o MASTER da igreja pode dar ou tirar as funções Financeiro e Conselho fiscal.',
     }
 
     if (!['MASTER', 'ADMIN', 'LIDER', 'MUSICO'].includes(role)) {

@@ -1,4 +1,4 @@
-// Função Financeiro só é dada ou retirada pelo MASTER da igreja.
+// Funções Financeiro e Conselho fiscal (AUDITOR) só são dadas ou retiradas pelo MASTER da igreja.
 // A regra de church_members deixa o ADMIN editar membros pela API; sem esta guarda, um ADMIN
 // (que no financeiro só lê) poderia se dar a função Financeiro e passar a lançar, conciliar e
 // conectar bancos. Os hooks musicians_save.js e invitations_create.js fazem a mesma conferência.
@@ -20,11 +20,12 @@ onRecordCreateRequest((e) => {
         ops = []
       }
     }
-    return Array.isArray(ops) && ops.indexOf('FINANCEIRO') !== -1
+    if (!Array.isArray(ops)) return ''
+    return ['FINANCEIRO', 'AUDITOR'].filter((r) => ops.indexOf(r) !== -1).join(',')
   }
   const rec = e.record
   const after = hasFinance(rec.getString('operational_roles'))
-  const before = rec.isNew() ? false : hasFinance(rec.original().getString('operational_roles'))
+  const before = rec.isNew() ? '' : hasFinance(rec.original().getString('operational_roles'))
   if (after !== before) {
     let isMaster = false
     try {
@@ -36,7 +37,9 @@ onRecordCreateRequest((e) => {
       isMaster = !!m
     } catch (_) {}
     if (!isMaster) {
-      throw new ForbiddenError('Só o MASTER da igreja pode dar ou tirar a função Financeiro.')
+      throw new ForbiddenError(
+        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro e Conselho fiscal.',
+      )
     }
   }
   e.next()
@@ -58,11 +61,12 @@ onRecordUpdateRequest((e) => {
         ops = []
       }
     }
-    return Array.isArray(ops) && ops.indexOf('FINANCEIRO') !== -1
+    if (!Array.isArray(ops)) return ''
+    return ['FINANCEIRO', 'AUDITOR'].filter((r) => ops.indexOf(r) !== -1).join(',')
   }
   const rec = e.record
   const after = hasFinance(rec.getString('operational_roles'))
-  const before = rec.isNew() ? false : hasFinance(rec.original().getString('operational_roles'))
+  const before = rec.isNew() ? '' : hasFinance(rec.original().getString('operational_roles'))
   if (after !== before) {
     let isMaster = false
     try {
@@ -74,7 +78,9 @@ onRecordUpdateRequest((e) => {
       isMaster = !!m
     } catch (_) {}
     if (!isMaster) {
-      throw new ForbiddenError('Só o MASTER da igreja pode dar ou tirar a função Financeiro.')
+      throw new ForbiddenError(
+        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro e Conselho fiscal.',
+      )
     }
   }
   e.next()

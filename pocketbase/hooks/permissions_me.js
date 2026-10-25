@@ -212,6 +212,11 @@ routerAdd(
           permissionsSet['finance.view'] = true
           permissionsSet['finance.edit'] = true
         }
+        // Conselho fiscal: vê o financeiro e audita, sem lançar
+        if (op === 'AUDITOR') {
+          permissionsSet['finance.view'] = true
+          permissionsSet['finance.audit'] = true
+        }
       }
     }
 

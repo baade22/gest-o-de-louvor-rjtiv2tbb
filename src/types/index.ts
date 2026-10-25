@@ -1,5 +1,12 @@
 export type AppRole = 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
-export type OperationalRole = 'MUSICO' | 'SOM' | 'PROJECAO' | 'MIDIA' | 'ILUMINACAO' | 'FINANCEIRO'
+export type OperationalRole =
+  | 'MUSICO'
+  | 'SOM'
+  | 'PROJECAO'
+  | 'MIDIA'
+  | 'ILUMINACAO'
+  | 'FINANCEIRO'
+  | 'AUDITOR'
 
 export interface User {
   id: string

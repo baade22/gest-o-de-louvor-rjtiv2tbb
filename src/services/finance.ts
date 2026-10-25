@@ -10,6 +10,8 @@ import type {
   FinBankImport,
   FinBankLine,
   FinBill,
+  FinAudit,
+  FinAuditComment,
   FinClosing,
   FinClosingCheck,
   FinBillKind,
@@ -562,3 +564,40 @@ export async function listApprovedCounts(churchId: string, from: string, to: str
     expand: 'account_id,event_id',
   })
 }
+
+// ---- Auditoria do conselho fiscal (hook finance_audit.js) ----
+
+export async function listAudits(churchId: string, month: string) {
+  return pb.collection('fin_audits').getFullList<FinAudit>({
+    filter: pb.filter('church_id = {:churchId} && month = {:month}', { churchId, month }),
+  })
+}
+
+export async function listAuditComments(churchId: string, month: string) {
+  return pb.collection('fin_audit_comments').getFullList<FinAuditComment>({
+    filter: pb.filter('church_id = {:churchId} && month = {:month}', { churchId, month }),
+    sort: 'created',
+  })
+}
+
+/** Ressalvas ainda sem resposta da tesouraria, de qualquer mês. */
+export async function listOpenObjections(churchId: string) {
+  return pb.collection('fin_audits').getFullList<FinAudit>({
+    filter: pb.filter("church_id = {:churchId} && status = 'RESSALVA'", { churchId }),
+    fields: 'id,month,transaction_id',
+  })
+}
+
+export const auditTransactions = (
+  churchId: string,
+  action: 'approve' | 'objection' | 'reply',
+  transactionIds: string[],
+  text = '',
+) =>
+  pb.send<{ approved: number; skipped_own: number; status: string }>(
+    '/backend/v1/finance/audit',
+    {
+      method: 'POST',
+      body: { church_id: churchId, action, transaction_ids: transactionIds, text },
+    },
+  )

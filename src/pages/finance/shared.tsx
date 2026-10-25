@@ -16,15 +16,18 @@ import {
 import type { FinAccountKind, FinBillDocumentType, FinPaymentMethod } from '@/types/finance'
 
 /**
- * Quem vê o Financeiro: MASTER, ADMIN e quem tem a função FINANCEIRO.
- * Quem lança e edita: MASTER e FINANCEIRO (ADMIN sem a função só acompanha).
+ * Quem vê o Financeiro: MASTER, ADMIN, quem tem a função FINANCEIRO e o conselho fiscal (AUDITOR).
+ * Quem lança e edita: MASTER e FINANCEIRO (ADMIN e conselho fiscal só acompanham).
+ * Quem audita (aprova ou registra ressalva): MASTER e conselho fiscal.
  */
 export function useFinanceAccess() {
   const { isMaster, isAdmin, operationalRoles } = useAuth()
   const isTreasurer = operationalRoles.includes('FINANCEIRO')
+  const isAuditor = operationalRoles.includes('AUDITOR')
   return {
-    canView: isMaster || isAdmin || isTreasurer,
+    canView: isMaster || isAdmin || isTreasurer || isAuditor,
     canEdit: isMaster || isTreasurer,
+    canAudit: isMaster || isAuditor,
   }
 }
 
@@ -137,11 +140,13 @@ export function PageHeader({
 }
 
 export function ReadOnlyNotice() {
+  const { operationalRoles } = useAuth()
   return (
     <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
       <Lock className="h-4 w-4 shrink-0 text-slate-400" />
-      Você acompanha o financeiro em modo leitura. Para lançar, peça a função Financeiro a um
-      administrador.
+      {operationalRoles.includes('AUDITOR')
+        ? 'Você acompanha o financeiro como conselho fiscal. Aprovações e ressalvas ficam em Auditoria.'
+        : 'Você acompanha o financeiro em modo leitura. Para lançar, peça a função Financeiro a um administrador.'}
     </div>
   )
 }

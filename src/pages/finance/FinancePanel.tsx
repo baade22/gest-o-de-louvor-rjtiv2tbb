@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Landmark,
   LockKeyholeOpen,
+  MessageSquareWarning,
   PiggyBank,
   Plus,
   Scale,
@@ -36,6 +37,7 @@ import {
   listClosings,
   listLedger,
   listOpenBills,
+  listOpenObjections,
   listPendingLines,
   lockedUntil,
 } from '@/services/finance'
@@ -119,6 +121,8 @@ export default function FinancePanel() {
   const [congregation, setCongregation] = useState('')
   // Último mês fechado ('' = nenhum; null = não carregou)
   const [locked, setLocked] = useState<string | null>(null)
+  // Ressalvas do conselho fiscal esperando resposta da tesouraria (meses)
+  const [objections, setObjections] = useState<string[]>([])
 
   useEffect(() => {
     if (!churchId) return
@@ -131,9 +135,11 @@ export default function FinancePanel() {
       listOpenBills(churchId).catch(() => [] as FinBill[]),
       listPendingLines(churchId).catch(() => []),
       listClosings(churchId).catch(() => null),
+      listOpenObjections(churchId).catch(() => []),
     ])
-      .then(([a, c, l, b, p, closings]) => {
+      .then(([a, c, l, b, p, closings, open]) => {
         setLocked(closings ? lockedUntil(closings) : null)
+        setObjections(open.map((o) => o.month).sort())
         setAccounts(a)
         setCategories(c)
         setLedger(l)
@@ -265,6 +271,23 @@ export default function FinancePanel() {
           </p>
           <Button asChild variant="outline" size="sm" className="bg-white">
             <Link to="/financeiro/fechamento">Fechar o mês</Link>
+          </Button>
+        </div>
+      )}
+
+      {canEdit && objections.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900 sm:flex-row sm:items-center">
+          <MessageSquareWarning className="h-4 w-4 shrink-0 text-orange-700" />
+          <p className="flex-1">
+            <b>
+              {objections.length === 1
+                ? '1 ressalva do conselho fiscal'
+                : `${objections.length} ressalvas do conselho fiscal`}
+            </b>{' '}
+            {objections.length === 1 ? 'espera' : 'esperam'} resposta da tesouraria.
+          </p>
+          <Button asChild variant="outline" size="sm" className="bg-white">
+            <Link to={`/financeiro/auditoria?mes=${objections[0]}`}>Responder</Link>
           </Button>
         </div>
       )}

@@ -130,7 +130,7 @@ routerAdd(
         allowed = isAdmin || isLider
         break
       case 'finance':
-        allowed = opRoles.includes('FINANCEIRO') || isAdmin
+        allowed = opRoles.includes('FINANCEIRO') || opRoles.includes('AUDITOR') || isAdmin
         break
       case 'integrations':
       case 'settings':
