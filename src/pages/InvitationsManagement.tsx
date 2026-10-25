@@ -150,7 +150,8 @@ export default function InvitationsManagement() {
     if (formData.operational_roles.length === 0) {
       toast({
         title: 'Função operacional obrigatória',
-        description: 'Selecione pelo menos uma função (Músico, Som, Projeção, Mídia, Iluminação).',
+        description:
+          'Selecione pelo menos uma função (Músico, Som, Projeção, Mídia, Iluminação, Financeiro).',
         variant: 'destructive',
       })
       return
@@ -595,16 +596,22 @@ export default function InvitationsManagement() {
                     { key: 'PROJECAO', label: 'Projeção', desc: 'Slides e Holyrics' },
                     { key: 'MIDIA', label: 'Mídia & Comunicação', desc: 'Artes e tarefas' },
                     { key: 'ILUMINACAO', label: 'Iluminação', desc: 'Luzes cênicas e cenas' },
+                    { key: 'FINANCEIRO', label: 'Financeiro', desc: 'Dízimos, ofertas e contas' },
+                    { key: 'AUDITOR', label: 'Conselho fiscal', desc: 'Confere o financeiro' },
                   ].map((op) => {
                     const isSelected = formData.operational_roles.includes(
                       op.key as OperationalRole,
                     )
+                    // Só o MASTER convida com Financeiro ou Conselho fiscal (o servidor confere também)
+                    const locked = (op.key === 'FINANCEIRO' || op.key === 'AUDITOR') && !isMaster
                     return (
                       <button
                         key={op.key}
                         type="button"
+                        disabled={locked}
+                        title={locked ? 'Só o MASTER da igreja pode dar esta função' : undefined}
                         onClick={() => toggleOpRole(op.key as OperationalRole)}
-                        className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                        className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                           isSelected
                             ? 'bg-teal-50 border-teal-600 text-teal-900 font-semibold shadow-xs'
                             : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'

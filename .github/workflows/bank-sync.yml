@@ -1,0 +1,36 @@
+# Conector bancário: busca saldo e extrato na Cora e no Bradesco e entrega ao LouvorFlow.
+# Configure os segredos do repositório (Settings > Secrets and variables > Actions):
+#   LOUVORFLOW_URL, BANK_SYNC_TOKEN, CORA_CLIENT_ID, CORA_CERT, CORA_KEY,
+#   BRADESCO_CLIENT_ID, BRADESCO_CLIENT_SECRET, BRADESCO_CERT, BRADESCO_KEY
+# Sem eles o job termina sem fazer nada. Detalhes em bank-sync/README.md.
+name: Conector bancário
+
+on:
+  schedule:
+    # De 2 em 2 horas, das 7h15 às 21h15 no horário de Brasília
+    - cron: '15 10-23/2 * * *'
+    - cron: '15 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bank-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: bank-sync
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Buscar saldos e extratos
+        run: node bank-sync/sync.mjs
+        env:
+          BANK_SYNC_SECRETS: ${{ toJSON(secrets) }}

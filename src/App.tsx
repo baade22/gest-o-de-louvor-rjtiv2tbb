@@ -31,6 +31,7 @@ import LightingModule from '@/pages/LightingModule'
 import TasksModule from '@/pages/TasksModule'
 import InvitationsManagement from '@/pages/InvitationsManagement'
 import InviteAccept from '@/pages/InviteAccept'
+import PublicCampaign from '@/pages/PublicCampaign'
 import PeopleList from '@/pages/membership/PeopleList'
 import PersonForm from '@/pages/membership/PersonForm'
 import Birthdays from '@/pages/membership/Birthdays'
@@ -49,6 +50,20 @@ import PersonDocuments from '@/pages/membership/documents/PersonDocuments'
 import MemberCards from '@/pages/membership/documents/MemberCards'
 import PublicSignup from '@/pages/membership/PublicSignup'
 import NotFound from '@/pages/NotFound'
+import FinancePanel from '@/pages/finance/FinancePanel'
+import FinanceTransactions from '@/pages/finance/FinanceTransactions'
+import FinanceRegistry from '@/pages/finance/FinanceRegistry'
+import FinanceCounts from '@/pages/finance/FinanceCounts'
+import FinanceBills from '@/pages/finance/FinanceBills'
+import FinanceReconcile from '@/pages/finance/FinanceReconcile'
+import FinanceBalances from '@/pages/finance/FinanceBalances'
+import FinanceClosing from '@/pages/finance/FinanceClosing'
+import FinanceReports from '@/pages/finance/FinanceReports'
+import FinanceStatements from '@/pages/finance/FinanceStatements'
+import FinanceCampaigns from '@/pages/finance/FinanceCampaigns'
+import FinanceBudget from '@/pages/finance/FinanceBudget'
+import FinanceCashFlow from '@/pages/finance/FinanceCashFlow'
+import FinanceAudit from '@/pages/finance/FinanceAudit'
 
 const App = () => (
   <BrowserRouter>
@@ -82,6 +97,9 @@ const App = () => (
               </RequireAuth>
             }
           />
+
+          {/* Página pública de doação de uma campanha do Financeiro */}
+          <Route path="/doar/:id" element={<PublicCampaign />} />
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>
@@ -224,6 +242,120 @@ const App = () => (
               element={
                 <RequireAuth requireModule="lighting">
                   <LightingModule />
+                </RequireAuth>
+              }
+            />
+
+            {/* Financeiro: MASTER, ADMIN (leitura) e função FINANCEIRO */}
+            <Route
+              path="/financeiro"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinancePanel />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/lancamentos"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceTransactions />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/contagem"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceCounts />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/contas"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceBills />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/saldos"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceBalances />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/conciliacao"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceReconcile />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/fluxo-de-caixa"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceCashFlow />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/campanhas"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceCampaigns />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/orcamento"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceBudget />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/fechamento"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceClosing />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/auditoria"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceAudit />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/relatorios"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceReports />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/informes"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceStatements />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/cadastros"
+              element={
+                <RequireAuth requireModule="finance">
+                  <FinanceRegistry />
                 </RequireAuth>
               }
             />
