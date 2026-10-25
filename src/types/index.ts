@@ -17,6 +17,12 @@ export interface Church {
   logo?: string
   is_active: boolean
   subscription_plan?: string
+  /** Dados que saem nos documentos da membresia (cartas, certificado, carteirinha). */
+  doc_signer_name?: string
+  doc_signer_title?: string
+  doc_city?: string
+  doc_address?: string
+  doc_cnpj?: string
   created: string
   updated: string
 }

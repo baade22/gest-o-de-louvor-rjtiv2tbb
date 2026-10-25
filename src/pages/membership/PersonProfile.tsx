@@ -51,6 +51,7 @@ import {
   DoorOpen,
   Droplets,
   Edit,
+  FileText,
   Flame,
   Footprints,
   Heart,
@@ -397,6 +398,12 @@ export default function PersonProfile() {
                 </Button>
               </a>
             )}
+            <Link to={`/membros/${person.id}/documentos`} className="flex-1">
+              <Button variant="outline" size="sm" className="w-full rounded-xl gap-1.5">
+                <FileText className="h-4 w-4 text-slate-500" />
+                Documentos
+              </Button>
+            </Link>
             <Link to={`/membros/${person.id}/editar`} className="flex-1">
               <Button
                 size="sm"

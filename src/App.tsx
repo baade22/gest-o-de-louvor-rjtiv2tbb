@@ -42,6 +42,8 @@ import ChurchEvents from '@/pages/membership/ChurchEvents'
 import ChurchEventForm from '@/pages/membership/ChurchEventForm'
 import ChurchEventDetail from '@/pages/membership/ChurchEventDetail'
 import PublicEventSignup from '@/pages/membership/PublicEventSignup'
+import PersonDocuments from '@/pages/membership/documents/PersonDocuments'
+import MemberCards from '@/pages/membership/documents/MemberCards'
 import PublicSignup from '@/pages/membership/PublicSignup'
 import NotFound from '@/pages/NotFound'
 
@@ -59,6 +61,24 @@ const App = () => (
           <Route path="/convite/:token" element={<InviteAccept />} />
           <Route path="/cadastro/:key" element={<PublicSignup />} />
           <Route path="/inscricao/:key" element={<PublicEventSignup />} />
+
+          {/* Documentos para imprimir: fora do Layout, para sair só a folha */}
+          <Route
+            path="/membros/:id/documentos"
+            element={
+              <RequireAuth requireRole="ADMIN">
+                <PersonDocuments />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/membros/carteirinhas"
+            element={
+              <RequireAuth requireRole="ADMIN">
+                <MemberCards />
+              </RequireAuth>
+            }
+          />
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>

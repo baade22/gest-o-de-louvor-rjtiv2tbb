@@ -131,7 +131,7 @@ function SignupCard({
           label="Nascimento"
           value={
             signup.birth_date
-              ? `${formatCalendarDateDisplay(signup.birth_date)}${age !== null ? ` · ${age} anos` : ''}`
+              ? `${formatCalendarDateDisplay(signup.birth_date, 'numeric')}${age !== null ? ` · ${age} anos` : ''}`
               : ''
           }
         />
