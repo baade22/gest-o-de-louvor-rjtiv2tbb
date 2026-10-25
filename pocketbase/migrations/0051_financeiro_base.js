@@ -1,4 +1,4 @@
-// Migração 0035: Financeiro, fase 1 (cadastros base e lançamentos).
+// Migração 0051: Financeiro, fase 1 (cadastros base e lançamentos).
 // - Nova função operacional FINANCEIRO (guardada em church_members.operational_roles).
 // - Coleções: people, fin_accounts, fin_categories, fin_cost_centers, fin_suppliers,
 //   fin_transactions.

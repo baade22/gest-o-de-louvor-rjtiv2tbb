@@ -1,4 +1,4 @@
-// Migração 0047: Financeiro, fechamento do mês.
+// Migração 0057: Financeiro, fechamento do mês.
 // - fin_closings: um registro por fechamento. O mês fechado mais recente (status FECHADO)
 //   trava tudo o que tem data até o fim dele: lançamentos, contagens e saldo inicial das contas
 //   (hook finance_closing.js). Guarda o resumo do mês e a conferência no momento do fechamento.
