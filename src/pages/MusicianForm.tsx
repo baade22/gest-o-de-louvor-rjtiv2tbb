@@ -18,6 +18,16 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 
+const OPERATIONAL_ROLE_OPTIONS: { key: string; label: string }[] = [
+  { key: 'MUSICO', label: 'Músico / Louvor' },
+  { key: 'SOM', label: 'Som' },
+  { key: 'PROJECAO', label: 'Projeção' },
+  { key: 'MIDIA', label: 'Mídia' },
+  { key: 'ILUMINACAO', label: 'Iluminação' },
+  { key: 'FINANCEIRO', label: 'Financeiro' },
+  { key: 'AUDITOR', label: 'Conselho fiscal' },
+]
+
 export default function MusicianForm() {
   const { id } = useParams<{ id: string }>()
   const isEditing = Boolean(id)
@@ -93,6 +103,17 @@ export default function MusicianForm() {
     }
   }, [id, isEditing, currentChurch, navigate, toast])
 
+  const isMusicianProfile = formData.operational_roles.includes('MUSICO')
+
+  const toggleOperationalRole = (key: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      operational_roles: prev.operational_roles.includes(key)
+        ? prev.operational_roles.filter((r) => r !== key)
+        : [...prev.operational_roles, key],
+    }))
+  }
+
   const toggleRole = (roleId: string) => {
     setFormData((prev) => {
       const exists = prev.selectedRoleIds.includes(roleId)
@@ -156,7 +177,16 @@ export default function MusicianForm() {
       return
     }
 
-    if (formData.selectedRoleIds.length === 0) {
+    if (formData.operational_roles.length === 0) {
+      toast({
+        title: 'Escolha uma área',
+        description: 'Marque ao menos uma área de atuação (Músico, Som, Financeiro...).',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (isMusicianProfile && formData.selectedRoleIds.length === 0) {
       toast({
         title: 'Selecione uma função',
         description: 'Defina ao menos uma função/instrumento para este músico.',
@@ -178,7 +208,7 @@ export default function MusicianForm() {
         role: formData.role,
         operational_roles: formData.operational_roles,
         is_active: formData.is_active,
-        role_ids: formData.selectedRoleIds,
+        role_ids: isMusicianProfile ? formData.selectedRoleIds : [],
       })
 
       // Mensagem de sucesso confirmada SOMENTE após resposta positiva do banco
@@ -323,37 +353,73 @@ export default function MusicianForm() {
             </div>
           </div>
 
-          {/* Seleção de Múltiplas Funções / Instrumentos */}
+          {/* Áreas de atuação (funções operacionais): definem os módulos que a pessoa vê */}
           <div className="space-y-2 pt-2">
             <Label className="text-xs font-semibold text-slate-700 block">
-              Instrumentos & Funções (Selecione um ou mais) <span className="text-red-500">*</span>
+              Áreas de atuação <span className="text-red-500">*</span>
             </Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {availableRoles.map((r) => {
-                const isSelected = formData.selectedRoleIds.includes(r.id)
+              {OPERATIONAL_ROLE_OPTIONS.map((op) => {
+                const isSelected = formData.operational_roles.includes(op.key)
+                // Só o MASTER dá ou tira Financeiro e Conselho fiscal (o servidor confere também)
+                const locked = (op.key === 'FINANCEIRO' || op.key === 'AUDITOR') && !isMaster
                 return (
                   <button
-                    key={r.id}
+                    key={op.key}
                     type="button"
-                    onClick={() => toggleRole(r.id)}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    disabled={locked}
+                    title={
+                      locked ? 'Só o MASTER da igreja pode dar ou tirar esta função' : undefined
+                    }
+                    onClick={() => toggleOperationalRole(op.key)}
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                       isSelected
                         ? 'bg-teal-50 border-teal-600 text-teal-900 shadow-xs'
                         : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                     }`}
                   >
-                    <span className="truncate">{r.name}</span>
+                    <span className="truncate">{op.label}</span>
                     {isSelected && <Check className="h-4 w-4 text-teal-700 shrink-0 ml-1" />}
                   </button>
                 )
               })}
             </div>
-            {formData.selectedRoleIds.length === 0 && (
-              <p className="text-[11px] text-amber-600">
-                Selecione pelo menos uma função ou instrumento que o músico executa.
-              </p>
-            )}
           </div>
+
+          {/* Seleção de Múltiplas Funções / Instrumentos */}
+          {isMusicianProfile && (
+            <div className="space-y-2 pt-2">
+              <Label className="text-xs font-semibold text-slate-700 block">
+                Instrumentos & Funções (Selecione um ou mais){' '}
+                <span className="text-red-500">*</span>
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {availableRoles.map((r) => {
+                  const isSelected = formData.selectedRoleIds.includes(r.id)
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => toggleRole(r.id)}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                        isSelected
+                          ? 'bg-teal-50 border-teal-600 text-teal-900 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="truncate">{r.name}</span>
+                      {isSelected && <Check className="h-4 w-4 text-teal-700 shrink-0 ml-1" />}
+                    </button>
+                  )
+                })}
+              </div>
+              {formData.selectedRoleIds.length === 0 && (
+                <p className="text-[11px] text-amber-600">
+                  Selecione pelo menos uma função ou instrumento que o músico executa.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <Link to="/musicians">

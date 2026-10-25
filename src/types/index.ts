@@ -1,5 +1,12 @@
 export type AppRole = 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
-export type OperationalRole = 'MUSICO' | 'SOM' | 'PROJECAO' | 'MIDIA' | 'ILUMINACAO'
+export type OperationalRole =
+  | 'MUSICO'
+  | 'SOM'
+  | 'PROJECAO'
+  | 'MIDIA'
+  | 'ILUMINACAO'
+  | 'FINANCEIRO'
+  | 'AUDITOR'
 
 export interface User {
   id: string
@@ -444,6 +451,10 @@ export interface Person {
   roll_number?: string
   skills?: PersonSkill[]
   user_id?: string
+  /** CPF, usado no informe de contribuições do Financeiro. */
+  document?: string
+  /** false = arquivada no Financeiro (some das listas de contribuinte). */
+  is_active?: boolean
   followup_stage?: FollowupStage | ''
   /** Ficha de quem acompanha esta pessoa. */
   followup_owner?: string

@@ -56,6 +56,7 @@ const EMPTY: FormState = {
   wedding_date: '',
   phone: '',
   email: '',
+  document: '',
   address: '',
   neighborhood: '',
   city: '',
@@ -209,6 +210,7 @@ export default function PersonForm() {
       church_id: currentChurch.id,
       name: form.name.trim(),
       email: form.email?.trim(),
+      document: form.document?.trim(),
       congregation: form.congregation?.trim(),
       state: form.state?.trim().toUpperCase(),
     }
@@ -443,6 +445,16 @@ export default function PersonForm() {
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 placeholder="maria@email.com"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="document" label="CPF (sai no informe de contribuições)">
+              <Input
+                id="document"
+                value={form.document}
+                onChange={(e) => set('document', e.target.value)}
+                placeholder="000.000.000-00"
+                inputMode="numeric"
                 className={inputClass}
               />
             </Field>
