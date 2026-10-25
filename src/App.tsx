@@ -38,6 +38,7 @@ import PersonProfile from '@/pages/membership/PersonProfile'
 import MembershipDashboard from '@/pages/membership/MembershipDashboard'
 import Signups from '@/pages/membership/Signups'
 import FollowUp from '@/pages/membership/FollowUp'
+import Reports from '@/pages/membership/Reports'
 import ChurchEvents from '@/pages/membership/ChurchEvents'
 import ChurchEventForm from '@/pages/membership/ChurchEventForm'
 import ChurchEventDetail from '@/pages/membership/ChurchEventDetail'
@@ -281,6 +282,14 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <FollowUp />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/relatorios"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <Reports />
                 </RequireAuth>
               }
             />
