@@ -36,7 +36,7 @@ const MEMBERSHIP_COLLECTIONS = [
 migrate(
   (app) => {
     const OLD = "@collection.church_members.role ?= 'ADMIN'"
-    const NEW = "@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"'"
+    const NEW = '@collection.church_members.operational_roles ?~ \'"MEMBRESIA"\''
     const swap = (rule) => {
       if (rule === null || rule === undefined) return rule
       const s = '' + rule // cópia primitiva: evita o proxy do goja (ver nota acima)
@@ -55,7 +55,7 @@ migrate(
   (app) => {
     // Rollback: volta a "MASTER ou ADMIN".
     const OLD = "@collection.church_members.role ?= 'ADMIN'"
-    const NEW = "@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"'"
+    const NEW = '@collection.church_members.operational_roles ?~ \'"MEMBRESIA"\''
     const unswap = (rule) => {
       if (rule === null || rule === undefined) return rule
       const s = '' + rule

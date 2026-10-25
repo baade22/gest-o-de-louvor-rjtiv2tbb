@@ -268,14 +268,24 @@ export default function Layout() {
           icon: UsersRound,
           allowed: canSeeMembership,
         },
-        { to: '/membros/eventos', label: 'Eventos da igreja', icon: Ticket, allowed: canSeeMembership },
+        {
+          to: '/membros/eventos',
+          label: 'Eventos da igreja',
+          icon: Ticket,
+          allowed: canSeeMembership,
+        },
         {
           to: '/membros/aniversarios',
           label: 'Aniversariantes',
           icon: Cake,
           allowed: canSeeMembership,
         },
-        { to: '/membros/cadastros', label: 'Cadastros (QR)', icon: QrCode, allowed: canSeeMembership },
+        {
+          to: '/membros/cadastros',
+          label: 'Cadastros (QR)',
+          icon: QrCode,
+          allowed: canSeeMembership,
+        },
         {
           to: '/membros/relatorios',
           label: 'Relatórios',

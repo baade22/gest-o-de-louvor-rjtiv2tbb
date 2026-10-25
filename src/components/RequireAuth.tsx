@@ -112,8 +112,8 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
         </div>
         <h2 className="text-2xl font-bold text-slate-900">Acesso ao Financeiro</h2>
         <p className="mt-2 max-w-md text-sm text-slate-600">
-          Esta área é restrita. Peça ao MASTER da igreja a função Financeiro ou Conselho fiscal
-          para acessá-la.
+          Esta área é restrita. Peça ao MASTER da igreja a função Financeiro ou Conselho fiscal para
+          acessá-la.
         </p>
         <Link to="/dashboard" className="mt-6">
           <Button variant="outline" className="gap-2">

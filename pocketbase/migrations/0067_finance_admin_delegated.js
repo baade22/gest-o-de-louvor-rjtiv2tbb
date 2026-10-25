@@ -33,13 +33,13 @@ const FINANCE_COLLECTIONS = [
 const WITH_ADMIN =
   "(@collection.church_members.role ?= 'MASTER'" +
   " || @collection.church_members.role ?= 'ADMIN'" +
-  " || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"'" +
-  " || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')"
+  ' || @collection.church_members.operational_roles ?~ \'"FINANCEIRO"\'' +
+  ' || @collection.church_members.operational_roles ?~ \'"AUDITOR"\')'
 
 const WITHOUT_ADMIN =
   "(@collection.church_members.role ?= 'MASTER'" +
-  " || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"'" +
-  " || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')"
+  ' || @collection.church_members.operational_roles ?~ \'"FINANCEIRO"\'' +
+  ' || @collection.church_members.operational_roles ?~ \'"AUDITOR"\')'
 
 function applyAll(app, from, to) {
   const swap = (rule) => {
