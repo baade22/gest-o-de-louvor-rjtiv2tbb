@@ -7,6 +7,7 @@ export type OperationalRole =
   | 'ILUMINACAO'
   | 'FINANCEIRO'
   | 'AUDITOR'
+  | 'MEMBRESIA'
 
 export interface User {
   id: string
