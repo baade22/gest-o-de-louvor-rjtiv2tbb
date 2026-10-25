@@ -65,7 +65,10 @@ function detectMediaTypeFromExtension(
 }
 
 export default function MediaModule() {
-  const { currentChurch, currentMember, isAdmin, isMaster } = useAuth()
+  const { currentChurch, currentMember, isAdmin, isMaster, isLeader, hasOperationalRole } = useAuth()
+  // Incluir/excluir mídia = gestor ou função MÍDIA (igual à regra do servidor em media_assets).
+  // Projeção vê a mídia e opera a playlist no Holyrics, mas não cadastra nem exclui arquivos.
+  const canManageMedia = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -319,13 +322,15 @@ export default function MediaModule() {
           </div>
         </div>
 
-        <Button
-          onClick={() => setUploadModalOpen(true)}
-          className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm gap-2"
-        >
-          <UploadCloud className="h-4 w-4" />
-          Enviar Nova Mídia
-        </Button>
+        {canManageMedia && (
+          <Button
+            onClick={() => setUploadModalOpen(true)}
+            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm gap-2"
+          >
+            <UploadCloud className="h-4 w-4" />
+            Enviar Nova Mídia
+          </Button>
+        )}
       </div>
 
       {/* Lista de Mídias */}
@@ -449,7 +454,7 @@ export default function MediaModule() {
                         Baixar Cópia
                       </Button>
 
-                      {(isAdmin || isMaster) && (
+                      {canManageMedia && (
                         <Button
                           variant="ghost"
                           size="icon"
