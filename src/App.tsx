@@ -84,7 +84,7 @@ const App = () => (
           <Route
             path="/membros/:id/documentos"
             element={
-              <RequireAuth requireRole="ADMIN">
+              <RequireAuth requireRole="MEMBERSHIP">
                 <PersonDocuments />
               </RequireAuth>
             }
@@ -92,7 +92,7 @@ const App = () => (
           <Route
             path="/membros/carteirinhas"
             element={
-              <RequireAuth requireRole="ADMIN">
+              <RequireAuth requireRole="MEMBERSHIP">
                 <MemberCards />
               </RequireAuth>
             }
@@ -250,7 +250,7 @@ const App = () => (
             <Route
               path="/financeiro"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinancePanel />
                 </RequireAuth>
               }
@@ -258,7 +258,7 @@ const App = () => (
             <Route
               path="/financeiro/lancamentos"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceTransactions />
                 </RequireAuth>
               }
@@ -266,7 +266,7 @@ const App = () => (
             <Route
               path="/financeiro/contagem"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceCounts />
                 </RequireAuth>
               }
@@ -274,7 +274,7 @@ const App = () => (
             <Route
               path="/financeiro/contas"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceBills />
                 </RequireAuth>
               }
@@ -282,7 +282,7 @@ const App = () => (
             <Route
               path="/financeiro/saldos"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceBalances />
                 </RequireAuth>
               }
@@ -290,7 +290,7 @@ const App = () => (
             <Route
               path="/financeiro/conciliacao"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceReconcile />
                 </RequireAuth>
               }
@@ -298,7 +298,7 @@ const App = () => (
             <Route
               path="/financeiro/fluxo-de-caixa"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceCashFlow />
                 </RequireAuth>
               }
@@ -306,7 +306,7 @@ const App = () => (
             <Route
               path="/financeiro/campanhas"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceCampaigns />
                 </RequireAuth>
               }
@@ -314,7 +314,7 @@ const App = () => (
             <Route
               path="/financeiro/orcamento"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceBudget />
                 </RequireAuth>
               }
@@ -322,7 +322,7 @@ const App = () => (
             <Route
               path="/financeiro/fechamento"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceClosing />
                 </RequireAuth>
               }
@@ -330,7 +330,7 @@ const App = () => (
             <Route
               path="/financeiro/auditoria"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceAudit />
                 </RequireAuth>
               }
@@ -338,7 +338,7 @@ const App = () => (
             <Route
               path="/financeiro/relatorios"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceReports />
                 </RequireAuth>
               }
@@ -346,7 +346,7 @@ const App = () => (
             <Route
               path="/financeiro/informes"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceStatements />
                 </RequireAuth>
               }
@@ -354,7 +354,7 @@ const App = () => (
             <Route
               path="/financeiro/cadastros"
               element={
-                <RequireAuth requireModule="finance">
+                <RequireAuth requireRole="FINANCE">
                   <FinanceRegistry />
                 </RequireAuth>
               }
@@ -374,7 +374,7 @@ const App = () => (
             <Route
               path="/membros"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PeopleList />
                 </RequireAuth>
               }
@@ -382,7 +382,7 @@ const App = () => (
             <Route
               path="/membros/novo"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PersonForm />
                 </RequireAuth>
               }
@@ -390,7 +390,7 @@ const App = () => (
             <Route
               path="/membros/aniversarios"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Birthdays />
                 </RequireAuth>
               }
@@ -398,7 +398,7 @@ const App = () => (
             <Route
               path="/membros/painel"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <MembershipDashboard />
                 </RequireAuth>
               }
@@ -406,7 +406,7 @@ const App = () => (
             <Route
               path="/membros/cadastros"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Signups />
                 </RequireAuth>
               }
@@ -414,7 +414,7 @@ const App = () => (
             <Route
               path="/membros/acompanhamento"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <FollowUp />
                 </RequireAuth>
               }
@@ -422,7 +422,7 @@ const App = () => (
             <Route
               path="/membros/relatorios"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Reports />
                 </RequireAuth>
               }
@@ -430,7 +430,7 @@ const App = () => (
             <Route
               path="/membros/grupos"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <Groups />
                 </RequireAuth>
               }
@@ -438,7 +438,7 @@ const App = () => (
             <Route
               path="/membros/grupos/:id"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <GroupDetail />
                 </RequireAuth>
               }
@@ -446,7 +446,7 @@ const App = () => (
             <Route
               path="/membros/eventos"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEvents />
                 </RequireAuth>
               }
@@ -454,7 +454,7 @@ const App = () => (
             <Route
               path="/membros/eventos/novo"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -462,7 +462,7 @@ const App = () => (
             <Route
               path="/membros/eventos/:id"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEventDetail />
                 </RequireAuth>
               }
@@ -470,7 +470,7 @@ const App = () => (
             <Route
               path="/membros/eventos/:id/editar"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -478,7 +478,7 @@ const App = () => (
             <Route
               path="/membros/:id"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PersonProfile />
                 </RequireAuth>
               }
@@ -486,7 +486,7 @@ const App = () => (
             <Route
               path="/membros/:id/editar"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requireRole="MEMBERSHIP">
                   <PersonForm />
                 </RequireAuth>
               }

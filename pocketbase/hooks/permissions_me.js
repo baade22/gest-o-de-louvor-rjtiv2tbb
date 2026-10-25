@@ -165,8 +165,8 @@ routerAdd(
         permissionsSet['holyrics.view'] = true
         permissionsSet['holyrics.sync'] = true
         permissionsSet['church.settings'] = true
-        // ADMIN acompanha o financeiro; lançar e editar exige a função FINANCEIRO
-        permissionsSet['finance.view'] = true
+        // Financeiro é delegado pelo MASTER: ADMIN só vê/mexe no financeiro se receber a
+        // função FINANCEIRO (ou AUDITOR), igual à Membresia. Sem a função, não vê.
       } else if (isLider) {
         permissionsSet['music.view'] = true
         permissionsSet['music.edit'] = true
@@ -189,12 +189,16 @@ routerAdd(
           permissionsSet['sound.view'] = true
           permissionsSet['sound.edit'] = true
           permissionsSet['events.view'] = true
+          // Som enxerga o repertório/letras do culto (só leitura; editar exige gestor)
+          permissionsSet['music.view'] = true
         }
         if (op === 'PROJECAO') {
           permissionsSet['projection.view'] = true
           permissionsSet['projection.edit'] = true
           permissionsSet['media.view'] = true
           permissionsSet['events.view'] = true
+          // Projeção enxerga músicas/letras (só leitura; editar exige gestor)
+          permissionsSet['music.view'] = true
         }
         if (op === 'MIDIA') {
           permissionsSet['media.view'] = true

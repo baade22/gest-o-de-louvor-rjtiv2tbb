@@ -51,7 +51,10 @@ export default function EventScaleDetail() {
   const canSeeLighting = isMaster || isAdmin || hasOperationalRole('ILUMINACAO')
   const canSeeMedia =
     isMaster || isAdmin || hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
-  const canOperateMedia = isMaster || isAdmin || hasOperationalRole('PROJECAO')
+  // Incluir/ordenar/excluir mídia = gestor ou função MÍDIA (igual à regra do servidor em media_assets).
+  const canManageMedia = canManageContent || hasOperationalRole('MIDIA')
+  // Enviar ao computador e montar a playlist no Holyrics = gestor, MÍDIA ou Projeção (quem opera o culto).
+  const canOperateMedia = canManageMedia || hasOperationalRole('PROJECAO')
   const canSeeAllTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const taskAreas: TeamArea[] | null = canSeeAllTasks
     ? null
@@ -324,8 +327,8 @@ export default function EventScaleDetail() {
               medias={medias}
               churchMembers={center.churchMembers}
               currentMemberId={currentMember?.id}
+              canManage={canManageMedia}
               canOperate={canOperateMedia}
-              canDelete={canManageContent}
               patch={center.patch}
               reload={center.reload}
             />

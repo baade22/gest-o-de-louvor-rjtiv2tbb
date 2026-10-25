@@ -82,9 +82,10 @@ interface MediaTabProps {
   medias: MediaAsset[]
   churchMembers: ChurchMember[]
   currentMemberId?: string
-  /** Enviar ao computador, ordenar e sincronizar a playlist (Projeção/Admin). */
+  /** Incluir, ordenar e excluir mídia (gestor ou função MÍDIA). */
+  canManage: boolean
+  /** Enviar ao computador e montar a playlist no Holyrics (gestor, MÍDIA ou Projeção). */
   canOperate: boolean
-  canDelete: boolean
   patch: EventCenter['patch']
   reload: () => Promise<void>
 }
@@ -94,8 +95,8 @@ export function MediaTab({
   medias,
   churchMembers,
   currentMemberId,
+  canManage,
   canOperate,
-  canDelete,
   patch,
   reload,
 }: MediaTabProps) {
@@ -214,14 +215,16 @@ export function MediaTab({
               Montar playlist no Holyrics
             </Button>
           )}
-          <Button
-            size="sm"
-            onClick={() => setUploadOpen(true)}
-            className="h-8 gap-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800"
-          >
-            <UploadCloud className="h-3.5 w-3.5" />
-            Enviar mídia
-          </Button>
+          {canManage && (
+            <Button
+              size="sm"
+              onClick={() => setUploadOpen(true)}
+              className="h-8 gap-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Enviar mídia
+            </Button>
+          )}
         </>
       }
     >
@@ -239,7 +242,7 @@ export function MediaTab({
             const isReady = media.status === 'BAIXADA' || media.status === 'IMPORTADA_HOLYRICS'
             return (
               <li key={media.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                {canOperate && (
+                {canManage && (
                   <div className="flex flex-col">
                     <button
                       type="button"
@@ -324,7 +327,7 @@ export function MediaTab({
                       <Download className="h-4 w-4 text-slate-500" />
                       Baixar cópia
                     </DropdownMenuItem>
-                    {canDelete && (
+                    {canManage && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem

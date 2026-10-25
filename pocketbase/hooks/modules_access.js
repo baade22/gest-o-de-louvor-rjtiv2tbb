@@ -114,7 +114,13 @@ routerAdd(
         allowed = opRoles.includes('MIDIA') || isAdmin || isLider
         break
       case 'songs':
-        allowed = opRoles.includes('MUSICO') || isAdmin || isLider
+        // Músico/gestor usam o repertório; Som e Projeção veem músicas/letras (só leitura)
+        allowed =
+          opRoles.includes('MUSICO') ||
+          opRoles.includes('SOM') ||
+          opRoles.includes('PROJECAO') ||
+          isAdmin ||
+          isLider
         break
       case 'events':
         allowed =
@@ -130,7 +136,9 @@ routerAdd(
         allowed = isAdmin || isLider
         break
       case 'finance':
-        allowed = opRoles.includes('FINANCEIRO') || opRoles.includes('AUDITOR') || isAdmin
+        // Financeiro é delegado pelo MASTER: só quem tem FINANCEIRO/AUDITOR (MASTER já
+        // passou acima). ADMIN não entra por padrão (precisa receber a função), igual à Membresia.
+        allowed = opRoles.includes('FINANCEIRO') || opRoles.includes('AUDITOR')
         break
       case 'integrations':
       case 'settings':
