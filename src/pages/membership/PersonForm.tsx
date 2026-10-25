@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { createPerson, getPerson, updatePerson, type PersonPayload } from '@/services/people'
+import {
+  createPerson,
+  createPersonEvent,
+  getPerson,
+  updatePerson,
+  type PersonPayload,
+} from '@/services/people'
 import type { AdmissionType, MaritalStatus, Person, PersonGender, PersonStatus } from '@/types'
 import {
   ADMISSION_TYPE_LABELS,
@@ -9,7 +15,9 @@ import {
   MARITAL_STATUS_LABELS,
   PERSON_STATUS_LABELS,
   PERSON_STATUS_ORDER,
+  STATUS_CHANGE_REASONS,
   ageOn,
+  reasonGroupFor,
 } from '@/lib/membership'
 import { getLocalTodayYMD, toCalendarYMD } from '@/lib/dateUtils'
 import { ArrowLeft, Camera, Save, Trash2 } from 'lucide-react'
@@ -60,6 +68,7 @@ const EMPTY: FormState = {
   admission_date: '',
   admission_type: '',
   church_office: '',
+  roll_number: '',
   notes: '',
   user_id: '',
 }
@@ -125,6 +134,10 @@ export default function PersonForm() {
   const [removePhoto, setRemovePhoto] = useState(false)
   const [isLoading, setIsLoading] = useState(isEditing)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Mudança de situação vira registro na linha do tempo, com data e motivo
+  const [statusDate, setStatusDate] = useState(getLocalTodayYMD())
+  const [statusReason, setStatusReason] = useState('')
+  const [statusNote, setStatusNote] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -203,16 +216,38 @@ export default function PersonForm() {
       payload.wedding_date = ''
     }
 
+    const statusChanged = !!original && original.status !== form.status
+    if (statusChanged && (!statusReason || !statusDate)) {
+      toast({
+        title: 'Informe o motivo da mudança de situação',
+        description: 'Ele fica registrado na linha do tempo da pessoa.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const photo = { file: photoFile, remove: removePhoto }
-      if (isEditing && id) await updatePerson(id, payload, photo)
-      else await createPerson(payload, photo)
+      const saved =
+        isEditing && id ? await updatePerson(id, payload, photo) : await createPerson(payload, photo)
+      if (statusChanged && original) {
+        await createPersonEvent({
+          church_id: saved.church_id,
+          person_id: saved.id,
+          kind: 'SITUACAO',
+          date: `${statusDate} 00:00:00.000Z`,
+          title: statusReason,
+          description: statusNote.trim(),
+          from_status: original.status,
+          to_status: form.status,
+        })
+      }
       toast({
         title: isEditing ? 'Ficha atualizada' : 'Membro cadastrado',
         description: `${payload.name} foi salvo(a).`,
       })
-      navigate('/membros')
+      navigate(`/membros/${saved.id}`)
     } catch (err) {
       console.error('Falha ao salvar ficha:', err)
       toast({
@@ -233,6 +268,7 @@ export default function PersonForm() {
     )
   }
 
+  const backTo = isEditing ? `/membros/${id}` : '/membros'
   const age = ageOn(form.birth_date, getLocalTodayYMD())
   const showWedding = ['CASADO', 'VIUVO', 'UNIAO_ESTAVEL'].includes(form.marital_status || '')
   const avatarPerson: Person = {
@@ -245,11 +281,11 @@ export default function PersonForm() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <Link
-        to="/membros"
+        to={backTo}
         className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Voltar para Membros
+        {isEditing ? 'Voltar para o perfil' : 'Voltar para Membros'}
       </Link>
 
       <div>
@@ -482,12 +518,63 @@ export default function PersonForm() {
                 ))}
               </datalist>
             </Field>
+            {original && original.status !== form.status && (
+              <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/60 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <p className="sm:col-span-3 text-xs text-amber-900">
+                  Situação muda de <b>{PERSON_STATUS_LABELS[original.status]}</b> para{' '}
+                  <b>{PERSON_STATUS_LABELS[form.status]}</b>. Isso fica na linha do tempo e na
+                  movimentação do painel.
+                </p>
+                <Field id="status_reason" label="Motivo" required>
+                  <Select value={statusReason} onValueChange={setStatusReason}>
+                    <SelectTrigger id="status_reason" className={`${inputClass} bg-white`}>
+                      <SelectValue placeholder="Escolha" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_CHANGE_REASONS[reasonGroupFor(original.status, form.status)].map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field id="status_date" label="Data da mudança" required>
+                  <Input
+                    id="status_date"
+                    type="date"
+                    value={statusDate}
+                    onChange={(e) => setStatusDate(e.target.value)}
+                    className={`${inputClass} bg-white`}
+                  />
+                </Field>
+                <Field id="status_note" label="Observação">
+                  <Input
+                    id="status_note"
+                    value={statusNote}
+                    onChange={(e) => setStatusNote(e.target.value)}
+                    placeholder="Ex: carta para a IB Central"
+                    className={`${inputClass} bg-white`}
+                  />
+                </Field>
+              </div>
+            )}
             <Field id="church_office" label="Cargo">
               <Input
                 id="church_office"
                 value={form.church_office}
                 onChange={(e) => set('church_office', e.target.value)}
                 placeholder="Ex: Diácono, Presbítero"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="roll_number" label="Nº do rol">
+              <Input
+                id="roll_number"
+                value={form.roll_number}
+                maxLength={20}
+                onChange={(e) => set('roll_number', e.target.value)}
+                placeholder="Matrícula do membro"
                 className={inputClass}
               />
             </Field>
@@ -552,7 +639,7 @@ export default function PersonForm() {
         </Section>
 
         <div className="flex justify-end gap-2 pb-6">
-          <Link to="/membros">
+          <Link to={backTo}>
             <Button type="button" variant="outline" className="rounded-xl">
               Cancelar
             </Button>
