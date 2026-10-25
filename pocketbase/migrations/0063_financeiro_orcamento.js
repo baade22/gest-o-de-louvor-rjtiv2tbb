@@ -1,7 +1,7 @@
-// Migração 0051: Financeiro, dados da igreja para o informe anual de contribuições.
-// fin_settings: um registro por igreja com razão social, CNPJ, endereço, cidade e o texto
-// que sai no rodapé do informe. A tesouraria (MASTER ou FINANCEIRO) edita; quem vê o
-// financeiro (inclusive ADMIN e conselho fiscal) lê.
+// Migração 0063: Financeiro, orçamento anual.
+// fin_budgets: o previsto de cada categoria num ano, da igreja toda (congregation vazio) ou de
+// uma congregação. Só leitura pela API; a rota /backend/v1/finance/budget (hook
+// finance_budget.js) grava o orçamento de um ano e congregação de uma vez.
 
 const MEMBER_OF_CHURCH =
   "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && " +
@@ -12,28 +12,23 @@ const FIN_READ =
   " && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || " +
   '@collection.church_members.operational_roles ?~ \'"FINANCEIRO"\' || ' +
   '@collection.church_members.operational_roles ?~ \'"AUDITOR"\')'
-const FIN_WRITE =
-  MEMBER_OF_CHURCH +
-  " && (@collection.church_members.role ?= 'MASTER' || " +
-  '@collection.church_members.operational_roles ?~ \'"FINANCEIRO"\')'
 
 migrate(
   (app) => {
     try {
-      app.findCollectionByNameOrId('fin_settings')
+      app.findCollectionByNameOrId('fin_budgets')
       return
     } catch (_) {}
     const churches = app.findCollectionByNameOrId('churches')
+    const categories = app.findCollectionByNameOrId('fin_categories')
     app.save(
       new Collection({
-        name: 'fin_settings',
+        name: 'fin_budgets',
         type: 'base',
         listRule: FIN_READ,
         viewRule: FIN_READ,
-        createRule: FIN_WRITE,
-        updateRule:
-          FIN_WRITE +
-          ' && (@request.body.church_id:isset = false || @request.body.church_id = church_id)',
+        createRule: null,
+        updateRule: null,
         deleteRule: null,
         fields: [
           {
@@ -44,21 +39,30 @@ migrate(
             cascadeDelete: true,
             maxSelect: 1,
           },
-          { name: 'legal_name', type: 'text', max: 200 },
-          { name: 'cnpj', type: 'text', max: 20 },
-          { name: 'address', type: 'text', max: 300 },
-          { name: 'city', type: 'text', max: 120 },
-          { name: 'statement_note', type: 'text', max: 1000 },
+          { name: 'year', type: 'number', required: true, onlyInt: true, min: 2000, max: 2100 },
+          { name: 'congregation', type: 'text', max: 60 },
+          {
+            name: 'category_id',
+            type: 'relation',
+            required: true,
+            collectionId: categories.id,
+            cascadeDelete: true,
+            maxSelect: 1,
+          },
+          { name: 'amount_cents', type: 'number', onlyInt: true, min: 0 },
+          { name: 'updated_by_name', type: 'text', max: 200 },
           { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
           { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
         ],
-        indexes: ['CREATE UNIQUE INDEX idx_fin_settings_church ON fin_settings (church_id)'],
+        indexes: [
+          'CREATE UNIQUE INDEX idx_fin_budgets_line ON fin_budgets (church_id, year, congregation, category_id)',
+        ],
       }),
     )
   },
   (app) => {
     try {
-      app.delete(app.findCollectionByNameOrId('fin_settings'))
+      app.delete(app.findCollectionByNameOrId('fin_budgets'))
     } catch (_) {}
   },
 )

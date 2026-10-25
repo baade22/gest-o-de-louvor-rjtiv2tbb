@@ -1,4 +1,4 @@
-// Migração 0052: Financeiro, campanhas.
+// Migração 0062: Financeiro, campanhas.
 // - fin_campaigns: arrecadação com meta e prazo (reforma, missões, congresso), opcionalmente
 //   de uma congregação. Não se apaga: encerra (status ENCERRADA) e pode reabrir.
 // - campaign_id em fin_transactions e fin_bills: a entrada (ou saída) conta para a campanha;

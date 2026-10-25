@@ -1,4 +1,4 @@
-// Migração 0054: Financeiro, PIX da igreja e página pública de doação das campanhas.
+// Migração 0064: Financeiro, PIX da igreja e página pública de doação das campanhas.
 // fin_settings ganha a chave PIX (tipo, chave, nome e cidade de quem recebe), usada para montar
 // o QR "copia e cola" no navegador. fin_campaigns ganha is_public: só campanha ativa e marcada
 // aparece na rota pública /backend/v1/public/campaign/{id} (hook finance_public.js), que tem

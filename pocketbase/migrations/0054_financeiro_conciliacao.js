@@ -1,4 +1,4 @@
-// Migração 0038: Financeiro, conciliação do extrato bancário (OFX).
+// Migração 0054: Financeiro, conciliação do extrato bancário (OFX).
 // - fin_bank_imports: cada arquivo importado (conta, período, saldo informado pelo banco).
 // - fin_bank_lines: cada movimento do extrato. Só o hook finance_reconcile.js cria linhas e
 //   liga uma linha a um lançamento; pela API dá apenas para ignorar uma linha pendente (tarifa

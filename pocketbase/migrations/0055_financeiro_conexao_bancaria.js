@@ -1,4 +1,4 @@
-// Migração 0039: Financeiro, conexão da conta com a API do banco (Cora e Bradesco).
+// Migração 0055: Financeiro, conexão da conta com a API do banco (Cora e Bradesco).
 // - fin_bank_connections: qual banco, ambiente, agência e conta de cada conta do financeiro.
 //   As credenciais (client id, segredo, certificado e chave privada) NÃO ficam aqui: ficam só
 //   no conector bancário (bank-sync/), que busca saldo e extrato e entrega ao hook

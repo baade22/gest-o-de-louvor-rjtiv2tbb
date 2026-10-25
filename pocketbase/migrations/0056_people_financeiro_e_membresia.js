@@ -1,6 +1,6 @@
-// Migração 0046: uma só collection `people` para a Membresia e o Financeiro.
+// Migração 0056: uma só collection `people` para a Membresia e o Financeiro.
 //
-// As duas frentes criam `people` (0035 do Financeiro e 0043 da Membresia), e cada migração
+// As duas frentes criam `people` (0051 do Financeiro e 0043 da Membresia), e cada migração
 // pula a criação se a outra já criou. Aqui juntamos os campos das duas, seja qual for a
 // ordem em que rodaram:
 // - campos da ficha de membro (Membresia), se a collection veio do Financeiro;
@@ -68,7 +68,7 @@ migrate(
       }),
     )
     add(new TextField({ name: 'church_office', max: 120 }))
-    // Campos do Financeiro (0035)
+    // Campos do Financeiro (0051)
     add(new TextField({ name: 'document', max: 20 }))
     add(new BoolField({ name: 'is_active' }))
 

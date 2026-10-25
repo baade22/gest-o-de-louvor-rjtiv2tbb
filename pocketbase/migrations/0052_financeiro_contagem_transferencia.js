@@ -1,4 +1,4 @@
-// Migração 0036: Financeiro, fase 2.
+// Migração 0052: Financeiro, fase 2.
 // - fin_accounts.congregation: congregação dona da conta (ex.: Aldeia, Diamante). Um financeiro
 //   só por igreja, com o painel filtrando por congregação.
 // - fin_transactions: novo tipo TRANSFERENCIA (sai de account_id e entra em to_account_id, sem
@@ -26,7 +26,7 @@ const SAME_CHURCH =
   " && (supplier_id = '' || supplier_id.church_id = church_id)" +
   " && (event_id = '' || event_id.church_id = church_id)"
 
-// Regras da 0035, para o down.
+// Regras da 0051, para o down.
 const OLD_TX_CREATE =
   FIN_WRITE +
   SAME_CHURCH +

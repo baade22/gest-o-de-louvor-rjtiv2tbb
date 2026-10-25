@@ -4,7 +4,7 @@
 // Só responde para campanha ATIVA marcada como pública (is_public). Devolve o necessário para a
 // página: nome, descrição, meta, quanto já entrou, quantas contribuições, prazo, cor, nome da
 // igreja e a chave PIX dos dados da igreja. Nunca devolve nomes de quem contribuiu nem valores
-// individuais. Limite de requisições pela regra "/backend/v1/public/" (migração 0054).
+// individuais. Limite de requisições pela regra "/backend/v1/public/" (migração 0064).
 
 routerAdd('GET', '/backend/v1/public/campaign/{id}', (e) => {
   const id = String(e.request.pathValue('id') || '')
