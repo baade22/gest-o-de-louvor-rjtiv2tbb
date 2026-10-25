@@ -27,6 +27,7 @@ import {
   AudioLines,
   Contact,
   Cake,
+  PieChart,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -138,6 +139,7 @@ export default function Layout() {
     {
       label: 'Membresia',
       items: [
+        { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeAdmin },
         { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeAdmin, end: true },
         { to: '/membros/aniversarios', label: 'Aniversariantes', icon: Cake, allowed: canSeeAdmin },
       ],

@@ -34,6 +34,8 @@ import InviteAccept from '@/pages/InviteAccept'
 import PeopleList from '@/pages/membership/PeopleList'
 import PersonForm from '@/pages/membership/PersonForm'
 import Birthdays from '@/pages/membership/Birthdays'
+import PersonProfile from '@/pages/membership/PersonProfile'
+import MembershipDashboard from '@/pages/membership/MembershipDashboard'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -226,6 +228,22 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <Birthdays />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/painel"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <MembershipDashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/:id"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <PersonProfile />
                 </RequireAuth>
               }
             />
