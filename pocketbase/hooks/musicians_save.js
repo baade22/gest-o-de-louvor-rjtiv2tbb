@@ -59,6 +59,7 @@ routerAdd(
     // 2. Validação Multi-tenant & Autorização (MASTER ou ADMIN)
     // PROTEÇÃO CRÍTICA DO MASTER:
     // Nenhum usuário operacional ou ADMIN comum pode criar MASTER, promover outro para MASTER ou promover a si mesmo.
+    let callerRole = ''
     try {
       const callerMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -75,7 +76,7 @@ routerAdd(
         })
       }
 
-      const callerRole = callerMemberships[0].getString('role')
+      callerRole = callerMemberships[0].getString('role')
       if (callerRole !== 'ADMIN' && callerRole !== 'MASTER') {
         return e.json(403, {
           message: 'Apenas administradores desta igreja podem cadastrar ou editar membros.',
@@ -110,6 +111,15 @@ routerAdd(
         // Validação estrita de isolamento multi-tenant
         if (memberRecord.getString('church_id') !== churchId) {
           return e.json(403, { message: 'Acesso negado: este membro pertence a outra igreja.' })
+        }
+
+        // Proteção do MASTER: um chamador que não é MASTER não pode editar (rebaixar,
+        // desativar ou alterar) um membro cujo papel ATUAL é MASTER. Caso contrário um
+        // ADMIN poderia rebaixar/desativar o dono da igreja e travar o acesso MASTER.
+        if (memberRecord.getString('role') === 'MASTER' && callerRole !== 'MASTER') {
+          return e.json(403, {
+            message: 'Apenas o perfil MASTER pode editar outro MASTER.',
+          })
         }
 
         const userId = memberRecord.getString('user_id')
@@ -215,6 +225,13 @@ routerAdd(
         if (existingMember.length > 0) {
           // Reativa ou atualiza membro existente
           newMember = existingMember[0]
+          // Proteção do MASTER: um não-MASTER não pode alterar um membro que já é MASTER
+          // (ex.: reaproveitar o fluxo de "criação" por e-mail para rebaixá-lo).
+          if (newMember.getString('role') === 'MASTER' && callerRole !== 'MASTER') {
+            return e.json(403, {
+              message: 'Apenas o perfil MASTER pode editar outro MASTER.',
+            })
+          }
           newMember.set('role', role)
           newMember.set('operational_roles', operationalRoles)
           newMember.set('phone', phone || null)

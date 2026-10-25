@@ -31,6 +31,11 @@ import LightingModule from '@/pages/LightingModule'
 import TasksModule from '@/pages/TasksModule'
 import InvitationsManagement from '@/pages/InvitationsManagement'
 import InviteAccept from '@/pages/InviteAccept'
+import PeopleList from '@/pages/membership/PeopleList'
+import PersonForm from '@/pages/membership/PersonForm'
+import Birthdays from '@/pages/membership/Birthdays'
+import PersonProfile from '@/pages/membership/PersonProfile'
+import MembershipDashboard from '@/pages/membership/MembershipDashboard'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -197,6 +202,56 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <InvitationsManagement />
+                </RequireAuth>
+              }
+            />
+
+            {/* Membresia (fichas com dados pessoais: só MASTER/ADMIN) */}
+            <Route
+              path="/membros"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <PeopleList />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/novo"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <PersonForm />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/aniversarios"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <Birthdays />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/painel"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <MembershipDashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/:id"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <PersonProfile />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/:id/editar"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <PersonForm />
                 </RequireAuth>
               }
             />

@@ -376,3 +376,97 @@ export interface EventMember {
     role_id?: Role
   }
 }
+
+// Membresia
+export type PersonStatus =
+  | 'MEMBRO'
+  | 'CONGREGADO'
+  | 'VISITANTE'
+  | 'AFASTADO'
+  | 'TRANSFERIDO'
+  | 'FALECIDO'
+export type PersonGender = 'M' | 'F'
+export type MaritalStatus = 'SOLTEIRO' | 'CASADO' | 'DIVORCIADO' | 'VIUVO' | 'UNIAO_ESTAVEL'
+export type AdmissionType = 'BATISMO' | 'TRANSFERENCIA' | 'ACLAMACAO' | 'RECONCILIACAO'
+export type PersonSkill =
+  | 'CANTA'
+  | 'VIOLAO'
+  | 'GUITARRA'
+  | 'BAIXO'
+  | 'TECLADO'
+  | 'BATERIA'
+  | 'PERCUSSAO'
+  | 'SOPRO'
+  | 'SOM'
+  | 'LUZ'
+  | 'PROJECAO'
+  | 'VIDEO_FOTO'
+  | 'RECEPCAO'
+  | 'INFANTIL'
+  | 'ENSINO'
+  | 'COZINHA'
+
+export interface Person {
+  id: string
+  collectionId?: string
+  collectionName?: string
+  church_id: string
+  name: string
+  photo?: string
+  birth_date?: string
+  gender?: PersonGender | ''
+  marital_status?: MaritalStatus | ''
+  wedding_date?: string
+  phone?: string
+  email?: string
+  address?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  congregation?: string
+  status: PersonStatus
+  conversion_date?: string
+  baptism_date?: string
+  admission_date?: string
+  admission_type?: AdmissionType | ''
+  church_office?: string
+  notes?: string
+  roll_number?: string
+  skills?: PersonSkill[]
+  user_id?: string
+  created: string
+  updated: string
+}
+
+export type PersonEventKind = 'SITUACAO' | 'CARGO' | 'VISITA' | 'CONTATO' | 'NOTA'
+
+/** Registro da linha do tempo da pessoa (people_events). */
+export interface PersonEvent {
+  id: string
+  church_id: string
+  person_id: string
+  kind: PersonEventKind
+  date: string
+  title: string
+  description?: string
+  from_status?: PersonStatus | ''
+  to_status?: PersonStatus | ''
+  created_by?: string
+  created: string
+  updated: string
+}
+
+/** "relative_id é <kind> de person_id" (people_relations). */
+export type RelationKind = 'CONJUGE' | 'FILHO' | 'PAI_MAE' | 'IRMAO' | 'OUTRO'
+
+export interface PersonRelation {
+  id: string
+  church_id: string
+  person_id: string
+  relative_id: string
+  kind: RelationKind
+  lives_together: boolean
+  created: string
+  updated: string
+}
