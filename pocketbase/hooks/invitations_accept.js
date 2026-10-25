@@ -104,17 +104,20 @@ routerAdd('POST', '/backend/v1/invitations/accept', (e) => {
     roleIds = []
   }
 
-  // 1. Cria ou atualiza o usuário na tabela de auth com a senha definida por ele mesmo
+  // 1. Cria a conta de usuário (só quando ainda não existe) com a senha definida pelo próprio usuário
+  let accountExisted = false
   try {
     let userRecord = null
     const usersCol = $app.findCollectionByNameOrId('_pb_users_auth_')
     try {
       userRecord = $app.findAuthRecordByEmail('_pb_users_auth_', email)
-      // Usuário já existe: define a nova senha e marca verificado
-      userRecord.setPassword(password)
-      userRecord.setVerified(true)
-      if (name) userRecord.set('name', name)
-      $app.save(userRecord)
+      accountExisted = true
+      // SEGURANÇA (tomada de conta): a conta JÁ existe. NÃO redefinimos a senha nem o
+      // "verified" de uma conta existente. Fazer isso permitiria que qualquer MASTER/ADMIN
+      // gerasse um convite para o e-mail de outra pessoa (inclusive de outra igreja) e, ao
+      // "aceitar", sobrescrevesse a senha dela — assumindo a conta. Aqui apenas vinculamos a
+      // membresia; o dono entra com a própria senha (ou usa "Esqueci minha senha"). A senha
+      // enviada neste request é ignorada de propósito.
     } catch (_) {
       // Usuário não existe: cria conta limpa com a senha que o próprio usuário digitou
       userRecord = new Record(usersCol)
@@ -215,7 +218,10 @@ routerAdd('POST', '/backend/v1/invitations/accept', (e) => {
 
     return e.json(200, {
       success: true,
-      message: 'Conta ativada com sucesso! Você já pode fazer login no LouvorFlow.',
+      account_existed: accountExisted,
+      message: accountExisted
+        ? 'Acesso liberado! Entre com o seu e-mail e a senha que você já usa nesta conta. Se não lembrar, use "Esqueci minha senha" na tela de login.'
+        : 'Conta ativada com sucesso! Você já pode fazer login no LouvorFlow.',
       email: email,
     })
   } catch (err) {
