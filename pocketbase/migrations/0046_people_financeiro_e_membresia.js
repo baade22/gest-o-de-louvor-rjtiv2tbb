@@ -1,4 +1,4 @@
-// Migração 0044: uma só collection `people` para a Membresia e o Financeiro.
+// Migração 0046: uma só collection `people` para a Membresia e o Financeiro.
 //
 // As duas frentes criam `people` (0035 do Financeiro e 0043 da Membresia), e cada migração
 // pula a criação se a outra já criou. Aqui juntamos os campos das duas, seja qual for a
