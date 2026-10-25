@@ -14,7 +14,11 @@ import {
   updatePerson,
 } from '@/services/people'
 import { listMusicians } from '@/services/musicians'
+import { listGroups, listPersonGroupMembers } from '@/services/groups'
+import { GROUP_KIND_LABELS, GROUP_ROLE_LABELS, groupsOfPerson } from '@/lib/groups'
 import type {
+  ChurchGroup,
+  GroupMember,
   Person,
   PersonEvent,
   PersonEventKind,
@@ -158,6 +162,8 @@ export default function PersonProfile() {
   const [scales, setScales] = useState<ScaleEntry[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [relations, setRelations] = useState<PersonRelation[]>([])
+  const [groups, setGroups] = useState<ChurchGroup[]>([])
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [accounts, setAccounts] = useState<Array<{ user_id: string; name: string }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [eventDialog, setEventDialog] = useState(false)
@@ -176,6 +182,13 @@ export default function PersonProfile() {
       setEvents(ev)
       setPeople(ppl)
       setRelations(rel)
+      // Grupos são opcionais: sem a coleção no servidor, a aba só fica vazia
+      const [g, gm] = await Promise.all([
+        listGroups(currentChurch.id).catch(() => []),
+        listPersonGroupMembers(id).catch(() => []),
+      ])
+      setGroups(g)
+      setGroupMembers(gm)
       setScales(
         p.user_id ? await listPersonScales(currentChurch.id, p.user_id).catch(() => []) : [],
       )
@@ -209,6 +222,10 @@ export default function PersonProfile() {
   const family = useMemo(
     () => (person ? familyOf(person.id, relations, peopleById) : []),
     [person, relations, peopleById],
+  )
+  const myGroups = useMemo(
+    () => (person ? groupsOfPerson(person.id, groups, groupMembers) : []),
+    [person, groups, groupMembers],
   )
   const timeline = useMemo(
     () => (person ? buildTimeline(person, events, scales) : []),
@@ -423,7 +440,7 @@ export default function PersonProfile() {
             {[
               ['linha', 'Linha do tempo', History, timeline.length],
               ['familia', 'Família', Users, family.length],
-              ['servir', 'Servir', HandHeart, (person.skills || []).length],
+              ['servir', 'Servir', HandHeart, myGroups.length + (person.skills || []).length],
               ['ficha', 'Ficha', Contact, 0],
             ].map(([value, label, Icon, count]) => {
               const I = Icon as LucideIcon
@@ -576,6 +593,38 @@ export default function PersonProfile() {
         </TabsContent>
 
         <TabsContent value="servir" className="mt-4 space-y-4">
+          <Panel
+            title="Grupos e ministérios"
+            description="Onde a pessoa serve ou participa, além do louvor"
+            action={
+              <Link to="/membros/grupos">
+                <Button size="sm" variant="outline" className="rounded-xl">
+                  Ver grupos
+                </Button>
+              </Link>
+            }
+          >
+            {myGroups.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-slate-500 text-center">
+                Não participa de nenhum grupo ainda. Adicione pela página do grupo.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 p-5">
+                {myGroups.map(({ group, role }) => (
+                  <Link
+                    key={group.id}
+                    to={`/membros/grupos/${group.id}`}
+                    className="rounded-xl border border-slate-200 px-3 py-2 hover:border-teal-300"
+                  >
+                    <p className="text-sm font-semibold text-slate-900">{group.name}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {GROUP_KIND_LABELS[group.kind]} · {GROUP_ROLE_LABELS[role]}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
           <Panel
             title="Habilidades"
             description="Toque para marcar o que a pessoa sabe ou gosta de fazer"

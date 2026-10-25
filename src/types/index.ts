@@ -569,3 +569,36 @@ export interface EventRegistration {
   created: string
   updated: string
 }
+
+export type GroupKind = 'MINISTERIO' | 'DEPARTAMENTO' | 'GRUPO'
+export type GroupRole = 'LIDER' | 'AUXILIAR' | 'PARTICIPANTE'
+
+/** Ministério, departamento ou grupo pequeno — church_groups. */
+export interface ChurchGroup {
+  id: string
+  church_id: string
+  name: string
+  kind: GroupKind
+  description?: string
+  congregation?: string
+  meeting_info?: string
+  /** Ficha (people) de quem lidera. */
+  leader_id?: string
+  /** Habilidades que ajudam a sugerir voluntários. */
+  skills?: PersonSkill[]
+  active: boolean
+  created: string
+  updated: string
+}
+
+/** Participação de uma ficha em um grupo — church_group_members. */
+export interface GroupMember {
+  id: string
+  church_id: string
+  group_id: string
+  person_id: string
+  role?: GroupRole | ''
+  since?: string
+  created: string
+  updated: string
+}
