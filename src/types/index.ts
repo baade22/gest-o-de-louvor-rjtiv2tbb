@@ -470,3 +470,48 @@ export interface PersonRelation {
   created: string
   updated: string
 }
+
+/** Link de autocadastro (QR code) da igreja. */
+export interface SignupLink {
+  id: string
+  church_id: string
+  title: string
+  congregation?: string
+  key: string
+  active: boolean
+  created_by?: string
+  created: string
+  updated: string
+}
+
+export type SignupRelationship = 'VISITANTE' | 'FREQUENTA' | 'MEMBRO'
+export type SignupStatus = 'PENDENTE' | 'APROVADO' | 'RECUSADO'
+
+/** Ficha enviada pelo formulário público, aguardando aprovação (people_signups). */
+export interface PersonSignup {
+  id: string
+  church_id: string
+  link_id?: string
+  name: string
+  birth_date?: string
+  gender?: PersonGender | ''
+  marital_status?: MaritalStatus | ''
+  phone?: string
+  email?: string
+  address?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  congregation?: string
+  relationship: SignupRelationship
+  baptized?: boolean
+  how_found?: string
+  prayer_request?: string
+  status: SignupStatus
+  person_id?: string
+  reviewed_by?: string
+  reviewed_at?: string
+  created: string
+  updated: string
+}

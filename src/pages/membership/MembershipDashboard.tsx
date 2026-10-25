@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { listPeople, listStatusChanges } from '@/services/people'
+import { countPendingSignups } from '@/services/signups'
 import type { Person, PersonEvent } from '@/types'
 import {
   CONGREGATIONS,
@@ -18,9 +19,11 @@ import {
 import { getLocalTodayYMD, parseCalendarDate } from '@/lib/dateUtils'
 import {
   Cake,
+  ChevronRight,
   FileWarning,
   Heart,
   HeartHandshake,
+  Inbox,
   MessageCircle,
   UserPlus,
   UserRoundPlus,
@@ -131,6 +134,15 @@ export default function MembershipDashboard() {
   const [loadError, setLoadError] = useState('')
   const [congregation, setCongregation] = useState('TODAS')
   const [view, setView] = useState<'idade' | 'tempo' | 'sexo'>('idade')
+  const [pendingSignups, setPendingSignups] = useState(0)
+
+  useEffect(() => {
+    if (!currentChurch) return
+    // Sem a coleção no servidor (backend antigo) o aviso só não aparece
+    countPendingSignups(currentChurch.id)
+      .then(setPendingSignups)
+      .catch(() => setPendingSignups(0))
+  }, [currentChurch])
 
   useEffect(() => {
     if (!currentChurch) return
@@ -211,6 +223,21 @@ export default function MembershipDashboard() {
           </Link>
         </div>
       </div>
+
+      {pendingSignups > 0 && (
+        <Link
+          to="/membros/cadastros"
+          className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100 transition-colors"
+        >
+          <Inbox className="h-5 w-5 shrink-0" />
+          <span>
+            <strong>{pendingSignups}</strong>{' '}
+            {pendingSignups === 1 ? 'cadastro pelo QR code aguardando' : 'cadastros pelo QR code aguardando'}{' '}
+            aprovação
+          </span>
+          <ChevronRight className="h-4 w-4 ml-auto" />
+        </Link>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

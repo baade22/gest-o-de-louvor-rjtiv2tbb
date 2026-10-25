@@ -36,6 +36,8 @@ import PersonForm from '@/pages/membership/PersonForm'
 import Birthdays from '@/pages/membership/Birthdays'
 import PersonProfile from '@/pages/membership/PersonProfile'
 import MembershipDashboard from '@/pages/membership/MembershipDashboard'
+import Signups from '@/pages/membership/Signups'
+import PublicSignup from '@/pages/membership/PublicSignup'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -50,6 +52,7 @@ const App = () => (
 
           {/* Rota pública de aceite de convite e definição de senha */}
           <Route path="/convite/:token" element={<InviteAccept />} />
+          <Route path="/cadastro/:key" element={<PublicSignup />} />
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>
@@ -236,6 +239,14 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <MembershipDashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/cadastros"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <Signups />
                 </RequireAuth>
               }
             />

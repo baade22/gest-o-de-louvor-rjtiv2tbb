@@ -28,6 +28,7 @@ import {
   Contact,
   Cake,
   PieChart,
+  QrCode,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -142,6 +143,7 @@ export default function Layout() {
         { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeAdmin },
         { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeAdmin, end: true },
         { to: '/membros/aniversarios', label: 'Aniversariantes', icon: Cake, allowed: canSeeAdmin },
+        { to: '/membros/cadastros', label: 'Cadastros (QR)', icon: QrCode, allowed: canSeeAdmin },
       ],
     },
     {
