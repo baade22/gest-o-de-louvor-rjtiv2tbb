@@ -25,6 +25,14 @@ import {
   ChevronsLeft,
   ChevronsRight,
   AudioLines,
+  Wallet,
+  ArrowLeftRight,
+  FolderCog,
+  HandCoins,
+  CalendarClock,
+  Coins,
+  Landmark,
+  LockKeyhole,
   Contact,
   Cake,
   PieChart,
@@ -33,6 +41,10 @@ import {
   Ticket,
   QrCode,
   UsersRound,
+  TrendingUp,
+  ShieldCheck,
+  Flag,
+  Target,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -121,6 +133,8 @@ export default function Layout() {
   const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
   const canSeeMusicians = isMaster || isAdmin || isLeader
   const canSeeAdmin = isMaster || isAdmin
+  const canSeeFinance =
+    isMaster || isAdmin || hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
 
   const sections: NavSection[] = [
     {
@@ -139,6 +153,90 @@ export default function Layout() {
         { to: '/midias', label: 'Mídias', icon: Images, allowed: canSeeMedia },
         { to: '/iluminacao', label: 'Iluminação', icon: LampCeiling, allowed: canSeeLighting },
         { to: '/tarefas', label: 'Tarefas', icon: ListChecks, allowed: canSeeTasks },
+      ],
+    },
+    {
+      label: 'Financeiro',
+      items: [
+        {
+          to: '/financeiro',
+          label: 'Painel financeiro',
+          icon: Wallet,
+          allowed: canSeeFinance,
+          end: true,
+        },
+        {
+          to: '/financeiro/lancamentos',
+          label: 'Lançamentos',
+          icon: ArrowLeftRight,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/contagem',
+          label: 'Contagem do culto',
+          icon: HandCoins,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/contas',
+          label: 'Contas a pagar e receber',
+          icon: CalendarClock,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/saldos',
+          label: 'Saldos e extratos',
+          icon: Coins,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/conciliacao',
+          label: 'Conciliação bancária',
+          icon: Landmark,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/fluxo-de-caixa',
+          label: 'Fluxo de caixa',
+          icon: TrendingUp,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/campanhas',
+          label: 'Campanhas',
+          icon: Flag,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/orcamento',
+          label: 'Orçamento',
+          icon: Target,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/fechamento',
+          label: 'Fechamento do mês',
+          icon: LockKeyhole,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/auditoria',
+          label: 'Auditoria',
+          icon: ShieldCheck,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/relatorios',
+          label: 'Relatórios',
+          icon: FileBarChart,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/cadastros',
+          label: 'Cadastros',
+          icon: FolderCog,
+          allowed: canSeeFinance,
+        },
       ],
     },
     {
@@ -199,7 +297,21 @@ export default function Layout() {
     navigate('/login')
   }
 
-  const roleLabel = role ? ROLE_LABELS[role] || role : ''
+  // Quem só cuida do financeiro aparece como "Financeiro" (ou "Conselho fiscal"), não como "Músico"
+  const onlyFinance =
+    role === 'MUSICO' && hasOperationalRole('FINANCEIRO') && !hasOperationalRole('MUSICO')
+  const onlyAudit =
+    role === 'MUSICO' &&
+    hasOperationalRole('AUDITOR') &&
+    !hasOperationalRole('FINANCEIRO') &&
+    !hasOperationalRole('MUSICO')
+  const roleLabel = onlyFinance
+    ? 'Financeiro'
+    : onlyAudit
+      ? 'Conselho fiscal'
+      : role
+        ? ROLE_LABELS[role] || role
+        : ''
   const userInitials = initials(user?.name)
   const churchInitials = initials(currentChurch?.name)
 
