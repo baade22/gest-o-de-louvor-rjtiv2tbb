@@ -9,6 +9,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Receipt,
   Search,
   Undo2,
 } from 'lucide-react'
@@ -32,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { TransactionSheet } from './TransactionSheet'
+import { ReceiptDialog, canIssueReceipt, type ReceiptData } from './ReceiptDialog'
 import { useFinanceLookups } from './useFinanceLookups'
 import {
   MonthSwitcher,
@@ -96,6 +98,7 @@ export default function FinanceTransactions() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<FinTransaction | null>(null)
   const [voiding, setVoiding] = useState<FinTransaction | null>(null)
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const { lookups, reload: reloadLookups } = useFinanceLookups(churchId)
 
@@ -302,6 +305,20 @@ export default function FinanceTransactions() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {canIssueReceipt(tx) && tx.expand?.person_id && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setReceipt({
+                              tx,
+                              person: tx.expand!.person_id!,
+                              categoryName: tx.expand?.category_id?.name || 'Contribuição',
+                              campaignName: tx.expand?.campaign_id?.name,
+                            })
+                          }
+                        >
+                          <Receipt className="mr-2 h-4 w-4" /> Recibo
+                        </DropdownMenuItem>
+                      )}
                       {tx.attachment && (
                         <DropdownMenuItem onClick={() => openAttachment(tx)}>
                           <Paperclip className="mr-2 h-4 w-4" /> Ver comprovante
@@ -328,7 +345,7 @@ export default function FinanceTransactions() {
                           </DropdownMenuItem>
                         </>
                       )}
-                      {!tx.attachment && (!canEdit || voided) && (
+                      {!tx.attachment && (!canEdit || voided) && !canIssueReceipt(tx) && (
                         <DropdownMenuItem disabled>Sem ações disponíveis</DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -361,6 +378,14 @@ export default function FinanceTransactions() {
         </div>
       </div>
 
+      {churchId && (
+        <ReceiptDialog
+          data={receipt}
+          churchId={churchId}
+          churchName={currentChurch?.name || ''}
+          onOpenChange={(open) => !open && setReceipt(null)}
+        />
+      )}
       {churchId && (
         <TransactionSheet
           open={sheetOpen}

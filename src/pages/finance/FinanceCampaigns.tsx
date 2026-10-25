@@ -3,7 +3,20 @@
 // ou na conciliação.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, ArchiveRestore, FileSpreadsheet, Flag, Loader2, Pencil, Plus } from 'lucide-react'
+import {
+  Archive,
+  ArchiveRestore,
+  Copy,
+  ExternalLink,
+  FileSpreadsheet,
+  Flag,
+  Globe,
+  Loader2,
+  MessageCircle,
+  Pencil,
+  Plus,
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -12,6 +25,7 @@ import { brtDay } from '@/lib/bankStatement'
 import { campaignProgress, type CampaignProgress } from '@/lib/campaigns'
 import { centsToText, toCsv } from '@/lib/financeReports'
 import {
+  getFinSettings,
   listCampaignTransactions,
   saveCampaign,
   setCampaignStatus,
@@ -23,6 +37,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -40,6 +55,7 @@ import {
 } from '@/components/ui/dialog'
 import { useFinanceLookups } from './useFinanceLookups'
 import { download } from './print'
+import { PixQr } from './PixQr'
 import {
   PAYMENT_METHOD_LABELS,
   PageHeader,
@@ -178,6 +194,11 @@ function CampaignCard({
           <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
             {campaign.congregation || 'Igreja toda'}
           </span>
+          {campaign.is_public && campaign.status === 'ATIVA' && (
+            <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-800">
+              Doação on-line
+            </span>
+          )}
           {progress.spent > 0 && (
             <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-600">
               Gasto {formatCents(progress.spent)}
@@ -197,6 +218,7 @@ const emptyForm = () => ({
   end_date: '',
   congregation: '',
   color: 'TEAL' as FinCampaignColor,
+  is_public: false,
 })
 
 function CampaignDialog({
@@ -230,6 +252,7 @@ function CampaignDialog({
             end_date: (editing.end_date || '').slice(0, 10),
             congregation: editing.congregation || '',
             color: (editing.color || 'TEAL') as FinCampaignColor,
+            is_public: !!editing.is_public,
           }
         : emptyForm(),
     )
@@ -262,6 +285,7 @@ function CampaignDialog({
       congregation: form.congregation,
       color: form.color,
       status: editing?.status || 'ATIVA',
+      is_public: form.is_public,
     }
     setSaving(true)
     try {
@@ -396,6 +420,20 @@ function CampaignDialog({
               onChange={(e) => set({ description: e.target.value })}
             />
           </div>
+          <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+            <Switch
+              checked={form.is_public}
+              onCheckedChange={(v) => set({ is_public: v })}
+              aria-label="Página de doação"
+            />
+            <span className="text-sm">
+              <span className="block font-medium text-slate-900">Página de doação por PIX</span>
+              <span className="text-slate-500">
+                Um link aberto, sem login, com a meta, quanto já entrou e o QR do PIX da igreja.
+                Nomes e valores de quem doou não aparecem.
+              </span>
+            </span>
+          </label>
           <DialogFooter>
             <Button
               type="button"
@@ -416,6 +454,92 @@ function CampaignDialog({
   )
 }
 
+/** Endereço da página pública, com ou sem "#" (o link de teste usa rotas com #). */
+export function publicLink(path: string) {
+  const { origin, pathname, hash } = window.location
+  return hash.startsWith('#/') ? `${origin}${pathname}#${path}` : `${origin}${path}`
+}
+
+function ShareDialog({
+  campaign,
+  churchId,
+  open,
+  onOpenChange,
+}: {
+  campaign: FinCampaign
+  churchId: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const { toast } = useToast()
+  const [hasPix, setHasPix] = useState<boolean | null>(null)
+  const link = publicLink(`/doar/${campaign.id}`)
+  const message = `Contribua com a campanha ${campaign.name}: ${link}`
+
+  useEffect(() => {
+    if (!open) return
+    setHasPix(null)
+    getFinSettings(churchId)
+      .then((s) => setHasPix(!!s?.pix_key))
+      .catch(() => setHasPix(false))
+  }, [open, churchId])
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link)
+      toast({ title: 'Link copiado' })
+    } catch {
+      toast({ title: 'Não deu para copiar', description: link, variant: 'destructive' })
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Doação por PIX</DialogTitle>
+          <DialogDescription>
+            Mande o link nos grupos ou mostre o QR no telão. Quem abrir vê a meta e o PIX da igreja.
+          </DialogDescription>
+        </DialogHeader>
+        {hasPix === false && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            A igreja ainda não tem chave PIX cadastrada: a página abre, mas sem o QR.{' '}
+            <Link to="/financeiro/cadastros?aba=igreja" className="font-semibold underline">
+              Cadastrar a chave
+            </Link>
+          </p>
+        )}
+        <div className="flex flex-col items-center gap-3">
+          <PixQr payload={link} label="QR do link da campanha" className="h-44 w-44" />
+          <p className="w-full break-all rounded-lg bg-slate-50 px-3 py-2 text-center text-sm text-slate-700">
+            {link}
+          </p>
+        </div>
+        <DialogFooter className="flex-wrap gap-2 sm:justify-center">
+          <Button variant="outline" className="h-9" onClick={copy}>
+            <Copy className="h-4 w-4" /> Copiar link
+          </Button>
+          <Button variant="outline" className="h-9" asChild>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </a>
+          </Button>
+          <Button variant="outline" className="h-9" asChild>
+            <a href={link} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" /> Abrir
+            </a>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function FinanceCampaigns() {
   const { currentChurch } = useAuth()
   const churchId = currentChurch?.id
@@ -429,6 +553,7 @@ export default function FinanceCampaigns() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<FinCampaign | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   const loadTxs = useCallback(async () => {
     if (!churchId) return
@@ -621,6 +746,12 @@ export default function FinanceCampaigns() {
               </p>
             </div>
             <div className="ml-auto flex flex-wrap gap-2">
+              {selected.is_public && selected.status === 'ATIVA' && (
+                <Button variant="outline" size="sm" onClick={() => setSharing(true)}>
+                  <Globe className="mr-1.5 h-4 w-4" />
+                  Link de doação
+                </Button>
+              )}
               <Button variant="outline" size="sm" disabled={!rows.length} onClick={exportCsv}>
                 <FileSpreadsheet className="mr-1.5 h-4 w-4" />
                 Planilha
@@ -728,6 +859,14 @@ export default function FinanceCampaigns() {
         </section>
       )}
 
+      {selected && (
+        <ShareDialog
+          campaign={selected}
+          churchId={churchId}
+          open={sharing}
+          onOpenChange={setSharing}
+        />
+      )}
       <CampaignDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

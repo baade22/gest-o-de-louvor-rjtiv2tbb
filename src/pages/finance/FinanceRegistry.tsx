@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { Archive, ArchiveRestore, Loader2, Pencil, Plus, Sparkles } from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Archive, ArchiveRestore, Loader2, Pencil, Plus, Printer, Sparkles } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
@@ -45,6 +45,9 @@ import {
   useFinanceAccess,
 } from './shared'
 import { DEFAULT_STATEMENT_NOTE } from './AnnualStatementSheet'
+import { PIX_KEY_OPTIONS, PixPosterSheet, PixQr } from './PixQr'
+import { printSheet } from './print'
+import { pixKeyProblem, pixPayload, type PixKeyType } from '@/lib/pix'
 import type { FinSettings } from '@/types/finance'
 
 type Row = Record<string, any> & { id: string; name: string; is_active: boolean }
@@ -569,6 +572,10 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
           address: row?.address || '',
           city: row?.city || '',
           statement_note: row?.statement_note || '',
+          pix_key_type: row?.pix_key_type || 'CPF_CNPJ',
+          pix_key: row?.pix_key || '',
+          pix_name: row?.pix_name || '',
+          pix_city: row?.pix_city || '',
         })
       })
       .catch((err) =>
@@ -581,8 +588,27 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
       .finally(() => setLoading(false))
   }, [churchId, toast])
 
+  const posterRef = useRef<HTMLDivElement>(null)
+  const keyType = (values.pix_key_type || 'CPF_CNPJ') as PixKeyType
+  const pixProblem = values.pix_key?.trim() ? pixKeyProblem(values.pix_key, keyType) : ''
+  const receiver = values.pix_name?.trim() || values.legal_name?.trim() || ''
+  const savedType = (current?.pix_key_type || 'CPF_CNPJ') as PixKeyType
+  const savedPix =
+    current?.pix_key && !pixKeyProblem(current.pix_key, savedType)
+      ? pixPayload({
+          key: current.pix_key,
+          keyType: savedType,
+          name: current.pix_name || current.legal_name || '',
+          city: current.pix_city || current.city || '',
+        })
+      : ''
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (pixProblem) {
+      toast({ title: 'Confira a chave PIX', description: pixProblem, variant: 'destructive' })
+      return
+    }
     setSaving(true)
     try {
       const data = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim()]))
@@ -604,7 +630,7 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
   return (
     <form onSubmit={save} className={cn(cardClass, 'max-w-2xl space-y-4 p-5')}>
       <p className="text-sm text-slate-600">
-        Saem no informe anual de contribuições que cada membro recebe.
+        Saem no informe anual de contribuições e nos recibos que cada membro recebe.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {SETTINGS_FIELDS.map((f) => (
@@ -637,12 +663,119 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
           <p className="text-xs text-slate-500">Em branco, sai o texto de exemplo acima.</p>
         </div>
       </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">PIX da igreja</h3>
+          <p className="text-sm text-slate-600">
+            Vai no QR das páginas de doação das campanhas e no cartaz para o templo. O dinheiro cai
+            direto na conta da chave; a tesouraria confere pelo extrato.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+          <div className="space-y-1.5">
+            <Label htmlFor="fs-pix-type" className="text-xs font-semibold text-slate-600">
+              Tipo de chave
+            </Label>
+            <Select
+              value={keyType}
+              disabled={!canEdit}
+              onValueChange={(v) => setValues((s) => ({ ...s, pix_key_type: v }))}
+            >
+              <SelectTrigger id="fs-pix-type" className="h-10 rounded-lg">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PIX_KEY_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fs-pix-key" className="text-xs font-semibold text-slate-600">
+              Chave PIX
+            </Label>
+            <Input
+              id="fs-pix-key"
+              value={values.pix_key ?? ''}
+              disabled={!canEdit}
+              onChange={(e) => setValues((s) => ({ ...s, pix_key: e.target.value }))}
+              className={cn('h-10 rounded-lg', pixProblem && 'border-red-400')}
+            />
+            {pixProblem && <p className="text-xs text-red-600">{pixProblem}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fs-pix-city" className="text-xs font-semibold text-slate-600">
+              Cidade no PIX
+            </Label>
+            <Input
+              id="fs-pix-city"
+              value={values.pix_city ?? ''}
+              maxLength={15}
+              placeholder={values.city?.slice(0, 15) || 'Ex.: Recife'}
+              disabled={!canEdit}
+              onChange={(e) => setValues((s) => ({ ...s, pix_city: e.target.value }))}
+              className="h-10 rounded-lg"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fs-pix-name" className="text-xs font-semibold text-slate-600">
+              Nome de quem recebe
+            </Label>
+            <Input
+              id="fs-pix-name"
+              value={values.pix_name ?? ''}
+              maxLength={25}
+              placeholder={values.legal_name?.slice(0, 25) || 'Como o banco mostra'}
+              disabled={!canEdit}
+              onChange={(e) => setValues((s) => ({ ...s, pix_name: e.target.value }))}
+              className="h-10 rounded-lg"
+            />
+            <p className="text-xs text-slate-500">
+              Até 25 letras, como aparece no aplicativo do banco ao pagar.
+            </p>
+          </div>
+        </div>
+        {savedPix && (
+          <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 p-3">
+            <PixQr payload={savedPix} className="h-24 w-24 rounded" />
+            <div className="min-w-0 flex-1 text-sm text-slate-600">
+              <p className="font-medium text-slate-900">QR da chave salva</p>
+              <p>Teste no aplicativo do banco antes de imprimir: deve aparecer o nome da igreja.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9"
+              onClick={() => posterRef.current && printSheet(posterRef.current, 'PIX da igreja')}
+            >
+              <Printer className="h-4 w-4" /> Imprimir cartaz
+            </Button>
+          </div>
+        )}
+      </div>
       {canEdit && (
         <div className="flex justify-end">
           <Button type="submit" disabled={saving} className={cn(primaryButtonClass, 'h-9')}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Salvar
           </Button>
+        </div>
+      )}
+      {savedPix && current && (
+        <div className="hidden">
+          <div ref={posterRef}>
+            <PixPosterSheet
+              churchName={current.legal_name || receiver}
+              payload={savedPix}
+              pixKey={current.pix_key || ''}
+              keyType={savedType}
+              receiver={current.pix_name || current.legal_name || ''}
+            />
+          </div>
         </div>
       )}
     </form>

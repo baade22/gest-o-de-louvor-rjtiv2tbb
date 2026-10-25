@@ -31,6 +31,7 @@ import LightingModule from '@/pages/LightingModule'
 import TasksModule from '@/pages/TasksModule'
 import InvitationsManagement from '@/pages/InvitationsManagement'
 import InviteAccept from '@/pages/InviteAccept'
+import PublicCampaign from '@/pages/PublicCampaign'
 import PeopleList from '@/pages/membership/PeopleList'
 import PersonForm from '@/pages/membership/PersonForm'
 import Birthdays from '@/pages/membership/Birthdays'
@@ -64,6 +65,9 @@ const App = () => (
 
           {/* Rota pública de aceite de convite e definição de senha */}
           <Route path="/convite/:token" element={<InviteAccept />} />
+
+          {/* Página pública de doação de uma campanha do Financeiro */}
+          <Route path="/doar/:id" element={<PublicCampaign />} />
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>

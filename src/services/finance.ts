@@ -17,6 +17,7 @@ import type {
   FinBillKind,
   FinBudget,
   FinCampaign,
+  PublicCampaign,
   FinCategory,
   FinCount,
   FinCountEnvelope,
@@ -612,7 +613,7 @@ export const auditTransactions = (
 // ---- Contribuições por pessoa e informe anual ----
 
 const GIVING_FIELDS =
-  'id,type,amount_cents,account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,bank_line_id,count_id'
+  'id,type,amount_cents,account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,bank_line_id,count_id,campaign_id'
 
 /** Entradas com o nome da pessoa (nunca as anônimas), da mais recente para a mais antiga. */
 export async function listPersonGiving(churchId: string, personId: string) {
@@ -665,7 +666,7 @@ export async function listCampaigns(churchId: string) {
 
 export type CampaignInput = Pick<
   FinCampaign,
-  'name' | 'description' | 'goal_cents' | 'congregation' | 'color' | 'status'
+  'name' | 'description' | 'goal_cents' | 'congregation' | 'color' | 'status' | 'is_public'
 > & { start_date: string; end_date: string }
 
 export async function saveCampaign(churchId: string, id: string | null, input: CampaignInput) {
@@ -680,6 +681,12 @@ export async function saveCampaign(churchId: string, id: string | null, input: C
 
 export const setCampaignStatus = (id: string, status: FinCampaign['status']) =>
   pb.collection('fin_campaigns').update<FinCampaign>(id, { status })
+
+/** Página pública de doação (sem login). */
+export const getPublicCampaign = (id: string) =>
+  pb.send<PublicCampaign>(`/backend/v1/public/campaign/${encodeURIComponent(id)}`, {
+    method: 'GET',
+  })
 
 /** Lançamentos ligados a alguma campanha, para os totais e a lista de cada uma. */
 export async function listCampaignTransactions(churchId: string) {

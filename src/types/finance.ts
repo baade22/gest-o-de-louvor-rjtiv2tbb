@@ -339,6 +339,12 @@ export interface FinSettings extends BaseRecord {
   city?: string
   /** Texto do rodapé do informe. */
   statement_note?: string
+  /** PIX da igreja, para o QR das campanhas e o cartaz. */
+  pix_key_type?: 'CPF_CNPJ' | 'TELEFONE' | 'EMAIL' | 'ALEATORIA' | ''
+  pix_key?: string
+  /** Nome de quem recebe, como o banco mostra (até 25 letras). */
+  pix_name?: string
+  pix_city?: string
 }
 
 export type FinCampaignStatus = 'ATIVA' | 'ENCERRADA'
@@ -355,6 +361,22 @@ export interface FinCampaign extends BaseRecord {
   congregation?: string
   color?: FinCampaignColor | ''
   status: FinCampaignStatus
+  /** Tem página de doação aberta (sem login) com o QR do PIX. */
+  is_public?: boolean
+}
+
+/** O que a página pública de doação recebe (hook finance_public.js). */
+export interface PublicCampaign {
+  id: string
+  name: string
+  description: string
+  goal_cents: number
+  raised_cents: number
+  participants: number
+  end_date: string
+  color: FinCampaignColor | ''
+  church_name: string
+  pix: { key: string; key_type: FinSettings['pix_key_type']; name: string; city: string } | null
 }
 
 /** Linha do orçamento anual: previsto de uma categoria no ano (gravada só pelo hook). */

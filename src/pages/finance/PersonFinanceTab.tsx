@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, EyeOff, FileText, Printer } from 'lucide-react'
+import { AlertTriangle, EyeOff, FileText, Printer, Receipt } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
@@ -13,10 +13,12 @@ import {
   listAccounts,
   listCategories,
   listPersonGiving,
+  listCampaigns,
   listSigners,
 } from '@/services/finance'
 import type {
   FinAccount,
+  FinCampaign,
   FinCategory,
   FinSettings,
   FinSigner,
@@ -33,6 +35,7 @@ import {
 } from '@/components/ui/select'
 import { AnnualStatementSheet } from './AnnualStatementSheet'
 import { printSheet } from './print'
+import { ReceiptDialog, canIssueReceipt, type ReceiptData } from './ReceiptDialog'
 import {
   PAYMENT_METHOD_LABELS,
   cardClass,
@@ -60,7 +63,7 @@ export default function PersonFinanceTab({
   churchName,
   today,
 }: {
-  person: { id: string; name: string; document?: string }
+  person: { id: string; name: string; document?: string; phone?: string; email?: string }
   churchId: string
   churchName: string
   /** Hoje, YYYY-MM-DD. */
@@ -76,6 +79,8 @@ export default function PersonFinanceTab({
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
   const [year, setYear] = useState<number | null>(null)
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null)
+  const [campaignNames, setCampaignNames] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     let alive = true
@@ -86,9 +91,11 @@ export default function PersonFinanceTab({
       listAccounts(churchId),
       listSigners(churchId),
       getFinSettings(churchId).catch(() => null),
+      listCampaigns(churchId).catch((): FinCampaign[] => []),
     ])
-      .then(([t, c, a, s, st]) => {
+      .then(([t, c, a, s, st, cp]) => {
         if (!alive) return
+        setCampaignNames(new Map(cp.map((x) => [x.id, x.name])))
         setTxs(t)
         setCategories(c)
         setAccounts(a)
@@ -250,6 +257,7 @@ export default function PersonFinanceTab({
                       <th className="px-4 py-2 font-semibold">Forma</th>
                       <th className="px-4 py-2 font-semibold">Origem</th>
                       <th className="px-4 py-2 text-right font-semibold">Valor</th>
+                      <th className="w-10 px-2 py-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -289,6 +297,28 @@ export default function PersonFinanceTab({
                             )}
                           >
                             {formatCents(tx.amount_cents)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right">
+                            {canIssueReceipt(tx) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Recibo"
+                                title="Recibo"
+                                onClick={() =>
+                                  setReceipt({
+                                    tx,
+                                    person,
+                                    categoryName:
+                                      categoryName.get(tx.category_id || '') || 'Contribuição',
+                                    campaignName: campaignNames.get(tx.campaign_id || ''),
+                                  })
+                                }
+                              >
+                                <Receipt className="h-4 w-4" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       )
@@ -385,6 +415,12 @@ export default function PersonFinanceTab({
           </div>
         </div>
       )}
+      <ReceiptDialog
+        data={receipt}
+        churchId={churchId}
+        churchName={churchName}
+        onOpenChange={(open) => !open && setReceipt(null)}
+      />
     </div>
   )
 }
