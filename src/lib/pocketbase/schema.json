@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T14:51:25.205Z",
+  "generatedAt": "2026-10-25T16:09:58.638Z",
   "collections": [
     {
       "name": "users",
@@ -203,8 +203,8 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
         "view": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && (user_id = @request.auth.id || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.role ?= 'ADMIN' && @request.body.role != 'MASTER'))",
+        "update": "@request.auth.id != '' && (user_id = @request.auth.id && @request.body.role:isset = false && @request.body.operational_roles:isset = false && @request.body.is_active:isset = false && @request.body.church_id:isset = false && @request.body.user_id:isset = false || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.role ?= 'ADMIN' && @request.body.role != 'MASTER'))))",
         "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
       },
       "fields": [
@@ -1898,10 +1898,10 @@
       "name": "people",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && (@request.body.followup_owner:isset = false || @request.body.followup_owner = '' || @request.body.followup_owner.church_id = @request.body.church_id)",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.followup_owner:isset = false || @request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.followup_owner:isset = false || @request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
         "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')"
       },
       "fields": [
@@ -2117,6 +2117,18 @@
         {
           "name": "followup_since",
           "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
           "required": false,
           "system": false
         }
@@ -2908,6 +2920,1741 @@
       "indexes": [
         "CREATE UNIQUE INDEX idx_church_group_members_unique ON church_group_members (group_id, person_id)",
         "CREATE INDEX idx_church_group_members_church ON church_group_members (church_id)"
+      ]
+    },
+    {
+      "name": "fin_accounts",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["CAIXA", "BANCO", "APLICACAO", "OUTRA"]
+        },
+        {
+          "name": "bank_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "agency",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "account_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "opening_balance_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "opening_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "congregation",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "accounting_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "min_balance_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_accounts_church ON fin_accounts (church_id)"]
+    },
+    {
+      "name": "fin_categories",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "direction",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ENTRADA", "SAIDA"]
+        },
+        {
+          "name": "is_contribution",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "parent_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_categories"
+        },
+        {
+          "name": "accounting_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_categories_church ON fin_categories (church_id)"]
+    },
+    {
+      "name": "fin_cost_centers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_cost_centers_church ON fin_cost_centers (church_id)"]
+    },
+    {
+      "name": "fin_suppliers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pix_key",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_suppliers_church ON fin_suppliers (church_id)"]
+    },
+    {
+      "name": "fin_transactions",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && account_id.church_id = church_id && (category_id = '' || category_id.church_id = church_id) && (cost_center_id = '' || cost_center_id.church_id = church_id) && (person_id = '' || person_id.church_id = church_id) && (supplier_id = '' || supplier_id.church_id = church_id) && (event_id = '' || event_id.church_id = church_id) && @request.body.created_by = @request.auth.id && @request.body.status != 'ESTORNADO' && (type != 'TRANSFERENCIA' || (to_account_id != '' && to_account_id != account_id && to_account_id.church_id = church_id)) && @request.body.count_id:isset = false && @request.body.bill_id:isset = false && @request.body.bank_line_id:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && account_id.church_id = church_id && (category_id = '' || category_id.church_id = church_id) && (cost_center_id = '' || cost_center_id.church_id = church_id) && (person_id = '' || person_id.church_id = church_id) && (supplier_id = '' || supplier_id.church_id = church_id) && (event_id = '' || event_id.church_id = church_id) && status != 'ESTORNADO' && @request.body.created_by:isset = false && (type != 'TRANSFERENCIA' || (to_account_id != '' && to_account_id != account_id && to_account_id.church_id = church_id)) && @request.body.count_id:isset = false && @request.body.bill_id:isset = false && @request.body.bank_line_id:isset = false",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ENTRADA", "SAIDA", "TRANSFERENCIA"]
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "amount_cents",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "account_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "category_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_categories"
+        },
+        {
+          "name": "cost_center_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_cost_centers"
+        },
+        {
+          "name": "payment_method",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "DINHEIRO",
+            "PIX",
+            "CARTAO",
+            "TRANSFERENCIA",
+            "BOLETO",
+            "CHEQUE",
+            "OUTRO"
+          ]
+        },
+        {
+          "name": "person_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "is_anonymous",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "supplier_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_suppliers"
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "attachment",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["CONFIRMADO", "ESTORNADO"]
+        },
+        {
+          "name": "void_reason",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "to_account_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "count_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_counts"
+        },
+        {
+          "name": "bill_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_bills"
+        },
+        {
+          "name": "bank_line_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_bank_lines"
+        },
+        {
+          "name": "campaign_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_campaigns"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_fin_transactions_church_date ON fin_transactions (church_id, date)",
+        "CREATE INDEX idx_fin_transactions_account ON fin_transactions (account_id)",
+        "CREATE INDEX idx_fin_transactions_person ON fin_transactions (person_id)",
+        "CREATE INDEX idx_fin_transactions_campaign ON fin_transactions (campaign_id)"
+      ]
+    },
+    {
+      "name": "fin_counts",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && account_id.church_id = church_id && offering_category_id.church_id = church_id && (event_id = '' || event_id.church_id = church_id) && @request.body.counted_by = @request.auth.id && @request.body.status = 'CONTADO' && @request.body.approved_by:isset = false && @request.body.approved_at:isset = false && @request.body.approved_by_name:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && account_id.church_id = church_id && offering_category_id.church_id = church_id && (event_id = '' || event_id.church_id = church_id) && status = 'CONTADO' && (@request.body.status:isset = false || @request.body.status = 'CONTADO' || @request.body.status = 'CANCELADO') && @request.body.counted_by:isset = false && @request.body.counted_by_name:isset = false && @request.body.approved_by:isset = false && @request.body.approved_at:isset = false && @request.body.approved_by_name:isset = false",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "event_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "account_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "cash_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "offering_category_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_categories"
+        },
+        {
+          "name": "envelopes",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "difference_note",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["CONTADO", "APROVADO", "CANCELADO"]
+        },
+        {
+          "name": "counted_by",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "approved_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "approved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "counted_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_counts_church_date ON fin_counts (church_id, date)"]
+    },
+    {
+      "name": "fin_bills",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && @request.body.status = 'ABERTO' && @request.body.paid_at:isset = false && @request.body.paid_amount_cents:isset = false && @request.body.paid_account_id:isset = false && @request.body.transaction_id:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && status = 'ABERTO' && (@request.body.status:isset = false || @request.body.status = 'ABERTO' || @request.body.status = 'CANCELADO') && @request.body.paid_at:isset = false && @request.body.paid_amount_cents:isset = false && @request.body.paid_account_id:isset = false && @request.body.transaction_id:isset = false",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PAGAR", "RECEBER"]
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "amount_cents",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "issue_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "category_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_categories"
+        },
+        {
+          "name": "cost_center_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_cost_centers"
+        },
+        {
+          "name": "supplier_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_suppliers"
+        },
+        {
+          "name": "person_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "account_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "document_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["BOLETO", "NOTA_FISCAL", "RECIBO", "FATURA", "CONTRATO", "OUTRO"]
+        },
+        {
+          "name": "document_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "attachment",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "recurrence_group",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "installment",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "installments",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ABERTO", "PAGO", "CANCELADO"]
+        },
+        {
+          "name": "paid_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paid_amount_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paid_account_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "transaction_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_transactions"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "campaign_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_campaigns"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_fin_bills_church_due ON fin_bills (church_id, due_date)",
+        "CREATE INDEX idx_fin_bills_status ON fin_bills (church_id, status)",
+        "CREATE INDEX idx_fin_bills_campaign ON fin_bills (campaign_id)"
+      ]
+    },
+    {
+      "name": "fin_bank_imports",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "account_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "balance_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "balance_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_balance",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "lines_created",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "lines_skipped",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imported_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_bank_imports_account ON fin_bank_imports (account_id)"]
+    },
+    {
+      "name": "fin_bank_lines",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": null,
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && status != 'CONCILIADO' && (@request.body.status = 'PENDENTE' || @request.body.status = 'IGNORADO') && @request.body.church_id:isset = false && @request.body.account_id:isset = false && @request.body.import_id:isset = false && @request.body.fitid:isset = false && @request.body.date:isset = false && @request.body.amount_cents:isset = false && @request.body.description:isset = false && @request.body.transaction_id:isset = false",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "account_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "import_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_bank_imports"
+        },
+        {
+          "name": "fitid",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "amount_cents",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PENDENTE", "CONCILIADO", "IGNORADO"]
+        },
+        {
+          "name": "transaction_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_transactions"
+        },
+        {
+          "name": "reconciled_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reconciled_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_fin_bank_lines_fitid ON fin_bank_lines (account_id, fitid)",
+        "CREATE INDEX idx_fin_bank_lines_status ON fin_bank_lines (church_id, status)"
+      ]
+    },
+    {
+      "name": "fin_bank_connections",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.church_id:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "account_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "provider",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["CORA", "BRADESCO"]
+        },
+        {
+          "name": "environment",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PRODUCAO", "TESTE"]
+        },
+        {
+          "name": "branch",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "account_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "account_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["CC", "CP"]
+        },
+        {
+          "name": "credential_key",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "auto_reconcile",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "initial_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_sync_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["OK", "ERRO"]
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "balance_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "available_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "balance_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_balance",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_created",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_auto_reconciled",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sync_requested_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_fin_bank_connections_account ON fin_bank_connections (account_id)"
+      ]
+    },
+    {
+      "name": "fin_closings",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "month",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["FECHADO", "REABERTO"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "summary",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "checklist",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "closed_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "closed_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "closed_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reopened_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "reopened_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reopened_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reopen_reason",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_closings_church_month ON fin_closings (church_id, month)"]
+    },
+    {
+      "name": "fin_signers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_signers_church ON fin_signers (church_id)"]
+    },
+    {
+      "name": "fin_audits",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "transaction_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_transactions"
+        },
+        {
+          "name": "month",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["APROVADO", "RESSALVA", "RESPONDIDA"]
+        },
+        {
+          "name": "approved_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tx_updated",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_fin_audits_tx ON fin_audits (transaction_id)",
+        "CREATE INDEX idx_fin_audits_church_month ON fin_audits (church_id, month)"
+      ]
+    },
+    {
+      "name": "fin_audit_comments",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "audit_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_audits"
+        },
+        {
+          "name": "month",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["RESSALVA", "RESPOSTA", "APROVACAO"]
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "author_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "author_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "author_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_fin_audit_comments_church_month ON fin_audit_comments (church_id, month)"
+      ]
+    },
+    {
+      "name": "fin_settings",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "legal_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cnpj",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "statement_note",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "pix_key_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["CPF_CNPJ", "TELEFONE", "EMAIL", "ALEATORIA"]
+        },
+        {
+          "name": "pix_key",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pix_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pix_city",
+          "type": "text",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_fin_settings_church ON fin_settings (church_id)"]
+    },
+    {
+      "name": "fin_campaigns",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "goal_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "congregation",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "color",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["TEAL", "INDIGO", "ORANGE", "ROSE", "SKY", "AMBER"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ATIVA", "ENCERRADA"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "is_public",
+          "type": "bool",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_fin_campaigns_church ON fin_campaigns (church_id)"]
+    },
+    {
+      "name": "fin_budgets",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "year",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "congregation",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "category_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fin_categories"
+        },
+        {
+          "name": "amount_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "updated_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_fin_budgets_line ON fin_budgets (church_id, year, congregation, category_id)"
       ]
     }
   ]
