@@ -1,5 +1,15 @@
 migrate(
   (app) => {
+    // Segurança (auditoria 2026-10-18): este seed cria contas de demonstração com
+    // senha fixa conhecida (inclusive a conta do admin). Só roda quando explicitamente
+    // autorizado via variável de ambiente, para NUNCA executar em produção.
+    if ($os.getenv('LOUVORFLOW_ALLOW_DEMO_SEED') !== 'true') {
+      console.log(
+        '[MIGRATION 0002] Seed de demonstração ignorado (LOUVORFLOW_ALLOW_DEMO_SEED != true).',
+      )
+      return
+    }
+
     const usersCol = app.findCollectionByNameOrId('_pb_users_auth_')
     const churchesCol = app.findCollectionByNameOrId('churches')
     const rolesCol = app.findCollectionByNameOrId('roles')

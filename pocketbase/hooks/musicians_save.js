@@ -135,6 +135,15 @@ routerAdd(
           return e.json(403, { message: 'Acesso negado: este membro pertence a outra igreja.' })
         }
 
+        // Proteção do MASTER: um chamador que não é MASTER não pode editar (rebaixar,
+        // desativar ou alterar) um membro cujo papel ATUAL é MASTER. Caso contrário um
+        // ADMIN poderia rebaixar/desativar o dono da igreja e travar o acesso MASTER.
+        if (memberRecord.getString('role') === 'MASTER' && callerRole !== 'MASTER') {
+          return e.json(403, {
+            message: 'Apenas o perfil MASTER pode editar outro MASTER.',
+          })
+        }
+
         const userId = memberRecord.getString('user_id')
         if (!userId) {
           return e.json(500, { message: 'Registro de membro corrompido: sem usuário vinculado.' })
@@ -242,6 +251,13 @@ routerAdd(
         if (existingMember.length > 0) {
           // Reativa ou atualiza membro existente
           newMember = existingMember[0]
+          // Proteção do MASTER: um não-MASTER não pode alterar um membro que já é MASTER
+          // (ex.: reaproveitar o fluxo de "criação" por e-mail para rebaixá-lo).
+          if (newMember.getString('role') === 'MASTER' && callerRole !== 'MASTER') {
+            return e.json(403, {
+              message: 'Apenas o perfil MASTER pode editar outro MASTER.',
+            })
+          }
           if (hasFinance(newMember) !== wantsFinance && callerRole !== 'MASTER') {
             return e.json(403, financeOnlyMaster)
           }

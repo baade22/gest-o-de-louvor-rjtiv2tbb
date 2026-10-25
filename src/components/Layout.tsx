@@ -32,6 +32,8 @@ import {
   CalendarClock,
   Coins,
   Landmark,
+  Contact,
+  Cake,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -190,9 +192,16 @@ export default function Layout() {
       ],
     },
     {
+      label: 'Membresia',
+      items: [
+        { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeAdmin, end: true },
+        { to: '/membros/aniversarios', label: 'Aniversariantes', icon: Cake, allowed: canSeeAdmin },
+      ],
+    },
+    {
       label: 'Administração',
       items: [
-        { to: '/musicians', label: 'Membros', icon: Users, allowed: canSeeMusicians },
+        { to: '/musicians', label: 'Equipe do louvor', icon: Users, allowed: canSeeMusicians },
         { to: '/convites', label: 'Convites', icon: UserPlus, allowed: canSeeAdmin },
         { to: '/roles', label: 'Funções e instrumentos', icon: Guitar, allowed: canSeeAdmin },
         {

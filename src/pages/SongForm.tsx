@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
 import type { Song } from '@/types'
 import {
-  Music2,
   ArrowLeft,
   Save,
   Youtube,
@@ -33,9 +32,8 @@ import {
   SongSection,
   serializeSections,
   extractSectionsFromText,
-  SECTION_MARKERS,
 } from '@/lib/songParser'
-import { ArrowUp, ArrowDown, Trash2, PlusCircle, FileEdit } from 'lucide-react'
+import { ArrowUp, ArrowDown, Trash2, PlusCircle } from 'lucide-react'
 import { CifraClubSearchModal } from '@/components/CifraClubSearchModal'
 import { YouTubeSearchModal } from '@/components/YouTubeSearchModal'
 import { addVideoToSong, getVideosForSong } from '@/services/songVideos'

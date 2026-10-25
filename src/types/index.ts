@@ -376,3 +376,46 @@ export interface EventMember {
     role_id?: Role
   }
 }
+
+// Membresia
+export type PersonStatus =
+  | 'MEMBRO'
+  | 'CONGREGADO'
+  | 'VISITANTE'
+  | 'AFASTADO'
+  | 'TRANSFERIDO'
+  | 'FALECIDO'
+export type PersonGender = 'M' | 'F'
+export type MaritalStatus = 'SOLTEIRO' | 'CASADO' | 'DIVORCIADO' | 'VIUVO' | 'UNIAO_ESTAVEL'
+export type AdmissionType = 'BATISMO' | 'TRANSFERENCIA' | 'ACLAMACAO' | 'RECONCILIACAO'
+
+export interface Person {
+  id: string
+  collectionId?: string
+  collectionName?: string
+  church_id: string
+  name: string
+  photo?: string
+  birth_date?: string
+  gender?: PersonGender | ''
+  marital_status?: MaritalStatus | ''
+  wedding_date?: string
+  phone?: string
+  email?: string
+  address?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  congregation?: string
+  status: PersonStatus
+  conversion_date?: string
+  baptism_date?: string
+  admission_date?: string
+  admission_type?: AdmissionType | ''
+  church_office?: string
+  notes?: string
+  user_id?: string
+  created: string
+  updated: string
+}

@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HolyricsClient } from '../../agent/src/holyricsClient.js'
-import { syncEventRepertoireWithHolyrics } from './holyricsAgent.js'
-import pb from '../lib/pocketbase/client.js'
 import { withTextBody } from '../test/fetchMock.js'
 
 /**

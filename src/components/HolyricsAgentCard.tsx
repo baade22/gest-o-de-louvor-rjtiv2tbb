@@ -46,8 +46,8 @@ import {
   type HolyricsAgentInfo,
 } from '@/services/holyricsAgent'
 
-const AGENT_LATEST_VERSION = '0.0.37'
-const AGENT_DOWNLOAD = `/LouvorFlow-Agent-${AGENT_LATEST_VERSION}.zip`
+const AGENT_LATEST_VERSION = '0.0.38'
+const AGENT_DOWNLOAD = `${import.meta.env.BASE_URL}LouvorFlow-Agent-${AGENT_LATEST_VERSION}.zip`
 const STALE_DAYS = 30
 
 type Filter = 'all' | 'online' | 'stale'

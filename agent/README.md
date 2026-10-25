@@ -1,4 +1,4 @@
-# LouvorFlow Agent v0.0.37 — Holyrics Bridge
+# LouvorFlow Agent v0.0.38 — Holyrics Bridge
 
 O **LouvorFlow Agent** é um serviço leve em Node.js/TypeScript que roda no computador da igreja onde o Holyrics está instalado. Ele faz a ponte segura entre o **LouvorFlow SaaS** e a **Holyrics API Server Local** (`http://127.0.0.1:8091`).
 

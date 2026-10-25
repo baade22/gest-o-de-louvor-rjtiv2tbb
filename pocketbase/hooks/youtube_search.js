@@ -8,6 +8,25 @@ routerAdd(
   'GET',
   '/backend/v1/youtube/search',
   (e) => {
+    // Criptografia em repouso das credenciais (auditoria 2026-10-18). Lê tanto o
+    // formato antigo em texto puro quanto o cifrado ({enc:'v1',data:...}).
+    // (Definido dentro do handler: o runtime do PocketBase o executa isolado.)
+    const lfUnwrapCred = (creds) => {
+      try {
+        if (
+          creds &&
+          typeof creds === 'object' &&
+          creds.enc === 'v1' &&
+          typeof creds.data === 'string'
+        ) {
+          const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+          if (k.length !== 32) return creds
+          return JSON.parse($security.decrypt(creds.data, k))
+        }
+      } catch (_) {}
+      return creds
+    }
+
     // 1. Validação do parâmetro de busca
     const query = e.request.url.query().get('q') || ''
     const churchId = e.request.url.query().get('church_id') || ''
@@ -95,6 +114,8 @@ routerAdd(
               }
             } catch (_) {}
           }
+
+          creds = lfUnwrapCred(creds)
 
           if (creds && typeof creds === 'object') {
             if (creds.apiKey) {
