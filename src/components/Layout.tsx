@@ -37,6 +37,7 @@ import {
   Cake,
   PieChart,
   FileBarChart,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -184,6 +185,12 @@ export default function Layout() {
           to: '/financeiro/conciliacao',
           label: 'Conciliação bancária',
           icon: Landmark,
+          allowed: canSeeFinance,
+        },
+        {
+          to: '/financeiro/fluxo-de-caixa',
+          label: 'Fluxo de caixa',
+          icon: TrendingUp,
           allowed: canSeeFinance,
         },
         {

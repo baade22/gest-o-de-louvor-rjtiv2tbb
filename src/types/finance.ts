@@ -38,6 +38,8 @@ export interface FinAccount extends BaseRecord {
   congregation?: string
   /** Conta no plano do contador, para a exportação contábil. */
   accounting_code?: string
+  /** Saldo mínimo que a tesouraria quer manter; o fluxo de caixa avisa abaixo dele. */
+  min_balance_cents?: number
   is_active: boolean
 }
 

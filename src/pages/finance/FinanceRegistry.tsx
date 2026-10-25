@@ -106,6 +106,12 @@ const TABS: TabConfig[] = [
       },
       { key: 'opening_date', label: 'Data do saldo inicial', type: 'date', createOnly: true },
       {
+        key: 'min_balance_cents',
+        label: 'Saldo mínimo (R$, opcional)',
+        type: 'money',
+        hint: 'O fluxo de caixa avisa quando a previsão fica abaixo deste valor.',
+      },
+      {
         key: 'accounting_code',
         label: 'Código contábil (opcional)',
         placeholder: 'Ex.: 1.1.1.02',
@@ -120,7 +126,9 @@ const TABS: TabConfig[] = [
         r.account_number,
       ]
         .filter(Boolean)
-        .join(' · ') + ` · saldo inicial ${formatCents(r.opening_balance_cents || 0)}`,
+        .join(' · ') +
+        ` · saldo inicial ${formatCents(r.opening_balance_cents || 0)}` +
+        (r.min_balance_cents ? ` · mínimo ${formatCents(r.min_balance_cents)}` : ''),
   },
   {
     key: 'fin_categories',
