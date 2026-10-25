@@ -41,6 +41,8 @@ import {
   type TimelineKind,
 } from '@/lib/membership'
 import { formatCalendarDateDisplay, getLocalTodayYMD } from '@/lib/dateUtils'
+import { waLink } from '@/lib/whatsapp'
+import { FOLLOWUP_LABELS, effectiveStage } from '@/lib/followup'
 import {
   ArrowLeft,
   Award,
@@ -50,6 +52,7 @@ import {
   Droplets,
   Edit,
   Flame,
+  Footprints,
   Heart,
   History,
   Home,
@@ -104,13 +107,6 @@ const TIMELINE_STYLE: Record<TimelineKind, { icon: LucideIcon; className: string
   ADMISSAO: { icon: DoorOpen, className: 'bg-emerald-50 text-emerald-700' },
   CASAMENTO: { icon: Heart, className: 'bg-rose-50 text-rose-700' },
   ESCALA: { icon: Music2, className: 'bg-teal-50 text-teal-700' },
-}
-
-function waLink(phone?: string): string {
-  let digits = (phone || '').replace(/\D/g, '')
-  if (!digits) return ''
-  if (digits.length <= 11) digits = `55${digits}`
-  return `https://wa.me/${digits}`
 }
 
 function Meta({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
@@ -231,6 +227,7 @@ export default function PersonProfile() {
   const filled = profileCompleteness(person)
   const missing = missingEssentials(person)
   const wa = waLink(person.phone)
+  const followStage = effectiveStage(person)
   const linkedAccount = accounts.find((a) => a.user_id === person.user_id)
 
   const savePerson = async (data: Partial<Person>, okMessage: string) => {
@@ -368,6 +365,13 @@ export default function PersonProfile() {
             {tenure !== null && (
               <Meta icon={CalendarHeart}>
                 Membro há {tenure} {tenure === 1 ? 'ano' : 'anos'}
+              </Meta>
+            )}
+            {followStage && followStage !== 'ENCERRADO' && (
+              <Meta icon={Footprints}>
+                <Link to="/membros/acompanhamento" className="hover:underline">
+                  Acompanhamento: {FOLLOWUP_LABELS[followStage]}
+                </Link>
               </Meta>
             )}
             {person.user_id && <Meta icon={KeyRound}>Tem login no LouvorFlow</Meta>}

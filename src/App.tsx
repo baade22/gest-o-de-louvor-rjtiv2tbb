@@ -37,6 +37,7 @@ import Birthdays from '@/pages/membership/Birthdays'
 import PersonProfile from '@/pages/membership/PersonProfile'
 import MembershipDashboard from '@/pages/membership/MembershipDashboard'
 import Signups from '@/pages/membership/Signups'
+import FollowUp from '@/pages/membership/FollowUp'
 import PublicSignup from '@/pages/membership/PublicSignup'
 import NotFound from '@/pages/NotFound'
 
@@ -247,6 +248,14 @@ const App = () => (
               element={
                 <RequireAuth requireRole="ADMIN">
                   <Signups />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/acompanhamento"
+              element={
+                <RequireAuth requireRole="ADMIN">
+                  <FollowUp />
                 </RequireAuth>
               }
             />

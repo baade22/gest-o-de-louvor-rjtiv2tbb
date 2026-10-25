@@ -435,9 +435,15 @@ export interface Person {
   roll_number?: string
   skills?: PersonSkill[]
   user_id?: string
+  followup_stage?: FollowupStage | ''
+  /** Ficha de quem acompanha esta pessoa. */
+  followup_owner?: string
+  followup_since?: string
   created: string
   updated: string
 }
+
+export type FollowupStage = 'PRIMEIRA_VISITA' | 'CONTATO' | 'RETORNO' | 'INTEGRADO' | 'ENCERRADO'
 
 export type PersonEventKind = 'SITUACAO' | 'CARGO' | 'VISITA' | 'CONTATO' | 'NOTA'
 
