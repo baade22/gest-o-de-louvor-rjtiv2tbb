@@ -46,6 +46,8 @@ Arquivos desta pasta:
 
 A `LOUVORFLOW_CREDENTIALS_KEY` tem que ser a mesma do Skip, senão as credenciais criptografadas não abrem.
 
+Depois da troca, no GitHub, mude o segredo `LOUVORFLOW_URL` (usado pelo conector de bancos em `bank-sync.yml`) para o domínio novo, e confira que `BANK_SYNC_TOKEN` é igual no GitHub e no servidor.
+
 ## Dia a dia
 
 | Para | Comando (no servidor) |
