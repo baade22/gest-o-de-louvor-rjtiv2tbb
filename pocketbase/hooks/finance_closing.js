@@ -344,7 +344,18 @@ routerAdd(
             .slice(0, 4)
             .map(
               (t) =>
-                (t.getString('description') || 'Sem descrição').slice(0, 40) +
+                (
+                  t.getString('description') ||
+                  (() => {
+                    try {
+                      return $app
+                        .findRecordById('fin_suppliers', t.getString('supplier_id'))
+                        .getString('name')
+                    } catch (_) {
+                      return 'Sem descrição'
+                    }
+                  })()
+                ).slice(0, 40) +
                 ' ' +
                 money(t.getInt('amount_cents')),
             )
