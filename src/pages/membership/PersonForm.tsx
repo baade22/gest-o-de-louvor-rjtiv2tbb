@@ -181,7 +181,11 @@ export default function PersonForm() {
     e.target.value = ''
     if (!file) return
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
-      toast({ title: 'Formato não aceito', description: 'Use uma foto JPG, PNG ou WEBP.', variant: 'destructive' })
+      toast({
+        title: 'Formato não aceito',
+        description: 'Use uma foto JPG, PNG ou WEBP.',
+        variant: 'destructive',
+      })
       return
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -230,7 +234,9 @@ export default function PersonForm() {
     try {
       const photo = { file: photoFile, remove: removePhoto }
       const saved =
-        isEditing && id ? await updatePerson(id, payload, photo) : await createPerson(payload, photo)
+        isEditing && id
+          ? await updatePerson(id, payload, photo)
+          : await createPerson(payload, photo)
       if (statusChanged && original) {
         await createPersonEvent({
           church_id: saved.church_id,
@@ -357,7 +363,10 @@ export default function PersonForm() {
                   required
                 />
               </Field>
-              <Field id="birth_date" label={age !== null ? `Nascimento (${age} anos)` : 'Nascimento'}>
+              <Field
+                id="birth_date"
+                label={age !== null ? `Nascimento (${age} anos)` : 'Nascimento'}
+              >
                 <Input
                   id="birth_date"
                   type="date"
@@ -531,11 +540,13 @@ export default function PersonForm() {
                       <SelectValue placeholder="Escolha" />
                     </SelectTrigger>
                     <SelectContent>
-                      {STATUS_CHANGE_REASONS[reasonGroupFor(original.status, form.status)].map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
+                      {STATUS_CHANGE_REASONS[reasonGroupFor(original.status, form.status)].map(
+                        (r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ),
+                      )}
                     </SelectContent>
                   </Select>
                 </Field>
@@ -608,9 +619,7 @@ export default function PersonForm() {
             <Field id="admission_type" label="Forma de admissão">
               <Select
                 value={form.admission_type || NONE}
-                onValueChange={(v) =>
-                  set('admission_type', v === NONE ? '' : (v as AdmissionType))
-                }
+                onValueChange={(v) => set('admission_type', v === NONE ? '' : (v as AdmissionType))}
               >
                 <SelectTrigger id="admission_type" className={inputClass}>
                   <SelectValue />

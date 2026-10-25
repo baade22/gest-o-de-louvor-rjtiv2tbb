@@ -15,7 +15,10 @@ export const STATUS_BADGE_CLASSES: Record<PersonStatus, string> = {
 
 export function StatusBadge({ status }: { status: PersonStatus }) {
   return (
-    <Badge variant="outline" className={`text-[10px] font-semibold ${STATUS_BADGE_CLASSES[status]}`}>
+    <Badge
+      variant="outline"
+      className={`text-[10px] font-semibold ${STATUS_BADGE_CLASSES[status]}`}
+    >
       {PERSON_STATUS_LABELS[status]}
     </Badge>
   )
@@ -43,7 +46,9 @@ export function usePhotoToken(enabled = true): string {
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+  return (
+    (parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  ).toUpperCase()
 }
 
 export function PersonAvatar({

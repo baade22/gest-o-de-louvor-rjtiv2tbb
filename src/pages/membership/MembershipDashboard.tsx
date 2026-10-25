@@ -172,7 +172,10 @@ export default function MembershipDashboard() {
     view === 'idade'
       ? ageBuckets(active, today)
       : view === 'tempo'
-        ? tenureBuckets(active.filter((p) => p.status === 'MEMBRO'), today)
+        ? tenureBuckets(
+            active.filter((p) => p.status === 'MEMBRO'),
+            today,
+          )
         : genderBuckets(active)
 
   const chip = (on: boolean) =>
@@ -191,7 +194,12 @@ export default function MembershipDashboard() {
         </div>
         <div className="lg:ml-auto flex flex-wrap items-center gap-2">
           {['TODAS', ...congregationOptions].map((c) => (
-            <button key={c} type="button" className={chip(congregation === c)} onClick={() => setCongregation(c)}>
+            <button
+              key={c}
+              type="button"
+              className={chip(congregation === c)}
+              onClick={() => setCongregation(c)}
+            >
               {c === 'TODAS' ? 'Toda a igreja' : c}
             </button>
           ))}
@@ -211,14 +219,22 @@ export default function MembershipDashboard() {
           ))}
         </div>
       ) : loadError ? (
-        <Card className="rounded-2xl border-red-200 bg-red-50 p-6 text-sm text-red-800">{loadError}</Card>
+        <Card className="rounded-2xl border-red-200 bg-red-50 p-6 text-sm text-red-800">
+          {loadError}
+        </Card>
       ) : people.length === 0 ? (
         <Card className="rounded-2xl border-dashed border-2 border-slate-200 bg-white/50 p-12 text-center">
           <Users className="mx-auto h-12 w-12 text-slate-400" />
-          <h3 className="mt-3 text-lg font-bold text-slate-900">O painel aparece com as primeiras fichas</h3>
-          <p className="text-sm text-slate-500 mt-1">Cadastre os membros para ver idade, tempo de igreja e aniversariantes.</p>
+          <h3 className="mt-3 text-lg font-bold text-slate-900">
+            O painel aparece com as primeiras fichas
+          </h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Cadastre os membros para ver idade, tempo de igreja e aniversariantes.
+          </p>
           <Link to="/membros/novo" className="mt-5 inline-block">
-            <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">Cadastrar primeiro membro</Button>
+            <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">
+              Cadastrar primeiro membro
+            </Button>
           </Link>
         </Card>
       ) : (
@@ -262,13 +278,34 @@ export default function MembershipDashboard() {
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Composição da igreja</h2>
                   <p className="text-xs text-slate-500">
-                    {view === 'tempo' ? 'Só membros, pela data de admissão' : 'Membros, congregados e visitantes'} · toque numa barra para ver os nomes
+                    {view === 'tempo'
+                      ? 'Só membros, pela data de admissão'
+                      : 'Membros, congregados e visitantes'}{' '}
+                    · toque numa barra para ver os nomes
                   </p>
                 </div>
                 <div className="ml-auto flex gap-1.5">
-                  <button type="button" className={chip(view === 'idade')} onClick={() => setView('idade')}>Idade</button>
-                  <button type="button" className={chip(view === 'tempo')} onClick={() => setView('tempo')}>Tempo de igreja</button>
-                  <button type="button" className={chip(view === 'sexo')} onClick={() => setView('sexo')}>Sexo</button>
+                  <button
+                    type="button"
+                    className={chip(view === 'idade')}
+                    onClick={() => setView('idade')}
+                  >
+                    Idade
+                  </button>
+                  <button
+                    type="button"
+                    className={chip(view === 'tempo')}
+                    onClick={() => setView('tempo')}
+                  >
+                    Tempo de igreja
+                  </button>
+                  <button
+                    type="button"
+                    className={chip(view === 'sexo')}
+                    onClick={() => setView('sexo')}
+                  >
+                    Sexo
+                  </button>
                 </div>
               </div>
               <div className="p-5">
@@ -280,12 +317,17 @@ export default function MembershipDashboard() {
               <section className="bg-white rounded-2xl border border-slate-200">
                 <div className="flex items-center px-5 py-4 border-b border-slate-100">
                   <h2 className="text-base font-bold text-slate-900">Aniversariantes da semana</h2>
-                  <Link to="/membros/aniversarios" className="ml-auto text-xs font-semibold text-teal-700 hover:underline">
+                  <Link
+                    to="/membros/aniversarios"
+                    className="ml-auto text-xs font-semibold text-teal-700 hover:underline"
+                  >
                     Ver todos
                   </Link>
                 </div>
                 {birthdays.length === 0 ? (
-                  <p className="px-5 py-6 text-sm text-slate-500">Nenhum aniversário nos próximos 7 dias.</p>
+                  <p className="px-5 py-6 text-sm text-slate-500">
+                    Nenhum aniversário nos próximos 7 dias.
+                  </p>
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {birthdays.slice(0, 6).map((c) => {
@@ -297,20 +339,38 @@ export default function MembershipDashboard() {
                           : `Feliz aniversário de casamento, ${first}! Que Deus abençoe a família de vocês.`,
                       )
                       return (
-                        <li key={`${c.person.id}-${c.kind}`} className="flex items-center gap-3 px-5 py-2.5">
+                        <li
+                          key={`${c.person.id}-${c.kind}`}
+                          className="flex items-center gap-3 px-5 py-2.5"
+                        >
                           <PersonAvatar person={c.person} token={photoToken} size="sm" />
                           <div className="min-w-0 flex-1">
-                            <Link to={`/membros/${c.person.id}`} className="text-sm font-semibold text-slate-900 hover:text-teal-800 truncate block">
+                            <Link
+                              to={`/membros/${c.person.id}`}
+                              className="text-sm font-semibold text-slate-900 hover:text-teal-800 truncate block"
+                            >
                               {c.person.name}
                             </Link>
                             <p className="text-xs text-slate-500 flex items-center gap-1">
-                              {c.kind === 'NASCIMENTO' ? <Cake className="h-3 w-3 text-pink-500" /> : <Heart className="h-3 w-3 text-rose-500" />}
-                              {c.inDays === 0 ? 'Hoje' : `${String(c.day).padStart(2, '0')}/${String(c.month).padStart(2, '0')}`}
-                              {c.years !== null && ` · ${c.years} ${c.kind === 'NASCIMENTO' ? 'anos' : 'anos de casados'}`}
+                              {c.kind === 'NASCIMENTO' ? (
+                                <Cake className="h-3 w-3 text-pink-500" />
+                              ) : (
+                                <Heart className="h-3 w-3 text-rose-500" />
+                              )}
+                              {c.inDays === 0
+                                ? 'Hoje'
+                                : `${String(c.day).padStart(2, '0')}/${String(c.month).padStart(2, '0')}`}
+                              {c.years !== null &&
+                                ` · ${c.years} ${c.kind === 'NASCIMENTO' ? 'anos' : 'anos de casados'}`}
                             </p>
                           </div>
                           {wa && (
-                            <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Parabenizar ${c.person.name}`}>
+                            <a
+                              href={wa}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Parabenizar ${c.person.name}`}
+                            >
                               <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg">
                                 <MessageCircle className="h-4 w-4 text-emerald-600" />
                               </Button>
@@ -326,11 +386,14 @@ export default function MembershipDashboard() {
               <section className="bg-white rounded-2xl border border-slate-200">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h2 className="text-base font-bold text-slate-900">Movimentação em {year}</h2>
-                  <p className="text-xs text-slate-500">Entradas e saídas do rol registradas ao mudar a situação</p>
+                  <p className="text-xs text-slate-500">
+                    Entradas e saídas do rol registradas ao mudar a situação
+                  </p>
                 </div>
                 {movements.entradas.length + movements.saidas.length === 0 ? (
                   <p className="px-5 py-6 text-sm text-slate-500">
-                    Nenhuma mudança registrada este ano. Ao mudar a situação de alguém na ficha, o motivo aparece aqui.
+                    Nenhuma mudança registrada este ano. Ao mudar a situação de alguém na ficha, o
+                    motivo aparece aqui.
                   </p>
                 ) : (
                   <dl className="px-5 py-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm">

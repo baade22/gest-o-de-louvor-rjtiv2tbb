@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-18T23:28:50.606Z",
+  "generatedAt": "2026-10-25T02:40:39.846Z",
   "collections": [
     {
       "name": "users",
@@ -29,14 +29,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -90,17 +95,24 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_churches_slug ON churches (slug)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_churches_slug ON churches (slug)"
+      ]
     },
     {
       "name": "roles",
@@ -143,17 +155,24 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
-      "indexes": ["CREATE INDEX idx_roles_church ON roles (church_id)"]
+      "indexes": [
+        "CREATE INDEX idx_roles_church ON roles (church_id)"
+      ]
     },
     {
       "name": "church_members",
@@ -185,7 +204,12 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["MASTER", "ADMIN", "LIDER", "MUSICO"]
+          "selectValues": [
+            "MASTER",
+            "ADMIN",
+            "LIDER",
+            "MUSICO"
+          ]
         },
         {
           "name": "phone",
@@ -204,14 +228,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "operational_roles",
@@ -262,14 +291,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -355,14 +389,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "raw_content",
@@ -447,21 +486,31 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["Planejado", "Confirmado", "Realizado", "Cancelado"]
+          "selectValues": [
+            "Planejado",
+            "Confirmado",
+            "Realizado",
+            "Cancelado"
+          ]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "holyrics_event_id",
@@ -531,14 +580,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "holyrics_status",
@@ -641,7 +695,11 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["PENDENTE", "CONFIRMADO", "RECUSADO"]
+          "selectValues": [
+            "PENDENTE",
+            "CONFIRMADO",
+            "RECUSADO"
+          ]
         },
         {
           "name": "response_at",
@@ -666,14 +724,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "team_area",
@@ -749,14 +812,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -817,7 +885,11 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["CONNECTED", "DISCONNECTED", "ERROR"]
+          "selectValues": [
+            "CONNECTED",
+            "DISCONNECTED",
+            "ERROR"
+          ]
         },
         {
           "name": "last_tested_at",
@@ -836,14 +908,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -892,7 +969,12 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["MASTER", "ADMIN", "LIDER", "MUSICO"]
+          "selectValues": [
+            "MASTER",
+            "ADMIN",
+            "LIDER",
+            "MUSICO"
+          ]
         },
         {
           "name": "operational_roles",
@@ -911,7 +993,12 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"]
+          "selectValues": [
+            "PENDING",
+            "ACCEPTED",
+            "EXPIRED",
+            "CANCELLED"
+          ]
         },
         {
           "name": "expires_at",
@@ -930,14 +1017,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -988,7 +1080,13 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["LOUVOR", "SOM", "PROJECAO", "MIDIA", "ILUMINACAO"]
+          "selectValues": [
+            "LOUVOR",
+            "SOM",
+            "PROJECAO",
+            "MIDIA",
+            "ILUMINACAO"
+          ]
         },
         {
           "name": "assigned_to",
@@ -1015,14 +1113,24 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"]
+          "selectValues": [
+            "PENDENTE",
+            "EM_ANDAMENTO",
+            "CONCLUIDA",
+            "CANCELADA"
+          ]
         },
         {
           "name": "priority",
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["BAIXA", "NORMAL", "ALTA", "URGENTE"]
+          "selectValues": [
+            "BAIXA",
+            "NORMAL",
+            "ALTA",
+            "URGENTE"
+          ]
         },
         {
           "name": "completed_at",
@@ -1041,14 +1149,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1101,7 +1214,12 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["VIDEO", "IMAGEM", "AUDIO", "DOCUMENTO"]
+          "selectValues": [
+            "VIDEO",
+            "IMAGEM",
+            "AUDIO",
+            "DOCUMENTO"
+          ]
         },
         {
           "name": "category",
@@ -1149,7 +1267,13 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["ENVIADA", "RECEBIDA", "BAIXADA", "IMPORTADA_HOLYRICS", "CONCLUIDA"]
+          "selectValues": [
+            "ENVIADA",
+            "RECEBIDA",
+            "BAIXADA",
+            "IMPORTADA_HOLYRICS",
+            "CONCLUIDA"
+          ]
         },
         {
           "name": "holyrics_status",
@@ -1188,14 +1312,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "original_filename",
@@ -1310,14 +1439,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1386,14 +1520,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1449,7 +1588,10 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["ONLINE", "OFFLINE"]
+          "selectValues": [
+            "ONLINE",
+            "OFFLINE"
+          ]
         },
         {
           "name": "last_seen_at",
@@ -1504,14 +1646,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1584,7 +1731,13 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["PENDING", "SENT", "DONE", "FAILED", "EXPIRED"]
+          "selectValues": [
+            "PENDING",
+            "SENT",
+            "DONE",
+            "FAILED",
+            "EXPIRED"
+          ]
         },
         {
           "name": "result",
@@ -1615,14 +1768,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1687,7 +1845,10 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["SUCCESS", "ERROR"]
+          "selectValues": [
+            "SUCCESS",
+            "ERROR"
+          ]
         },
         {
           "name": "error",
@@ -1706,14 +1867,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "command_id",
@@ -1840,17 +2006,433 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
-      "indexes": ["CREATE INDEX idx_event_moments_event ON event_moments (event_id)"]
+      "indexes": [
+        "CREATE INDEX idx_event_moments_event ON event_moments (event_id)"
+      ]
+    },
+    {
+      "name": "people",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "photo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "birth_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gender",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "M",
+            "F"
+          ]
+        },
+        {
+          "name": "marital_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "SOLTEIRO",
+            "CASADO",
+            "DIVORCIADO",
+            "VIUVO",
+            "UNIAO_ESTAVEL"
+          ]
+        },
+        {
+          "name": "wedding_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "neighborhood",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zip_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "congregation",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "MEMBRO",
+            "CONGREGADO",
+            "VISITANTE",
+            "AFASTADO",
+            "TRANSFERIDO",
+            "FALECIDO"
+          ]
+        },
+        {
+          "name": "conversion_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "baptism_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "admission_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "admission_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "BATISMO",
+            "TRANSFERENCIA",
+            "ACLAMACAO",
+            "RECONCILIACAO"
+          ]
+        },
+        {
+          "name": "church_office",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "roll_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "skills",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "CANTA",
+            "VIOLAO",
+            "GUITARRA",
+            "BAIXO",
+            "TECLADO",
+            "BATERIA",
+            "PERCUSSAO",
+            "SOPRO",
+            "SOM",
+            "LUZ",
+            "PROJECAO",
+            "VIDEO_FOTO",
+            "RECEPCAO",
+            "INFANTIL",
+            "ENSINO",
+            "COZINHA"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_people_church ON people (church_id)",
+        "CREATE INDEX idx_people_status ON people (church_id, status)",
+        "CREATE INDEX idx_people_congregation ON people (church_id, congregation)"
+      ]
+    },
+    {
+      "name": "people_events",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && @request.body.person_id.church_id = @request.body.church_id",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.person_id:isset = false || @request.body.person_id.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "person_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "SITUACAO",
+            "CARGO",
+            "VISITA",
+            "CONTATO",
+            "NOTA"
+          ]
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "from_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "to_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_people_events_person ON people_events (person_id, date)",
+        "CREATE INDEX idx_people_events_church ON people_events (church_id, kind, date)"
+      ]
+    },
+    {
+      "name": "people_relations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && @request.body.person_id.church_id = @request.body.church_id && @request.body.relative_id.church_id = @request.body.church_id && @request.body.person_id != @request.body.relative_id",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.person_id:isset = false && @request.body.relative_id:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "person_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "relative_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "CONJUGE",
+            "FILHO",
+            "PAI_MAE",
+            "IRMAO",
+            "OUTRO"
+          ]
+        },
+        {
+          "name": "lives_together",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_people_relations_pair ON people_relations (person_id, relative_id)",
+        "CREATE INDEX idx_people_relations_relative ON people_relations (relative_id)",
+        "CREATE INDEX idx_people_relations_church ON people_relations (church_id)"
+      ]
     }
   ]
 }

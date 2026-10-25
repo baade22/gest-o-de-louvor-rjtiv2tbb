@@ -179,7 +179,9 @@ export default function PersonProfile() {
       setEvents(ev)
       setPeople(ppl)
       setRelations(rel)
-      setScales(p.user_id ? await listPersonScales(currentChurch.id, p.user_id).catch(() => []) : [])
+      setScales(
+        p.user_id ? await listPersonScales(currentChurch.id, p.user_id).catch(() => []) : [],
+      )
     } catch (err) {
       toast({
         title: 'Ficha não encontrada',
@@ -200,7 +202,9 @@ export default function PersonProfile() {
   useEffect(() => {
     if (!currentChurch) return
     listMusicians(currentChurch.id)
-      .then((list) => setAccounts(list.map((m) => ({ user_id: m.user_id, name: m.name || m.email }))))
+      .then((list) =>
+        setAccounts(list.map((m) => ({ user_id: m.user_id, name: m.name || m.email }))),
+      )
       .catch(() => setAccounts([]))
   }, [currentChurch])
 
@@ -287,20 +291,31 @@ export default function PersonProfile() {
   const fichaRows: Array<[string, string | undefined]> = [
     ['Nascimento', person.birth_date && formatCalendarDateDisplay(person.birth_date, 'numeric')],
     ['Sexo', person.gender === 'F' ? 'Feminino' : person.gender === 'M' ? 'Masculino' : undefined],
-    ['Estado civil', person.marital_status ? MARITAL_STATUS_LABELS[person.marital_status] : undefined],
+    [
+      'Estado civil',
+      person.marital_status ? MARITAL_STATUS_LABELS[person.marital_status] : undefined,
+    ],
     ['Casamento', person.wedding_date && formatCalendarDateDisplay(person.wedding_date, 'numeric')],
     ['Telefone', person.phone],
     ['E-mail', person.email],
     [
       'Endereço',
-      [person.address, person.neighborhood, person.city && `${person.city}${person.state ? `/${person.state}` : ''}`, person.zip_code]
+      [
+        person.address,
+        person.neighborhood,
+        person.city && `${person.city}${person.state ? `/${person.state}` : ''}`,
+        person.zip_code,
+      ]
         .filter(Boolean)
         .join(' · '),
     ],
     ['Congregação', person.congregation],
     ['Nº do rol', person.roll_number],
     ['Cargo', person.church_office],
-    ['Conversão', person.conversion_date && formatCalendarDateDisplay(person.conversion_date, 'numeric')],
+    [
+      'Conversão',
+      person.conversion_date && formatCalendarDateDisplay(person.conversion_date, 'numeric'),
+    ],
     ['Batismo', person.baptism_date && formatCalendarDateDisplay(person.baptism_date, 'numeric')],
     [
       'Admissão',
@@ -379,7 +394,10 @@ export default function PersonProfile() {
               </a>
             )}
             <Link to={`/membros/${person.id}/editar`} className="flex-1">
-              <Button size="sm" className="w-full rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800 text-white">
+              <Button
+                size="sm"
+                className="w-full rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800 text-white"
+              >
                 <Edit className="h-4 w-4" />
                 Editar
               </Button>
@@ -422,7 +440,12 @@ export default function PersonProfile() {
             title="Linha do tempo"
             description="Mudanças de situação, datas da ficha, contatos e escalas, do mais recente ao mais antigo"
             action={
-              <Button size="sm" variant="outline" className="rounded-xl gap-1.5" onClick={() => setEventDialog(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1.5"
+                onClick={() => setEventDialog(true)}
+              >
                 <Plus className="h-4 w-4" />
                 Registrar
               </Button>
@@ -438,17 +461,24 @@ export default function PersonProfile() {
                   const style = TIMELINE_STYLE[entry.kind]
                   const Icon = style.icon
                   return (
-                    <li key={entry.key} className="group grid grid-cols-[5.5rem_1.75rem_1fr_auto] gap-3 py-2.5 items-start">
+                    <li
+                      key={entry.key}
+                      className="group grid grid-cols-[5.5rem_1.75rem_1fr_auto] gap-3 py-2.5 items-start"
+                    >
                       <span className="text-xs text-slate-400 text-right pt-1">
                         {formatCalendarDateDisplay(entry.date, 'numeric')}
                       </span>
-                      <span className={`h-7 w-7 rounded-full grid place-items-center ${style.className}`}>
+                      <span
+                        className={`h-7 w-7 rounded-full grid place-items-center ${style.className}`}
+                      >
                         <Icon className="h-3.5 w-3.5" />
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900">{entry.title}</p>
                         {entry.description && (
-                          <p className="text-xs text-slate-500 whitespace-pre-line">{entry.description}</p>
+                          <p className="text-xs text-slate-500 whitespace-pre-line">
+                            {entry.description}
+                          </p>
                         )}
                       </div>
                       {entry.eventId ? (
@@ -477,7 +507,12 @@ export default function PersonProfile() {
             title="Família"
             description="Vínculos com outras fichas da igreja"
             action={
-              <Button size="sm" variant="outline" className="rounded-xl gap-1.5" onClick={() => setFamilyDialog(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1.5"
+                onClick={() => setFamilyDialog(true)}
+              >
                 <Link2 className="h-4 w-4" />
                 Vincular
               </Button>
@@ -495,7 +530,10 @@ export default function PersonProfile() {
                     <li key={f.relation.id} className="flex items-center gap-3 px-5 py-3">
                       <PersonAvatar person={f.relative} token={photoToken} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <Link to={`/membros/${f.relative.id}`} className="text-sm font-semibold text-slate-900 hover:text-teal-800">
+                        <Link
+                          to={`/membros/${f.relative.id}`}
+                          className="text-sm font-semibold text-slate-900 hover:text-teal-800"
+                        >
                           {f.relative.name}
                         </Link>
                         <p className="text-xs text-slate-500">
@@ -527,7 +565,10 @@ export default function PersonProfile() {
         </TabsContent>
 
         <TabsContent value="servir" className="mt-4 space-y-4">
-          <Panel title="Habilidades" description="Toque para marcar o que a pessoa sabe ou gosta de fazer">
+          <Panel
+            title="Habilidades"
+            description="Toque para marcar o que a pessoa sabe ou gosta de fazer"
+          >
             <div className="flex flex-wrap gap-2 p-5">
               {SKILL_ORDER.map((skill) => {
                 const on = (person.skills || []).includes(skill)
@@ -654,7 +695,12 @@ function EventDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (data: { kind: PersonEventKind; date: string; title: string; description: string }) => Promise<void>
+  onSave: (data: {
+    kind: PersonEventKind
+    date: string
+    title: string
+    description: string
+  }) => Promise<void>
 }) {
   const { toast } = useToast()
   const [kind, setKind] = useState<Exclude<PersonEventKind, 'SITUACAO'>>('CONTATO')
@@ -684,10 +730,19 @@ function EventDialog({
     if (!title.trim() || !date) return
     setSaving(true)
     try {
-      await onSave({ kind, date: `${date} 00:00:00.000Z`, title: title.trim(), description: description.trim() })
+      await onSave({
+        kind,
+        date: `${date} 00:00:00.000Z`,
+        title: title.trim(),
+        description: description.trim(),
+      })
       onOpenChange(false)
     } catch (err) {
-      toast({ title: 'Erro ao registrar', description: errorMessage(err, 'Tente novamente.'), variant: 'destructive' })
+      toast({
+        title: 'Erro ao registrar',
+        description: errorMessage(err, 'Tente novamente.'),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
@@ -717,23 +772,60 @@ function EventDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="event-date" className="text-xs font-semibold text-slate-700">Data</Label>
-              <Input id="event-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border-slate-200" required />
+              <Label htmlFor="event-date" className="text-xs font-semibold text-slate-700">
+                Data
+              </Label>
+              <Input
+                id="event-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="rounded-xl border-slate-200"
+                required
+              />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="event-title" className="text-xs font-semibold text-slate-700">O que aconteceu</Label>
-            <Input id="event-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={placeholder[kind]} className="rounded-xl border-slate-200" required maxLength={200} />
+            <Label htmlFor="event-title" className="text-xs font-semibold text-slate-700">
+              O que aconteceu
+            </Label>
+            <Input
+              id="event-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={placeholder[kind]}
+              className="rounded-xl border-slate-200"
+              required
+              maxLength={200}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="event-desc" className="text-xs font-semibold text-slate-700">Detalhes (opcional)</Label>
-            <Textarea id="event-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="rounded-xl border-slate-200" maxLength={2000} />
+            <Label htmlFor="event-desc" className="text-xs font-semibold text-slate-700">
+              Detalhes (opcional)
+            </Label>
+            <Textarea
+              id="event-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="rounded-xl border-slate-200"
+              maxLength={2000}
+            />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => onOpenChange(false)}
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={saving} className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white">
+            <Button
+              type="submit"
+              disabled={saving}
+              className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white"
+            >
               {saving ? 'Salvando...' : 'Registrar'}
             </Button>
           </DialogFooter>
@@ -803,7 +895,11 @@ function FamilyDialog({
       await onSave(relativeId, kind, livesTogether)
       onOpenChange(false)
     } catch (err) {
-      toast({ title: 'Erro ao vincular', description: errorMessage(err, 'Tente novamente.'), variant: 'destructive' })
+      toast({
+        title: 'Erro ao vincular',
+        description: errorMessage(err, 'Tente novamente.'),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
@@ -817,17 +913,29 @@ function FamilyDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="family-search" className="text-xs font-semibold text-slate-700">Quem é</Label>
+            <Label htmlFor="family-search" className="text-xs font-semibold text-slate-700">
+              Quem é
+            </Label>
             {selected ? (
               <div className="flex items-center justify-between rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm">
                 <span className="font-semibold text-teal-900">{selected.name}</span>
-                <button type="button" className="text-xs text-teal-700 underline" onClick={() => setRelativeId('')}>
+                <button
+                  type="button"
+                  className="text-xs text-teal-700 underline"
+                  onClick={() => setRelativeId('')}
+                >
                   trocar
                 </button>
               </div>
             ) : (
               <>
-                <Input id="family-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar ficha pelo nome" className="rounded-xl border-slate-200" />
+                <Input
+                  id="family-search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar ficha pelo nome"
+                  className="rounded-xl border-slate-200"
+                />
                 <ul className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-100">
                   {candidates.length === 0 ? (
                     <li className="px-3 py-2 text-xs text-slate-500">
@@ -836,7 +944,11 @@ function FamilyDialog({
                   ) : (
                     candidates.map((p) => (
                       <li key={p.id}>
-                        <button type="button" onClick={() => setRelativeId(p.id)} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50">
+                        <button
+                          type="button"
+                          onClick={() => setRelativeId(p.id)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                        >
                           {p.name}
                         </button>
                       </li>
@@ -869,10 +981,20 @@ function FamilyDialog({
           </label>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => onOpenChange(false)}
+          >
             Cancelar
           </Button>
-          <Button type="button" disabled={!relativeId || saving} onClick={submit} className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white">
+          <Button
+            type="button"
+            disabled={!relativeId || saving}
+            onClick={submit}
+            className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white"
+          >
             {saving ? 'Salvando...' : 'Vincular'}
           </Button>
         </DialogFooter>

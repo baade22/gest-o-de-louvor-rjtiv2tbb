@@ -127,7 +127,11 @@ export default function PeopleList() {
   }
 
   const hasFilters =
-    !!search || status !== 'TODOS' || congregation !== 'TODAS' || skill !== 'TODAS' || onlyIncomplete
+    !!search ||
+    status !== 'TODOS' ||
+    congregation !== 'TODAS' ||
+    skill !== 'TODAS' ||
+    onlyIncomplete
 
   return (
     <div className="space-y-6">
@@ -142,7 +146,10 @@ export default function PeopleList() {
         </div>
         <div className="flex items-center gap-2">
           <Link to="/membros/aniversarios">
-            <Button variant="outline" className="h-10 rounded-xl border-slate-200 font-semibold gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-slate-200 font-semibold gap-2"
+            >
               <Cake className="h-4 w-4" />
               Aniversariantes
             </Button>

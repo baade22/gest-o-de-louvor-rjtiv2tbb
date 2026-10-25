@@ -80,7 +80,9 @@ function CelebrationRow({
               <Heart className="h-3.5 w-3.5 text-rose-500" />
             )}
             {describe(c)}
-            {c.person.congregation && <span className="text-slate-400">· {c.person.congregation}</span>}
+            {c.person.congregation && (
+              <span className="text-slate-400">· {c.person.congregation}</span>
+            )}
           </p>
         </div>
       </div>
@@ -252,7 +254,9 @@ export default function Birthdays() {
                   c={c}
                   token={photoToken}
                   highlight={
-                    month === todayParts.month && year === todayParts.year && c.day === todayParts.day
+                    month === todayParts.month &&
+                    year === todayParts.year &&
+                    c.day === todayParts.day
                   }
                   dateLabel={String(c.day).padStart(2, '0')}
                 />

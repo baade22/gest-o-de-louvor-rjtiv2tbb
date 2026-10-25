@@ -1,11 +1,5 @@
 import pb from '@/lib/pocketbase/client'
-import type {
-  EventMember,
-  Person,
-  PersonEvent,
-  PersonRelation,
-  RelationKind,
-} from '@/types'
+import type { EventMember, Person, PersonEvent, PersonRelation, RelationKind } from '@/types'
 import type { ScaleEntry } from '@/lib/membership'
 
 /** Campos editáveis da ficha (tudo menos id/datas de sistema/foto). */
