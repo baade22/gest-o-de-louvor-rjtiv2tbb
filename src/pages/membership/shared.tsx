@@ -125,7 +125,10 @@ export function PersonPicker({
 }) {
   const [search, setSearch] = useState('')
   const candidates = useMemo(
-    () => filterPeople(people, { search }).filter((p) => !exclude?.has(p.id)).slice(0, 8),
+    () =>
+      filterPeople(people, { search })
+        .filter((p) => !exclude?.has(p.id))
+        .slice(0, 8),
     [people, exclude, search],
   )
   return (

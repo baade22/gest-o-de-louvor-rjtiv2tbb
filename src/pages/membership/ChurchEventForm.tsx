@@ -97,7 +97,11 @@ export default function ChurchEventForm() {
         }),
       )
       .catch((err) =>
-        toast({ title: 'Erro', description: errorMessage(err, 'Evento não encontrado.'), variant: 'destructive' }),
+        toast({
+          title: 'Erro',
+          description: errorMessage(err, 'Evento não encontrado.'),
+          variant: 'destructive',
+        }),
       )
       .finally(() => setIsLoading(false))
   }, [id, toast])
@@ -109,11 +113,19 @@ export default function ChurchEventForm() {
     e.preventDefault()
     if (!currentChurch) return
     if (!form.title.trim() || !form.starts_on) {
-      toast({ title: 'Faltam dados', description: 'Informe o nome e a data do evento.', variant: 'destructive' })
+      toast({
+        title: 'Faltam dados',
+        description: 'Informe o nome e a data do evento.',
+        variant: 'destructive',
+      })
       return
     }
     if (form.ends_on && form.ends_on < form.starts_on) {
-      toast({ title: 'Confira as datas', description: 'O término vem antes do início.', variant: 'destructive' })
+      toast({
+        title: 'Confira as datas',
+        description: 'O término vem antes do início.',
+        variant: 'destructive',
+      })
       return
     }
     const price = Number(form.price.replace(/\./g, '').replace(',', '.')) || 0
@@ -153,12 +165,17 @@ export default function ChurchEventForm() {
   const back = id ? `/membros/eventos/${id}` : '/membros/eventos'
   return (
     <form onSubmit={submit} className="max-w-3xl mx-auto space-y-5">
-      <Link to={back} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
+      <Link
+        to={back}
+        className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800"
+      >
         <ArrowLeft className="h-4 w-4" />
         Voltar
       </Link>
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-900">{id ? 'Editar evento' : 'Novo evento'}</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900">
+          {id ? 'Editar evento' : 'Novo evento'}
+        </h1>
         <p className="text-xs text-slate-500 mt-0.5">
           Depois de salvar, o evento ganha um link e um QR code de inscrição.
         </p>
@@ -177,13 +194,31 @@ export default function ChurchEventForm() {
         </Field>
         <div className="grid sm:grid-cols-3 gap-4">
           <Field id="ev-start" label="Data" required>
-            <Input id="ev-start" type="date" value={form.starts_on} onChange={(e) => set('starts_on', e.target.value)} className={inputClass} />
+            <Input
+              id="ev-start"
+              type="date"
+              value={form.starts_on}
+              onChange={(e) => set('starts_on', e.target.value)}
+              className={inputClass}
+            />
           </Field>
           <Field id="ev-end" label="Até (se durar mais de um dia)">
-            <Input id="ev-end" type="date" value={form.ends_on} onChange={(e) => set('ends_on', e.target.value)} className={inputClass} />
+            <Input
+              id="ev-end"
+              type="date"
+              value={form.ends_on}
+              onChange={(e) => set('ends_on', e.target.value)}
+              className={inputClass}
+            />
           </Field>
           <Field id="ev-time" label="Horário">
-            <Input id="ev-time" type="time" value={form.start_time} onChange={(e) => set('start_time', e.target.value)} className={inputClass} />
+            <Input
+              id="ev-time"
+              type="time"
+              value={form.start_time}
+              onChange={(e) => set('start_time', e.target.value)}
+              className={inputClass}
+            />
           </Field>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
@@ -247,7 +282,11 @@ export default function ChurchEventForm() {
             />
           </Field>
         </div>
-        <Field id="ev-pay" label="Como pagar" hint="Ex: chave Pix, conta, com quem entregar o dinheiro. Aparece depois da inscrição.">
+        <Field
+          id="ev-pay"
+          label="Como pagar"
+          hint="Ex: chave Pix, conta, com quem entregar o dinheiro. Aparece depois da inscrição."
+        >
           <Textarea
             id="ev-pay"
             value={form.payment_info}
@@ -257,16 +296,28 @@ export default function ChurchEventForm() {
           />
         </Field>
         <label className="flex items-center gap-3 text-sm text-slate-700">
-          <Switch checked={form.registration_open} onCheckedChange={(v) => set('registration_open', v)} />
+          <Switch
+            checked={form.registration_open}
+            onCheckedChange={(v) => set('registration_open', v)}
+          />
           Inscrições abertas pelo link
         </label>
       </section>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" className="rounded-xl" onClick={() => navigate(back)}>
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-xl"
+          onClick={() => navigate(back)}
+        >
           Cancelar
         </Button>
-        <Button type="submit" disabled={saving} className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800">
+        <Button
+          type="submit"
+          disabled={saving}
+          className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
+        >
           <Save className="h-4 w-4" />
           Salvar evento
         </Button>

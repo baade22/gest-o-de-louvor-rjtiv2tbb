@@ -18,7 +18,9 @@ describe('etapas', () => {
   it('visitante sem etapa começa em 1ª visita; membro sem etapa fica fora', () => {
     expect(effectiveStage(person({}))).toBe('PRIMEIRA_VISITA')
     expect(effectiveStage(person({ status: 'MEMBRO' }))).toBeNull()
-    expect(effectiveStage(person({ status: 'CONGREGADO', followup_stage: 'RETORNO' }))).toBe('RETORNO')
+    expect(effectiveStage(person({ status: 'CONGREGADO', followup_stage: 'RETORNO' }))).toBe(
+      'RETORNO',
+    )
   })
 
   it('conta os dias desde a mudança de etapa, ou desde o cadastro', () => {
@@ -40,9 +42,19 @@ describe('etapas', () => {
 
 describe('quadro', () => {
   const people = [
-    person({ id: 'a', followup_since: '2026-10-24', congregation: 'Aldeia', followup_owner: 'rute' }),
+    person({
+      id: 'a',
+      followup_since: '2026-10-24',
+      congregation: 'Aldeia',
+      followup_owner: 'rute',
+    }),
     person({ id: 'b', congregation: 'Diamante' }),
-    person({ id: 'c', followup_stage: 'CONTATO', followup_since: '2026-10-10', congregation: 'Aldeia' }),
+    person({
+      id: 'c',
+      followup_stage: 'CONTATO',
+      followup_since: '2026-10-10',
+      congregation: 'Aldeia',
+    }),
     person({ id: 'd', status: 'MEMBRO' }),
     person({ id: 'e', status: 'TRANSFERIDO', followup_stage: 'RETORNO' }),
     person({ id: 'f', status: 'CONGREGADO', followup_stage: 'ENCERRADO' }),
@@ -58,7 +70,9 @@ describe('quadro', () => {
 
   it('filtra por congregação, responsável e parados', () => {
     const ids = (f: Parameters<typeof boardColumns>[2]) =>
-      Object.values(boardColumns(people, TODAY, f)).flat().map((p) => p.id)
+      Object.values(boardColumns(people, TODAY, f))
+        .flat()
+        .map((p) => p.id)
     expect(ids({ congregation: 'Aldeia' })).toEqual(['a', 'c'])
     expect(ids({ ownerId: 'rute' })).toEqual(['a'])
     expect(ids({ ownerId: 'NINGUEM', onlyStale: true })).toEqual(['b', 'c'])

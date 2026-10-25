@@ -26,7 +26,10 @@ export const GREETING_SENT_TITLE: Record<CelebrationKind, string> = {
   CASAMENTO: 'Parabéns de casamento pelo WhatsApp',
 }
 
-export function greetingTemplate(kind: CelebrationKind, church?: Pick<Church, 'greeting_birthday' | 'greeting_wedding'> | null): string {
+export function greetingTemplate(
+  kind: CelebrationKind,
+  church?: Pick<Church, 'greeting_birthday' | 'greeting_wedding'> | null,
+): string {
   const custom = kind === 'NASCIMENTO' ? church?.greeting_birthday : church?.greeting_wedding
   return custom?.trim() || DEFAULT_GREETINGS[kind]
 }

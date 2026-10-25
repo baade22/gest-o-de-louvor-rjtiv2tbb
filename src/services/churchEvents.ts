@@ -85,7 +85,10 @@ export async function createRegistration(
 export async function updateRegistration(
   id: string,
   data: Partial<
-    Pick<EventRegistration, 'paid' | 'paid_amount' | 'payment_method' | 'attended' | 'notes' | 'person_id'>
+    Pick<
+      EventRegistration,
+      'paid' | 'paid_amount' | 'payment_method' | 'attended' | 'notes' | 'person_id'
+    >
   >,
 ): Promise<EventRegistration> {
   return pb.collection('church_event_registrations').update<EventRegistration>(id, data)

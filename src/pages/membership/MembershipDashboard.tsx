@@ -226,7 +226,9 @@ export default function MembershipDashboard() {
           <Inbox className="h-5 w-5 shrink-0" />
           <span>
             <strong>{pendingSignups}</strong>{' '}
-            {pendingSignups === 1 ? 'cadastro pelo QR code aguardando' : 'cadastros pelo QR code aguardando'}{' '}
+            {pendingSignups === 1
+              ? 'cadastro pelo QR code aguardando'
+              : 'cadastros pelo QR code aguardando'}{' '}
             aprovação
           </span>
           <ChevronRight className="h-4 w-4 ml-auto" />

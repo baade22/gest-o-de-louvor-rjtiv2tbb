@@ -33,10 +33,14 @@ migrate(
       '@collection.church_members.user_id ?= @request.auth.id && ' +
       '@collection.church_members.is_active ?= true && ' +
       "(@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')"
-    const OWNER_UNSET = "(@request.body.followup_owner:isset = false || @request.body.followup_owner = ''"
+    const OWNER_UNSET =
+      "(@request.body.followup_owner:isset = false || @request.body.followup_owner = ''"
 
     people.createRule =
-      ADMIN_OF_CHURCH + ' && ' + OWNER_UNSET + ' || @request.body.followup_owner.church_id = @request.body.church_id)'
+      ADMIN_OF_CHURCH +
+      ' && ' +
+      OWNER_UNSET +
+      ' || @request.body.followup_owner.church_id = @request.body.church_id)'
     people.updateRule =
       ADMIN_OF_CHURCH +
       ' && (@request.body.church_id:isset = false || @request.body.church_id = church_id)' +

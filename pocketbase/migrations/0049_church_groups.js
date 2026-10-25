@@ -33,9 +33,17 @@ migrate(
         listRule: ADMIN_OF_CHURCH,
         viewRule: ADMIN_OF_CHURCH,
         createRule:
-          ADMIN_OF_CHURCH + ' && ' + LEADER_UNSET + ' || @request.body.leader_id.church_id = @request.body.church_id)',
+          ADMIN_OF_CHURCH +
+          ' && ' +
+          LEADER_UNSET +
+          ' || @request.body.leader_id.church_id = @request.body.church_id)',
         updateRule:
-          ADMIN_OF_CHURCH + ' && ' + KEEP_CHURCH + ' && ' + LEADER_UNSET + ' || @request.body.leader_id.church_id = church_id)',
+          ADMIN_OF_CHURCH +
+          ' && ' +
+          KEEP_CHURCH +
+          ' && ' +
+          LEADER_UNSET +
+          ' || @request.body.leader_id.church_id = church_id)',
         deleteRule: ADMIN_OF_CHURCH,
         fields: [
           {
@@ -47,7 +55,13 @@ migrate(
             maxSelect: 1,
           },
           { name: 'name', type: 'text', required: true, max: 120 },
-          { name: 'kind', type: 'select', required: true, values: ['MINISTERIO', 'DEPARTAMENTO', 'GRUPO'], maxSelect: 1 },
+          {
+            name: 'kind',
+            type: 'select',
+            required: true,
+            values: ['MINISTERIO', 'DEPARTAMENTO', 'GRUPO'],
+            maxSelect: 1,
+          },
           { name: 'description', type: 'text', max: 1000 },
           { name: 'congregation', type: 'text', max: 120 },
           { name: 'meeting_info', type: 'text', max: 160 },
@@ -106,7 +120,12 @@ migrate(
               cascadeDelete: true,
               maxSelect: 1,
             },
-            { name: 'role', type: 'select', values: ['LIDER', 'AUXILIAR', 'PARTICIPANTE'], maxSelect: 1 },
+            {
+              name: 'role',
+              type: 'select',
+              values: ['LIDER', 'AUXILIAR', 'PARTICIPANTE'],
+              maxSelect: 1,
+            },
             { name: 'since', type: 'date' },
             { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
             { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },

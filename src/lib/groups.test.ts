@@ -3,7 +3,15 @@ import type { ChurchGroup, GroupMember, Person } from '@/types'
 import { filterGroups, groupsOfPerson, memberRows, phoneList, suggestVolunteers } from './groups'
 
 const person = (over: Partial<Person>): Person =>
-  ({ id: over.name || 'p', church_id: 'c1', name: 'Fulano', status: 'MEMBRO', created: '', updated: '', ...over }) as Person
+  ({
+    id: over.name || 'p',
+    church_id: 'c1',
+    name: 'Fulano',
+    status: 'MEMBRO',
+    created: '',
+    updated: '',
+    ...over,
+  }) as Person
 
 const member = (over: Partial<GroupMember>): GroupMember => ({
   id: `${over.group_id}-${over.person_id}`,
@@ -74,11 +82,11 @@ describe('groupsOfPerson e filterGroups', () => {
   ]
 
   it('lista os grupos da pessoa com o papel', () => {
-    const out = groupsOfPerson(
-      'p1',
-      groups,
-      [member({ group_id: 'Recepção', person_id: 'p1', role: 'LIDER' }), member({ group_id: 'Jovens', person_id: 'p1' }), member({ group_id: 'Jovens', person_id: 'p2' })],
-    )
+    const out = groupsOfPerson('p1', groups, [
+      member({ group_id: 'Recepção', person_id: 'p1', role: 'LIDER' }),
+      member({ group_id: 'Jovens', person_id: 'p1' }),
+      member({ group_id: 'Jovens', person_id: 'p2' }),
+    ])
     expect(out.map((g) => [g.group.name, g.role])).toEqual([
       ['Jovens', 'PARTICIPANTE'],
       ['Recepção', 'LIDER'],
@@ -88,7 +96,9 @@ describe('groupsOfPerson e filterGroups', () => {
   it('filtra por tipo, congregação, busca sem acento e esconde inativos', () => {
     expect(filterGroups(groups, {}).map((g) => g.name)).toEqual(['Jovens', 'Recepção'])
     expect(filterGroups(groups, { kind: 'DEPARTAMENTO' }).map((g) => g.name)).toEqual(['Jovens'])
-    expect(filterGroups(groups, { congregation: 'Aldeia' }).map((g) => g.name)).toEqual(['Recepção'])
+    expect(filterGroups(groups, { congregation: 'Aldeia' }).map((g) => g.name)).toEqual([
+      'Recepção',
+    ])
     expect(filterGroups(groups, { search: 'recepcao' }).map((g) => g.name)).toEqual(['Recepção'])
     expect(filterGroups(groups, { showInactive: true })).toHaveLength(3)
   })

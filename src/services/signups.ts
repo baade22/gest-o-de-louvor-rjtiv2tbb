@@ -37,7 +37,10 @@ export async function deleteSignupLink(id: string): Promise<void> {
 
 // ---------- Cadastros recebidos ----------
 
-export async function listSignups(churchId: string, status?: SignupStatus): Promise<PersonSignup[]> {
+export async function listSignups(
+  churchId: string,
+  status?: SignupStatus,
+): Promise<PersonSignup[]> {
   const filter = status
     ? pb.filter('church_id = {:churchId} && status = {:status}', { churchId, status })
     : pb.filter('church_id = {:churchId}', { churchId })

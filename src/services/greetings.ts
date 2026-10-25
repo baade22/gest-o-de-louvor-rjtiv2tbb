@@ -14,11 +14,14 @@ export async function saveGreetings(
 /** Contatos registrados hoje (para marcar quem já recebeu os parabéns). */
 export async function listContactsOn(churchId: string, dayYMD: string): Promise<PersonEvent[]> {
   return pb.collection('people_events').getFullList<PersonEvent>({
-    filter: pb.filter("church_id = {:churchId} && kind = 'CONTATO' && date >= {:start} && date <= {:end}", {
-      churchId,
-      start: `${dayYMD} 00:00:00`,
-      end: `${dayYMD} 23:59:59`,
-    }),
+    filter: pb.filter(
+      "church_id = {:churchId} && kind = 'CONTATO' && date >= {:start} && date <= {:end}",
+      {
+        churchId,
+        start: `${dayYMD} 00:00:00`,
+        end: `${dayYMD} 23:59:59`,
+      },
+    ),
   })
 }
 

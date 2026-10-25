@@ -4,7 +4,14 @@ import { getLocalTodayYMD } from '@/lib/dateUtils'
 
 export type ChurchGroupPayload = Pick<
   ChurchGroup,
-  'name' | 'kind' | 'description' | 'congregation' | 'meeting_info' | 'leader_id' | 'skills' | 'active'
+  | 'name'
+  | 'kind'
+  | 'description'
+  | 'congregation'
+  | 'meeting_info'
+  | 'leader_id'
+  | 'skills'
+  | 'active'
 >
 
 export async function listGroups(churchId: string): Promise<ChurchGroup[]> {

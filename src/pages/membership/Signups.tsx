@@ -113,7 +113,10 @@ function SignupCard({
           <p className="text-xs text-slate-500">Enviado em {createdOn(signup)}</p>
         </div>
         <div className="ml-auto flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-200">
+          <Badge
+            variant="outline"
+            className="text-[11px] bg-amber-50 text-amber-800 border-amber-200"
+          >
             {RELATIONSHIP_LABELS[signup.relationship]}
           </Badge>
           {signup.congregation && (
@@ -158,7 +161,10 @@ function SignupCard({
           </p>
           {duplicates.map((d) => (
             <div key={d.person.id} className="flex flex-wrap items-center gap-2 text-sm">
-              <Link to={`/membros/${d.person.id}`} className="font-medium text-slate-900 hover:underline">
+              <Link
+                to={`/membros/${d.person.id}`}
+                className="font-medium text-slate-900 hover:underline"
+              >
                 {d.person.name}
               </Link>
               <StatusBadge status={d.person.status} />
@@ -240,7 +246,12 @@ function LinkCard({
             <Copy className="h-3.5 w-3.5" />
             Copiar link
           </Button>
-          <Button size="sm" variant="outline" className="rounded-lg gap-1.5" onClick={() => downloadQrPng(url, `cadastro ${link.title}`)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-lg gap-1.5"
+            onClick={() => downloadQrPng(url, `cadastro ${link.title}`)}
+          >
             <Download className="h-3.5 w-3.5" />
             Baixar QR code
           </Button>
@@ -350,7 +361,10 @@ export default function Signups() {
       confirmLabel: 'Juntar',
       onConfirm: async () => {
         await approveIntoExisting(s, p)
-        toast({ title: 'Ficha atualizada', description: `${p.name} foi completada com o cadastro.` })
+        toast({
+          title: 'Ficha atualizada',
+          description: `${p.name} foi completada com o cadastro.`,
+        })
         await load()
       },
     })
@@ -408,7 +422,11 @@ export default function Signups() {
       await setSignupLinkActive(link.id, active)
       await load()
     } catch (err) {
-      toast({ title: 'Erro', description: errorMessage(err, 'Tente de novo.'), variant: 'destructive' })
+      toast({
+        title: 'Erro',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
     }
   }
 
@@ -466,7 +484,9 @@ export default function Signups() {
                 {count > 0 && (
                   <span
                     className={`text-[11px] rounded-full px-1.5 ${
-                      value === 'pendentes' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                      value === 'pendentes'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-600'
                     }`}
                   >
                     {count}
@@ -490,7 +510,11 @@ export default function Signups() {
                   : 'Quando alguém preencher o formulário, aparece aqui.'}
               </p>
               {links.length === 0 && (
-                <Button variant="outline" className="rounded-xl mt-2" onClick={() => setNewLinkOpen(true)}>
+                <Button
+                  variant="outline"
+                  className="rounded-xl mt-2"
+                  onClick={() => setNewLinkOpen(true)}
+                >
                   Criar QR code
                 </Button>
               )}
@@ -546,7 +570,10 @@ export default function Signups() {
                   </div>
                   <div className="ml-auto flex items-center gap-2">
                     {s.status === 'APROVADO' ? (
-                      <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-800 border-emerald-200 gap-1">
+                      <Badge
+                        variant="outline"
+                        className="text-[11px] bg-emerald-50 text-emerald-800 border-emerald-200 gap-1"
+                      >
                         <Check className="h-3 w-3" />
                         Aprovado
                       </Badge>
@@ -650,7 +677,10 @@ export default function Signups() {
             <Label htmlFor="approve-status" className="text-xs font-semibold">
               Situação
             </Label>
-            <Select value={approveStatus} onValueChange={(v) => setApproveStatus(v as PersonStatus)}>
+            <Select
+              value={approveStatus}
+              onValueChange={(v) => setApproveStatus(v as PersonStatus)}
+            >
               <SelectTrigger id="approve-status" className="rounded-xl">
                 <SelectValue />
               </SelectTrigger>

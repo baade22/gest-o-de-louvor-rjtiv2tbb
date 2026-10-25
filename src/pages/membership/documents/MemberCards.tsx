@@ -28,10 +28,12 @@ export default function MemberCards() {
 
   useEffect(() => {
     if (!currentChurch) return
-    Promise.all([listPeople(currentChurch.id), getChurchForDocs(currentChurch.id)]).then(([p, c]) => {
-      setPeople(p)
-      setChurch(c)
-    })
+    Promise.all([listPeople(currentChurch.id), getChurchForDocs(currentChurch.id)]).then(
+      ([p, c]) => {
+        setPeople(p)
+        setChurch(c)
+      },
+    )
   }, [currentChurch])
 
   const candidates = useMemo(
@@ -59,7 +61,10 @@ export default function MemberCards() {
     <div className="min-h-screen bg-slate-100 print:bg-white print:min-h-0">
       <div className="no-print max-w-5xl mx-auto px-4 py-5 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Link to="/membros" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
+          <Link
+            to="/membros"
+            className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
+          >
             <ArrowLeft className="h-4 w-4" />
             Membros
           </Link>
@@ -82,14 +87,19 @@ export default function MemberCards() {
                 type="button"
                 onClick={() => setCongregation(c)}
                 className={`h-9 px-3 rounded-xl border text-sm font-medium ${
-                  congregation === c ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-white border-slate-200 text-slate-600'
+                  congregation === c
+                    ? 'bg-teal-50 border-teal-300 text-teal-800'
+                    : 'bg-white border-slate-200 text-slate-600'
                 }`}
               >
                 {c === 'TODAS' ? 'Toda a igreja' : c}
               </button>
             ))}
             <label className="flex items-center gap-2 text-sm text-slate-700 ml-2">
-              <Checkbox checked={withCongregados} onCheckedChange={(v) => setWithCongregados(v === true)} />
+              <Checkbox
+                checked={withCongregados}
+                onCheckedChange={(v) => setWithCongregados(v === true)}
+              />
               Incluir congregados
             </label>
             <Input
@@ -106,11 +116,14 @@ export default function MemberCards() {
                 <span className="truncate">{p.name}</span>
               </label>
             ))}
-            {candidates.length === 0 && <p className="text-sm text-slate-500">Ninguém com esse filtro.</p>}
+            {candidates.length === 0 && (
+              <p className="text-sm text-slate-500">Ninguém com esse filtro.</p>
+            )}
           </div>
         </div>
         <p className="text-xs text-slate-500">
-          Cada linha é uma carteirinha: frente à esquerda, verso à direita. Recorte, dobre no meio e plastifique.
+          Cada linha é uma carteirinha: frente à esquerda, verso à direita. Recorte, dobre no meio e
+          plastifique.
         </p>
       </div>
 

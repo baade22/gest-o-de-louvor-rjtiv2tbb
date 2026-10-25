@@ -51,14 +51,20 @@ describe('documentos', () => {
   })
 
   it('sem destino deixa um espaço para preencher; recomendação tem destinatário padrão', () => {
-    expect(transferLetterBody({ person: person({}), church, destination: '' })[0]).toContain('[igreja de destino]')
-    expect(recommendationLetterBody({ person: person({ gender: 'M' }), church, destination: '' })[0]).toBe(
+    expect(transferLetterBody({ person: person({}), church, destination: '' })[0]).toContain(
+      '[igreja de destino]',
+    )
+    expect(
+      recommendationLetterBody({ person: person({ gender: 'M' }), church, destination: '' })[0],
+    ).toBe(
       'A IB Missionária em Aldeia recomenda a quem possa interessar o irmão Ana Carolina Duarte, membro desta igreja.',
     )
   })
 
   it('certificado sem data de batismo deixa linha em branco', () => {
-    expect(baptismCertificateText(person({ gender: 'M' }), church)).toContain('foi batizado por imersão')
+    expect(baptismCertificateText(person({ gender: 'M' }), church)).toContain(
+      'foi batizado por imersão',
+    )
     expect(baptismCertificateText(person({}), church)).toContain('em ____ de')
   })
 })

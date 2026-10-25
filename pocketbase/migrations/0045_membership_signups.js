@@ -51,7 +51,14 @@ migrate(
           { name: 'title', type: 'text', required: true, max: 120 },
           { name: 'congregation', type: 'text', max: 120 },
           // Chave do QR code: só letras e números, longa o bastante para não ser adivinhada
-          { name: 'key', type: 'text', required: true, min: 20, max: 40, pattern: '^[A-Za-z0-9]+$' },
+          {
+            name: 'key',
+            type: 'text',
+            required: true,
+            min: 20,
+            max: 40,
+            pattern: '^[A-Za-z0-9]+$',
+          },
           { name: 'active', type: 'bool' },
           { name: 'created_by', type: 'relation', collectionId: users.id, maxSelect: 1 },
           { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },

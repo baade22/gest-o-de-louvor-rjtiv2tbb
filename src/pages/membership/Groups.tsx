@@ -22,7 +22,9 @@ const KIND_STYLE: Record<GroupKind, string> = {
 
 function chip(active: boolean) {
   return `h-9 px-3 rounded-xl border text-sm font-medium ${
-    active ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+    active
+      ? 'bg-teal-50 border-teal-300 text-teal-800'
+      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
   }`
 }
 
@@ -42,7 +44,11 @@ export default function Groups() {
 
   useEffect(() => {
     if (!currentChurch) return
-    Promise.all([listGroups(currentChurch.id), listAllGroupMembers(currentChurch.id), listPeople(currentChurch.id)])
+    Promise.all([
+      listGroups(currentChurch.id),
+      listAllGroupMembers(currentChurch.id),
+      listPeople(currentChurch.id),
+    ])
       .then(([g, m, p]) => {
         setGroups(g)
         setMembers(m)
@@ -72,7 +78,10 @@ export default function Groups() {
             Infantil, recepção, mídia, jovens, casais: quem participa e quem pode ajudar.
           </p>
         </div>
-        <Button className="sm:ml-auto rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800" onClick={() => setFormOpen(true)}>
+        <Button
+          className="sm:ml-auto rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
+          onClick={() => setFormOpen(true)}
+        >
           <Plus className="h-4 w-4" />
           Novo grupo
         </Button>
@@ -87,7 +96,12 @@ export default function Groups() {
           ))}
           <span className="w-px h-6 bg-slate-200 mx-1" />
           {['TODAS', ...CONGREGATIONS].map((c) => (
-            <button key={c} type="button" className={chip(congregation === c)} onClick={() => setCongregation(c)}>
+            <button
+              key={c}
+              type="button"
+              className={chip(congregation === c)}
+              onClick={() => setCongregation(c)}
+            >
               {c === 'TODAS' ? 'Toda a igreja' : c}
             </button>
           ))}
@@ -114,16 +128,21 @@ export default function Groups() {
           ))}
         </div>
       ) : loadError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">{loadError}</div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+          {loadError}
+        </div>
       ) : groups.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-2">
           <UsersRound className="h-10 w-10 text-slate-400 mx-auto" />
           <p className="font-semibold text-slate-800">Nenhum grupo ainda</p>
           <p className="text-sm text-slate-500 max-w-md mx-auto">
-            Crie os ministérios e departamentos da igreja. Há modelos prontos (infantil, recepção, mídia, jovens,
-            casais) e as habilidades das fichas viram sugestões de voluntários.
+            Crie os ministérios e departamentos da igreja. Há modelos prontos (infantil, recepção,
+            mídia, jovens, casais) e as habilidades das fichas viram sugestões de voluntários.
           </p>
-          <Button className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800 mt-2" onClick={() => setFormOpen(true)}>
+          <Button
+            className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800 mt-2"
+            onClick={() => setFormOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             Criar o primeiro
           </Button>
@@ -133,7 +152,9 @@ export default function Groups() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {shown.map((g) => {
               const leader = g.leader_id ? peopleById.get(g.leader_id) : undefined
-              const memberIds = new Set(members.filter((m) => m.group_id === g.id).map((m) => m.person_id))
+              const memberIds = new Set(
+                members.filter((m) => m.group_id === g.id).map((m) => m.person_id),
+              )
               const suggestions = suggestVolunteers(g, people, memberIds).length
               return (
                 <Link
@@ -144,15 +165,23 @@ export default function Groups() {
                   }`}
                 >
                   <div className="flex items-start gap-2">
-                    <h3 className="font-bold text-slate-900 group-hover:text-teal-800 flex-1 min-w-0 truncate">{g.name}</h3>
-                    <span className={`shrink-0 text-[11px] font-semibold rounded-full px-2 py-0.5 ${KIND_STYLE[g.kind]}`}>
+                    <h3 className="font-bold text-slate-900 group-hover:text-teal-800 flex-1 min-w-0 truncate">
+                      {g.name}
+                    </h3>
+                    <span
+                      className={`shrink-0 text-[11px] font-semibold rounded-full px-2 py-0.5 ${KIND_STYLE[g.kind]}`}
+                    >
                       {GROUP_KIND_LABELS[g.kind]}
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 space-y-1">
                     <p className="flex items-center gap-1.5">
                       <Crown className="h-3.5 w-3.5 text-slate-400" />
-                      {leader ? leader.name : <span className="text-amber-700">Sem líder definido</span>}
+                      {leader ? (
+                        leader.name
+                      ) : (
+                        <span className="text-amber-700">Sem líder definido</span>
+                      )}
                     </p>
                     {g.meeting_info && (
                       <p className="flex items-center gap-1.5">
@@ -172,18 +201,25 @@ export default function Groups() {
                         {suggestions} {suggestions === 1 ? 'sugestão' : 'sugestões'}
                       </span>
                     )}
-                    {g.congregation && <span className="ml-auto text-slate-400">{g.congregation}</span>}
+                    {g.congregation && (
+                      <span className="ml-auto text-slate-400">{g.congregation}</span>
+                    )}
                     {!g.active && <span className="ml-auto text-slate-500">Inativo</span>}
                   </div>
                 </Link>
               )
             })}
           </div>
-          {shown.length === 0 && <p className="text-sm text-slate-500">Nenhum grupo com esse filtro.</p>}
+          {shown.length === 0 && (
+            <p className="text-sm text-slate-500">Nenhum grupo com esse filtro.</p>
+          )}
           {withoutGroup > 0 && (
             <p className="text-xs text-slate-500">
-              {withoutGroup} {withoutGroup === 1 ? 'membro ou congregado ainda não participa' : 'membros e congregados ainda não participam'} de
-              nenhum grupo daqui.
+              {withoutGroup}{' '}
+              {withoutGroup === 1
+                ? 'membro ou congregado ainda não participa'
+                : 'membros e congregados ainda não participam'}{' '}
+              de nenhum grupo daqui.
             </p>
           )}
         </>

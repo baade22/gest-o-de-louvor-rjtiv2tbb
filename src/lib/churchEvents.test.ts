@@ -67,8 +67,12 @@ describe('datas', () => {
     expect(eventDateLabel({ starts_on: '2026-11-30', ends_on: '2026-12-02' })).toBe(
       '30 de nov. a 2 de dez.',
     )
-    expect(eventDateLabel({ starts_on: '2026-11-08', start_time: '19:30' })).toBe('8 de nov. · 19:30')
-    expect(isPastEvent({ starts_on: '2026-10-20', ends_on: '2026-10-25' }, '2026-10-25')).toBe(false)
+    expect(eventDateLabel({ starts_on: '2026-11-08', start_time: '19:30' })).toBe(
+      '8 de nov. · 19:30',
+    )
+    expect(isPastEvent({ starts_on: '2026-10-20', ends_on: '2026-10-25' }, '2026-10-25')).toBe(
+      false,
+    )
     expect(isPastEvent({ starts_on: '2026-10-20' }, '2026-10-25')).toBe(true)
   })
 })

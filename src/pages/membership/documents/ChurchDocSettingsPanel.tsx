@@ -49,7 +49,10 @@ export function ChurchDocSettingsPanel({
     } catch (err) {
       toast({
         title: 'Não foi possível salvar',
-        description: errorMessage(err, 'Só o pastor/administrador principal pode editar os dados da igreja.'),
+        description: errorMessage(
+          err,
+          'Só o pastor/administrador principal pode editar os dados da igreja.',
+        ),
         variant: 'destructive',
       })
     } finally {
@@ -70,7 +73,9 @@ export function ChurchDocSettingsPanel({
             preencha uma vez
           </span>
         )}
-        <ChevronDown className={`h-4 w-4 ml-auto text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`h-4 w-4 ml-auto text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3">
@@ -90,7 +95,12 @@ export function ChurchDocSettingsPanel({
               </div>
             ))}
           </div>
-          <Button size="sm" onClick={save} disabled={saving} className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800">
+          <Button
+            size="sm"
+            onClick={save}
+            disabled={saving}
+            className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
+          >
             <Save className="h-3.5 w-3.5" />
             Salvar dados da igreja
           </Button>

@@ -17,7 +17,9 @@ routerAdd('GET', '/backend/v1/signup/info', (e) => {
   }
 
   try {
-    const found = $app.findRecordsByFilter('people_signup_links', 'key = {:key}', '', 1, 0, { key: key })
+    const found = $app.findRecordsByFilter('people_signup_links', 'key = {:key}', '', 1, 0, {
+      key: key,
+    })
     if (found.length === 0 || !found[0].getBool('active')) {
       return e.json(404, {
         valid: false,
@@ -43,7 +45,10 @@ routerAdd('GET', '/backend/v1/signup/info', (e) => {
 routerAdd('POST', '/backend/v1/signup', (e) => {
   const body = e.requestInfo().body || {}
 
-  const text = (v, max) => String(v == null ? '' : v).trim().slice(0, max)
+  const text = (v, max) =>
+    String(v == null ? '' : v)
+      .trim()
+      .slice(0, max)
   const oneOf = (v, list) => (list.indexOf(String(v || '')) >= 0 ? String(v) : '')
   const ymd = (v) => {
     const s = String(v || '').trim()
@@ -69,9 +74,12 @@ routerAdd('POST', '/backend/v1/signup', (e) => {
   const relationship = oneOf(body.relationship, ['VISITANTE', 'FREQUENTA', 'MEMBRO'])
 
   if (name.length < 3) return e.json(400, { message: 'Informe o nome completo.' })
-  if (!relationship) return e.json(400, { message: 'Diga se é visitante, se frequenta ou se já é membro.' })
-  if (!phone && !email) return e.json(400, { message: 'Informe um telefone ou um e-mail para contato.' })
-  if (phone && phone.replace(/\D/g, '').length < 8) return e.json(400, { message: 'Confira o telefone.' })
+  if (!relationship)
+    return e.json(400, { message: 'Diga se é visitante, se frequenta ou se já é membro.' })
+  if (!phone && !email)
+    return e.json(400, { message: 'Informe um telefone ou um e-mail para contato.' })
+  if (phone && phone.replace(/\D/g, '').length < 8)
+    return e.json(400, { message: 'Confira o telefone.' })
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return e.json(400, { message: 'Confira o e-mail.' })
   }
@@ -81,7 +89,9 @@ routerAdd('POST', '/backend/v1/signup', (e) => {
 
   let link
   try {
-    const found = $app.findRecordsByFilter('people_signup_links', 'key = {:key}', '', 1, 0, { key: key })
+    const found = $app.findRecordsByFilter('people_signup_links', 'key = {:key}', '', 1, 0, {
+      key: key,
+    })
     if (found.length === 0 || !found[0].getBool('active')) {
       return e.json(404, { message: 'Este link de cadastro não está mais ativo.' })
     }

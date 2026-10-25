@@ -219,7 +219,9 @@ export default function FollowUp() {
   )
   const active = FOLLOWUP_STAGES.flatMap((s) => all[s.id])
   const staleCount = active.filter((p) => isStale(p, today)).length
-  const noOwnerCount = active.filter((p) => p.id && !p.followup_owner && effectiveStage(p) !== 'INTEGRADO').length
+  const noOwnerCount = active.filter(
+    (p) => p.id && !p.followup_owner && effectiveStage(p) !== 'INTEGRADO',
+  ).length
   const owners = useMemo(() => {
     const ids = new Set(active.map((p) => p.followup_owner).filter(Boolean) as string[])
     return Array.from(ids)
@@ -264,7 +266,8 @@ export default function FollowUp() {
 
   const submitEdit = async () => {
     if (!editing) return
-    if (await save(editing, editStage, editOwner === NONE ? '' : editOwner, editNote)) setEditing(null)
+    if (await save(editing, editStage, editOwner === NONE ? '' : editOwner, editNote))
+      setEditing(null)
   }
 
   return (
@@ -281,7 +284,12 @@ export default function FollowUp() {
         </div>
         <div className="lg:ml-auto flex flex-wrap items-center gap-2">
           {['TODAS', ...CONGREGATIONS].map((c) => (
-            <button key={c} type="button" className={chip(congregation === c)} onClick={() => setCongregation(c)}>
+            <button
+              key={c}
+              type="button"
+              className={chip(congregation === c)}
+              onClick={() => setCongregation(c)}
+            >
               {c === 'TODAS' ? 'Toda a igreja' : c}
             </button>
           ))}
@@ -306,7 +314,10 @@ export default function FollowUp() {
           </span>
         </button>
         <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="h-9 w-auto min-w-48 rounded-xl bg-white" aria-label="Responsável">
+          <SelectTrigger
+            className="h-9 w-auto min-w-48 rounded-xl bg-white"
+            aria-label="Responsável"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -379,10 +390,18 @@ export default function FollowUp() {
             <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
               {all.ENCERRADO.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <Link to={`/membros/${p.id}`} className="text-sm font-medium text-slate-900 hover:underline">
+                  <Link
+                    to={`/membros/${p.id}`}
+                    className="text-sm font-medium text-slate-900 hover:underline"
+                  >
                     {p.name}
                   </Link>
-                  <Button size="sm" variant="outline" className="ml-auto h-8 rounded-lg" onClick={() => openEdit(p)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto h-8 rounded-lg"
+                    onClick={() => openEdit(p)}
+                  >
                     Reabrir
                   </Button>
                 </div>
@@ -415,7 +434,9 @@ export default function FollowUp() {
                       {s.label}
                     </SelectItem>
                   ))}
-                  <SelectItem value="ENCERRADO">Encerrar (parou de vir, mudou de cidade...)</SelectItem>
+                  <SelectItem value="ENCERRADO">
+                    Encerrar (parou de vir, mudou de cidade...)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -455,7 +476,10 @@ export default function FollowUp() {
             {editStage === 'INTEGRADO' && editing?.status === 'VISITANTE' && (
               <p className="text-xs text-slate-600 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                 Lembre de mudar a situação na ficha para Congregado ou Membro.{' '}
-                <Link to={`/membros/${editing.id}/editar`} className="font-semibold text-emerald-800 underline">
+                <Link
+                  to={`/membros/${editing.id}/editar`}
+                  className="font-semibold text-emerald-800 underline"
+                >
                   Editar ficha
                 </Link>
               </p>
@@ -465,7 +489,11 @@ export default function FollowUp() {
             <Button variant="outline" onClick={() => setEditing(null)}>
               Cancelar
             </Button>
-            <Button onClick={submitEdit} disabled={saving} className="bg-teal-700 hover:bg-teal-800">
+            <Button
+              onClick={submitEdit}
+              disabled={saving}
+              className="bg-teal-700 hover:bg-teal-800"
+            >
               Salvar
             </Button>
           </DialogFooter>

@@ -72,7 +72,17 @@ import { StatusBadge, errorMessage } from './shared'
 
 const PAY_METHODS: PaymentMethod[] = ['PIX', 'DINHEIRO', 'CARTAO', 'ISENTO', 'OUTRO']
 
-function Stat({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string; sub?: string }) {
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  sub?: string
+}) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
       <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
@@ -87,7 +97,9 @@ function Stat({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: stri
 
 function chip(active: boolean) {
   return `h-8 px-3 rounded-lg border text-xs font-medium transition-colors ${
-    active ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+    active
+      ? 'bg-teal-50 border-teal-300 text-teal-800'
+      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
   }`
 }
 
@@ -118,7 +130,11 @@ export default function ChurchEventDetail() {
       setEvent(e)
       setRegs(r)
     } catch (err) {
-      toast({ title: 'Erro', description: errorMessage(err, 'Evento não encontrado.'), variant: 'destructive' })
+      toast({
+        title: 'Erro',
+        description: errorMessage(err, 'Evento não encontrado.'),
+        variant: 'destructive',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -130,18 +146,25 @@ export default function ChurchEventDetail() {
 
   useEffect(() => {
     if (!addOpen || !currentChurch || people.length) return
-    listPeople(currentChurch.id).then(setPeople).catch(() => setPeople([]))
+    listPeople(currentChurch.id)
+      .then(setPeople)
+      .catch(() => setPeople([]))
   }, [addOpen, currentChurch, people.length])
 
   const summary = useMemo(() => (event ? summarizeRegistrations(event, regs) : null), [event, regs])
   const shown = useMemo(() => filterRegistrations(regs, search, filter), [regs, search, filter])
   const checkinList = useMemo(() => filterRegistrations(regs, checkinSearch), [regs, checkinSearch])
-  const registeredPeople = useMemo(() => new Set(regs.map((r) => r.person_id).filter(Boolean)), [regs])
+  const registeredPeople = useMemo(
+    () => new Set(regs.map((r) => r.person_id).filter(Boolean)),
+    [regs],
+  )
   const peopleResults = useMemo(
     () =>
       peopleSearch.trim().length < 2
         ? []
-        : filterPeople(people, { search: peopleSearch }).filter((p) => p.status !== 'FALECIDO').slice(0, 8),
+        : filterPeople(people, { search: peopleSearch })
+            .filter((p) => p.status !== 'FALECIDO')
+            .slice(0, 8),
     [people, peopleSearch],
   )
 
@@ -167,12 +190,20 @@ export default function ChurchEventDetail() {
       await updateRegistration(r.id, data)
     } catch (err) {
       setRegs((list) => list.map((x) => (x.id === r.id ? r : x)))
-      toast({ title: 'Não foi possível salvar', description: errorMessage(err, 'Tente de novo.'), variant: 'destructive' })
+      toast({
+        title: 'Não foi possível salvar',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
     }
   }
 
   const markPaid = (r: EventRegistration, method: PaymentMethod) =>
-    patchReg(r, { paid: true, payment_method: method, paid_amount: method === 'ISENTO' ? 0 : event.price || 0 })
+    patchReg(r, {
+      paid: true,
+      payment_method: method,
+      paid_amount: method === 'ISENTO' ? 0 : event.price || 0,
+    })
 
   const addRegistration = async (data: Parameters<typeof createRegistration>[1]) => {
     setBusy(true)
@@ -184,7 +215,11 @@ export default function ChurchEventDetail() {
       setNewName('')
       setNewPhone('')
     } catch (err) {
-      toast({ title: 'Não foi possível inscrever', description: errorMessage(err, 'Tente de novo.'), variant: 'destructive' })
+      toast({
+        title: 'Não foi possível inscrever',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
     } finally {
       setBusy(false)
     }
@@ -193,7 +228,10 @@ export default function ChurchEventDetail() {
   const removeReg = (r: EventRegistration) =>
     confirm({
       title: `Cancelar a inscrição de ${r.name}?`,
-      description: r.paid && !free ? 'Ela já estava paga. Lembre de combinar a devolução, se for o caso.' : 'A vaga fica livre de novo.',
+      description:
+        r.paid && !free
+          ? 'Ela já estava paga. Lembre de combinar a devolução, se for o caso.'
+          : 'A vaga fica livre de novo.',
       confirmLabel: 'Cancelar inscrição',
       destructive: true,
       onConfirm: async () => {
@@ -218,7 +256,11 @@ export default function ChurchEventDetail() {
     try {
       setEvent(await updateChurchEvent(event.id, { registration_open: open }))
     } catch (err) {
-      toast({ title: 'Erro', description: errorMessage(err, 'Tente de novo.'), variant: 'destructive' })
+      toast({
+        title: 'Erro',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
     }
   }
 
@@ -240,14 +282,19 @@ export default function ChurchEventDetail() {
   return (
     <div className="space-y-5">
       {confirmDialog}
-      <Link to="/membros/eventos" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
+      <Link
+        to="/membros/eventos"
+        className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800"
+      >
         <ArrowLeft className="h-4 w-4" />
         Eventos da igreja
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{event.title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            {event.title}
+          </h1>
           <p className="text-sm text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
             <span>{eventDateLabel(event)}</span>
             {event.location && (
@@ -261,11 +308,21 @@ export default function ChurchEventDetail() {
           </p>
         </div>
         <div className="sm:ml-auto flex gap-2 shrink-0">
-          <Button variant="outline" className="rounded-xl gap-1.5" onClick={() => navigate(`/membros/eventos/${event.id}/editar`)}>
+          <Button
+            variant="outline"
+            className="rounded-xl gap-1.5"
+            onClick={() => navigate(`/membros/eventos/${event.id}/editar`)}
+          >
             <Edit className="h-4 w-4" />
             Editar
           </Button>
-          <Button variant="ghost" size="icon" className="rounded-xl text-slate-400 hover:text-red-600" onClick={removeEvent} aria-label="Apagar evento">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-slate-400 hover:text-red-600"
+            onClick={removeEvent}
+            aria-label="Apagar evento"
+          >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -276,19 +333,43 @@ export default function ChurchEventDetail() {
           icon={Users}
           label="Inscritos"
           value={String(summary.total)}
-          sub={summary.spotsLeft !== null ? `${summary.spotsLeft} vagas livres de ${event.capacity}` : 'sem limite de vagas'}
+          sub={
+            summary.spotsLeft !== null
+              ? `${summary.spotsLeft} vagas livres de ${event.capacity}`
+              : 'sem limite de vagas'
+          }
         />
         {free ? (
-          <Stat icon={Link2} label="Pelo link" value={String(regs.filter((r) => r.source === 'LINK').length)} sub="se inscreveram sozinhos" />
+          <Stat
+            icon={Link2}
+            label="Pelo link"
+            value={String(regs.filter((r) => r.source === 'LINK').length)}
+            sub="se inscreveram sozinhos"
+          />
         ) : (
-          <Stat icon={Check} label="Pagos" value={String(summary.paid)} sub={summary.pending ? `${summary.pending} ainda não pagaram` : 'todos pagaram'} />
+          <Stat
+            icon={Check}
+            label="Pagos"
+            value={String(summary.paid)}
+            sub={summary.pending ? `${summary.pending} ainda não pagaram` : 'todos pagaram'}
+          />
         )}
         {free ? (
           <Stat icon={Wallet} label="Valor" value="Gratuito" />
         ) : (
-          <Stat icon={Wallet} label="Recebido" value={formatBRL(summary.collected)} sub={summary.toCollect ? `falta ${formatBRL(summary.toCollect)}` : undefined} />
+          <Stat
+            icon={Wallet}
+            label="Recebido"
+            value={formatBRL(summary.collected)}
+            sub={summary.toCollect ? `falta ${formatBRL(summary.toCollect)}` : undefined}
+          />
         )}
-        <Stat icon={ClipboardCheck} label="Presentes" value={String(summary.attended)} sub={summary.total ? `de ${summary.total} inscritos` : undefined} />
+        <Stat
+          icon={ClipboardCheck}
+          label="Presentes"
+          value={String(summary.attended)}
+          sub={summary.total ? `de ${summary.total} inscritos` : undefined}
+        />
       </div>
 
       <Tabs defaultValue="inscritos">
@@ -302,7 +383,11 @@ export default function ChurchEventDetail() {
               >
                 <Icon className="h-4 w-4" />
                 {label}
-                {count > 0 && <span className="text-[11px] bg-slate-100 text-slate-600 rounded-full px-1.5">{count}</span>}
+                {count > 0 && (
+                  <span className="text-[11px] bg-slate-100 text-slate-600 rounded-full px-1.5">
+                    {count}
+                  </span>
+                )}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -312,17 +397,38 @@ export default function ChurchEventDetail() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-52">
               <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar inscrito" className="pl-9 rounded-xl bg-white" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar inscrito"
+                className="pl-9 rounded-xl bg-white"
+              />
             </div>
             {(free
               ? (['TODOS', 'PRESENTES', 'AUSENTES'] as RegistrationFilter[])
               : (['TODOS', 'PAGOS', 'PENDENTES', 'PRESENTES'] as RegistrationFilter[])
             ).map((f) => (
-              <button key={f} type="button" className={chip(filter === f)} onClick={() => setFilter(f)}>
-                {{ TODOS: 'Todos', PAGOS: 'Pagos', PENDENTES: 'A pagar', PRESENTES: 'Presentes', AUSENTES: 'Ausentes' }[f]}
+              <button
+                key={f}
+                type="button"
+                className={chip(filter === f)}
+                onClick={() => setFilter(f)}
+              >
+                {
+                  {
+                    TODOS: 'Todos',
+                    PAGOS: 'Pagos',
+                    PENDENTES: 'A pagar',
+                    PRESENTES: 'Presentes',
+                    AUSENTES: 'Ausentes',
+                  }[f]
+                }
               </button>
             ))}
-            <Button className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800 ml-auto" onClick={() => setAddOpen(true)}>
+            <Button
+              className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800 ml-auto"
+              onClick={() => setAddOpen(true)}
+            >
               <UserPlus className="h-4 w-4" />
               Inscrever
             </Button>
@@ -331,7 +437,9 @@ export default function ChurchEventDetail() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs divide-y divide-slate-100">
             {shown.length === 0 && (
               <p className="p-8 text-center text-sm text-slate-500">
-                {regs.length === 0 ? 'Ninguém inscrito ainda. Divulgue o link ou inscreva pela secretaria.' : 'Ninguém com esse filtro.'}
+                {regs.length === 0
+                  ? 'Ninguém inscrito ainda. Divulgue o link ou inscreva pela secretaria.'
+                  : 'Ninguém com esse filtro.'}
               </p>
             )}
             {shown.map((r) => (
@@ -339,46 +447,82 @@ export default function ChurchEventDetail() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     {r.person_id ? (
-                      <Link to={`/membros/${r.person_id}`} className="text-sm font-semibold text-slate-900 hover:underline truncate">
+                      <Link
+                        to={`/membros/${r.person_id}`}
+                        className="text-sm font-semibold text-slate-900 hover:underline truncate"
+                      >
                         {r.name}
                       </Link>
                     ) : (
-                      <span className="text-sm font-semibold text-slate-900 truncate">{r.name}</span>
+                      <span className="text-sm font-semibold text-slate-900 truncate">
+                        {r.name}
+                      </span>
                     )}
                     {r.source === 'LINK' && (
-                      <Badge variant="outline" className="text-[10px] text-sky-800 bg-sky-50 border-sky-200">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] text-sky-800 bg-sky-50 border-sky-200"
+                      >
                         pelo link
                       </Badge>
                     )}
-                    {r.attended && <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-label="Presente" />}
+                    {r.attended && (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-label="Presente" />
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 truncate">{[r.phone, r.notes].filter(Boolean).join(' · ') || 'sem telefone'}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {[r.phone, r.notes].filter(Boolean).join(' · ') || 'sem telefone'}
+                  </p>
                 </div>
                 {!free &&
                   (r.paid ? (
                     <div className="flex items-center gap-1">
-                      <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-800 border-emerald-200">
-                        {r.payment_method === 'ISENTO' ? 'Isento' : `Pago${r.payment_method ? ` · ${PAYMENT_METHOD_LABELS[r.payment_method]}` : ''}`}
+                      <Badge
+                        variant="outline"
+                        className="text-[11px] bg-emerald-50 text-emerald-800 border-emerald-200"
+                      >
+                        {r.payment_method === 'ISENTO'
+                          ? 'Isento'
+                          : `Pago${r.payment_method ? ` · ${PAYMENT_METHOD_LABELS[r.payment_method]}` : ''}`}
                       </Badge>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" aria-label="Desfazer pagamento" onClick={() => patchReg(r, { paid: false, payment_method: '', paid_amount: 0 })}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-slate-400"
+                        aria-label="Desfazer pagamento"
+                        onClick={() =>
+                          patchReg(r, { paid: false, payment_method: '', paid_amount: 0 })
+                        }
+                      >
                         <Undo2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   ) : (
                     <Select onValueChange={(v) => markPaid(r, v as PaymentMethod)}>
-                      <SelectTrigger className="h-8 w-32 rounded-lg text-xs border-amber-200 bg-amber-50 text-amber-900" aria-label={`Marcar pagamento de ${r.name}`}>
+                      <SelectTrigger
+                        className="h-8 w-32 rounded-lg text-xs border-amber-200 bg-amber-50 text-amber-900"
+                        aria-label={`Marcar pagamento de ${r.name}`}
+                      >
                         <SelectValue placeholder="A pagar" />
                       </SelectTrigger>
                       <SelectContent>
                         {PAY_METHODS.map((m) => (
                           <SelectItem key={m} value={m}>
-                            {m === 'ISENTO' ? 'Isento (não paga)' : `Pago no ${PAYMENT_METHOD_LABELS[m].toLowerCase()}`}
+                            {m === 'ISENTO'
+                              ? 'Isento (não paga)'
+                              : `Pago no ${PAYMENT_METHOD_LABELS[m].toLowerCase()}`}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ))}
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-600" aria-label={`Cancelar inscrição de ${r.name}`} onClick={() => removeReg(r)}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-slate-400 hover:text-red-600"
+                  aria-label={`Cancelar inscrição de ${r.name}`}
+                  onClick={() => removeReg(r)}
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -398,7 +542,8 @@ export default function ChurchEventDetail() {
               />
             </div>
             <p className="text-sm text-slate-600">
-              <strong className="text-slate-900">{summary.attended}</strong> de {summary.total} presentes
+              <strong className="text-slate-900">{summary.attended}</strong> de {summary.total}{' '}
+              presentes
             </p>
           </div>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
@@ -408,7 +553,9 @@ export default function ChurchEventDetail() {
                 type="button"
                 onClick={() => patchReg(r, { attended: !r.attended })}
                 className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-                  r.attended ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200 hover:border-teal-300'
+                  r.attended
+                    ? 'bg-emerald-50 border-emerald-300'
+                    : 'bg-white border-slate-200 hover:border-teal-300'
                 }`}
               >
                 {r.attended ? (
@@ -417,13 +564,21 @@ export default function ChurchEventDetail() {
                   <Circle className="h-6 w-6 text-slate-300 shrink-0" />
                 )}
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-900 truncate">{r.name}</span>
-                  {!free && !r.paid && <span className="block text-xs text-amber-700">ainda não pagou</span>}
+                  <span className="block text-sm font-semibold text-slate-900 truncate">
+                    {r.name}
+                  </span>
+                  {!free && !r.paid && (
+                    <span className="block text-xs text-amber-700">ainda não pagou</span>
+                  )}
                 </span>
               </button>
             ))}
           </div>
-          {checkinList.length === 0 && <p className="text-sm text-slate-500 text-center py-6">Ninguém com esse nome na lista.</p>}
+          {checkinList.length === 0 && (
+            <p className="text-sm text-slate-500 text-center py-6">
+              Ninguém com esse nome na lista.
+            </p>
+          )}
         </TabsContent>
 
         <TabsContent value="divulgar" className="mt-4">
@@ -434,15 +589,24 @@ export default function ChurchEventDetail() {
             <div className="flex-1 min-w-0 space-y-4">
               <label className="flex items-center gap-3 text-sm font-medium text-slate-800">
                 <Switch checked={event.registration_open} onCheckedChange={toggleOpen} />
-                {event.registration_open ? 'Inscrições abertas pelo link' : 'Inscrições fechadas (o link mostra que encerrou)'}
+                {event.registration_open
+                  ? 'Inscrições abertas pelo link'
+                  : 'Inscrições fechadas (o link mostra que encerrou)'}
               </label>
-              <div className="text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 break-all text-slate-700">{url}</div>
+              <div className="text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 break-all text-slate-700">
+                {url}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" className="rounded-lg gap-1.5" onClick={copy}>
                   <Copy className="h-3.5 w-3.5" />
                   Copiar link
                 </Button>
-                <Button size="sm" variant="outline" className="rounded-lg gap-1.5" onClick={() => downloadQrPng(url, event.title)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg gap-1.5"
+                  onClick={() => downloadQrPng(url, event.title)}
+                >
                   <Download className="h-3.5 w-3.5" />
                   Baixar QR code
                 </Button>
@@ -454,7 +618,8 @@ export default function ChurchEventDetail() {
                 </Button>
               </div>
               <p className="text-xs text-slate-500">
-                Quem se inscreve pelo link entra como "a pagar" (se o evento for pago) e vê as instruções de pagamento no fim.
+                Quem se inscreve pelo link entra como "a pagar" (se o evento for pago) e vê as
+                instruções de pagamento no fim.
               </p>
             </div>
           </div>
@@ -465,14 +630,22 @@ export default function ChurchEventDetail() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Inscrever no evento</DialogTitle>
-            <DialogDescription>Procure a ficha da pessoa ou inscreva só com nome e telefone.</DialogDescription>
+            <DialogDescription>
+              Procure a ficha da pessoa ou inscreva só com nome e telefone.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="reg-search" className="text-xs font-semibold">
                 Buscar ficha
               </Label>
-              <Input id="reg-search" value={peopleSearch} onChange={(e) => setPeopleSearch(e.target.value)} placeholder="Nome ou telefone" className="rounded-xl" />
+              <Input
+                id="reg-search"
+                value={peopleSearch}
+                onChange={(e) => setPeopleSearch(e.target.value)}
+                placeholder="Nome ou telefone"
+                className="rounded-xl"
+              />
               <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
                 {peopleResults.map((p) => {
                   const already = registeredPeople.has(p.id)
@@ -481,10 +654,19 @@ export default function ChurchEventDetail() {
                       key={p.id}
                       type="button"
                       disabled={already || busy}
-                      onClick={() => addRegistration({ name: p.name, person_id: p.id, phone: p.phone || '', email: p.email || '' })}
+                      onClick={() =>
+                        addRegistration({
+                          name: p.name,
+                          person_id: p.id,
+                          phone: p.phone || '',
+                          email: p.email || '',
+                        })
+                      }
                       className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-slate-50 disabled:opacity-50 rounded-lg"
                     >
-                      <span className="text-sm font-medium text-slate-900 flex-1 truncate">{p.name}</span>
+                      <span className="text-sm font-medium text-slate-900 flex-1 truncate">
+                        {p.name}
+                      </span>
                       <StatusBadge status={p.status} />
                       {already && <span className="text-xs text-slate-500">já inscrito</span>}
                     </button>
@@ -493,10 +675,24 @@ export default function ChurchEventDetail() {
               </div>
             </div>
             <div className="border-t border-slate-100 pt-4 space-y-2">
-              <p className="text-xs font-semibold text-slate-700">Sem ficha (visitante, convidado)</p>
+              <p className="text-xs font-semibold text-slate-700">
+                Sem ficha (visitante, convidado)
+              </p>
               <div className="grid grid-cols-2 gap-2">
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome completo" className="rounded-xl" aria-label="Nome" />
-                <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Telefone" className="rounded-xl" aria-label="Telefone" />
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Nome completo"
+                  className="rounded-xl"
+                  aria-label="Nome"
+                />
+                <Input
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="Telefone"
+                  className="rounded-xl"
+                  aria-label="Telefone"
+                />
               </div>
             </div>
           </div>

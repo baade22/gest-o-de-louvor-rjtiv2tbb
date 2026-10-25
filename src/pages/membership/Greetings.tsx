@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import type { Church } from '@/types'
 import type { Celebration, CelebrationKind } from '@/lib/membership'
-import { GREETING_FIELDS, DEFAULT_GREETINGS, greetedToday, greetingTemplate, renderGreeting } from '@/lib/greetings'
+import {
+  GREETING_FIELDS,
+  DEFAULT_GREETINGS,
+  greetedToday,
+  greetingTemplate,
+  renderGreeting,
+} from '@/lib/greetings'
 import { waLink } from '@/lib/whatsapp'
 import { getChurchForDocs } from '@/services/churchDocs'
 import { listContactsOn, registerGreeting, saveGreetings } from '@/services/greetings'
@@ -107,7 +113,12 @@ export function GreetButton({
   )
 }
 
-const KINDS: Array<{ kind: CelebrationKind; label: string; field: 'greeting_birthday' | 'greeting_wedding'; years: number }> = [
+const KINDS: Array<{
+  kind: CelebrationKind
+  label: string
+  field: 'greeting_birthday' | 'greeting_wedding'
+  years: number
+}> = [
   { kind: 'NASCIMENTO', label: 'Aniversário', field: 'greeting_birthday', years: 36 },
   { kind: 'CASAMENTO', label: 'Aniversário de casamento', field: 'greeting_wedding', years: 12 },
 ]
@@ -141,14 +152,24 @@ export function GreetingSettingsDialog({
     try {
       // Igual ao padrão fica vazio, para acompanhar melhorias futuras do texto padrão
       const updated = await saveGreetings(church.id, {
-        greeting_birthday: texts.greeting_birthday.trim() === DEFAULT_GREETINGS.NASCIMENTO ? '' : texts.greeting_birthday.trim(),
-        greeting_wedding: texts.greeting_wedding.trim() === DEFAULT_GREETINGS.CASAMENTO ? '' : texts.greeting_wedding.trim(),
+        greeting_birthday:
+          texts.greeting_birthday.trim() === DEFAULT_GREETINGS.NASCIMENTO
+            ? ''
+            : texts.greeting_birthday.trim(),
+        greeting_wedding:
+          texts.greeting_wedding.trim() === DEFAULT_GREETINGS.CASAMENTO
+            ? ''
+            : texts.greeting_wedding.trim(),
       })
       onSaved(updated)
       toast({ title: 'Mensagens salvas' })
       onOpenChange(false)
     } catch (err) {
-      toast({ title: 'Erro ao salvar', description: errorMessage(err, 'Tente novamente.'), variant: 'destructive' })
+      toast({
+        title: 'Erro ao salvar',
+        description: errorMessage(err, 'Tente novamente.'),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
@@ -160,7 +181,8 @@ export function GreetingSettingsDialog({
         <DialogHeader>
           <DialogTitle>Mensagens de parabéns</DialogTitle>
           <DialogDescription>
-            O texto já vai pronto no WhatsApp; dá para mudar antes de enviar. Toque num campo para incluir.
+            O texto já vai pronto no WhatsApp; dá para mudar antes de enviar. Toque num campo para
+            incluir.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
@@ -191,7 +213,9 @@ export function GreetingSettingsDialog({
                     key={f.token}
                     type="button"
                     title={f.label}
-                    onClick={() => setTexts((t) => ({ ...t, [field]: `${t[field]} ${f.token}`.trim() }))}
+                    onClick={() =>
+                      setTexts((t) => ({ ...t, [field]: `${t[field]} ${f.token}`.trim() }))
+                    }
                     className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-mono text-slate-600 hover:border-teal-300"
                   >
                     {f.token}
@@ -199,7 +223,11 @@ export function GreetingSettingsDialog({
                 ))}
               </div>
               <p className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs text-emerald-900 whitespace-pre-line">
-                {renderGreeting(texts[field] || DEFAULT_GREETINGS[kind], { person: { name: 'Maria Souza' }, years }, church.name)}
+                {renderGreeting(
+                  texts[field] || DEFAULT_GREETINGS[kind],
+                  { person: { name: 'Maria Souza' }, years },
+                  church.name,
+                )}
               </p>
             </div>
           ))}
@@ -208,7 +236,11 @@ export function GreetingSettingsDialog({
           <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button className="rounded-xl bg-teal-700 hover:bg-teal-800" onClick={save} disabled={saving}>
+          <Button
+            className="rounded-xl bg-teal-700 hover:bg-teal-800"
+            onClick={save}
+            disabled={saving}
+          >
             {saving ? 'Salvando...' : 'Salvar'}
           </Button>
         </DialogFooter>

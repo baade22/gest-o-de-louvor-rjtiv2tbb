@@ -42,11 +42,15 @@ function EventCard({
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-start gap-2">
-          <h3 className="font-bold text-slate-900 group-hover:text-teal-800 truncate">{event.title}</h3>
+          <h3 className="font-bold text-slate-900 group-hover:text-teal-800 truncate">
+            {event.title}
+          </h3>
           {!past && (
             <span
               className={`ml-auto shrink-0 text-[11px] font-semibold rounded-full px-2 py-0.5 ${
-                event.registration_open ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                event.registration_open
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : 'bg-slate-100 text-slate-600'
               }`}
             >
               {event.registration_open ? 'Inscrições abertas' : 'Inscrições fechadas'}
@@ -142,7 +146,9 @@ export default function ChurchEvents() {
           ))}
         </div>
       ) : loadError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">{loadError}</div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+          {loadError}
+        </div>
       ) : events.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-2">
           <CalendarPlus className="h-10 w-10 text-slate-400 mx-auto" />
@@ -155,7 +161,9 @@ export default function ChurchEvents() {
         <>
           <section className="space-y-3">
             <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Próximos</h2>
-            {upcoming.length === 0 && <p className="text-sm text-slate-500">Nenhum evento marcado.</p>}
+            {upcoming.length === 0 && (
+              <p className="text-sm text-slate-500">Nenhum evento marcado.</p>
+            )}
             <div className="grid lg:grid-cols-2 gap-3">
               {upcoming.map((e) => (
                 <EventCard key={e.id} event={e} regs={regsByEvent.get(e.id) || []} past={false} />
@@ -164,7 +172,9 @@ export default function ChurchEvents() {
           </section>
           {past.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Já aconteceram</h2>
+              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
+                Já aconteceram
+              </h2>
               <div className="grid lg:grid-cols-2 gap-3">
                 {past.map((e) => (
                   <EventCard key={e.id} event={e} regs={regsByEvent.get(e.id) || []} past />

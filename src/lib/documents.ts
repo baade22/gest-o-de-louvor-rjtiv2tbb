@@ -64,7 +64,12 @@ export function transferLetterBody({ person, church, destination, extra }: Lette
   ]
 }
 
-export function recommendationLetterBody({ person, church, destination, extra }: LetterInput): string[] {
+export function recommendationLetterBody({
+  person,
+  church,
+  destination,
+  extra,
+}: LetterInput): string[] {
   const to = destination.trim() ? `à ${destination.trim()}` : 'a quem possa interessar'
   return [
     `A ${church.name} recomenda ${to} ${brother(person)} ${person.name}, ${sinceClause(person)}.`,

@@ -2,14 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { listPeople, listStatusChanges } from '@/services/people'
 import type { Person, PersonEvent, PersonStatus } from '@/types'
+import { REPORTS, buildReport, reportTitle, toCSV, type ReportId } from '@/lib/reports'
 import {
-  REPORTS,
-  buildReport,
-  reportTitle,
-  toCSV,
-  type ReportId,
-} from '@/lib/reports'
-import { CONGREGATIONS, MONTH_NAMES, PERSON_STATUS_LABELS, PERSON_STATUS_ORDER } from '@/lib/membership'
+  CONGREGATIONS,
+  MONTH_NAMES,
+  PERSON_STATUS_LABELS,
+  PERSON_STATUS_ORDER,
+} from '@/lib/membership'
 import { getLocalTodayYMD, parseCalendarDate } from '@/lib/dateUtils'
 import { Download, FileBarChart, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -59,7 +58,8 @@ export default function Reports() {
 
   const opts = { congregation, statuses, month, year, todayYMD: today }
   const table = useMemo(
-    () => buildReport(report, people, events, { congregation, statuses, month, year, todayYMD: today }),
+    () =>
+      buildReport(report, people, events, { congregation, statuses, month, year, todayYMD: today }),
     [report, people, events, congregation, statuses, month, year, today],
   )
   const title = reportTitle(report, opts)
@@ -73,7 +73,11 @@ export default function Reports() {
     const a = document.createElement('a')
     const cong = congregation === 'TODAS' ? '' : `-${congregation}`
     a.href = url
-    a.download = `${title}${cong}.csv`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9.]+/g, '-')
+    a.download = `${title}${cong}.csv`
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9.]+/g, '-')
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -85,8 +89,12 @@ export default function Reports() {
     <div className="space-y-6 print:space-y-3">
       {wide && <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>}
       <div className="no-print">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Relatórios</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Escolha o relatório, filtre, e imprima ou baixe para o Excel.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Relatórios
+        </h1>
+        <p className="text-sm text-slate-500 mt-0.5">
+          Escolha o relatório, filtre, e imprima ou baixe para o Excel.
+        </p>
       </div>
 
       <div className="no-print grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -96,10 +104,16 @@ export default function Reports() {
             type="button"
             onClick={() => setReport(r.id)}
             className={`text-left rounded-2xl border p-3 transition-colors ${
-              report === r.id ? 'bg-teal-50 border-teal-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              report === r.id
+                ? 'bg-teal-50 border-teal-300'
+                : 'bg-white border-slate-200 hover:border-slate-300'
             }`}
           >
-            <p className={`text-sm font-semibold ${report === r.id ? 'text-teal-900' : 'text-slate-900'}`}>{r.label}</p>
+            <p
+              className={`text-sm font-semibold ${report === r.id ? 'text-teal-900' : 'text-slate-900'}`}
+            >
+              {r.label}
+            </p>
             <p className="text-xs text-slate-500 mt-0.5">{r.hint}</p>
           </button>
         ))}
@@ -158,11 +172,20 @@ export default function Reports() {
           </div>
         )}
         <div className="ml-auto flex gap-2">
-          <Button variant="outline" className="rounded-xl gap-1.5" onClick={() => window.print()} disabled={!table.rows.length}>
+          <Button
+            variant="outline"
+            className="rounded-xl gap-1.5"
+            onClick={() => window.print()}
+            disabled={!table.rows.length}
+          >
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>
-          <Button className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800" onClick={download} disabled={!table.rows.length}>
+          <Button
+            className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
+            onClick={download}
+            disabled={!table.rows.length}
+          >
             <Download className="h-4 w-4" />
             Baixar CSV (Excel)
           </Button>
@@ -172,7 +195,9 @@ export default function Reports() {
       {isLoading ? (
         <Skeleton className="h-64 rounded-2xl" />
       ) : loadError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">{loadError}</div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+          {loadError}
+        </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs print:border-0 print:shadow-none print:p-[10mm]">
           <div className="px-4 py-3 border-b border-slate-100 flex items-baseline gap-3 print:px-0">
@@ -194,7 +219,10 @@ export default function Reports() {
                 <thead>
                   <tr className="bg-slate-50 text-left">
                     {table.columns.map((c) => (
-                      <th key={c} className="px-3 py-2 print:px-1.5 print:py-1 font-semibold text-slate-600 whitespace-nowrap">
+                      <th
+                        key={c}
+                        className="px-3 py-2 print:px-1.5 print:py-1 font-semibold text-slate-600 whitespace-nowrap"
+                      >
                         {c}
                       </th>
                     ))}
@@ -204,9 +232,12 @@ export default function Reports() {
                   {table.rows.map((row, i) => (
                     <tr key={i} className="break-inside-avoid">
                       {row.map((cell, j) => (
-                        <td key={j} className={`px-3 py-1.5 print:px-1.5 print:py-0.5 text-slate-800 ${j === 0 ? 'font-medium' : ''} ${
+                        <td
+                          key={j}
+                          className={`px-3 py-1.5 print:px-1.5 print:py-0.5 text-slate-800 ${j === 0 ? 'font-medium' : ''} ${
                             j > 0 && j < row.length - 1 ? 'print:whitespace-nowrap' : ''
-                          }`}>
+                          }`}
+                        >
                           {cell}
                         </td>
                       ))}

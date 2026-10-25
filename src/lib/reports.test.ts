@@ -21,9 +21,21 @@ const opts: ReportOptions = {
 }
 
 const people = [
-  person({ id: 'a', name: 'Ana', phone: '81 9999-0000', birth_date: '1989-10-27', congregation: 'Aldeia' }),
+  person({
+    id: 'a',
+    name: 'Ana',
+    phone: '81 9999-0000',
+    birth_date: '1989-10-27',
+    congregation: 'Aldeia',
+  }),
   person({ id: 'b', name: 'Bruno', status: 'CONGREGADO', congregation: 'Diamante' }),
-  person({ id: 'c', name: 'Caio', status: 'VISITANTE', phone: '81 1111-2222', created: '2026-09-10 10:00:00.000Z' }),
+  person({
+    id: 'c',
+    name: 'Caio',
+    status: 'VISITANTE',
+    phone: '81 1111-2222',
+    created: '2026-09-10 10:00:00.000Z',
+  }),
   person({ id: 'd', name: 'Davi', status: 'TRANSFERIDO', congregation: 'Aldeia' }),
 ]
 
@@ -58,9 +70,18 @@ describe('relatórios', () => {
   })
 
   it('movimentação mostra quem saiu mesmo fora do filtro de situação', () => {
-    const rows = buildReport('movimentacao', people, [ev({}), ev({ id: 'x', date: '2025-01-01' })], opts).rows
-    expect(rows).toEqual([['03/05/2026', 'Davi', 'Membro', 'Transferido', 'Transferência enviada', '']])
-    expect(buildReport('movimentacao', people, [ev({})], { ...opts, congregation: 'Diamante' }).rows).toEqual([])
+    const rows = buildReport(
+      'movimentacao',
+      people,
+      [ev({}), ev({ id: 'x', date: '2025-01-01' })],
+      opts,
+    ).rows
+    expect(rows).toEqual([
+      ['03/05/2026', 'Davi', 'Membro', 'Transferido', 'Transferência enviada', ''],
+    ])
+    expect(
+      buildReport('movimentacao', people, [ev({})], { ...opts, congregation: 'Diamante' }).rows,
+    ).toEqual([])
   })
 
   it('visitantes do ano e fichas incompletas', () => {
@@ -78,7 +99,13 @@ describe('relatórios', () => {
 
 describe('CSV', () => {
   it('usa ponto e vírgula, BOM e aspas quando precisa', () => {
-    const csv = toCSV({ columns: ['Nome', 'Obs'], rows: [['Ana', 'diz "oi"; tchau'], ['Bia', 'linha\noutra']] })
+    const csv = toCSV({
+      columns: ['Nome', 'Obs'],
+      rows: [
+        ['Ana', 'diz "oi"; tchau'],
+        ['Bia', 'linha\noutra'],
+      ],
+    })
     expect(csv).toBe('﻿Nome;Obs\r\nAna;"diz ""oi""; tchau"\r\nBia;"linha\noutra"')
   })
 })

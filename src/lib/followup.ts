@@ -10,9 +10,17 @@ export const FOLLOWUP_STAGES: Array<{
   label: string
   hint: string
 }> = [
-  { id: 'PRIMEIRA_VISITA', label: '1ª visita', hint: 'Veio pela primeira vez; ainda ninguém falou com a pessoa.' },
+  {
+    id: 'PRIMEIRA_VISITA',
+    label: '1ª visita',
+    hint: 'Veio pela primeira vez; ainda ninguém falou com a pessoa.',
+  },
   { id: 'CONTATO', label: 'Contato feito', hint: 'Alguém ligou, mandou mensagem ou visitou.' },
-  { id: 'RETORNO', label: 'Voltou', hint: 'Voltou a outros cultos; convide para célula ou classe.' },
+  {
+    id: 'RETORNO',
+    label: 'Voltou',
+    hint: 'Voltou a outros cultos; convide para célula ou classe.',
+  },
   { id: 'INTEGRADO', label: 'Integrado', hint: 'Já faz parte; atualize a situação na ficha.' },
 ]
 
@@ -78,8 +86,17 @@ export function boardColumns(people: Person[], todayYMD: string, filter: BoardFi
     const stage = effectiveStage(p)
     if (!stage) continue
     if (p.status === 'FALECIDO' || p.status === 'TRANSFERIDO') continue
-    if (filter.congregation && filter.congregation !== 'TODAS' && (p.congregation || '') !== filter.congregation) continue
-    if (filter.ownerId && (filter.ownerId === 'NINGUEM' ? !!p.followup_owner : p.followup_owner !== filter.ownerId)) continue
+    if (
+      filter.congregation &&
+      filter.congregation !== 'TODAS' &&
+      (p.congregation || '') !== filter.congregation
+    )
+      continue
+    if (
+      filter.ownerId &&
+      (filter.ownerId === 'NINGUEM' ? !!p.followup_owner : p.followup_owner !== filter.ownerId)
+    )
+      continue
     if (filter.onlyStale && !isStale(p, todayYMD)) continue
     columns[stage].push(p)
   }

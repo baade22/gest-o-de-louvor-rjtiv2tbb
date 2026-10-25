@@ -51,7 +51,8 @@ export function memberRows(members: GroupMember[], peopleById: Map<string, Perso
     .filter((r): r is MemberRow => !!r.person)
     .sort(
       (a, b) =>
-        rank(a.member.role) - rank(b.member.role) || a.person.name.localeCompare(b.person.name, 'pt-BR'),
+        rank(a.member.role) - rank(b.member.role) ||
+        a.person.name.localeCompare(b.person.name, 'pt-BR'),
     )
 }
 
@@ -76,7 +77,10 @@ export function suggestVolunteers(
     .filter((p) => !group.congregation || !p.congregation || p.congregation === group.congregation)
     .map((person) => ({ person, matched: wanted.filter((s) => (person.skills || []).includes(s)) }))
     .filter((s) => s.matched.length > 0)
-    .sort((a, b) => b.matched.length - a.matched.length || a.person.name.localeCompare(b.person.name, 'pt-BR'))
+    .sort(
+      (a, b) =>
+        b.matched.length - a.matched.length || a.person.name.localeCompare(b.person.name, 'pt-BR'),
+    )
 }
 
 /** Grupos de que a pessoa participa, com o papel dela em cada um. */

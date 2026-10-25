@@ -21,7 +21,10 @@ export function isFree(event: Pick<ChurchEvent, 'price'>): boolean {
 }
 
 /** Evento já passou (conta o último dia, se tiver data de término). */
-export function isPastEvent(event: Pick<ChurchEvent, 'starts_on' | 'ends_on'>, todayYMD: string): boolean {
+export function isPastEvent(
+  event: Pick<ChurchEvent, 'starts_on' | 'ends_on'>,
+  todayYMD: string,
+): boolean {
   const last = toCalendarYMD(event.ends_on) || toCalendarYMD(event.starts_on)
   return !!last && last < todayYMD
 }
@@ -95,8 +98,23 @@ export function filterRegistrations(
 }
 
 /** "20 a 22 de nov." ou "20 de nov. · 19:30" para cartões e cabeçalhos. */
-export function eventDateLabel(event: Pick<ChurchEvent, 'starts_on' | 'ends_on' | 'start_time'>): string {
-  const months = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.']
+export function eventDateLabel(
+  event: Pick<ChurchEvent, 'starts_on' | 'ends_on' | 'start_time'>,
+): string {
+  const months = [
+    'jan.',
+    'fev.',
+    'mar.',
+    'abr.',
+    'mai.',
+    'jun.',
+    'jul.',
+    'ago.',
+    'set.',
+    'out.',
+    'nov.',
+    'dez.',
+  ]
   const s = toCalendarYMD(event.starts_on)
   if (!s) return ''
   const [, sm, sd] = s.split('-').map(Number)
@@ -104,7 +122,10 @@ export function eventDateLabel(event: Pick<ChurchEvent, 'starts_on' | 'ends_on' 
   let label = `${sd} de ${months[sm - 1]}`
   if (e && e !== s) {
     const [, em, ed] = e.split('-').map(Number)
-    label = em === sm ? `${sd} a ${ed} de ${months[sm - 1]}` : `${sd} de ${months[sm - 1]} a ${ed} de ${months[em - 1]}`
+    label =
+      em === sm
+        ? `${sd} a ${ed} de ${months[sm - 1]}`
+        : `${sd} de ${months[sm - 1]} a ${ed} de ${months[em - 1]}`
   }
   return event.start_time ? `${label} · ${event.start_time}` : label
 }

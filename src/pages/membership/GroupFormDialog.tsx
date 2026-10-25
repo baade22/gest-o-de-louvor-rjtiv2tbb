@@ -81,7 +81,12 @@ export function GroupFormDialog({
   const set = <K extends keyof ChurchGroupPayload>(key: K, value: ChurchGroupPayload[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
   const toggleSkill = (s: PersonSkill) =>
-    set('skills', (form.skills || []).includes(s) ? form.skills!.filter((x) => x !== s) : [...(form.skills || []), s])
+    set(
+      'skills',
+      (form.skills || []).includes(s)
+        ? form.skills!.filter((x) => x !== s)
+        : [...(form.skills || []), s],
+    )
   const leader = people.find((p) => p.id === form.leader_id)
   const templates = GROUP_TEMPLATES.filter((t) => !existingNames.includes(t.name))
 
@@ -89,12 +94,19 @@ export function GroupFormDialog({
     if (!form.name.trim()) return
     setSaving(true)
     try {
-      const saved = await saveGroup(churchId, group?.id || null, { ...form, name: form.name.trim() })
+      const saved = await saveGroup(churchId, group?.id || null, {
+        ...form,
+        name: form.name.trim(),
+      })
       toast({ title: group ? 'Grupo atualizado' : 'Grupo criado' })
       onSaved(saved)
       onOpenChange(false)
     } catch (err) {
-      toast({ title: 'Erro ao salvar', description: errorMessage(err, 'Tente novamente.'), variant: 'destructive' })
+      toast({
+        title: 'Erro ao salvar',
+        description: errorMessage(err, 'Tente novamente.'),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
@@ -115,7 +127,9 @@ export function GroupFormDialog({
                   <button
                     key={t.name}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, name: t.name, kind: t.kind, skills: t.skills }))}
+                    onClick={() =>
+                      setForm((f) => ({ ...f, name: t.name, kind: t.kind, skills: t.skills }))
+                    }
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                       form.name === t.name
                         ? 'bg-teal-50 border-teal-300 text-teal-800'
@@ -159,7 +173,10 @@ export function GroupFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">Congregação</Label>
-              <Select value={form.congregation || 'TODAS'} onValueChange={(v) => set('congregation', v === 'TODAS' ? '' : v)}>
+              <Select
+                value={form.congregation || 'TODAS'}
+                onValueChange={(v) => set('congregation', v === 'TODAS' ? '' : v)}
+              >
                 <SelectTrigger className="rounded-xl border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
@@ -193,12 +210,20 @@ export function GroupFormDialog({
             {leader ? (
               <div className="flex items-center justify-between rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm">
                 <span className="font-semibold text-teal-900">{leader.name}</span>
-                <button type="button" className="text-xs text-teal-700 underline" onClick={() => set('leader_id', '')}>
+                <button
+                  type="button"
+                  className="text-xs text-teal-700 underline"
+                  onClick={() => set('leader_id', '')}
+                >
                   trocar
                 </button>
               </div>
             ) : (
-              <PersonPicker id="group-leader" people={people} onPick={(p) => set('leader_id', p.id)} />
+              <PersonPicker
+                id="group-leader"
+                people={people}
+                onPick={(p) => set('leader_id', p.id)}
+              />
             )}
           </div>
           <div className="space-y-1.5">
@@ -216,7 +241,9 @@ export function GroupFormDialog({
                     aria-pressed={on}
                     onClick={() => toggleSkill(s)}
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                      on ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-white border-slate-200 text-slate-500'
+                      on
+                        ? 'bg-teal-50 border-teal-300 text-teal-800'
+                        : 'bg-white border-slate-200 text-slate-500'
                     }`}
                   >
                     {SKILL_LABELS[s]}

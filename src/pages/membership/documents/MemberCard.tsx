@@ -5,18 +5,29 @@ import { PERSON_STATUS_LABELS } from '@/lib/membership'
 import { formatCalendarDateDisplay } from '@/lib/dateUtils'
 
 // Tamanho de cartão de crédito (ISO 7810 ID-1)
-const CARD = 'font-sans w-[85.6mm] h-[54mm] rounded-[3mm] overflow-hidden border border-slate-300 bg-white relative shrink-0'
+const CARD =
+  'font-sans w-[85.6mm] h-[54mm] rounded-[3mm] overflow-hidden border border-slate-300 bg-white relative shrink-0'
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+  return (
+    (parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  ).toUpperCase()
 }
 
 function date(d?: string) {
   return d ? formatCalendarDateDisplay(d, 'numeric') : '—'
 }
 
-export function MemberCardFront({ person, church, token }: { person: Person; church: Church; token: string }) {
+export function MemberCardFront({
+  person,
+  church,
+  token,
+}: {
+  person: Person
+  church: Church
+  token: string
+}) {
   const photo = personPhotoUrl(person, token, false)
   return (
     <div className={CARD}>
@@ -31,7 +42,11 @@ export function MemberCardFront({ person, church, token }: { person: Person; chu
       </div>
       <div className="flex gap-[3.5mm] px-[4mm] pt-[3mm]">
         {photo ? (
-          <img src={photo} alt="" className="h-[28mm] w-[22mm] object-cover rounded-[1.5mm] border border-slate-200" />
+          <img
+            src={photo}
+            alt=""
+            className="h-[28mm] w-[22mm] object-cover rounded-[1.5mm] border border-slate-200"
+          />
         ) : (
           <div className="h-[28mm] w-[22mm] rounded-[1.5mm] bg-teal-50 border border-teal-100 text-teal-800 font-bold text-[7mm] flex items-center justify-center">
             {initials(person.name)}
@@ -45,7 +60,9 @@ export function MemberCardFront({ person, church, token }: { person: Person; chu
           <div className="flex gap-[4mm]">
             <div>
               <p className="text-[2.2mm] uppercase text-slate-500">Situação</p>
-              <p className="text-[2.9mm] font-semibold text-slate-800">{PERSON_STATUS_LABELS[person.status]}</p>
+              <p className="text-[2.9mm] font-semibold text-slate-800">
+                {PERSON_STATUS_LABELS[person.status]}
+              </p>
             </div>
             {person.roll_number && (
               <div>
@@ -88,7 +105,9 @@ export function MemberCardBack({ person, church }: { person: Person; church: Chu
         </div>
         <div>
           <p className="text-[2.2mm] uppercase text-slate-500">Congregação</p>
-          <p className="text-[2.9mm] font-semibold text-slate-800 truncate">{person.congregation || '—'}</p>
+          <p className="text-[2.9mm] font-semibold text-slate-800 truncate">
+            {person.congregation || '—'}
+          </p>
         </div>
       </div>
       <div className="absolute left-[4mm] right-[4mm] bottom-[4mm]">

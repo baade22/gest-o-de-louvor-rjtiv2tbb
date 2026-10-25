@@ -115,7 +115,8 @@ export default function PublicSignup() {
     if (!form.phone.trim() && !form.email.trim()) {
       return setError('Informe um telefone ou um e-mail para a igreja falar com você.')
     }
-    if (!form.relationship) return setError('Conte se está visitando, se frequenta ou se já é membro.')
+    if (!form.relationship)
+      return setError('Conte se está visitando, se frequenta ou se já é membro.')
     if (!consent) return setError('Marque a autorização no fim do formulário.')
     setSending(true)
     try {
@@ -162,7 +163,8 @@ export default function PublicSignup() {
           </div>
           <h1 className="text-xl font-bold text-slate-900">Obrigado, {first}!</h1>
           <p className="text-slate-600">
-            Seu cadastro chegou para a secretaria da {info.church_name}. Que bom ter você com a gente.
+            Seu cadastro chegou para a secretaria da {info.church_name}. Que bom ter você com a
+            gente.
           </p>
         </div>
       </div>
@@ -199,7 +201,11 @@ export default function PublicSignup() {
             />
           </Field>
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field id="su-phone" label="Telefone / WhatsApp" hint="Telefone ou e-mail: pelo menos um.">
+            <Field
+              id="su-phone"
+              label="Telefone / WhatsApp"
+              hint="Telefone ou e-mail: pelo menos um."
+            >
               <Input
                 id="su-phone"
                 type="tel"
@@ -389,7 +395,10 @@ export default function PublicSignup() {
         </label>
 
         {error && (
-          <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+          <p
+            role="alert"
+            className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3"
+          >
             {error}
           </p>
         )}

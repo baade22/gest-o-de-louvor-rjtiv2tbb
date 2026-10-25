@@ -59,7 +59,9 @@ function Sheet({ children }: { children: React.ReactNode }) {
 export default function PersonDocuments() {
   const { id = '' } = useParams<{ id: string }>()
   const [params, setParams] = useSearchParams()
-  const kind = (KINDS.includes(params.get('tipo') as DocumentKind) ? params.get('tipo') : 'carteirinha') as DocumentKind
+  const kind = (
+    KINDS.includes(params.get('tipo') as DocumentKind) ? params.get('tipo') : 'carteirinha'
+  ) as DocumentKind
   const { currentChurch } = useAuth()
   const token = usePhotoToken()
   const today = getLocalTodayYMD()
@@ -99,14 +101,22 @@ export default function PersonDocuments() {
   return (
     <div className="min-h-screen bg-slate-100 print:bg-white print:min-h-0">
       {/* O certificado sai em paisagem; esta regra vem depois da padrão (retrato) e a substitui */}
-      {kind === 'batismo' && <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>}
+      {kind === 'batismo' && (
+        <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>
+      )}
       <div className="no-print max-w-[210mm] mx-auto px-4 py-5 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Link to={`/membros/${person.id}`} className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
+          <Link
+            to={`/membros/${person.id}`}
+            className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
+          >
             <ArrowLeft className="h-4 w-4" />
             {person.name}
           </Link>
-          <Button onClick={() => window.print()} className="ml-auto rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800">
+          <Button
+            onClick={() => window.print()}
+            className="ml-auto rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
+          >
             <Printer className="h-4 w-4" />
             Imprimir ou salvar PDF
           </Button>
@@ -118,7 +128,9 @@ export default function PersonDocuments() {
               type="button"
               onClick={() => setParams({ tipo: k })}
               className={`h-9 px-3 rounded-xl border text-sm font-medium ${
-                kind === k ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-white border-slate-200 text-slate-600'
+                kind === k
+                  ? 'bg-teal-50 border-teal-300 text-teal-800'
+                  : 'bg-white border-slate-200 text-slate-600'
               }`}
             >
               {DOCUMENT_LABELS[k]}
@@ -173,18 +185,28 @@ export default function PersonDocuments() {
           <div className="print-sheet bg-white shadow-lg mx-auto w-[297mm] h-[210mm] overflow-hidden">
             <div className="h-full p-[10mm]">
               <div className="h-full border-[1.5mm] border-double border-teal-700 rounded-[3mm] flex flex-col items-center justify-center text-center px-[25mm] font-serif text-slate-900">
-                <p className="text-[4mm] uppercase tracking-[0.35em] text-teal-800">{church.name}</p>
-                <h1 className="text-[13mm] font-bold mt-[6mm] text-teal-900">Certificado de Batismo</h1>
-                <p className="text-[5mm] leading-relaxed mt-[8mm] max-w-[210mm]">{baptismCertificateText(person, church)}</p>
+                <p className="text-[4mm] uppercase tracking-[0.35em] text-teal-800">
+                  {church.name}
+                </p>
+                <h1 className="text-[13mm] font-bold mt-[6mm] text-teal-900">
+                  Certificado de Batismo
+                </h1>
+                <p className="text-[5mm] leading-relaxed mt-[8mm] max-w-[210mm]">
+                  {baptismCertificateText(person, church)}
+                </p>
                 <p className="text-[4mm] italic text-slate-600 mt-[6mm]">
-                  "Portanto, ide, fazei discípulos de todas as nações, batizando-os em nome do Pai, e do Filho, e do
-                  Espírito Santo." Mateus 28:19
+                  "Portanto, ide, fazei discípulos de todas as nações, batizando-os em nome do Pai,
+                  e do Filho, e do Espírito Santo." Mateus 28:19
                 </p>
                 <div className="mt-[14mm] w-[90mm] border-t border-slate-800 pt-[1.5mm]">
                   <p className="text-[4mm] font-semibold">{church.doc_signer_name || ' '}</p>
-                  <p className="text-[3.4mm] text-slate-600">{church.doc_signer_title || 'Pastor'}</p>
+                  <p className="text-[3.4mm] text-slate-600">
+                    {church.doc_signer_title || 'Pastor'}
+                  </p>
                 </div>
-                <p className="text-[3.4mm] text-slate-500 mt-[4mm]">{placeAndDate(church.doc_city, today)}</p>
+                <p className="text-[3.4mm] text-slate-500 mt-[4mm]">
+                  {placeAndDate(church.doc_city, today)}
+                </p>
               </div>
             </div>
           </div>

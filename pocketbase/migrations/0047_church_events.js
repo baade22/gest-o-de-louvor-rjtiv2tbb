@@ -36,7 +36,8 @@ migrate(
         listRule: ADMIN_OF_CHURCH,
         viewRule: ADMIN_OF_CHURCH,
         createRule: ADMIN_OF_CHURCH,
-        updateRule: ADMIN_OF_CHURCH + ' && ' + KEEP_CHURCH + ' && @request.body.public_key:isset = false',
+        updateRule:
+          ADMIN_OF_CHURCH + ' && ' + KEEP_CHURCH + ' && @request.body.public_key:isset = false',
         deleteRule: ADMIN_OF_CHURCH,
         fields: [
           {
@@ -60,7 +61,14 @@ migrate(
           { name: 'capacity', type: 'number', min: 0, onlyInt: true },
           { name: 'payment_info', type: 'text', max: 500 },
           { name: 'registration_open', type: 'bool' },
-          { name: 'public_key', type: 'text', required: true, min: 20, max: 40, pattern: '^[A-Za-z0-9]+$' },
+          {
+            name: 'public_key',
+            type: 'text',
+            required: true,
+            min: 20,
+            max: 40,
+            pattern: '^[A-Za-z0-9]+$',
+          },
           { name: 'created_by', type: 'relation', collectionId: users.id, maxSelect: 1 },
           { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
           { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
@@ -154,7 +162,8 @@ migrate(
     const settings = app.settings()
     const rules = Array.isArray(settings.rateLimits.rules) ? settings.rateLimits.rules : []
     settings.rateLimits.rules = rules.filter(
-      (r) => r.label !== 'POST /backend/v1/event-signup' && r.label !== '/backend/v1/event-signup/info',
+      (r) =>
+        r.label !== 'POST /backend/v1/event-signup' && r.label !== '/backend/v1/event-signup/info',
     )
     app.save(settings)
   },
