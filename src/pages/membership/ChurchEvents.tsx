@@ -45,16 +45,26 @@ function EventCard({
           <h3 className="font-bold text-slate-900 group-hover:text-teal-800 truncate">
             {event.title}
           </h3>
-          {!past && (
-            <span
-              className={`ml-auto shrink-0 text-[11px] font-semibold rounded-full px-2 py-0.5 ${
-                event.registration_open
-                  ? 'bg-emerald-50 text-emerald-800'
-                  : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {event.registration_open ? 'Inscrições abertas' : 'Inscrições fechadas'}
+          {event.closed_at ? (
+            <span className="ml-auto shrink-0 text-[11px] font-semibold rounded-full px-2 py-0.5 bg-slate-100 text-slate-600">
+              Encerrado
             </span>
+          ) : (
+            !past && (
+              <span
+                className={`ml-auto shrink-0 text-[11px] font-semibold rounded-full px-2 py-0.5 ${
+                  event.registration_open && !event.publish_only
+                    ? 'bg-emerald-50 text-emerald-800'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {event.publish_only
+                  ? 'Só divulgação'
+                  : event.registration_open
+                    ? 'Inscrições abertas'
+                    : 'Inscrições fechadas'}
+              </span>
+            )
           )}
         </div>
         <p className="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -65,7 +75,11 @@ function EventCard({
               {event.location}
             </span>
           )}
-          <span>{isFree(event) ? 'Gratuito' : formatBRL(event.price!)}</span>
+          <span>
+            {isFree(event)
+              ? 'Gratuito'
+              : `${formatBRL(event.price!)}${event.couple_only ? ' por casal' : ''}`}
+          </span>
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700 pt-0.5">
           <span className="flex items-center gap-1">

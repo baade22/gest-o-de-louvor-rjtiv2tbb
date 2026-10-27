@@ -7,6 +7,7 @@ import {
   deleteRegistration,
   eventSignupUrl,
   getChurchEvent,
+  getRegistration,
   listRegistrations,
   updateChurchEvent,
   updateRegistration,
@@ -19,10 +20,12 @@ import {
   filterRegistrations,
   formatBRL,
   isFree,
+  registrationDue,
   summarizeRegistrations,
   type RegistrationFilter,
 } from '@/lib/churchEvents'
 import { filterPeople } from '@/lib/membership'
+import { fillMessage, messageVarsFor, richToWhatsApp, whatsappUrl } from '@/lib/eventPage'
 import {
   ArrowLeft,
   Check,
@@ -33,8 +36,12 @@ import {
   Download,
   Edit,
   ExternalLink,
+  Landmark,
   Link2,
+  Lock,
+  LockOpen,
   MapPin,
+  MessageCircle,
   Megaphone,
   Search,
   Trash2,
@@ -122,6 +129,7 @@ export default function ChurchEventDetail() {
   const [peopleSearch, setPeopleSearch] = useState('')
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
+  const [newPartner, setNewPartner] = useState('')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -188,6 +196,11 @@ export default function ChurchEventDetail() {
     setRegs((list) => list.map((x) => (x.id === r.id ? { ...x, ...data } : x)))
     try {
       await updateRegistration(r.id, data)
+      // O servidor lança (ou estorna) no Financeiro depois de gravar: busca de novo
+      if ('paid' in data) {
+        const fresh = await getRegistration(r.id)
+        setRegs((list) => list.map((x) => (x.id === r.id ? fresh : x)))
+      }
     } catch (err) {
       setRegs((list) => list.map((x) => (x.id === r.id ? r : x)))
       toast({
@@ -202,8 +215,47 @@ export default function ChurchEventDetail() {
     patchReg(r, {
       paid: true,
       payment_method: method,
-      paid_amount: method === 'ISENTO' ? 0 : event.price || 0,
+      paid_amount: method === 'ISENTO' ? 0 : registrationDue(event, r),
     })
+
+  const whatsappFor = (r: EventRegistration) => {
+    const template =
+      r.paid && r.payment_method !== 'ISENTO' ? event.payment_message : event.confirm_message
+    const text = template
+      ? richToWhatsApp(
+          fillMessage(
+            template,
+            messageVarsFor(
+              event,
+              { name: r.name, amount: registrationDue(event, r) },
+              eventDateLabel(event),
+              currentChurch?.name || '',
+            ),
+          ),
+        )
+      : ''
+    return whatsappUrl(r.phone || '', text)
+  }
+
+  const toggleClosed = async () => {
+    try {
+      setEvent(
+        await updateChurchEvent(
+          event.id,
+          event.closed_at
+            ? { closed_at: '' }
+            : { closed_at: new Date().toISOString().replace('T', ' '), registration_open: false },
+        ),
+      )
+      toast({ title: event.closed_at ? 'Evento reaberto' : 'Evento encerrado' })
+    } catch (err) {
+      toast({
+        title: 'Erro',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
+    }
+  }
 
   const addRegistration = async (data: Parameters<typeof createRegistration>[1]) => {
     setBusy(true)
@@ -214,6 +266,7 @@ export default function ChurchEventDetail() {
       setPeopleSearch('')
       setNewName('')
       setNewPhone('')
+      setNewPartner('')
     } catch (err) {
       toast({
         title: 'Não foi possível inscrever',
@@ -303,11 +356,24 @@ export default function ChurchEventDetail() {
                 {event.location}
               </span>
             )}
-            <span>{free ? 'Gratuito' : `${formatBRL(event.price!)} por pessoa`}</span>
+            <span>
+              {free
+                ? 'Gratuito'
+                : `${formatBRL(event.price!)} ${event.couple_only ? 'por casal' : 'por pessoa'}`}
+            </span>
             {event.congregation && <span>{event.congregation}</span>}
+            {event.closed_at && (
+              <Badge variant="outline" className="text-[11px] bg-slate-100 text-slate-700">
+                Encerrado
+              </Badge>
+            )}
           </p>
         </div>
         <div className="sm:ml-auto flex gap-2 shrink-0">
+          <Button variant="outline" className="rounded-xl gap-1.5" onClick={toggleClosed}>
+            {event.closed_at ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+            {event.closed_at ? 'Reabrir' : 'Encerrar'}
+          </Button>
           <Button
             variant="outline"
             className="rounded-xl gap-1.5"
@@ -458,6 +524,9 @@ export default function ChurchEventDetail() {
                         {r.name}
                       </span>
                     )}
+                    {r.partner_name && (
+                      <span className="text-sm text-slate-600 truncate">e {r.partner_name}</span>
+                    )}
                     {r.source === 'LINK' && (
                       <Badge
                         variant="outline"
@@ -471,8 +540,27 @@ export default function ChurchEventDetail() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    {[r.phone, r.notes].filter(Boolean).join(' · ') || 'sem telefone'}
+                    {[
+                      r.phone,
+                      r.coupon_code &&
+                        `cupom ${r.coupon_code} (${r.amount_due ? formatBRL(r.amount_due) : 'sem custo'})`,
+                      r.notes,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'sem telefone'}
                   </p>
+                  {!free && r.paid && r.payment_method !== 'ISENTO' && !event.skip_finance && (
+                    <p
+                      className={`text-[11px] flex items-center gap-1 ${
+                        r.fin_transaction_id ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      <Landmark className="h-3 w-3" />
+                      {r.fin_transaction_id
+                        ? 'Lançado no Financeiro'
+                        : r.fin_note || 'Ainda não lançado no Financeiro'}
+                    </p>
+                  )}
                 </div>
                 {!free &&
                   (r.paid ? (
@@ -516,6 +604,24 @@ export default function ChurchEventDetail() {
                       </SelectContent>
                     </Select>
                   ))}
+                {r.phone && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
+                    aria-label={`Mandar mensagem no WhatsApp para ${r.name}`}
+                    title={
+                      r.paid && r.payment_method !== 'ISENTO'
+                        ? 'WhatsApp com a mensagem de pagamento'
+                        : 'WhatsApp com a mensagem de inscrição'
+                    }
+                    asChild
+                  >
+                    <a href={whatsappFor(r)} target="_blank" rel="noreferrer noopener">
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
                 <Button
                   size="icon"
                   variant="ghost"
@@ -618,8 +724,9 @@ export default function ChurchEventDetail() {
                 </Button>
               </div>
               <p className="text-xs text-slate-500">
-                Quem se inscreve pelo link entra como "a pagar" (se o evento for pago) e vê as
-                instruções de pagamento no fim.
+                Quem se inscreve pelo link entra como "a pagar" (se o evento for pago) e, no fim, vê
+                a mensagem de confirmação e o Pix com o valor certo. Para mudar capa, cor, textos e
+                mensagens, use Editar.
               </p>
             </div>
           </div>
@@ -635,6 +742,20 @@ export default function ChurchEventDetail() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {event.couple_only && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reg-partner" className="text-xs font-semibold">
+                  Cônjuge (evento para casais)
+                </Label>
+                <Input
+                  id="reg-partner"
+                  value={newPartner}
+                  onChange={(e) => setNewPartner(e.target.value)}
+                  placeholder="Nome do cônjuge"
+                  className="rounded-xl"
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="reg-search" className="text-xs font-semibold">
                 Buscar ficha
@@ -660,6 +781,7 @@ export default function ChurchEventDetail() {
                           person_id: p.id,
                           phone: p.phone || '',
                           email: p.email || '',
+                          partner_name: newPartner.trim(),
                         })
                       }
                       className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-slate-50 disabled:opacity-50 rounded-lg"
@@ -702,7 +824,13 @@ export default function ChurchEventDetail() {
             </Button>
             <Button
               disabled={busy || newName.trim().length < 3}
-              onClick={() => addRegistration({ name: newName.trim(), phone: newPhone.trim() })}
+              onClick={() =>
+                addRegistration({
+                  name: newName.trim(),
+                  phone: newPhone.trim(),
+                  partner_name: newPartner.trim(),
+                })
+              }
               className="bg-teal-700 hover:bg-teal-800"
             >
               Inscrever sem ficha

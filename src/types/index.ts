@@ -559,9 +559,51 @@ export interface ChurchEvent {
   payment_info?: string
   registration_open: boolean
   public_key: string
+  /** Capa para celular (horizontal) e para computador (vertical). */
+  cover?: string
+  cover_side?: string
+  /** Cor do botão e dos destaques da página (#RRGGBB). */
+  color?: string
+  registration_deadline?: string
+  contact_name?: string
+  contact_phone?: string
+  address_cep?: string
+  address_street?: string
+  address_number?: string
+  address_complement?: string
+  address_district?: string
+  address_city?: string
+  address_state?: string
+  /** Página só de divulgação, sem botão de inscrição. */
+  publish_only?: boolean
+  /** Valor só aparece depois da inscrição. */
+  hide_price?: boolean
+  /** Esconde nome da igreja e do evento sobre a capa (quando a arte já traz). */
+  hide_header?: boolean
+  /** Inscrição do casal: o valor é para os dois. */
+  couple_only?: boolean
+  confirm_message?: string
+  payment_message?: string
+  send_confirm_email?: boolean
+  send_payment_email?: boolean
+  coupons?: EventCoupon[] | null
+  /** Não lançar os pagamentos no Financeiro. */
+  skip_finance?: boolean
+  /** Conta do Financeiro que recebe; vazio = o servidor escolhe pela congregação. */
+  fin_account_id?: string
+  closed_at?: string
   created_by?: string
   created: string
   updated: string
+}
+
+export interface EventCoupon {
+  code: string
+  kind: 'PERCENT' | 'VALUE'
+  /** Percentual (0–100) ou valor em reais. */
+  value: number
+  /** Quantas inscrições podem usar (0 = sem limite). */
+  limit?: number
 }
 
 export type PaymentMethod = 'PIX' | 'DINHEIRO' | 'CARTAO' | 'ISENTO' | 'OUTRO'
@@ -581,6 +623,15 @@ export interface EventRegistration {
   paid_amount?: number
   payment_method?: PaymentMethod | ''
   attended: boolean
+  partner_name?: string
+  partner_phone?: string
+  coupon_code?: string
+  /** Valor a pagar (com cupom); vazio = o valor do evento. */
+  amount_due?: number
+  /** Lançamento no Financeiro (gravado pelo servidor). */
+  fin_transaction_id?: string
+  /** Aviso do servidor quando não deu para lançar no Financeiro. */
+  fin_note?: string
   created: string
   updated: string
 }
