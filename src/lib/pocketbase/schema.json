@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T21:34:13.581Z",
+  "generatedAt": "2026-10-27T23:42:53.232Z",
   "collections": [
     {
       "name": "users",
@@ -2894,6 +2894,157 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "cover",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cover_side",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "color",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "registration_deadline",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contact_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contact_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_cep",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_street",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_complement",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_district",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "publish_only",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hide_price",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hide_header",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "couple_only",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "confirm_message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "payment_message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "send_confirm_email",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "send_payment_email",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "coupons",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "skip_finance",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fin_account_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_accounts"
+        },
+        {
+          "name": "closed_at",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -2907,8 +3058,8 @@
       "apiRules": {
         "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
         "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && @request.body.event_id.church_id = @request.body.church_id && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = @request.body.church_id)",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.event_id:isset = false && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id)",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && @request.body.event_id.church_id = @request.body.church_id && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = @request.body.church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.event_id:isset = false && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false",
         "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
       },
       "fields": [
@@ -3016,6 +3167,43 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "partner_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "partner_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "coupon_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "amount_due",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fin_transaction_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "fin_transactions"
+        },
+        {
+          "name": "fin_note",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
