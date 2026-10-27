@@ -41,29 +41,40 @@ export interface RegistrationSummary {
   spotsLeft: number | null
 }
 
+/** Valor que a inscrição deve: o do cupom, se houver, ou o do evento. */
+export function registrationDue(
+  event: Pick<ChurchEvent, 'price'>,
+  reg: Pick<EventRegistration, 'amount_due'>,
+): number {
+  return reg.amount_due && reg.amount_due > 0 ? reg.amount_due : event.price || 0
+}
+
 export function summarizeRegistrations(
   event: Pick<ChurchEvent, 'price' | 'capacity'>,
   regs: EventRegistration[],
 ): RegistrationSummary {
-  const price = event.price || 0
   let paid = 0
+  let pending = 0
   let attended = 0
   let collected = 0
+  let toCollect = 0
   for (const r of regs) {
     if (r.paid) {
       paid++
-      collected += r.payment_method === 'ISENTO' ? 0 : (r.paid_amount ?? price)
+      collected += r.payment_method === 'ISENTO' ? 0 : (r.paid_amount ?? registrationDue(event, r))
+    } else if (!isFree(event)) {
+      pending++
+      toCollect += registrationDue(event, r)
     }
     if (r.attended) attended++
   }
-  const pending = isFree(event) ? 0 : regs.length - paid
   return {
     total: regs.length,
     paid,
     pending,
     attended,
     collected,
-    toCollect: pending * price,
+    toCollect,
     spotsLeft: event.capacity ? Math.max(0, event.capacity - regs.length) : null,
   }
 }
