@@ -1,5 +1,7 @@
 import pb from '@/lib/pocketbase/client'
 import type { ChurchEvent, EventRegistration } from '@/types'
+import type { PixKeyType } from '@/lib/pix'
+import type { ClosedReason } from '@/lib/eventPage'
 import { newSignupKey } from '@/lib/signups'
 
 export type ChurchEventPayload = Pick<
@@ -15,7 +17,32 @@ export type ChurchEventPayload = Pick<
   | 'capacity'
   | 'payment_info'
   | 'registration_open'
+  | 'color'
+  | 'registration_deadline'
+  | 'contact_name'
+  | 'contact_phone'
+  | 'address_cep'
+  | 'address_street'
+  | 'address_number'
+  | 'address_complement'
+  | 'address_district'
+  | 'address_city'
+  | 'address_state'
+  | 'publish_only'
+  | 'hide_price'
+  | 'hide_header'
+  | 'couple_only'
+  | 'confirm_message'
+  | 'payment_message'
+  | 'send_confirm_email'
+  | 'send_payment_email'
+  | 'coupons'
+  | 'skip_finance'
+  | 'fin_account_id'
+  | 'closed_at'
 >
+
+export type CoverField = 'cover' | 'cover_side'
 
 export async function listChurchEvents(churchId: string): Promise<ChurchEvent[]> {
   return pb.collection('church_events').getFullList<ChurchEvent>({
@@ -47,6 +74,29 @@ export async function updateChurchEvent(
   return pb.collection('church_events').update<ChurchEvent>(id, payload)
 }
 
+/** Troca (ou tira, com null) a capa do evento. */
+export async function setEventCover(
+  id: string,
+  field: CoverField,
+  file: File | null,
+): Promise<ChurchEvent> {
+  if (!file) return pb.collection('church_events').update<ChurchEvent>(id, { [field]: null })
+  const form = new FormData()
+  form.append(field, file)
+  return pb.collection('church_events').update<ChurchEvent>(id, form)
+}
+
+export function eventCoverUrl(event: ChurchEvent, field: CoverField, thumb = ''): string {
+  const file = event[field]
+  return file ? pb.files.getURL(event, file, thumb ? { thumb } : undefined) : ''
+}
+
+/** Endereço público de um arquivo devolvido pela rota de inscrição (/api/files/...). */
+export function publicFileUrl(path?: string): string {
+  if (!path) return ''
+  return `${pb.baseURL.replace(/\/$/, '')}${path}`
+}
+
 export async function deleteChurchEvent(id: string): Promise<void> {
   await pb.collection('church_events').delete(id)
 }
@@ -55,7 +105,7 @@ export async function deleteChurchEvent(id: string): Promise<void> {
 export async function listAllRegistrations(churchId: string): Promise<EventRegistration[]> {
   return pb.collection('church_event_registrations').getFullList<EventRegistration>({
     filter: pb.filter('church_id = {:churchId}', { churchId }),
-    fields: 'id,event_id,paid,paid_amount,payment_method,attended',
+    fields: 'id,event_id,paid,paid_amount,payment_method,attended,amount_due',
   })
 }
 
@@ -66,10 +116,19 @@ export async function listRegistrations(eventId: string): Promise<EventRegistrat
   })
 }
 
+export async function getRegistration(id: string): Promise<EventRegistration> {
+  return pb.collection('church_event_registrations').getOne<EventRegistration>(id)
+}
+
 export async function createRegistration(
   event: ChurchEvent,
   data: Pick<EventRegistration, 'name'> &
-    Partial<Pick<EventRegistration, 'person_id' | 'phone' | 'email' | 'notes'>>,
+    Partial<
+      Pick<
+        EventRegistration,
+        'person_id' | 'phone' | 'email' | 'notes' | 'partner_name' | 'partner_phone'
+      >
+    >,
 ): Promise<EventRegistration> {
   const free = !event.price || event.price <= 0
   return pb.collection('church_event_registrations').create<EventRegistration>({
@@ -77,6 +136,7 @@ export async function createRegistration(
     church_id: event.church_id,
     event_id: event.id,
     source: 'SECRETARIA',
+    amount_due: free ? 0 : event.price,
     paid: free,
     payment_method: free ? 'ISENTO' : '',
   })
@@ -87,7 +147,14 @@ export async function updateRegistration(
   data: Partial<
     Pick<
       EventRegistration,
-      'paid' | 'paid_amount' | 'payment_method' | 'attended' | 'notes' | 'person_id'
+      | 'paid'
+      | 'paid_amount'
+      | 'payment_method'
+      | 'attended'
+      | 'notes'
+      | 'person_id'
+      | 'partner_name'
+      | 'amount_due'
     >
   >,
 ): Promise<EventRegistration> {
@@ -100,10 +167,17 @@ export async function deleteRegistration(id: string): Promise<void> {
 
 // ---------- Inscrição pública (sem login) ----------
 
+export interface EventPix {
+  key: string
+  key_type?: PixKeyType
+  name: string
+  city: string
+}
+
 export interface EventSignupInfo {
   valid: boolean
   open?: boolean
-  closed_reason?: 'closed' | 'full' | ''
+  closed_reason?: ClosedReason
   church_name?: string
   title?: string
   description?: string
@@ -111,9 +185,40 @@ export interface EventSignupInfo {
   ends_on?: string
   start_time?: string
   location?: string
-  price?: number
+  address_cep?: string
+  address_street?: string
+  address_number?: string
+  address_complement?: string
+  address_district?: string
+  address_city?: string
+  address_state?: string
+  contact_name?: string
+  contact_phone?: string
+  registration_deadline?: string
+  cover_url?: string
+  cover_side_url?: string
+  color?: string
+  hide_header?: boolean
+  couple_only?: boolean
+  paid_event?: boolean
+  /** null quando o evento esconde o valor até a inscrição. */
+  price?: number | null
   payment_info?: string
+  has_coupons?: boolean
+  pix?: EventPix | null
   spots_left?: number | null
+  message?: string
+}
+
+export interface EventSignupResult {
+  ok: boolean
+  id?: string
+  /** Valor a pagar, já com o cupom. */
+  amount?: number
+  price?: number
+  coupon_code?: string
+  payment_info?: string
+  /** Mensagem de confirmação do evento, com os campos preenchidos. */
   message?: string
 }
 
@@ -135,10 +240,36 @@ export async function submitEventSignup(payload: {
   phone: string
   email?: string
   notes?: string
+  partner_name?: string
+  partner_phone?: string
+  coupon?: string
   consent: boolean
   website?: string
-}): Promise<{ ok: boolean; price?: number; payment_info?: string }> {
+}): Promise<EventSignupResult> {
   return pb.send('/backend/v1/event-signup', { method: 'POST', body: payload })
+}
+
+export async function checkEventCoupon(
+  key: string,
+  code: string,
+): Promise<{ valid: boolean; code?: string; amount?: number; message?: string }> {
+  try {
+    return await pb.send(
+      `/backend/v1/event-signup/coupon?key=${encodeURIComponent(key)}&code=${encodeURIComponent(code)}`,
+      { method: 'GET' },
+    )
+  } catch (err) {
+    const data = (err as { response?: { message?: string } }).response
+    return { valid: false, message: data?.message || 'Cupom inválido.' }
+  }
+}
+
+/** Busca o endereço pelo CEP no ViaCEP. */
+export async function lookupCep(cep: string): Promise<unknown> {
+  const digits = cep.replace(/\D/g, '')
+  if (digits.length !== 8) return null
+  const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`)
+  return res.ok ? res.json() : null
 }
 
 export function eventSignupUrl(key: string, origin = window.location.origin): string {

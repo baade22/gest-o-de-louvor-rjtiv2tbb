@@ -1,16 +1,50 @@
-import React, { useEffect, useState } from 'react'
+// Página pública do evento (link / QR code, sem login): capa, descrição, local com mapa,
+// formulário de inscrição e, no fim, a mensagem de confirmação e o Pix com o valor certo.
+
+import React, { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { AlertCircle, CalendarDays, Check, MapPin, Send, Ticket } from 'lucide-react'
+import {
+  AlertCircle,
+  CalendarDays,
+  Check,
+  Clock,
+  Copy,
+  ExternalLink,
+  Info,
+  MapPin,
+  MessageCircle,
+  Send,
+  Tag,
+  Ticket,
+  XCircle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { RichTextView } from '@/components/RichText'
+import { PixQr, displayPixKey } from '@/pages/finance/PixQr'
 import {
+  checkEventCoupon,
   getEventSignupInfo,
+  publicFileUrl,
   submitEventSignup,
   type EventSignupInfo,
+  type EventSignupResult,
 } from '@/services/churchEvents'
 import { eventDateLabel, formatBRL } from '@/lib/churchEvents'
+import {
+  CLOSED_REASON_LABELS,
+  addressLines,
+  eventColor,
+  hasAddress,
+  mapsUrl,
+  normalizeCouponCode,
+  registrationPixTxid,
+  whatsappUrl,
+} from '@/lib/eventPage'
+import { pixPayload, type PixKeyType } from '@/lib/pix'
+import { toCalendarYMD } from '@/lib/dateUtils'
 
 const inputClass = 'rounded-xl border-slate-200 h-11 text-base sm:text-sm'
 
@@ -24,38 +58,129 @@ function Centered({ children }: { children: React.ReactNode }) {
   )
 }
 
+function Card({
+  icon: Icon,
+  title,
+  accent,
+  children,
+}: {
+  icon: typeof Info
+  title: string
+  accent: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-3">
+      <h2 className="flex items-center gap-2.5 text-base font-bold text-slate-900">
+        <span
+          className="h-8 w-8 rounded-lg flex items-center justify-center"
+          style={{ background: `${accent}1a`, color: accent }}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function dmy(value?: string) {
+  const ymd = toCalendarYMD(value)
+  return ymd ? ymd.split('-').reverse().join('/') : ''
+}
+
 export default function PublicEventSignup() {
   const { key = '' } = useParams<{ key: string }>()
   const [info, setInfo] = useState<EventSignupInfo | null>(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [partnerName, setPartnerName] = useState('')
+  const [partnerPhone, setPartnerPhone] = useState('')
+  const [couponInput, setCouponInput] = useState('')
+  const [coupon, setCoupon] = useState<{ code: string; amount: number } | null>(null)
+  const [couponMsg, setCouponMsg] = useState('')
   const [website, setWebsite] = useState('')
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
-  const [done, setDone] = useState(false)
+  const [result, setResult] = useState<EventSignupResult | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     getEventSignupInfo(key).then(setInfo)
   }, [key])
+
+  useEffect(() => {
+    if (info?.title) document.title = info.title
+  }, [info?.title])
+
+  const amount = result?.amount ?? 0
+  const pixCode = useMemo(() => {
+    if (!info?.pix || !result?.id || amount <= 0) return ''
+    return pixPayload({
+      key: info.pix.key,
+      keyType: (info.pix.key_type || undefined) as PixKeyType | undefined,
+      name: info.pix.name,
+      city: info.pix.city,
+      amountCents: Math.round(amount * 100),
+      txid: registrationPixTxid(result.id),
+      message: info.title,
+    })
+  }, [info, result, amount])
+
+  const applyCoupon = async () => {
+    const code = normalizeCouponCode(couponInput)
+    setCouponMsg('')
+    if (!code) return
+    const r = await checkEventCoupon(key, code)
+    if (r.valid && typeof r.amount === 'number') {
+      setCoupon({ code, amount: r.amount })
+    } else {
+      setCoupon(null)
+      setCouponMsg(r.message || 'Cupom inválido.')
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     if (name.trim().split(/\s+/).length < 2) return setError('Informe o nome completo.')
     if (phone.replace(/\D/g, '').length < 10) return setError('Informe o telefone com DDD.')
+    if (info?.couple_only && partnerName.trim().split(/\s+/).length < 2)
+      return setError('Informe o nome completo do cônjuge.')
     if (!consent) return setError('Marque a autorização para enviar.')
     setSending(true)
     try {
-      await submitEventSignup({ key, name, phone, email, consent, website })
-      setDone(true)
+      const r = await submitEventSignup({
+        key,
+        name,
+        phone,
+        email,
+        partner_name: info?.couple_only ? partnerName : undefined,
+        partner_phone: info?.couple_only ? partnerPhone : undefined,
+        coupon: coupon?.code,
+        consent,
+        website,
+      })
+      setResult(r)
       window.scrollTo(0, 0)
     } catch (err) {
       const data = (err as { response?: { message?: string } }).response
       setError(data?.message || 'Não foi possível enviar agora. Tente de novo em instantes.')
     } finally {
       setSending(false)
+    }
+  }
+
+  const copyPix = async () => {
+    try {
+      await navigator.clipboard.writeText(pixCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      /* o código continua visível para copiar à mão */
     }
   }
 
@@ -79,83 +204,221 @@ export default function PublicEventSignup() {
     )
   }
 
-  const paid = !!info.price && info.price > 0
+  const accent = eventColor(info.color)
+  const cover = publicFileUrl(info.cover_url)
+  const side = publicFileUrl(info.cover_side_url) || cover
   const dateLabel = eventDateLabel({
     starts_on: info.starts_on || '',
     ends_on: info.ends_on,
     start_time: info.start_time,
   })
+  const [addr1, addr2] = addressLines(info)
+  const showAddress = hasAddress(info)
+  const priceKnown = typeof info.price === 'number'
+  const priceLabel = info.couple_only ? 'por casal' : 'por pessoa'
+  const firstName = name.trim().split(/\s+/)[0]
 
-  if (done) {
-    return (
-      <Centered>
-        <div className="h-14 w-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-          <Check className="h-8 w-8" />
+  const header = (
+    <header className="relative">
+      {cover ? (
+        <div className="relative lg:hidden">
+          <img src={cover} alt="" className="w-full aspect-video object-cover" />
+          {!info.hide_header && (
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent" />
+          )}
         </div>
-        <h1 className="text-xl font-bold text-slate-900">Inscrição feita!</h1>
-        <p className="text-slate-600">
-          {name.trim().split(/\s+/)[0]}, você está inscrito(a) em <strong>{info.title}</strong> (
-          {dateLabel}).
-        </p>
-        {paid && (
-          <div className="text-left rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-1">
-            <p className="text-sm font-semibold text-amber-900">
-              Falta o pagamento de {formatBRL(info.price!)}
-            </p>
-            <p className="text-sm text-amber-900 whitespace-pre-line">
-              {info.payment_info || 'A secretaria da igreja vai passar as instruções.'}
-            </p>
-          </div>
+      ) : (
+        <div className="h-44 lg:hidden" style={{ background: accent }} />
+      )}
+      {!info.hide_header && (
+        <div className="absolute inset-x-0 top-0 px-5 pt-6 text-white lg:hidden">
+          <p className="text-xs font-medium uppercase tracking-wide opacity-90 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full" style={{ background: '#fff' }} />
+            {info.church_name}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold leading-tight drop-shadow">{info.title}</h1>
+        </div>
+      )}
+    </header>
+  )
+
+  const desktopTitle = !info.hide_header && (
+    <div className="hidden lg:block space-y-1">
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>
+        {info.church_name}
+      </p>
+      <h1 className="text-3xl font-extrabold leading-tight text-slate-900">{info.title}</h1>
+    </div>
+  )
+
+  const infoCard = (
+    <Card icon={Info} title="Informações" accent={accent}>
+      <ul className="space-y-3 text-sm text-slate-700">
+        <li className="flex gap-3">
+          <CalendarDays className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+          <span>{dateLabel}</span>
+        </li>
+        {(info.location || showAddress) && (
+          <li className="flex gap-3">
+            <MapPin className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+            <span className="flex-1 min-w-0">
+              {info.location && <span className="block font-medium">{info.location}</span>}
+              {addr1 && <span className="block uppercase text-xs font-semibold">{addr1}</span>}
+              {addr2 && <span className="block uppercase text-[11px] text-slate-500">{addr2}</span>}
+            </span>
+            <a
+              href={mapsUrl(info, info.location)}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="h-8 px-2.5 rounded-lg border border-slate-200 text-xs font-medium flex items-center gap-1 shrink-0 self-start"
+              style={{ color: accent }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Mapa
+            </a>
+          </li>
         )}
-      </Centered>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 pb-10">
-      <header className="bg-teal-700 text-white">
-        <div className="max-w-xl mx-auto px-4 py-7 space-y-2">
-          <p className="text-teal-100 text-sm">{info.church_name}</p>
-          <h1 className="text-2xl font-bold leading-tight">{info.title}</h1>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-teal-50">
-            <span className="flex items-center gap-1.5">
-              <CalendarDays className="h-4 w-4" />
-              {dateLabel}
-            </span>
-            {info.location && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" />
-                {info.location}
+        {info.paid_event ? (
+          priceKnown && (
+            <li className="flex gap-3">
+              <Ticket className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+              <span>
+                <strong>{formatBRL(info.price!)}</strong> {priceLabel}
               </span>
+            </li>
+          )
+        ) : (
+          <li className="flex gap-3">
+            <Ticket className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+            <span>Gratuito</span>
+          </li>
+        )}
+        {info.registration_deadline && (
+          <li className="flex gap-3">
+            <Clock className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+            <span>Inscrições até {dmy(info.registration_deadline)}</span>
+          </li>
+        )}
+        {info.contact_name && (
+          <li className="flex gap-3 items-center">
+            <MessageCircle className="h-4 w-4 text-slate-400 shrink-0" />
+            <span className="flex-1">Dúvidas: {info.contact_name}</span>
+            {info.contact_phone && (
+              <a
+                href={whatsappUrl(info.contact_phone, `Olá! Tenho uma dúvida sobre ${info.title}.`)}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="h-8 px-2.5 rounded-lg bg-emerald-600 text-white text-xs font-medium flex items-center"
+              >
+                WhatsApp
+              </a>
             )}
-            <span className="flex items-center gap-1.5">
-              <Ticket className="h-4 w-4" />
-              {paid ? formatBRL(info.price!) : 'Gratuito'}
-            </span>
-          </div>
-        </div>
-      </header>
+          </li>
+        )}
+      </ul>
+    </Card>
+  )
 
-      <div className="max-w-xl mx-auto px-4 -mt-3 space-y-4">
-        {info.description && (
-          <section className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-            <p className="text-sm text-slate-700 whitespace-pre-line">{info.description}</p>
+  let body: React.ReactNode
+  if (result) {
+    body = (
+      <>
+        <section className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm text-center space-y-3">
+          <div
+            className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto"
+            style={{ background: `${accent}1a`, color: accent }}
+          >
+            <Check className="h-8 w-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Inscrição feita!</h2>
+          {result.message ? (
+            <RichTextView text={result.message} className="text-left" linkColor={accent} />
+          ) : (
+            <p className="text-slate-600">
+              {firstName}, sua inscrição em <strong>{info.title}</strong> ({dateLabel}) foi
+              recebida.
+            </p>
+          )}
+        </section>
+        {amount > 0 && (
+          <section className="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm space-y-3">
+            <p className="text-center">
+              <span className="block text-sm text-slate-600">Falta o pagamento de</span>
+              <span className="block text-3xl font-extrabold text-slate-900">
+                {formatBRL(amount)}
+              </span>
+              {result.coupon_code && (
+                <span className="text-xs text-emerald-700">
+                  com o cupom {result.coupon_code} (de {formatBRL(result.price || 0)})
+                </span>
+              )}
+            </p>
+            {pixCode && (
+              <div className="text-center space-y-3">
+                <PixQr payload={pixCode} className="mx-auto h-52 w-52" />
+                <Button
+                  onClick={copyPix}
+                  className="h-12 w-full rounded-xl text-base text-white gap-2"
+                  style={{ background: accent }}
+                >
+                  {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                  {copied ? 'Código copiado' : 'Copiar código Pix'}
+                </Button>
+                <p className="break-all text-left font-mono text-[11px] leading-snug text-slate-400">
+                  {pixCode}
+                </p>
+                <p className="text-xs text-slate-500">
+                  O Pix cai na conta da igreja ({info.pix!.name} · chave{' '}
+                  {displayPixKey(info.pix!.key, info.pix!.key_type || undefined)}). A equipe
+                  confirma o pagamento pelo extrato.
+                </p>
+              </div>
+            )}
+            {(result.payment_info || !pixCode) && (
+              <p className="text-sm text-slate-700 whitespace-pre-line rounded-xl bg-amber-50 p-3">
+                {result.payment_info || 'A equipe do evento vai passar as instruções de pagamento.'}
+              </p>
+            )}
           </section>
         )}
-
+        {infoCard}
+      </>
+    )
+  } else {
+    body = (
+      <>
+        {desktopTitle}
+        {info.description && (
+          <Card icon={Info} title="Sobre" accent={accent}>
+            <RichTextView text={info.description} linkColor={accent} />
+          </Card>
+        )}
+        {infoCard}
         {!info.open ? (
-          <section className="bg-white rounded-2xl border border-slate-200 p-6 text-center space-y-1 shadow-xs">
-            <p className="font-semibold text-slate-900">
-              {info.closed_reason === 'full' ? 'As vagas acabaram' : 'Inscrições encerradas'}
+          <section className="bg-white rounded-2xl border border-slate-200/80 p-8 text-center space-y-2 shadow-sm">
+            {info.closed_reason === 'soon' ? (
+              <CalendarDays className="h-12 w-12 mx-auto" style={{ color: accent }} />
+            ) : (
+              <XCircle className="h-12 w-12 mx-auto text-red-500" />
+            )}
+            <p className="text-xl font-bold text-slate-900">
+              {CLOSED_REASON_LABELS[(info.closed_reason || 'closed') as 'closed']}
             </p>
-            <p className="text-sm text-slate-500">Fale com a secretaria da igreja.</p>
+            <p className="text-sm text-slate-500">
+              {info.closed_reason === 'soon'
+                ? 'Fique de olho: em breve o formulário abre aqui.'
+                : 'Fale com a equipe do evento se precisar.'}
+            </p>
           </section>
         ) : (
           <form
             onSubmit={submit}
             noValidate
-            className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs"
+            className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4 shadow-sm"
           >
+            <h2 className="text-base font-bold text-slate-900">
+              {info.couple_only ? 'Inscrição do casal' : 'Faça sua inscrição'}
+            </h2>
             {typeof info.spots_left === 'number' && info.spots_left <= 10 && (
               <p className="text-sm font-medium text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
                 {info.spots_left === 1 ? 'Última vaga!' : `Restam ${info.spots_left} vagas`}
@@ -163,7 +426,8 @@ export default function PublicEventSignup() {
             )}
             <div className="space-y-1.5">
               <Label htmlFor="ev-name" className="text-sm font-semibold">
-                Nome completo <span className="text-red-500">*</span>
+                {info.couple_only ? 'Seu nome completo' : 'Nome completo'}{' '}
+                <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="ev-name"
@@ -204,6 +468,78 @@ export default function PublicEventSignup() {
                 maxLength={200}
               />
             </div>
+            {info.couple_only && (
+              <div className="grid sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ev-partner" className="text-sm font-semibold">
+                    Nome do cônjuge <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="ev-partner"
+                    value={partnerName}
+                    onChange={(e) => setPartnerName(e.target.value)}
+                    className={`${inputClass} bg-white`}
+                    maxLength={200}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ev-partner-phone" className="text-sm font-semibold">
+                    Telefone do cônjuge
+                  </Label>
+                  <Input
+                    id="ev-partner-phone"
+                    type="tel"
+                    inputMode="tel"
+                    value={partnerPhone}
+                    onChange={(e) => setPartnerPhone(e.target.value)}
+                    className={`${inputClass} bg-white`}
+                    maxLength={40}
+                  />
+                </div>
+              </div>
+            )}
+            {info.has_coupons && (
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="ev-coupon"
+                  className="text-sm font-semibold flex items-center gap-1.5"
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  Cupom de desconto
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="ev-coupon"
+                    value={couponInput}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase())
+                      setCoupon(null)
+                      setCouponMsg('')
+                    }}
+                    className={`${inputClass} font-mono uppercase`}
+                    maxLength={30}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl"
+                    onClick={applyCoupon}
+                    disabled={!couponInput.trim()}
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+                {coupon && (
+                  <p className="text-sm text-emerald-700">
+                    Cupom aplicado:{' '}
+                    {coupon.amount > 0
+                      ? `você paga ${formatBRL(coupon.amount)}`
+                      : 'inscrição sem custo'}
+                  </p>
+                )}
+                {couponMsg && <p className="text-sm text-red-600">{couponMsg}</p>}
+              </div>
+            )}
             <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
               <input
                 tabIndex={-1}
@@ -234,13 +570,34 @@ export default function PublicEventSignup() {
             <Button
               type="submit"
               disabled={sending}
-              className="w-full h-12 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-base font-semibold gap-2"
+              className="w-full h-12 rounded-xl text-white text-base font-semibold gap-2 hover:opacity-90"
+              style={{ background: accent }}
             >
               <Send className="h-4 w-4" />
-              {sending ? 'Enviando...' : 'Fazer inscrição'}
+              {sending ? 'Enviando...' : 'Quero me inscrever'}
             </Button>
           </form>
         )}
+      </>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 lg:flex">
+      {/* Computador: a arte vira faixa lateral fixa */}
+      <aside className="hidden lg:block lg:w-[38%] xl:w-[34%] shrink-0">
+        <div className="sticky top-0 h-screen overflow-hidden" style={{ background: accent }}>
+          {side && <img src={side} alt="" className="h-full w-full object-cover" />}
+        </div>
+      </aside>
+      <div className="flex-1 min-w-0">
+        {header}
+        <main className="max-w-xl mx-auto px-4 pb-10 pt-4 lg:pt-10 space-y-4 relative">
+          {body}
+          <footer className="pt-4 text-center text-xs text-slate-400">
+            © {new Date().getFullYear()} · {info.church_name}
+          </footer>
+        </main>
       </div>
     </div>
   )
