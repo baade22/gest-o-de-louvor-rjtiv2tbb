@@ -1,0 +1,65 @@
+# Servidor do WhatsApp do LouvorFlow: Evolution API (WhatsApp Web pareado por QR Code)
+# + Postgres + Caddy (HTTPS automático). Passo a passo no README.md desta pasta.
+services:
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: https://${WHATSAPP_DOMAIN}
+      AUTHENTICATION_API_KEY: ${WHATSAPP_API_KEY}
+      DATABASE_ENABLED: 'true'
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: louvorflow
+      # Não guardar as conversas do WhatsApp da igreja no servidor: só a sessão
+      DATABASE_SAVE_DATA_INSTANCE: 'true'
+      DATABASE_SAVE_DATA_NEW_MESSAGE: 'false'
+      DATABASE_SAVE_MESSAGE_UPDATE: 'false'
+      DATABASE_SAVE_DATA_CONTACTS: 'false'
+      DATABASE_SAVE_DATA_CHATS: 'false'
+      DATABASE_SAVE_DATA_LABELS: 'false'
+      DATABASE_SAVE_DATA_HISTORIC: 'false'
+      CACHE_REDIS_ENABLED: 'false'
+      CACHE_LOCAL_ENABLED: 'true'
+      DEL_INSTANCE: 'false'
+      QRCODE_LIMIT: '30'
+      CONFIG_SESSION_PHONE_CLIENT: LouvorFlow
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      LOG_LEVEL: ERROR,WARN
+      LANGUAGE: pt-BR
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      WHATSAPP_DOMAIN: ${WHATSAPP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - evolution
+
+volumes:
+  evolution_instances:
+  postgres_data:
+  caddy_data:
