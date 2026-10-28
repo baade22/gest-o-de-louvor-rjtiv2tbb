@@ -90,6 +90,7 @@ export default function WhatsAppSettings() {
 
   const [status, setStatus] = useState<WhatsAppStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [qr, setQr] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [testPhone, setTestPhone] = useState('')
@@ -106,8 +107,10 @@ export default function WhatsAppSettings() {
     try {
       const s = await getWhatsAppStatus(churchId)
       setStatus(s)
+      setLoadError('')
       return s
     } catch (err) {
+      setLoadError(errorText(err))
       toast({
         title: 'Erro ao ler o WhatsApp',
         description: errorText(err),
@@ -309,12 +312,38 @@ export default function WhatsAppSettings() {
             <Badge variant="outline" className="bg-slate-50 text-slate-500">
               Servidor não configurado
             </Badge>
+          ) : !status ? (
+            <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-50 gap-1">
+              <AlertTriangle className="h-3 w-3" /> Erro
+            </Badge>
           ) : (
             <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 gap-1">
               <AlertTriangle className="h-3 w-3" /> Desconectado
             </Badge>
           )}
         </div>
+
+        {!loading && !status && (
+          <div className="space-y-3">
+            <p className="text-sm text-red-600">
+              O LouvorFlow não conseguiu ler o WhatsApp: {loadError || 'sem resposta do servidor.'}
+            </p>
+            <p className="text-xs text-slate-500">
+              Confira no Skip se a migração 0074 foi aplicada e se os segredos{' '}
+              <code>WHATSAPP_API_URL</code> e <code>WHATSAPP_API_KEY</code> estão no backend.
+            </p>
+            <Button
+              variant="outline"
+              className="rounded-xl gap-1.5"
+              onClick={() => {
+                setLoading(true)
+                loadStatus()
+              }}
+            >
+              <RefreshCw className="h-4 w-4" /> Tentar de novo
+            </Button>
+          </div>
+        )}
 
         {state === 'unconfigured' && (
           <p className="text-sm text-slate-600 leading-relaxed">
