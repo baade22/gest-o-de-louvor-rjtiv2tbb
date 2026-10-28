@@ -32,6 +32,7 @@ routerAdd(
       'FINANCEIRO',
       'AUDITOR',
       'MEMBRESIA',
+      'EVENTOS',
     ]
     for (const op of operationalRoles) {
       if (knownOps.indexOf(op) === -1) {
@@ -101,12 +102,13 @@ routerAdd(
       if (
         (operationalRoles.indexOf('FINANCEIRO') !== -1 ||
           operationalRoles.indexOf('AUDITOR') !== -1 ||
-          operationalRoles.indexOf('MEMBRESIA') !== -1) &&
+          operationalRoles.indexOf('MEMBRESIA') !== -1 ||
+          operationalRoles.indexOf('EVENTOS') !== -1) &&
         callerRole !== 'MASTER'
       ) {
         return e.json(403, {
           message:
-            'Só o MASTER da igreja pode convidar alguém com a função Financeiro, Conselho fiscal ou Membresia.',
+            'Só o MASTER da igreja pode convidar alguém com a função Financeiro, Conselho fiscal, Membresia ou Eventos.',
         })
       }
     } catch (err) {

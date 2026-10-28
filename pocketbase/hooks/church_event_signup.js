@@ -2,7 +2,8 @@
 //
 // GET  /backend/v1/event-signup/info?key=...         → dados públicos do evento, vagas e Pix
 // GET  /backend/v1/event-signup/coupon?key=&code=    → confere um cupom e devolve o valor
-// POST /backend/v1/event-signup                      → grava a inscrição (não paga)
+// POST /backend/v1/event-signup                      → grava a inscrição (não paga) e
+//                                                      devolve o código do comprovante
 //
 // A chave é church_events.public_key. O evento precisa estar com inscrições abertas, dentro
 // do prazo e com vaga. Limites por IP nas migrações 0047 e 0068. Depois de gravar, devolve a
@@ -102,6 +103,19 @@ routerAdd('GET', '/backend/v1/event-signup/info', (e) => {
       price: ev.getBool('hide_price') ? null : price,
       payment_info: ev.getBool('hide_price') ? '' : ev.getString('payment_info'),
       has_coupons: price > 0 && Array.isArray(coupons) && coupons.length > 0,
+      questions: (() => {
+        let qs = []
+        try {
+          qs = JSON.parse(ev.getString('questions') || '[]') || []
+        } catch (_) {}
+        return (Array.isArray(qs) ? qs : []).map((q) => ({
+          id: String(q.id || ''),
+          label: String(q.label || ''),
+          kind: String(q.kind || 'TEXT'),
+          options: Array.isArray(q.options) ? q.options.map((o) => String(o)) : [],
+          required: !!q.required,
+        }))
+      })(),
       pix: pix,
       spots_left: capacity > 0 ? Math.max(0, capacity - taken) : null,
     })
@@ -203,6 +217,26 @@ routerAdd('POST', '/backend/v1/event-signup', (e) => {
   if (ev.getBool('couple_only') && partnerName.length < 3) {
     return e.json(400, { message: 'Informe o nome do cônjuge.' })
   }
+  // Questionário: guarda só as perguntas do evento e confere as obrigatórias
+  // (mesmas regras de cleanAnswers em src/lib/eventPage.ts)
+  let questions = []
+  try {
+    questions = JSON.parse(ev.getString('questions') || '[]') || []
+  } catch (_) {}
+  const given = body.answers && typeof body.answers === 'object' ? body.answers : {}
+  const answers = {}
+  for (const q of Array.isArray(questions) ? questions : []) {
+    const qid = String(q.id || '')
+    if (!qid) continue
+    let v = text(given[qid], 500)
+    if (q.kind === 'YESNO' && v !== 'Sim' && v !== 'Não') v = ''
+    if (q.kind === 'CHOICE' && (Array.isArray(q.options) ? q.options : []).indexOf(v) === -1) v = ''
+    if (q.required && !v) {
+      return e.json(400, { message: 'Responda: ' + String(q.label || '').slice(0, 120) })
+    }
+    if (v) answers[qid] = v
+  }
+
   const capacity = ev.getInt('capacity')
   if (capacity > 0) {
     const taken = $app.countRecords('church_event_registrations', $dbx.hashExp({ event_id: ev.id }))
@@ -254,6 +288,7 @@ routerAdd('POST', '/backend/v1/event-signup', (e) => {
     rec.set('partner_phone', ev.getBool('couple_only') ? partnerPhone : '')
     rec.set('coupon_code', couponCode)
     rec.set('amount_due', amount)
+    rec.set('answers', answers)
     rec.set('source', 'LINK')
     rec.set('paid', amount <= 0)
     rec.set('payment_method', amount <= 0 ? 'ISENTO' : '')
@@ -353,5 +388,7 @@ routerAdd('POST', '/backend/v1/event-signup', (e) => {
     coupon_code: couponCode,
     payment_info: ev.getString('payment_info'),
     message: message,
+    // Comprovante: a equipe lê este código (QR) na entrada
+    checkin_code: rec.getString('checkin_code'),
   })
 })

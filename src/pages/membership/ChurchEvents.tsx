@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { listAllRegistrations, listChurchEvents } from '@/services/churchEvents'
+import { listAllRegistrations, listChurchEvents, updateChurchEvent } from '@/services/churchEvents'
 import type { ChurchEvent, EventRegistration } from '@/types'
 import {
   eventDateLabel,
@@ -11,10 +11,54 @@ import {
   summarizeRegistrations,
 } from '@/lib/churchEvents'
 import { getLocalTodayYMD, toCalendarYMD } from '@/lib/dateUtils'
-import { CalendarPlus, MapPin, Plus, Ticket, Users, Wallet } from 'lucide-react'
+import { eventsDashboard } from '@/lib/eventPage'
+import {
+  AlertCircle,
+  CalendarDays,
+  CalendarPlus,
+  List,
+  Lock,
+  MapPin,
+  Plus,
+  Ticket,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from './shared'
+import { EventsCalendar } from './EventsCalendar'
+import { useToast } from '@/hooks/use-toast'
+
+function Tile({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone = 'slate',
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  sub?: string
+  tone?: 'slate' | 'amber'
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-4 shadow-xs ${
+        tone === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'
+      }`}
+    >
+      <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </p>
+      <p className="text-2xl font-extrabold text-slate-900 mt-1">{value}</p>
+      {sub && <p className="text-xs text-slate-500">{sub}</p>}
+    </div>
+  )
+}
 
 const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
 
@@ -108,7 +152,9 @@ function EventCard({
 
 export default function ChurchEvents() {
   const { currentChurch } = useAuth()
+  const { toast } = useToast()
   const today = getLocalTodayYMD()
+  const [view, setView] = useState<'lista' | 'calendario'>('lista')
   const [events, setEvents] = useState<ChurchEvent[]>([])
   const [regs, setRegs] = useState<EventRegistration[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -133,6 +179,24 @@ export default function ChurchEvents() {
   // Próximos do mais perto para o mais longe; passados do mais recente para trás
   const upcoming = events.filter((e) => !isPastEvent(e, today)).reverse()
   const past = events.filter((e) => isPastEvent(e, today))
+  const panel = useMemo(() => eventsDashboard(events, regs, today), [events, regs, today])
+
+  const closeEvent = async (e: ChurchEvent) => {
+    try {
+      const saved = await updateChurchEvent(e.id, {
+        closed_at: new Date().toISOString().replace('T', ' '),
+        registration_open: false,
+      })
+      setEvents((list) => list.map((x) => (x.id === e.id ? saved : x)))
+      toast({ title: `${e.title} encerrado` })
+    } catch (err) {
+      toast({
+        title: 'Não foi possível encerrar',
+        description: errorMessage(err, 'Tente de novo.'),
+        variant: 'destructive',
+      })
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -173,28 +237,126 @@ export default function ChurchEvents() {
         </div>
       ) : (
         <>
-          <section className="space-y-3">
-            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Próximos</h2>
-            {upcoming.length === 0 && (
-              <p className="text-sm text-slate-500">Nenhum evento marcado.</p>
-            )}
-            <div className="grid lg:grid-cols-2 gap-3">
-              {upcoming.map((e) => (
-                <EventCard key={e.id} event={e} regs={regsByEvent.get(e.id) || []} past={false} />
-              ))}
-            </div>
-          </section>
-          {past.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
-                Já aconteceram
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Tile
+              icon={CalendarDays}
+              label="Eventos ativos"
+              value={String(panel.active)}
+              sub={`de ${events.length} cadastrados`}
+            />
+            <Tile
+              icon={Users}
+              label="Inscrições"
+              value={String(panel.registrations)}
+              sub="nos eventos não encerrados"
+            />
+            <Tile
+              icon={Wallet}
+              label="Pagamentos pendentes"
+              value={String(panel.unpaid)}
+              sub={panel.unpaid ? `falta ${formatBRL(panel.unpaidAmount)}` : 'nenhuma pendência'}
+              tone={panel.unpaid ? 'amber' : 'slate'}
+            />
+            <Tile
+              icon={AlertCircle}
+              label="Para encerrar"
+              value={String(panel.toClose.length)}
+              sub="já aconteceram e seguem abertos"
+              tone={panel.toClose.length ? 'amber' : 'slate'}
+            />
+          </div>
+
+          {panel.toClose.length > 0 && (
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <h2 className="px-4 pt-4 text-sm font-bold text-slate-900">
+                Pendentes de encerramento
               </h2>
-              <div className="grid lg:grid-cols-2 gap-3">
-                {past.map((e) => (
-                  <EventCard key={e.id} event={e} regs={regsByEvent.get(e.id) || []} past />
+              <p className="px-4 text-xs text-slate-500">
+                Confira presença e pagamentos e encerre: o evento sai das contas do painel.
+              </p>
+              <ul className="divide-y divide-slate-100 mt-2">
+                {panel.toClose.map((e) => (
+                  <li key={e.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <Link
+                      to={`/membros/eventos/${e.id}`}
+                      className="min-w-0 flex-1 text-sm font-semibold text-slate-900 hover:underline truncate"
+                    >
+                      {e.title}
+                    </Link>
+                    <span className="text-xs text-slate-500 shrink-0">{eventDateLabel(e)}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg gap-1.5 shrink-0"
+                      onClick={() => closeEvent(e)}
+                    >
+                      <Lock className="h-3.5 w-3.5" />
+                      Encerrar
+                    </Button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </section>
+          )}
+
+          <div className="flex gap-1">
+            {(
+              [
+                ['lista', 'Lista', List],
+                ['calendario', 'Calendário', CalendarDays],
+              ] as const
+            ).map(([v, text, Icon]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={`h-8 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                  view === v
+                    ? 'bg-teal-50 border-teal-300 text-teal-800'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {text}
+              </button>
+            ))}
+          </div>
+
+          {view === 'calendario' ? (
+            <EventsCalendar events={events} today={today} />
+          ) : (
+            <>
+              <section className="space-y-3">
+                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
+                  Próximos
+                </h2>
+                {upcoming.length === 0 && (
+                  <p className="text-sm text-slate-500">Nenhum evento marcado.</p>
+                )}
+                <div className="grid lg:grid-cols-2 gap-3">
+                  {upcoming.map((e) => (
+                    <EventCard
+                      key={e.id}
+                      event={e}
+                      regs={regsByEvent.get(e.id) || []}
+                      past={false}
+                    />
+                  ))}
+                </div>
+              </section>
+              {past.length > 0 && (
+                <section className="space-y-3">
+                  <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
+                    Já aconteceram
+                  </h2>
+                  <div className="grid lg:grid-cols-2 gap-3">
+                    {past.map((e) => (
+                      <EventCard key={e.id} event={e} regs={regsByEvent.get(e.id) || []} past />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
           )}
         </>
       )}

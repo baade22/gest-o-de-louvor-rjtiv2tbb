@@ -42,7 +42,9 @@ import {
   LockOpen,
   MapPin,
   MessageCircle,
+  HandHelping,
   Megaphone,
+  Printer,
   Search,
   Trash2,
   Undo2,
@@ -76,6 +78,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { QrCodeImage, downloadQrPng } from '@/components/QrCodeImage'
 import { StatusBadge, errorMessage } from './shared'
+import { EventPrintTab } from './EventPrintSheets'
 
 const PAY_METHODS: PaymentMethod[] = ['PIX', 'DINHEIRO', 'CARTAO', 'ISENTO', 'OUTRO']
 
@@ -112,7 +115,9 @@ function chip(active: boolean) {
 
 export default function ChurchEventDetail() {
   const { id = '' } = useParams<{ id: string }>()
-  const { currentChurch } = useAuth()
+  const { currentChurch, isMaster, hasOperationalRole } = useAuth()
+  // Quem tem só a função EVENTOS não vê as fichas da membresia
+  const canSeePeople = isMaster || hasOperationalRole('MEMBRESIA')
   const { toast } = useToast()
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
@@ -153,11 +158,11 @@ export default function ChurchEventDetail() {
   }, [load])
 
   useEffect(() => {
-    if (!addOpen || !currentChurch || people.length) return
+    if (!addOpen || !currentChurch || people.length || !canSeePeople) return
     listPeople(currentChurch.id)
       .then(setPeople)
       .catch(() => setPeople([]))
-  }, [addOpen, currentChurch, people.length])
+  }, [addOpen, currentChurch, people.length, canSeePeople])
 
   const summary = useMemo(() => (event ? summarizeRegistrations(event, regs) : null), [event, regs])
   const shown = useMemo(() => filterRegistrations(regs, search, filter), [regs, search, filter])
@@ -330,6 +335,7 @@ export default function ChurchEventDetail() {
     ['inscritos', 'Inscritos', Users, regs.length],
     ['presenca', 'Lista de presença', ClipboardCheck, summary.attended],
     ['divulgar', 'Divulgar', Megaphone, 0],
+    ['imprimir', 'Imprimir e planilha', Printer, 0],
   ]
 
   return (
@@ -545,6 +551,9 @@ export default function ChurchEventDetail() {
                       r.coupon_code &&
                         `cupom ${r.coupon_code} (${r.amount_due ? formatBRL(r.amount_due) : 'sem custo'})`,
                       r.notes,
+                      ...(event.questions || [])
+                        .filter((q) => r.answers?.[q.id])
+                        .map((q) => `${q.label}: ${r.answers![q.id]}`),
                     ]
                       .filter(Boolean)
                       .join(' · ') || 'sem telefone'}
@@ -657,7 +666,13 @@ export default function ChurchEventDetail() {
               <button
                 key={r.id}
                 type="button"
-                onClick={() => patchReg(r, { attended: !r.attended })}
+                onClick={() =>
+                  patchReg(r, {
+                    attended: !r.attended,
+                    attended_at: r.attended ? '' : new Date().toISOString().replace('T', ' '),
+                    checked_out_at: '',
+                  })
+                }
                 className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
                   r.attended
                     ? 'bg-emerald-50 border-emerald-300'
@@ -730,6 +745,36 @@ export default function ChurchEventDetail() {
               </p>
             </div>
           </div>
+          {(event.staff || []).length > 0 && (
+            <div className="mt-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-2">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <HandHelping className="h-4 w-4 text-teal-700" />
+                Equipe de apoio
+              </h3>
+              <ul className="divide-y divide-slate-100">
+                {(event.staff || []).map((m, i) => (
+                  <li key={i} className="flex items-center gap-3 py-2 text-sm">
+                    <span className="font-medium text-slate-900">{m.name}</span>
+                    {m.task && <span className="text-slate-500">{m.task}</span>}
+                    {m.phone && (
+                      <a
+                        href={whatsappUrl(m.phone)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="ml-auto text-xs text-emerald-700 hover:underline"
+                      >
+                        WhatsApp
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="imprimir" className="mt-4">
+          <EventPrintTab event={event} regs={regs} churchName={currentChurch?.name || ''} />
         </TabsContent>
       </Tabs>
 
@@ -756,46 +801,48 @@ export default function ChurchEventDetail() {
                 />
               </div>
             )}
-            <div className="space-y-1.5">
-              <Label htmlFor="reg-search" className="text-xs font-semibold">
-                Buscar ficha
-              </Label>
-              <Input
-                id="reg-search"
-                value={peopleSearch}
-                onChange={(e) => setPeopleSearch(e.target.value)}
-                placeholder="Nome ou telefone"
-                className="rounded-xl"
-              />
-              <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
-                {peopleResults.map((p) => {
-                  const already = registeredPeople.has(p.id)
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={already || busy}
-                      onClick={() =>
-                        addRegistration({
-                          name: p.name,
-                          person_id: p.id,
-                          phone: p.phone || '',
-                          email: p.email || '',
-                          partner_name: newPartner.trim(),
-                        })
-                      }
-                      className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-slate-50 disabled:opacity-50 rounded-lg"
-                    >
-                      <span className="text-sm font-medium text-slate-900 flex-1 truncate">
-                        {p.name}
-                      </span>
-                      <StatusBadge status={p.status} />
-                      {already && <span className="text-xs text-slate-500">já inscrito</span>}
-                    </button>
-                  )
-                })}
+            {canSeePeople && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reg-search" className="text-xs font-semibold">
+                  Buscar ficha
+                </Label>
+                <Input
+                  id="reg-search"
+                  value={peopleSearch}
+                  onChange={(e) => setPeopleSearch(e.target.value)}
+                  placeholder="Nome ou telefone"
+                  className="rounded-xl"
+                />
+                <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                  {peopleResults.map((p) => {
+                    const already = registeredPeople.has(p.id)
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={already || busy}
+                        onClick={() =>
+                          addRegistration({
+                            name: p.name,
+                            person_id: p.id,
+                            phone: p.phone || '',
+                            email: p.email || '',
+                            partner_name: newPartner.trim(),
+                          })
+                        }
+                        className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-slate-50 disabled:opacity-50 rounded-lg"
+                      >
+                        <span className="text-sm font-medium text-slate-900 flex-1 truncate">
+                          {p.name}
+                        </span>
+                        <StatusBadge status={p.status} />
+                        {already && <span className="text-xs text-slate-500">já inscrito</span>}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
             <div className="border-t border-slate-100 pt-4 space-y-2">
               <p className="text-xs font-semibold text-slate-700">
                 Sem ficha (visitante, convidado)

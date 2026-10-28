@@ -5,7 +5,7 @@
  * As regras de cupom e de mensagem também existem no servidor
  * (hooks/church_event_signup.js e hooks/church_event_payments.js): mudou aqui, muda lá.
  */
-import type { ChurchEvent, EventCoupon } from '@/types'
+import type { ChurchEvent, EventCoupon, EventQuestion, EventRegistration } from '@/types'
 
 export const DEFAULT_EVENT_COLOR = '#0f766e'
 
@@ -314,4 +314,161 @@ export function messageVarsFor(
         : 'gratuito',
     igreja: churchName,
   }
+}
+
+// ---------- Questionário ----------
+
+export const QUESTION_KIND_LABELS: Record<EventQuestion['kind'], string> = {
+  TEXT: 'Resposta livre',
+  CHOICE: 'Escolher uma opção',
+  YESNO: 'Sim ou não',
+}
+
+export function newQuestionId(): string {
+  return `q${Math.random().toString(36).slice(2, 8)}`
+}
+
+/**
+ * Respostas que valem para as perguntas do evento (mesma regra do servidor): resposta fora das
+ * opções é descartada. Devolve a primeira obrigatória sem resposta, se houver.
+ */
+export function cleanAnswers(
+  questions: EventQuestion[] | null | undefined,
+  given: Record<string, string>,
+): { answers: Record<string, string>; missing: EventQuestion | null } {
+  const answers: Record<string, string> = {}
+  let missing: EventQuestion | null = null
+  for (const q of questions || []) {
+    if (!q.id) continue
+    let v = (given[q.id] || '').trim().slice(0, 500)
+    if (q.kind === 'YESNO' && v !== 'Sim' && v !== 'Não') v = ''
+    if (q.kind === 'CHOICE' && !(q.options || []).includes(v)) v = ''
+    if (v) answers[q.id] = v
+    else if (q.required && !missing) missing = q
+  }
+  return { answers, missing }
+}
+
+// ---------- Check-in ----------
+
+export function checkinUrl(code: string, origin = window.location.origin): string {
+  return `${origin}/checkin/${code}`
+}
+
+/** "19:02" de uma data do PocketBase, no horário de Brasília. */
+export function timeBrazil(value?: string): string {
+  if (!value) return ''
+  const d = new Date(value.replace(' ', 'T'))
+  if (Number.isNaN(d.getTime())) return ''
+  return new Date(d.getTime() - 3 * 3600 * 1000).toISOString().slice(11, 16)
+}
+
+// ---------- Planilha dos inscritos ----------
+
+export function registrationsTable(
+  event: Pick<ChurchEvent, 'price' | 'couple_only' | 'questions'>,
+  regs: EventRegistration[],
+): string[][] {
+  const questions = event.questions || []
+  const paidEvent = (event.price || 0) > 0
+  const header = [
+    'Nome',
+    ...(event.couple_only ? ['Cônjuge'] : []),
+    'Telefone',
+    'E-mail',
+    'Origem',
+    ...(paidEvent ? ['Valor', 'Cupom', 'Pagamento', 'Forma'] : []),
+    'Presença',
+    ...questions.map((q) => q.label),
+  ]
+  const money = (v: number) => v.toFixed(2).replace('.', ',')
+  const rows = [...regs]
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+    .map((r) => [
+      r.name,
+      ...(event.couple_only ? [r.partner_name || ''] : []),
+      r.phone || '',
+      r.email || '',
+      r.source === 'LINK' ? 'Link' : 'Secretaria',
+      ...(paidEvent
+        ? [
+            money(
+              r.amount_due && r.amount_due > 0
+                ? r.amount_due
+                : r.payment_method === 'ISENTO'
+                  ? 0
+                  : event.price || 0,
+            ),
+            r.coupon_code || '',
+            r.paid ? (r.payment_method === 'ISENTO' ? 'Isento' : 'Pago') : 'A pagar',
+            r.paid && r.payment_method !== 'ISENTO' ? r.payment_method || '' : '',
+          ]
+        : []),
+      r.attended ? `Presente ${timeBrazil(r.attended_at)}`.trim() : '',
+      ...questions.map((q) => r.answers?.[q.id] || ''),
+    ])
+  return [header, ...rows]
+}
+
+// ---------- Painel e calendário ----------
+
+export interface EventsDashboard {
+  /** Eventos com inscrições abertas ou que ainda vão acontecer. */
+  active: number
+  registrations: number
+  unpaid: number
+  unpaidAmount: number
+  /** Já aconteceram e ainda não foram encerrados (o mais antigo primeiro). */
+  toClose: ChurchEvent[]
+}
+
+export function eventsDashboard(
+  events: ChurchEvent[],
+  regs: Array<Pick<EventRegistration, 'event_id' | 'paid' | 'amount_due'>>,
+  todayYMD: string,
+): EventsDashboard {
+  const byId = new Map(events.map((e) => [e.id, e]))
+  let unpaid = 0
+  let unpaidAmount = 0
+  for (const r of regs) {
+    const ev = byId.get(r.event_id)
+    if (!ev || ev.closed_at || r.paid || !(ev.price && ev.price > 0)) continue
+    unpaid++
+    unpaidAmount += r.amount_due && r.amount_due > 0 ? r.amount_due : ev.price
+  }
+  const lastDay = (e: ChurchEvent) => (e.ends_on || e.starts_on || '').slice(0, 10)
+  return {
+    active: events.filter((e) => !e.closed_at && lastDay(e) >= todayYMD).length,
+    registrations: regs.filter((r) => {
+      const ev = byId.get(r.event_id)
+      return !!ev && !ev.closed_at
+    }).length,
+    unpaid,
+    unpaidAmount: Math.round(unpaidAmount * 100) / 100,
+    toClose: events
+      .filter((e) => !e.closed_at && lastDay(e) && lastDay(e) < todayYMD)
+      .sort((a, b) => lastDay(a).localeCompare(lastDay(b))),
+  }
+}
+
+/** Semanas (domingo a sábado) do mês, com AAAA-MM-DD ou '' fora do mês. */
+export function monthWeeks(year: number, month: number): string[][] {
+  const first = new Date(Date.UTC(year, month - 1, 1))
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const cells: string[] = Array(first.getUTCDay()).fill('')
+  for (let d = 1; d <= days; d++)
+    cells.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`)
+  while (cells.length % 7) cells.push('')
+  const weeks: string[][] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return weeks
+}
+
+/** Eventos que acontecem no dia (conta os de vários dias). */
+export function eventsOnDay(events: ChurchEvent[], ymd: string): ChurchEvent[] {
+  return events.filter((e) => {
+    const start = (e.starts_on || '').slice(0, 10)
+    const end = (e.ends_on || '').slice(0, 10) || start
+    return !!start && start <= ymd && ymd <= end
+  })
 }
