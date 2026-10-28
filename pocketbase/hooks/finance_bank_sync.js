@@ -288,13 +288,14 @@ routerAdd(
         { c: churchId, u: authRecord.id },
       )
     } catch (_) {}
-    let opRoles = []
+    let perms = []
     try {
-      opRoles = JSON.parse((member && member.getString('operational_roles')) || '[]') || []
+      perms = JSON.parse((member && member.getString('permissions')) || '[]') || []
     } catch (_) {}
     if (
       !member ||
-      (member.getString('role') !== 'MASTER' && opRoles.indexOf('FINANCEIRO') === -1)
+      (member.getString('role') !== 'MASTER' &&
+        perms.indexOf('financeiro.conciliacao.alterar') === -1)
     ) {
       return e.json(403, { message: 'Só quem cuida do financeiro pode atualizar os saldos.' })
     }

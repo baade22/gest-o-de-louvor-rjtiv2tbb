@@ -16,7 +16,10 @@ routerAdd(
       return e.json(400, { message: 'church_id é obrigatório' })
     }
 
-    // Valida que o usuário faz parte da igreja
+    // Valida que o usuário faz parte da igreja. Contato (e-mail e telefone) só para quem
+    // gere as pessoas (admin.pessoas.ver) ou a membresia; os demais veem só nome e funções
+    // (achado A2 da auditoria de 2026-10-25).
+    let canSeeContacts = false
     try {
       const userMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -30,6 +33,15 @@ routerAdd(
       if (userMemberships.length === 0) {
         return e.json(403, { message: 'Sem acesso a esta congregação' })
       }
+      const caller = userMemberships[0]
+      let callerPerms = []
+      try {
+        callerPerms = JSON.parse(caller.getString('permissions') || '[]') || []
+      } catch (_) {}
+      canSeeContacts =
+        caller.getString('role') === 'MASTER' ||
+        callerPerms.indexOf('admin.pessoas.ver') !== -1 ||
+        callerPerms.indexOf('membresia.pessoas.ver') !== -1
     } catch (_) {
       return e.json(403, { message: 'Permissão insuficiente' })
     }
@@ -43,6 +55,19 @@ routerAdd(
         0,
         { churchId: churchId },
       )
+
+      const profileNames = {}
+      try {
+        const profiles = $app.findRecordsByFilter(
+          'access_profiles',
+          'church_id = {:churchId}',
+          '',
+          0,
+          0,
+          { churchId: churchId },
+        )
+        for (const p of profiles) profileNames[p.id] = p.getString('name')
+      } catch (_) {}
 
       const result = []
       for (let i = 0; i < members.length; i++) {
@@ -87,11 +112,16 @@ routerAdd(
         }
 
         let opRoles = []
+        let profileIds = []
         try {
-          const raw = m.get('operational_roles')
-          if (Array.isArray(raw)) opRoles = raw
-          else if (typeof raw === 'string' && raw) opRoles = JSON.parse(raw)
+          opRoles = JSON.parse(m.getString('operational_roles') || '[]') || []
+          profileIds = JSON.parse(m.getString('access_profiles') || '[]') || []
         } catch (_) {}
+        const accessProfiles = []
+        for (const id of profileIds) {
+          if (profileNames[id]) accessProfiles.push({ id: id, name: profileNames[id] })
+        }
+        if (!canSeeContacts) userEmail = ''
 
         result.push({
           id: m.id,
@@ -99,7 +129,8 @@ routerAdd(
           user_id: userId,
           role: m.getString('role'),
           operational_roles: opRoles,
-          phone: m.getString('phone'),
+          access_profiles: accessProfiles,
+          phone: canSeeContacts ? m.getString('phone') : '',
           is_active: m.getBool('is_active'),
           created: m.getString('created'),
           updated: m.getString('updated'),

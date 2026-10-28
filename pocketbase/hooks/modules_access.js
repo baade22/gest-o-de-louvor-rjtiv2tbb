@@ -72,77 +72,62 @@ routerAdd(
       return e.json(200, { allowed: true, module: moduleName, is_master: true })
     }
 
-    let opRoles = []
+    let perms = []
     try {
-      const raw = memberRecord.get('operational_roles')
-      if (typeof raw === 'string' && raw) {
-        opRoles = JSON.parse(raw)
-      } else if (Array.isArray(raw)) {
-        if (raw.length > 0 && typeof raw[0] === 'number') {
-          let str = ''
-          for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
-          opRoles = JSON.parse(str)
-        } else {
-          opRoles = raw
-        }
-      }
+      perms = JSON.parse(memberRecord.getString('permissions') || '[]') || []
     } catch (_) {}
-    if (!Array.isArray(opRoles)) opRoles = []
-    if (opRoles.length === 0) {
-      opRoles = ['MUSICO']
+    if (!Array.isArray(perms)) perms = []
+    const has = (k) => perms.indexOf(k) !== -1
+    const hasAny = (prefix) => {
+      for (let i = 0; i < perms.length; i++)
+        if (String(perms[i]).indexOf(prefix + '.') === 0) return true
+      return false
     }
 
-    const isAdmin = appRole === 'ADMIN'
-    const isLider = appRole === 'LIDER'
-
+    // Módulo -> chave dos perfis de acesso (src/lib/accessCatalog.ts)
     let allowed = false
-
     switch (moduleName) {
       case 'sound':
-        allowed = opRoles.includes('SOM') || isAdmin
+        allowed = has('culto.som.ver')
         break
       case 'projection':
-        allowed = opRoles.includes('PROJECAO') || isAdmin
+        allowed = has('culto.projecao.ver')
         break
       case 'media':
-        allowed = opRoles.includes('MIDIA') || opRoles.includes('PROJECAO') || isAdmin
+        allowed = has('culto.midias.ver')
         break
       case 'lighting':
-        allowed = opRoles.includes('ILUMINACAO') || isAdmin
+        allowed = has('culto.iluminacao.ver')
         break
       case 'tasks':
-        allowed = opRoles.includes('MIDIA') || isAdmin || isLider
+        allowed = has('louvor.tarefas.ver')
         break
       case 'songs':
-        // Músico/gestor usam o repertório; Som e Projeção veem músicas/letras (só leitura)
-        allowed =
-          opRoles.includes('MUSICO') ||
-          opRoles.includes('SOM') ||
-          opRoles.includes('PROJECAO') ||
-          isAdmin ||
-          isLider
+        allowed = has('louvor.musicas.ver')
         break
       case 'events':
-        allowed =
-          opRoles.includes('SOM') ||
-          opRoles.includes('PROJECAO') ||
-          opRoles.includes('MIDIA') ||
-          opRoles.includes('ILUMINACAO') ||
-          isAdmin ||
-          isLider
+        allowed = has('louvor.cultos.ver')
         break
       case 'musicians':
+        allowed = has('admin.pessoas.ver')
+        break
       case 'roles':
-        allowed = isAdmin || isLider
+        allowed = has('admin.funcoes.ver')
         break
       case 'finance':
-        // Financeiro é delegado pelo MASTER: só quem tem FINANCEIRO/AUDITOR (MASTER já
-        // passou acima). ADMIN não entra por padrão (precisa receber a função), igual à Membresia.
-        allowed = opRoles.includes('FINANCEIRO') || opRoles.includes('AUDITOR')
+        allowed = hasAny('financeiro')
+        break
+      case 'membership':
+        allowed = hasAny('membresia')
+        break
+      case 'church_events':
+        allowed = hasAny('eventos')
         break
       case 'integrations':
+        allowed = has('admin.integracoes.ver')
+        break
       case 'settings':
-        allowed = isAdmin
+        allowed = has('admin.configuracoes.ver')
         break
       default:
         allowed = true

@@ -2,7 +2,7 @@
 //
 // POST /backend/v1/finance/closing
 // Body: { church_id, action: 'check' | 'close' | 'reopen', month?: 'AAAA-MM', notes?, reason? }
-// - check: conferência e resumo do mês (MASTER, ADMIN, FINANCEIRO ou AUDITOR).
+// - check: conferência e resumo do mês (MASTER ou quem vê o financeiro).
 // - close: fecha o mês (MASTER ou FINANCEIRO). Trava tudo até o fim dele. Precisa ser um mês
 //   que já acabou, depois do último fechado, e sem pendências que bloqueiam (contagem sem
 //   2ª conferência e movimento do extrato sem conciliar).
@@ -41,14 +41,17 @@ routerAdd(
     } catch (_) {}
     if (!member) return e.json(403, { message: 'Sem acesso ao financeiro desta igreja.' })
     const role = member.getString('role')
-    let opRoles = []
+    let perms = []
+    let cong = []
     try {
-      opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
+      perms = JSON.parse(member.getString('permissions') || '[]') || []
+      cong = JSON.parse(member.getString('cong_financeiro') || '[]') || []
     } catch (_) {}
-    const isFin = opRoles.indexOf('FINANCEIRO') !== -1
-    // O conselho fiscal (AUDITOR) confere, como o ADMIN; fechar continua com MASTER e FINANCEIRO
-    const isAuditor = opRoles.indexOf('AUDITOR') !== -1
-    if (role !== 'MASTER' && role !== 'ADMIN' && !isFin && !isAuditor) {
+    // Perfis de acesso: conferir = qualquer tela do financeiro; fechar = fechamento.fechar
+    // valendo para todas as congregações (o fechamento é da igreja inteira)
+    const isFin = perms.indexOf('financeiro.fechamento.fechar') !== -1 && cong.indexOf('*') !== -1
+    const canSee = perms.some((k) => String(k).indexOf('financeiro.') === 0)
+    if (role !== 'MASTER' && !canSee) {
       return e.json(403, { message: 'Sem acesso ao financeiro desta igreja.' })
     }
 

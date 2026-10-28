@@ -35,7 +35,14 @@ routerAdd(
         return e.json(403, { message: 'Apenas administradores podem desconectar integrações' })
       }
       const role = userMemberships[0].getString('role')
-      if (role !== 'ADMIN' && role !== 'MASTER') {
+      const rolePerms = (() => {
+        try {
+          return JSON.parse(userMemberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (role !== 'MASTER' && rolePerms.indexOf('admin.integracoes.alterar') === -1) {
         return e.json(403, {
           message: 'Apenas administradores ou MASTER podem desconectar integrações',
         })

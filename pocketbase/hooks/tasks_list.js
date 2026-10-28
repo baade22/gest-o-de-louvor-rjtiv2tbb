@@ -68,8 +68,14 @@ routerAdd(
 
     const appRole = member.getString('role')
     const isMaster = appRole === 'MASTER'
-    const isAdmin = appRole === 'ADMIN' || isMaster
-    const isLider = appRole === 'LIDER' || isAdmin
+    // Perfis de acesso: quem tem louvor.tarefas.alterar gere todas as tarefas; os demais
+    // cuidam das tarefas da própria área (funções derivadas dos perfis) ou atribuídas a eles
+    let accessKeys = []
+    try {
+      accessKeys = JSON.parse(member.getString('permissions') || '[]') || []
+    } catch (_) {}
+    const isAdmin = isMaster || accessKeys.indexOf('louvor.tarefas.alterar') !== -1
+    const isLider = isAdmin
 
     let opRoles = []
     try {

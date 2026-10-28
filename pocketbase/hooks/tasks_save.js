@@ -52,8 +52,14 @@ routerAdd(
 
     const appRole = member.getString('role')
     const isMaster = appRole === 'MASTER'
-    const isAdmin = appRole === 'ADMIN' || isMaster
-    const isLider = appRole === 'LIDER' || isAdmin
+    // Perfis de acesso: quem tem louvor.tarefas.alterar gere todas as tarefas; os demais
+    // cuidam das tarefas da própria área (funções derivadas dos perfis) ou atribuídas a eles
+    let accessKeys = []
+    try {
+      accessKeys = JSON.parse(member.getString('permissions') || '[]') || []
+    } catch (_) {}
+    const isAdmin = isMaster || accessKeys.indexOf('louvor.tarefas.alterar') !== -1
+    const isLider = isAdmin
 
     let opRoles = []
     try {
@@ -159,9 +165,11 @@ routerAdd(
       return e.json(200, { success: true, task: existing })
     }
 
-    // Criando nova tarefa: MASTER, ADMIN, LIDER ou MIDIA (para tarefas de mídia)
+    // Criando nova tarefa: quem gere tarefas, ou quem tem louvor.tarefas.novo na própria área
     const teamArea = String(body.team_area || 'LOUVOR').toUpperCase()
-    if (!isAdmin && !isLider && !(opRoles.includes('MIDIA') && teamArea === 'MIDIA')) {
+    const canCreateInArea =
+      accessKeys.indexOf('louvor.tarefas.novo') !== -1 && opRoles.includes(teamArea)
+    if (!isAdmin && !isLider && !canCreateInArea) {
       return e.json(403, { message: 'Você não tem permissão para criar tarefas.' })
     }
 
