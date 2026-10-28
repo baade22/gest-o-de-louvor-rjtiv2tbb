@@ -54,7 +54,7 @@ export const WHATSAPP_AUTO: Array<{
   },
 ]
 
-export const WHATSAPP_KIND_LABEL: Record<WhatsAppAutoKind | 'TESTE', string> = {
+export const WHATSAPP_KIND_LABEL: Record<WhatsAppAutoKind | 'TESTE' | 'AVISO', string> = {
   ESCALA: 'Escala',
   LEMBRETE_ESCALA: 'Lembrete de escala',
   INSCRICAO: 'Inscrição',
@@ -62,6 +62,7 @@ export const WHATSAPP_KIND_LABEL: Record<WhatsAppAutoKind | 'TESTE', string> = {
   ANIVERSARIO: 'Aniversário',
   CASAMENTO: 'Casamento',
   TESTE: 'Teste',
+  AVISO: 'Aviso',
 }
 
 /** Número como o servidor guarda (55 + DDD + número) ou vazio quando não dá. */

@@ -78,6 +78,12 @@ export const ACCESS_MODULES: AccessModule[] = [
       },
       { key: 'iluminacao', label: 'Iluminação', actions: ['ver', 'alterar'] },
       {
+        key: 'avisos',
+        label: 'Avisos pelo WhatsApp',
+        actions: ALL,
+        specials: [{ key: 'enviar', label: 'Programar e disparar envios' }],
+      },
+      {
         key: 'computadores',
         label: 'Computadores conectados (Holyrics)',
         actions: ['ver', 'excluir'],

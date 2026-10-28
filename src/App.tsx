@@ -27,6 +27,10 @@ import UserProfile from '@/pages/UserProfile'
 import ChurchSettings from '@/pages/ChurchSettings'
 import IntegrationsSettings from '@/pages/IntegrationsSettings'
 import WhatsAppSettings from '@/pages/WhatsAppSettings'
+import AvisosPanel from '@/pages/avisos/AvisosPanel'
+import AvisoEditor from '@/pages/avisos/AvisoEditor'
+import AvisosCultos from '@/pages/avisos/AvisosCultos'
+import AvisoEnvio from '@/pages/avisos/AvisoEnvio'
 import SoundModule from '@/pages/SoundModule'
 import ProjectionModule from '@/pages/ProjectionModule'
 import MediaModule from '@/pages/MediaModule'
@@ -228,6 +232,63 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="culto.midias.ver">
                   <MediaModule />
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/avisos"
+              element={
+                <RequireAuth requirePermission="culto.avisos.ver">
+                  <AvisosPanel />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/novo"
+              element={
+                <RequireAuth requirePermission="culto.avisos.novo">
+                  <AvisoEditor kind="AVULSO" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/cultos"
+              element={
+                <RequireAuth requirePermission="culto.avisos.ver">
+                  <AvisosCultos />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/regras/nova"
+              element={
+                <RequireAuth requirePermission="culto.avisos.novo">
+                  <AvisoEditor kind="REGRA_CULTO" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/regras/:id"
+              element={
+                <RequireAuth requirePermission="culto.avisos.ver">
+                  <AvisoEditor kind="REGRA_CULTO" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/:id"
+              element={
+                <RequireAuth requirePermission="culto.avisos.ver">
+                  <AvisoEditor kind="AVULSO" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/:id/envio"
+              element={
+                <RequireAuth requirePermission="culto.avisos.ver">
+                  <AvisoEnvio />
                 </RequireAuth>
               }
             />
