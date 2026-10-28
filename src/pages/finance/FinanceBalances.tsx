@@ -980,8 +980,11 @@ function ConnectionDialog({
           </label>
 
           <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
-            O certificado, a chave e o client ID do banco não ficam no LouvorFlow: ficam guardados
-            no conector bancário.{' '}
+            O client ID, o certificado e a chave do banco são cadastrados pelo MASTER em{' '}
+            <Link to="/configuracoes/integracoes" className="font-semibold text-teal-700 underline">
+              Configurações › Integrações
+            </Link>
+            , junto com a chave do conector bancário.{' '}
             <a
               href={README_URL}
               target="_blank"

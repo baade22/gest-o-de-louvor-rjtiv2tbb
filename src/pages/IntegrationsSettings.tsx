@@ -35,6 +35,7 @@ import {
   disconnectIntegration,
 } from '@/services/integrations'
 import { HolyricsAgentCard } from '@/components/HolyricsAgentCard'
+import { BankIntegrations } from '@/pages/finance/BankIntegrations'
 
 export default function IntegrationsSettings() {
   const { currentChurch, can, isMaster } = useAuth()
@@ -406,6 +407,9 @@ export default function IntegrationsSettings() {
           isAdmin={can('culto.computadores.parear')}
         />
       </div>
+
+      {/* Bancos do financeiro: credenciais da Cora e do Bradesco e o conector bancário */}
+      {currentChurch && <BankIntegrations churchId={currentChurch.id} isMaster={isMaster} />}
 
       {/* MODAL: Configurar / Alterar YouTube API Key */}
       <Dialog open={youtubeModalOpen} onOpenChange={setYoutubeModalOpen}>

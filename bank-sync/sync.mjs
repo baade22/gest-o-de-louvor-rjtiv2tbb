@@ -5,7 +5,9 @@
 // Sem dependências: as chamadas aos bancos usam certificado do cliente (mTLS) via node:https.
 //
 // Variáveis de ambiente (veja bank-sync/README.md):
-//   LOUVORFLOW_URL, BANK_SYNC_TOKEN
+//   LOUVORFLOW_URL, BANK_SYNC_TOKEN (a chave do conector gerada em Configurações > Integrações)
+// As credenciais dos bancos cadastradas no LouvorFlow chegam junto com cada conta. Para quem
+// prefere deixá-las só aqui, continuam valendo as variáveis:
 //   CORA_CLIENT_ID, CORA_CERT, CORA_KEY
 //   BRADESCO_CLIENT_ID, BRADESCO_CLIENT_SECRET, BRADESCO_CERT, BRADESCO_KEY
 //   (CERT e KEY com o conteúdo PEM, ou *_CERT_FILE / *_KEY_FILE com o caminho do arquivo).
@@ -46,7 +48,19 @@ try {
 
 const env = (name) => (process.env[name] || '').trim()
 
-function credentials(provider, key) {
+function credentials(provider, key, fromServer) {
+  if (fromServer?.client_id && fromServer.cert && fromServer.key) {
+    // Entram na lista do que nunca pode aparecer em log ou mensagem de erro
+    serverSecrets.push(
+      ...[fromServer.client_id, fromServer.client_secret, fromServer.cert, fromServer.key],
+    )
+    return {
+      clientId: fromServer.client_id,
+      clientSecret: fromServer.client_secret || '',
+      cert: fromServer.cert,
+      key: fromServer.key,
+    }
+  }
   const p = key ? `${provider}_${key.toUpperCase()}` : provider
   const pem = (name) => {
     const inline = env(`${p}_${name}`)
@@ -93,15 +107,19 @@ function request(url, { method = 'GET', headers = {}, body, cert, key } = {}) {
 
 // O texto de erro do banco vai para o log do GitHub e para a tela: tira dele qualquer
 // segredo do conector e qualquer coisa com cara de token
+const serverSecrets = []
 const secretValues = () =>
-  Object.entries(process.env)
-    .filter(([k, v]) => /^(CORA_|BRADESCO_|BANK_SYNC_TOKEN)/.test(k) && v && v.length >= 6)
-    .flatMap(([, v]) =>
-      v
-        .split('\n')
-        .map((x) => x.trim())
-        .filter((x) => x.length >= 6),
-    )
+  [
+    ...Object.entries(process.env)
+      .filter(([k, v]) => /^(CORA_|BRADESCO_|BANK_SYNC_TOKEN)/.test(k) && v && v.length >= 6)
+      .map(([, v]) => v),
+    ...serverSecrets.filter(Boolean),
+  ].flatMap((v) =>
+    v
+      .split('\n')
+      .map((x) => x.trim())
+      .filter((x) => x.length >= 6),
+  )
 function redact(text) {
   let out = String(text || '')
   for (const v of secretValues()) out = out.split(v).join('***')
@@ -228,7 +246,7 @@ async function main() {
     try {
       if (!HOSTS[conn.provider]?.[conn.environment])
         throw new Error('Banco ou ambiente desconhecido')
-      const cred = credentials(conn.provider, conn.credential_key)
+      const cred = credentials(conn.provider, conn.credential_key, conn.credentials)
       const data =
         conn.provider === 'CORA' ? await syncCora(conn, cred) : await syncBradesco(conn, cred)
       const res = await louvorflow('/backend/v1/finance/bank-sync/push', {
