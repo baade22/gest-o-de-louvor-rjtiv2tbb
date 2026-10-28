@@ -26,6 +26,7 @@ import AccessProfileForm from '@/pages/access/AccessProfileForm'
 import UserProfile from '@/pages/UserProfile'
 import ChurchSettings from '@/pages/ChurchSettings'
 import IntegrationsSettings from '@/pages/IntegrationsSettings'
+import WhatsAppSettings from '@/pages/WhatsAppSettings'
 import SoundModule from '@/pages/SoundModule'
 import ProjectionModule from '@/pages/ProjectionModule'
 import MediaModule from '@/pages/MediaModule'
@@ -588,6 +589,14 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="admin.integracoes.ver">
                   <IntegrationsSettings />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/configuracoes/whatsapp"
+              element={
+                <RequireAuth requireRole="MASTER">
+                  <WhatsAppSettings />
                 </RequireAuth>
               }
             />
