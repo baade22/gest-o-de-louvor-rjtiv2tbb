@@ -30,7 +30,7 @@ import type { EventTask, EventItem, ChurchMember, TeamArea, TaskPriority } from 
 import { listEventTasks, saveEventTask, updateTaskStatus, deleteTask } from '@/services/tasks'
 
 export default function TasksModule() {
-  const { currentChurch, currentMember, isAdmin, isLeader, isMaster } = useAuth()
+  const { currentChurch, currentMember, can } = useAuth()
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -363,7 +363,7 @@ export default function TasksModule() {
                       {task.status}
                     </Badge>
 
-                    {(isAdmin || isMaster) && (
+                    {can('louvor.tarefas.excluir') && (
                       <Button
                         variant="ghost"
                         size="icon"

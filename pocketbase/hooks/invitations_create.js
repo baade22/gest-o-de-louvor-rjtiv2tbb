@@ -1,8 +1,8 @@
 // Hook para criar convite de novo usuário secundário
 // POST /backend/v1/invitations/create
-// Body: { church_id, email, name, role, operational_roles, role_ids }
-// Permissão: Apenas MASTER ou ADMIN da congregação.
-// Regra de segurança: ADMIN não pode criar convite com perfil MASTER. Apenas MASTER cria MASTER.
+// Body: { church_id, email, name, is_master, access_profiles: [ids], role_ids }
+// Permissão: MASTER ou quem tem admin.pessoas.novo. Só o MASTER convida MASTER, e quem não é
+// MASTER só convida com perfis que não liberem nada além do que ele mesmo tem.
 
 routerAdd(
   'POST',
@@ -19,24 +19,13 @@ routerAdd(
       .trim()
       .toLowerCase()
     const name = String(body.name || '').trim()
-    const role = String(body.role || 'MUSICO').trim()
-    const operationalRoles = Array.isArray(body.operational_roles)
-      ? body.operational_roles.map((r) => String(r))
-      : ['MUSICO']
-    const knownOps = [
-      'MUSICO',
-      'SOM',
-      'PROJECAO',
-      'MIDIA',
-      'ILUMINACAO',
-      'FINANCEIRO',
-      'AUDITOR',
-      'MEMBRESIA',
-      'EVENTOS',
-    ]
-    for (const op of operationalRoles) {
-      if (knownOps.indexOf(op) === -1) {
-        return e.json(400, { message: 'Função operacional inválida: ' + op })
+    const isMasterInvite = body.is_master === true
+    const role = isMasterInvite ? 'MASTER' : 'MUSICO'
+    const profileIds = []
+    if (Array.isArray(body.access_profiles)) {
+      for (const id of body.access_profiles) {
+        const s = String(id || '').trim()
+        if (s && profileIds.indexOf(s) === -1) profileIds.push(s)
       }
     }
     const rawRoleIds = Array.isArray(body.role_ids) ? body.role_ids : []
@@ -64,14 +53,11 @@ routerAdd(
     if (!emailPattern.test(email)) {
       return e.json(400, { message: 'Formato de e-mail inválido' })
     }
-    if (!['MASTER', 'ADMIN', 'LIDER', 'MUSICO'].includes(role)) {
-      return e.json(400, { message: 'Nível de permissão inválido' })
-    }
-    if (operationalRoles.length === 0) {
-      return e.json(400, { message: 'Selecione ao menos uma função operacional' })
+    if (!isMasterInvite && profileIds.length === 0) {
+      return e.json(400, { message: 'Escolha ao menos um perfil de acesso' })
     }
 
-    // 1. Autorização do chamador na igreja
+    // 1. Autorização do chamador na igreja (perfis de acesso)
     try {
       const callerMemberships = $app.findRecordsByFilter(
         'church_members',
@@ -86,30 +72,48 @@ routerAdd(
         return e.json(403, { message: 'Sem acesso a esta congregação' })
       }
 
-      const callerRole = callerMemberships[0].getString('role')
-      if (callerRole !== 'MASTER' && callerRole !== 'ADMIN') {
+      const caller = callerMemberships[0]
+      const callerIsMaster = caller.getString('role') === 'MASTER'
+      let callerPerms = []
+      try {
+        callerPerms = JSON.parse(caller.getString('permissions') || '[]') || []
+      } catch (_) {}
+      if (!callerIsMaster && callerPerms.indexOf('admin.pessoas.novo') === -1) {
         return e.json(403, {
-          message: 'Apenas administradores e MASTER podem criar convites de usuários.',
+          message: 'Seu perfil de acesso não permite convidar pessoas.',
         })
       }
-
-      if (role === 'MASTER' && callerRole !== 'MASTER') {
+      if (isMasterInvite && !callerIsMaster) {
         return e.json(403, {
           message: 'Apenas o perfil MASTER pode convidar outro usuário com nível MASTER.',
         })
       }
-      // Funções sensíveis (dinheiro e dados dos membros): só o MASTER convida com elas
-      if (
-        (operationalRoles.indexOf('FINANCEIRO') !== -1 ||
-          operationalRoles.indexOf('AUDITOR') !== -1 ||
-          operationalRoles.indexOf('MEMBRESIA') !== -1 ||
-          operationalRoles.indexOf('EVENTOS') !== -1) &&
-        callerRole !== 'MASTER'
-      ) {
-        return e.json(403, {
-          message:
-            'Só o MASTER da igreja pode convidar alguém com a função Financeiro, Conselho fiscal, Membresia ou Eventos.',
-        })
+      // Perfis do convite: desta igreja e, para quem não é MASTER, sem liberar nada além do
+      // que o próprio convidante tem
+      for (const id of profileIds) {
+        let p = null
+        try {
+          p = $app.findRecordById('access_profiles', id)
+        } catch (_) {}
+        if (!p || p.getString('church_id') !== churchId) {
+          return e.json(400, { message: 'Perfil de acesso inválido.' })
+        }
+        if (!callerIsMaster) {
+          let keys = []
+          try {
+            keys = JSON.parse(p.getString('permissions') || '[]') || []
+          } catch (_) {}
+          for (const k of keys) {
+            if (callerPerms.indexOf(k) === -1) {
+              return e.json(403, {
+                message:
+                  'Você não pode convidar com o perfil "' +
+                  p.getString('name') +
+                  '": ele libera coisas que você mesmo não tem. Peça ao MASTER.',
+              })
+            }
+          }
+        }
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente: ' + err.message })
@@ -173,7 +177,8 @@ routerAdd(
       inv.set('name', name)
       inv.set('token', token)
       inv.set('role', role)
-      inv.set('operational_roles', operationalRoles)
+      inv.set('operational_roles', [])
+      inv.set('access_profiles', profileIds)
       inv.set('role_ids', roleIds)
       inv.set('status', 'PENDING')
       inv.set('expires_at', expiresAt)
@@ -189,7 +194,7 @@ routerAdd(
           name: name,
           token: token,
           role: role,
-          operational_roles: operationalRoles,
+          access_profiles: profileIds,
           status: 'PENDING',
           expires_at: expiresAt,
         },

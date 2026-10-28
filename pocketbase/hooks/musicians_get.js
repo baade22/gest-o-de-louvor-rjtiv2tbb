@@ -55,6 +55,17 @@ routerAdd(
       if (userMemberships.length === 0) {
         return e.json(403, { message: 'Sem acesso a este membro' })
       }
+      // Contato e perfis só para quem gere as pessoas (ou para a própria pessoa)
+      const caller = userMemberships[0]
+      let callerPerms = []
+      try {
+        callerPerms = JSON.parse(caller.getString('permissions') || '[]') || []
+      } catch (_) {}
+      const canSeeDetails =
+        caller.getString('role') === 'MASTER' ||
+        callerPerms.indexOf('admin.pessoas.ver') !== -1 ||
+        callerPerms.indexOf('membresia.pessoas.ver') !== -1 ||
+        caller.id === member.id
       const userId = member.getString('user_id')
       let userName = ''
       let userEmail = ''
@@ -97,11 +108,19 @@ routerAdd(
       }
 
       let opRoles = []
+      let profileIds = []
       try {
-        const raw = member.get('operational_roles')
-        if (Array.isArray(raw)) opRoles = raw
-        else if (typeof raw === 'string' && raw) opRoles = JSON.parse(raw)
+        opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
+        profileIds = JSON.parse(member.getString('access_profiles') || '[]') || []
       } catch (_) {}
+      const accessProfiles = []
+      for (const id of profileIds) {
+        try {
+          const p = $app.findRecordById('access_profiles', id)
+          accessProfiles.push({ id: p.id, name: p.getString('name') })
+        } catch (_) {}
+      }
+      if (!canSeeDetails) userEmail = ''
 
       return e.json(200, {
         id: member.id,
@@ -109,7 +128,9 @@ routerAdd(
         user_id: userId,
         role: member.getString('role'),
         operational_roles: opRoles,
-        phone: member.getString('phone'),
+        access_profiles: canSeeDetails ? accessProfiles : [],
+        permissions: canSeeDetails ? JSON.parse(member.getString('permissions') || '[]') : [],
+        phone: canSeeDetails ? member.getString('phone') : '',
         is_active: member.getBool('is_active'),
         created: member.getString('created'),
         updated: member.getString('updated'),

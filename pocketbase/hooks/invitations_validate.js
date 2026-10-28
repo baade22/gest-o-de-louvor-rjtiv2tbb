@@ -88,6 +88,16 @@ routerAdd('GET', '/backend/v1/invitations/validate', (e) => {
       }
     } catch (_) {}
     if (!Array.isArray(opRoles)) opRoles = []
+    const accessProfiles = []
+    try {
+      const ids = JSON.parse(inv.getString('access_profiles') || '[]') || []
+      for (const id of ids) {
+        try {
+          const p = $app.findRecordById('access_profiles', String(id))
+          accessProfiles.push({ id: p.id, name: p.getString('name') })
+        } catch (_) {}
+      }
+    } catch (_) {}
 
     return e.json(200, {
       valid: true,
@@ -98,6 +108,7 @@ routerAdd('GET', '/backend/v1/invitations/validate', (e) => {
       email: inv.getString('email'),
       role: inv.getString('role'),
       operational_roles: opRoles,
+      access_profiles: accessProfiles,
       expires_at: expiresAtStr,
     })
   } catch (err) {

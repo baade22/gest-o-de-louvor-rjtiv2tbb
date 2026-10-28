@@ -46,7 +46,14 @@ routerAdd(
         return e.json(403, { success: false, message: 'Acesso negado a esta congregação.' })
       }
       const role = memberships[0].getString('role')
-      if (role !== 'MASTER' && role !== 'ADMIN') {
+      const rolePerms = (() => {
+        try {
+          return JSON.parse(memberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (role !== 'MASTER' && rolePerms.indexOf('culto.computadores.excluir') === -1) {
         return e.json(403, {
           success: false,
           error_code: 'INSUFFICIENT_PERMISSIONS',
@@ -99,7 +106,7 @@ routerAdd(
 )
 
 // POST /backend/v1/saas/holyrics/agents/rename
-// Body: { church_id, agent_id, name }. MASTER/ADMIN/LIDER.
+// Body: { church_id, agent_id, name }. MASTER ou culto.computadores.parear.
 routerAdd(
   'POST',
   '/backend/v1/saas/holyrics/agents/rename',
@@ -133,11 +140,19 @@ routerAdd(
       if (memberships.length === 0) {
         return e.json(403, { success: false, message: 'Acesso negado a esta congregação.' })
       }
-      if (memberships[0].getString('role') === 'MUSICO') {
+      const role = memberships[0].getString('role')
+      const rolePerms = (() => {
+        try {
+          return JSON.parse(memberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (role !== 'MASTER' && rolePerms.indexOf('culto.computadores.parear') === -1) {
         return e.json(403, {
           success: false,
           error_code: 'INSUFFICIENT_PERMISSIONS',
-          message: 'Músicos não possuem permissão para gerenciar computadores.',
+          message: 'Seu perfil de acesso não permite gerenciar os computadores.',
         })
       }
     } catch (err) {

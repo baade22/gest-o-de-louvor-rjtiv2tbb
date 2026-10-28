@@ -158,7 +158,7 @@ export default function PersonProfile() {
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const photoToken = usePhotoToken()
-  const { canView: canSeeFinance } = useFinanceAccess()
+  const { canView: canSeeFinance } = useFinanceAccess('contribuintes')
   const today = getLocalTodayYMD()
 
   const [person, setPerson] = useState<Person | null>(null)

@@ -338,7 +338,7 @@ function EditDialog({
 export default function FinanceBudget() {
   const { currentChurch } = useAuth()
   const churchId = currentChurch?.id
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('orcamento')
   const { toast } = useToast()
   const day = today()
   const [year, setYear] = useState(Number(day.slice(0, 4)))

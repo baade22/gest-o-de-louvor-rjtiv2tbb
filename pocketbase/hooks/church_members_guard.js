@@ -58,6 +58,7 @@ onRecordUpdateRequest((e) => {
     record.set('church_id', original.getString('church_id'))
     record.set('is_active', original.getBool('is_active'))
     record.set('operational_roles', original.get('operational_roles'))
+    record.set('access_profiles', original.get('access_profiles'))
   } catch (_) {}
 
   e.next()

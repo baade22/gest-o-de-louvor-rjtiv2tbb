@@ -44,8 +44,15 @@ routerAdd(
         return e.json(403, { message: 'Sem acesso a esta congregação' })
       }
       const callerRole = callerMemberships[0].getString('role')
-      if (callerRole !== 'MASTER' && callerRole !== 'ADMIN') {
-        return e.json(403, { message: 'Apenas MASTER ou Administrador pode visualizar convites.' })
+      const callerRolePerms = (() => {
+        try {
+          return JSON.parse(callerMemberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (callerRole !== 'MASTER' && callerRolePerms.indexOf('admin.pessoas.novo') === -1) {
+        return e.json(403, { message: 'Só quem pode convidar pessoas vê os convites.' })
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente' })
@@ -97,6 +104,16 @@ routerAdd(
           }
         } catch (_) {}
         if (!Array.isArray(opRoles)) opRoles = []
+        const accessProfiles = []
+        try {
+          const ids = JSON.parse(inv.getString('access_profiles') || '[]') || []
+          for (const id of ids) {
+            try {
+              const p = $app.findRecordById('access_profiles', String(id))
+              accessProfiles.push({ id: p.id, name: p.getString('name') })
+            } catch (_) {}
+          }
+        } catch (_) {}
 
         list.push({
           id: inv.id,
@@ -106,6 +123,7 @@ routerAdd(
           token: inv.getString('token'),
           role: inv.getString('role'),
           operational_roles: opRoles,
+          access_profiles: accessProfiles,
           status: status,
           expires_at: expiresAtStr,
           accepted_at: inv.getString('accepted_at') || null,

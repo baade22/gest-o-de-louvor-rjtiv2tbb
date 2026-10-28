@@ -273,7 +273,7 @@ function weekCsv(flow: CashFlow) {
 export default function FinanceCashFlow() {
   const { currentChurch } = useAuth()
   const churchId = currentChurch?.id
-  const { canView, canEdit } = useFinanceAccess()
+  const { canView, canEdit } = useFinanceAccess('fluxo')
   const { toast } = useToast()
   const today = brtDay(new Date().toISOString())
 

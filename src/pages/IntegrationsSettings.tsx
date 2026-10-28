@@ -37,7 +37,8 @@ import {
 import { HolyricsAgentCard } from '@/components/HolyricsAgentCard'
 
 export default function IntegrationsSettings() {
-  const { currentChurch, isAdmin } = useAuth()
+  const { currentChurch, can } = useAuth()
+  const isAdmin = can('admin.integracoes.alterar')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -217,7 +218,7 @@ export default function IntegrationsSettings() {
     })
   }
 
-  if (!isAdmin) {
+  if (!can('admin.integracoes.ver')) {
     return (
       <div className="max-w-2xl mx-auto py-12 text-center space-y-4">
         <ShieldCheck className="mx-auto h-12 w-12 text-slate-400" />
@@ -401,7 +402,10 @@ export default function IntegrationsSettings() {
         </div>
 
         {/* CARD 2: HOLYRICS LOCAL AGENT (OFICIAL LouvorFlow Agent) */}
-        <HolyricsAgentCard currentChurch={currentChurch} isAdmin={isAdmin} />
+        <HolyricsAgentCard
+          currentChurch={currentChurch}
+          isAdmin={can('culto.computadores.parear')}
+        />
       </div>
 
       {/* MODAL: Configurar / Alterar YouTube API Key */}

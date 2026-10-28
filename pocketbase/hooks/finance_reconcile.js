@@ -12,7 +12,7 @@
 //             cria o lançamento a partir da linha (transferência quando vier transfer_account_id)
 // unreconcile { line_id }   desfaz a ligação; o lançamento continua como está
 //
-// Só MASTER ou quem tem a função FINANCEIRO na igreja da conta. Tudo numa transação só.
+// Só MASTER ou quem tem financeiro.conciliacao.alterar (na congregação da conta). Tudo numa transação só.
 // Se o lançamento conciliado for estornado, a linha volta a ficar pendente.
 
 routerAdd(
@@ -24,7 +24,8 @@ routerAdd(
     const action = e.request.pathValue('action')
     const body = e.requestInfo().body || {}
 
-    const canManage = (churchId) => {
+    // Perfis de acesso: financeiro.conciliacao.alterar, na congregação da conta
+    const canManage = (churchId, accountId) => {
       let member = null
       try {
         const rows = $app.findRecordsByFilter(
@@ -38,11 +39,20 @@ routerAdd(
         member = rows.length > 0 ? rows[0] : null
       } catch (_) {}
       if (!member) return false
-      let opRoles = []
+      if (member.getString('role') === 'MASTER') return true
+      let perms = []
+      let cong = []
       try {
-        opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
+        perms = JSON.parse(member.getString('permissions') || '[]') || []
+        cong = JSON.parse(member.getString('cong_financeiro') || '[]') || []
       } catch (_) {}
-      return member.getString('role') === 'MASTER' || opRoles.indexOf('FINANCEIRO') !== -1
+      if (perms.indexOf('financeiro.conciliacao.alterar') === -1) return false
+      if (cong.indexOf('*') !== -1 || !accountId) return true
+      let c = ''
+      try {
+        c = $app.findRecordById('fin_accounts', accountId).getString('congregation')
+      } catch (_) {}
+      return !c || cong.indexOf(c) !== -1
     }
     const findOr = (collection, id) => {
       if (!id) return null
@@ -61,7 +71,7 @@ routerAdd(
       const account = findOr('fin_accounts', body.account_id)
       if (!account) return e.json(404, { message: 'Conta não encontrada' })
       const churchId = account.getString('church_id')
-      if (!canManage(churchId)) {
+      if (!canManage(churchId, account.id)) {
         return e.json(403, { message: 'Só quem cuida do financeiro pode importar extrato.' })
       }
       const lines = Array.isArray(body.lines) ? body.lines : []
@@ -160,7 +170,7 @@ routerAdd(
     const line = findOr('fin_bank_lines', body.line_id)
     if (!line) return e.json(404, { message: 'Movimento não encontrado' })
     const churchId = line.getString('church_id')
-    if (!canManage(churchId)) {
+    if (!canManage(churchId, line.getString('account_id'))) {
       return e.json(403, { message: 'Só quem cuida do financeiro pode conciliar.' })
     }
     const lineAmount = line.getInt('amount_cents')

@@ -20,8 +20,18 @@ interface AuthContextType {
   hasOperationalRole: (opRole: OperationalRole) => boolean
   hasPermission: (perm: string) => boolean
   hasModule: (moduleName: string) => boolean
-  canManageContent: boolean // Admin or Lider or Master
-  canManageChurch: boolean // Admin or Master
+  /** Chaves dos perfis de acesso (modulo.tela.acao). MASTER = ['*']. */
+  accessKeys: string[]
+  /** Perfis de acesso da pessoa nesta igreja */
+  accessProfiles: { id: string; name: string }[]
+  /** Congregações liberadas por módulo (membresia, eventos, financeiro); ['*'] = todas */
+  congregations: Record<string, string[]>
+  /** Tem a chave exata (ex.: 'financeiro.lancamentos.novo') */
+  can: (key: string) => boolean
+  /** Tem alguma chave que começa com o prefixo (ex.: 'financeiro' ou 'louvor.musicas') */
+  canAny: (prefix: string) => boolean
+  canManageContent: boolean // pode alterar músicas, cultos e escalas
+  canManageChurch: boolean // pode gerenciar pessoas com acesso
   login: (email: string, pass: string) => Promise<void>
   logout: () => void
   switchChurch: (churchId: string) => Promise<void>
@@ -39,7 +49,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [operationalRoles, setOperationalRoles] = useState<OperationalRole[]>([])
   const [permissions, setPermissions] = useState<string[]>([])
   const [allowedModules, setAllowedModules] = useState<string[]>([])
+  const [accessKeys, setAccessKeys] = useState<string[]>([])
+  const [accessProfiles, setAccessProfiles] = useState<{ id: string; name: string }[]>([])
+  const [congregations, setCongregations] = useState<Record<string, string[]>>({})
   const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  const applyPermissions = useCallback((permRes: UserPermissions) => {
+    setOperationalRoles(permRes.operational_roles || [])
+    setPermissions(permRes.permissions || [])
+    setAllowedModules(permRes.modules || [])
+    setAccessKeys(permRes.access_keys || [])
+    setAccessProfiles(permRes.profiles || [])
+    setCongregations(permRes.congregations || {})
+  }, [])
 
   const loadUserData = useCallback(async () => {
     try {
@@ -100,9 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               `/backend/v1/permissions/me?church_id=${selectedMember.church_id}`,
               { method: 'GET' },
             )
-            setOperationalRoles(permRes.operational_roles || [])
-            setPermissions(permRes.permissions || [])
-            setAllowedModules(permRes.modules || [])
+            applyPermissions(permRes)
           } catch (_) {
             const ops = (selectedMember.operational_roles as OperationalRole[]) || ['MUSICO']
             setOperationalRoles(ops)
@@ -125,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [applyPermissions])
 
   useEffect(() => {
     loadUserData()
@@ -160,6 +180,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOperationalRoles([])
     setPermissions([])
     setAllowedModules([])
+    setAccessKeys([])
+    setAccessProfiles([])
+    setCongregations({})
   }
 
   const switchChurch = async (churchId: string) => {
@@ -183,9 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             `/backend/v1/permissions/me?church_id=${churchId}`,
             { method: 'GET' },
           )
-          setOperationalRoles(permRes.operational_roles || [])
-          setPermissions(permRes.permissions || [])
-          setAllowedModules(permRes.modules || [])
+          applyPermissions(permRes)
         } catch (_) {
           const ops = (membership.operational_roles as OperationalRole[]) || ['MUSICO']
           setOperationalRoles(ops)
@@ -223,8 +244,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return allowedModules.includes(moduleName)
   }
 
-  const canManageContent = isAdmin || isLeader
-  const canManageChurch = isAdmin
+  const can = (key: string) => {
+    if (isMaster) return true
+    return accessKeys.includes(key)
+  }
+
+  const canAny = (prefix: string) => {
+    if (isMaster) return true
+    const p = prefix + '.'
+    return accessKeys.some((k) => k.startsWith(p))
+  }
+
+  const canManageContent =
+    can('louvor.musicas.alterar') || can('louvor.cultos.alterar') || can('louvor.escalas.alterar')
+  const canManageChurch = can('admin.pessoas.alterar')
 
   return (
     <AuthContext.Provider
@@ -246,6 +279,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasOperationalRole,
         hasPermission,
         hasModule,
+        accessKeys,
+        accessProfiles,
+        congregations,
+        can,
+        canAny,
         canManageContent,
         canManageChurch,
         login,

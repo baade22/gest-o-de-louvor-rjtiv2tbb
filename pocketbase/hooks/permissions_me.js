@@ -1,6 +1,12 @@
 // Hook para obter as permissões consolidadas do usuário autenticado na congregação ativa
 // GET /backend/v1/permissions/me?church_id=... (requer autenticação)
-// Retorna: { church_id, role, operational_roles, is_master, permissions: string[], modules: string[] }
+// Retorna: { church_id, role, operational_roles, is_master, access_keys, congregations,
+//            profiles, permissions, modules }
+//
+// access_keys são as chaves dos perfis de acesso (modulo.tela.acao, ver
+// src/lib/accessCatalog.ts), já somadas pelo hook church_members_access.js. permissions
+// traz também as chaves antigas (music.view, finance.edit...) derivadas delas, para as
+// telas que ainda usam esses nomes. MASTER tem tudo (is_master).
 
 routerAdd(
   'GET',
@@ -64,192 +70,113 @@ routerAdd(
         message: 'Você não possui vínculo ativo nesta congregação.',
         church_id: churchId,
         permissions: [],
+        access_keys: [],
         modules: [],
         is_master: false,
       })
     }
 
+    const parseList = (s) => {
+      try {
+        const v = JSON.parse(s || '[]')
+        return Array.isArray(v) ? v.map((x) => String(x)) : []
+      } catch (_) {
+        return []
+      }
+    }
+
     const appRole = memberRecord.getString('role') || 'MUSICO'
-    let opRoles = []
-    try {
-      const raw = memberRecord.get('operational_roles')
-      if (typeof raw === 'string' && raw) {
-        opRoles = JSON.parse(raw)
-      } else if (Array.isArray(raw)) {
-        if (raw.length > 0 && typeof raw[0] === 'number') {
-          let str = ''
-          for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
-          opRoles = JSON.parse(str)
-        } else {
-          opRoles = raw
-        }
-      }
-    } catch (_) {}
-    if (!Array.isArray(opRoles)) opRoles = []
-
-    // Se não tiver operational_roles configurado ainda, o papel de app dá um default sensato
-    if (opRoles.length === 0) {
-      if (appRole === 'MASTER') {
-        opRoles = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO']
-      } else if (appRole === 'ADMIN' || appRole === 'LIDER') {
-        opRoles = ['MUSICO']
-      } else {
-        opRoles = ['MUSICO']
-      }
-    }
-
     const isMaster = appRole === 'MASTER'
-    const isAdmin = appRole === 'ADMIN' || isMaster
-    const isLider = appRole === 'LIDER' || isAdmin
-
-    // Monta matriz de permissões
-    // MASTER tem 100% das permissões
-    const allPermissions = [
-      'music.view',
-      'music.edit',
-      'events.view',
-      'events.edit',
-      'scales.view',
-      'scales.edit',
-      'profile.view',
-      'profile.edit',
-      'sound.view',
-      'sound.edit',
-      'projection.view',
-      'projection.edit',
-      'media.view',
-      'media.upload',
-      'lighting.view',
-      'lighting.edit',
-      'tasks.view',
-      'tasks.edit',
-      'users.view',
-      'users.create',
-      'users.edit',
-      'roles.view',
-      'roles.edit',
-      'integrations.view',
-      'integrations.edit',
-      'holyrics.view',
-      'holyrics.sync',
-      'church.settings',
-      'finance.view',
-      'finance.edit',
-    ]
-
-    let permissionsSet = {}
-    // Sempre básico para todo membro autenticado ativo
-    permissionsSet['profile.view'] = true
-    permissionsSet['profile.edit'] = true
-    permissionsSet['scales.view'] = true
-
-    if (isMaster) {
-      for (let i = 0; i < allPermissions.length; i++) {
-        permissionsSet[allPermissions[i]] = true
-      }
-    } else {
-      // Regras para ADMIN e LIDER
-      if (isAdmin) {
-        permissionsSet['music.view'] = true
-        permissionsSet['music.edit'] = true
-        permissionsSet['events.view'] = true
-        permissionsSet['events.edit'] = true
-        permissionsSet['scales.edit'] = true
-        permissionsSet['users.view'] = true
-        permissionsSet['users.create'] = true
-        permissionsSet['users.edit'] = true
-        permissionsSet['roles.view'] = true
-        permissionsSet['roles.edit'] = true
-        permissionsSet['integrations.view'] = true
-        permissionsSet['integrations.edit'] = true
-        permissionsSet['holyrics.view'] = true
-        permissionsSet['holyrics.sync'] = true
-        permissionsSet['church.settings'] = true
-        // Financeiro é delegado pelo MASTER: ADMIN só vê/mexe no financeiro se receber a
-        // função FINANCEIRO (ou AUDITOR), igual à Membresia. Sem a função, não vê.
-      } else if (isLider) {
-        permissionsSet['music.view'] = true
-        permissionsSet['music.edit'] = true
-        permissionsSet['events.view'] = true
-        permissionsSet['events.edit'] = true
-        permissionsSet['scales.edit'] = true
-        permissionsSet['users.view'] = true
-        permissionsSet['roles.view'] = true
-        permissionsSet['holyrics.view'] = true
-        permissionsSet['holyrics.sync'] = true
-      }
-
-      // União das funções operacionais
-      for (let i = 0; i < opRoles.length; i++) {
-        const op = opRoles[i]
-        if (op === 'MUSICO') {
-          permissionsSet['music.view'] = true
-        }
-        if (op === 'SOM') {
-          permissionsSet['sound.view'] = true
-          permissionsSet['sound.edit'] = true
-          permissionsSet['events.view'] = true
-          // Som enxerga o repertório/letras do culto (só leitura; editar exige gestor)
-          permissionsSet['music.view'] = true
-        }
-        if (op === 'PROJECAO') {
-          permissionsSet['projection.view'] = true
-          permissionsSet['projection.edit'] = true
-          permissionsSet['media.view'] = true
-          permissionsSet['events.view'] = true
-          // Projeção enxerga músicas/letras (só leitura; editar exige gestor)
-          permissionsSet['music.view'] = true
-        }
-        if (op === 'MIDIA') {
-          permissionsSet['media.view'] = true
-          permissionsSet['media.upload'] = true
-          permissionsSet['tasks.view'] = true
-          permissionsSet['tasks.edit'] = true
-          permissionsSet['events.view'] = true
-        }
-        if (op === 'ILUMINACAO') {
-          permissionsSet['lighting.view'] = true
-          permissionsSet['lighting.edit'] = true
-          permissionsSet['events.view'] = true
-        }
-        if (op === 'FINANCEIRO') {
-          permissionsSet['finance.view'] = true
-          permissionsSet['finance.edit'] = true
-        }
-        // Conselho fiscal: vê o financeiro e audita, sem lançar
-        if (op === 'AUDITOR') {
-          permissionsSet['finance.view'] = true
-          permissionsSet['finance.audit'] = true
-        }
-      }
+    const keys = isMaster ? ['*'] : parseList(memberRecord.getString('permissions'))
+    const has = (k) => isMaster || keys.indexOf(k) !== -1
+    const hasAny = (prefix) => {
+      if (isMaster) return true
+      for (let i = 0; i < keys.length; i++) if (keys[i].indexOf(prefix + '.') === 0) return true
+      return false
     }
 
-    const permissionsList = Object.keys(permissionsSet)
+    const congregations = {
+      membresia: isMaster ? ['*'] : parseList(memberRecord.getString('cong_membresia')),
+      eventos: isMaster ? ['*'] : parseList(memberRecord.getString('cong_eventos')),
+      financeiro: isMaster ? ['*'] : parseList(memberRecord.getString('cong_financeiro')),
+    }
 
-    // Determina lista de módulos permitidos
-    // Módulos: dashboard, songs, events, my_scales, sound, projection, media, tasks, lighting, musicians, roles, profile, integrations, settings
+    const profiles = []
+    for (const id of parseList(memberRecord.getString('access_profiles'))) {
+      try {
+        const p = $app.findRecordById('access_profiles', id)
+        profiles.push({ id: p.id, name: p.getString('name') })
+      } catch (_) {}
+    }
+
+    // Chaves antigas derivadas das novas (compatibilidade com telas antigas)
+    const legacy = {
+      'profile.view': true,
+      'profile.edit': true,
+      'scales.view': true,
+      'music.view': has('louvor.musicas.ver'),
+      'music.edit': has('louvor.musicas.alterar'),
+      'events.view': has('louvor.cultos.ver'),
+      'events.edit': has('louvor.cultos.alterar'),
+      'scales.edit': has('louvor.escalas.alterar'),
+      'sound.view': has('culto.som.ver'),
+      'sound.edit': has('culto.som.alterar'),
+      'projection.view': has('culto.projecao.ver'),
+      'projection.edit': has('culto.projecao.alterar'),
+      'media.view': has('culto.midias.ver'),
+      'media.upload': has('culto.midias.novo'),
+      'lighting.view': has('culto.iluminacao.ver'),
+      'lighting.edit': has('culto.iluminacao.alterar'),
+      'tasks.view': has('louvor.tarefas.ver'),
+      'tasks.edit': has('louvor.tarefas.alterar'),
+      'users.view': has('admin.pessoas.ver'),
+      'users.create': has('admin.pessoas.novo'),
+      'users.edit': has('admin.pessoas.alterar'),
+      'roles.view': has('admin.funcoes.ver'),
+      'roles.edit': has('admin.funcoes.alterar'),
+      'integrations.view': has('admin.integracoes.ver'),
+      'integrations.edit': has('admin.integracoes.alterar'),
+      'holyrics.view': has('culto.computadores.ver'),
+      'holyrics.sync': has('culto.computadores.enviar'),
+      'church.settings': has('admin.configuracoes.alterar'),
+      'finance.view': hasAny('financeiro'),
+      'finance.edit': has('financeiro.lancamentos.novo'),
+      'finance.audit': has('financeiro.auditoria.auditar'),
+    }
+    const permissionsList = Object.keys(legacy).filter((k) => legacy[k])
+    if (!isMaster) for (const k of keys) permissionsList.push(k)
+
+    // Módulos (nomes antigos usados no menu e em /modules/access)
     const modules = ['dashboard', 'profile']
-    if (permissionsSet['scales.view']) modules.push('my_scales')
-    if (permissionsSet['music.view']) modules.push('songs')
-    if (permissionsSet['events.view']) modules.push('events')
-    if (permissionsSet['sound.view']) modules.push('sound')
-    if (permissionsSet['projection.view']) modules.push('projection')
-    if (permissionsSet['media.view']) modules.push('media')
-    if (permissionsSet['tasks.view']) modules.push('tasks')
-    if (permissionsSet['lighting.view']) modules.push('lighting')
-    if (permissionsSet['users.view']) modules.push('musicians')
-    if (permissionsSet['roles.view']) modules.push('roles')
-    if (permissionsSet['integrations.view']) modules.push('integrations')
-    if (permissionsSet['church.settings']) modules.push('settings')
-    if (permissionsSet['finance.view']) modules.push('finance')
+    if (has('louvor.minhas_escalas.ver')) modules.push('my_scales')
+    if (has('louvor.musicas.ver')) modules.push('songs')
+    if (has('louvor.cultos.ver')) modules.push('events')
+    if (has('culto.som.ver')) modules.push('sound')
+    if (has('culto.projecao.ver')) modules.push('projection')
+    if (has('culto.midias.ver')) modules.push('media')
+    if (has('louvor.tarefas.ver')) modules.push('tasks')
+    if (has('culto.iluminacao.ver')) modules.push('lighting')
+    if (has('admin.pessoas.ver')) modules.push('musicians')
+    if (has('admin.funcoes.ver')) modules.push('roles')
+    if (has('admin.integracoes.ver')) modules.push('integrations')
+    if (has('admin.configuracoes.ver')) modules.push('settings')
+    if (hasAny('financeiro')) modules.push('finance')
+    if (hasAny('membresia')) modules.push('membership')
+    if (hasAny('eventos')) modules.push('church_events')
+
+    let opRoles = parseList(memberRecord.getString('operational_roles'))
+    if (isMaster) opRoles = ['MUSICO', 'SOM', 'PROJECAO', 'MIDIA', 'ILUMINACAO']
 
     return e.json(200, {
       church_id: churchId,
       role: appRole,
       operational_roles: opRoles,
       is_master: isMaster,
-      is_admin: isAdmin,
-      is_leader: isLider,
+      is_admin: isMaster || appRole === 'ADMIN',
+      is_leader: isMaster || appRole === 'ADMIN' || appRole === 'LIDER',
+      access_keys: keys,
+      congregations: congregations,
+      profiles: profiles,
       permissions: permissionsList,
       modules: modules,
     })

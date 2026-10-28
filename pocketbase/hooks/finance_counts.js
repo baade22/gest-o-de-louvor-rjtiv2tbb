@@ -1,7 +1,7 @@
 // Aprovação da contagem do culto (Financeiro)
 // POST /backend/v1/finance/counts/approve
 // Body: { count_id: string }
-// Quem aprova precisa ser MASTER ou ter a função FINANCEIRO na igreja da contagem, e não pode
+// Quem aprova precisa ser MASTER ou ter financeiro.contagem.aprovar na igreja da contagem, e não pode
 // ser quem contou (são sempre duas pessoas). Numa transação só: cria um lançamento para o
 // dinheiro da salva (anônimo) e um para cada envelope, e trava a contagem como APROVADO.
 
@@ -43,12 +43,25 @@ routerAdd(
     if (!member) {
       return e.json(404, { message: 'Contagem não encontrada' })
     }
-    let opRoles = []
+    let perms = []
+    let cong = []
     try {
-      opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
+      perms = JSON.parse(member.getString('permissions') || '[]') || []
+      cong = JSON.parse(member.getString('cong_financeiro') || '[]') || []
     } catch (_) {}
-    if (member.getString('role') !== 'MASTER' && opRoles.indexOf('FINANCEIRO') === -1) {
-      return e.json(403, { message: 'Só quem cuida do financeiro pode aprovar a contagem.' })
+    if (member.getString('role') !== 'MASTER') {
+      if (perms.indexOf('financeiro.contagem.aprovar') === -1) {
+        return e.json(403, { message: 'Seu perfil de acesso não permite aprovar a contagem.' })
+      }
+      let c = ''
+      try {
+        c = $app
+          .findRecordById('fin_accounts', count.getString('account_id'))
+          .getString('congregation')
+      } catch (_) {}
+      if (cong.indexOf('*') === -1 && c && cong.indexOf(c) === -1) {
+        return e.json(403, { message: 'Esta contagem é de uma congregação fora do seu perfil.' })
+      }
     }
 
     if (count.getString('status') !== 'CONTADO') {

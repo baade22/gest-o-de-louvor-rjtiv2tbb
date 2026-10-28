@@ -37,7 +37,10 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { AVAILABLE_KEYS } from '@/lib/transposition'
 
 export default function SongsList() {
-  const { currentChurch, canManageContent } = useAuth()
+  const { currentChurch, can } = useAuth()
+  const canCreate = can('louvor.musicas.novo')
+  const canEdit = can('louvor.musicas.alterar')
+  const canDelete = can('louvor.musicas.excluir')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -123,7 +126,7 @@ export default function SongsList() {
           </p>
         </div>
 
-        {canManageContent && (
+        {canCreate && (
           <Link to="/songs/new">
             <Button className="h-10 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
@@ -182,7 +185,7 @@ export default function SongsList() {
               ? 'Tente ajustar os filtros de busca para encontrar o que procura.'
               : 'Comece adicionando os hinos e cânticos que sua equipe de louvor costuma ministrar.'}
           </p>
-          {canManageContent && !search && selectedKey === 'ALL' && (
+          {canCreate && !search && selectedKey === 'ALL' && (
             <Link to="/songs/new" className="mt-5 inline-block">
               <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">
                 Cadastrar Primeira Música
@@ -251,7 +254,7 @@ export default function SongsList() {
                   </Button>
                 </Link>
 
-                {canManageContent && (
+                {(canEdit || canDelete) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                       <Button
@@ -264,23 +267,27 @@ export default function SongsList() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          window.location.href = `/songs/${song.id}/edit`
-                        }}
-                        className="gap-2 text-xs"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                        Editar Música
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(e) => handleDeleteSong(song.id, e)}
-                        className="gap-2 text-xs text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Excluir Música
-                      </DropdownMenuItem>
+                      {canEdit && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.location.href = `/songs/${song.id}/edit`
+                          }}
+                          className="gap-2 text-xs"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                          Editar Música
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <DropdownMenuItem
+                          onClick={(e) => handleDeleteSong(song.id, e)}
+                          className="gap-2 text-xs text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Excluir Música
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
