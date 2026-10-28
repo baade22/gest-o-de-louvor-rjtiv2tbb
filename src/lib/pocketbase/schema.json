@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-27T23:42:53.232Z",
+  "generatedAt": "2026-10-28T01:04:23.986Z",
   "collections": [
     {
       "name": "users",
@@ -2783,11 +2783,11 @@
       "name": "church_events",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.public_key:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"')) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.public_key:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))"
       },
       "fields": [
         {
@@ -3045,6 +3045,18 @@
           "type": "date",
           "required": false,
           "system": false
+        },
+        {
+          "name": "questions",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "staff",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -3056,11 +3068,11 @@
       "name": "church_event_registrations",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && @request.body.event_id.church_id = @request.body.church_id && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = @request.body.church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.event_id:isset = false && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"')) && @request.body.event_id.church_id = @request.body.church_id && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = @request.body.church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false && @request.body.checkin_code:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"')) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.event_id:isset = false && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false && @request.body.checkin_code:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))"
       },
       "fields": [
         {
@@ -3204,10 +3216,35 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "answers",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "checkin_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "attended_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "checked_out_at",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
-        "CREATE INDEX idx_church_event_regs_event ON church_event_registrations (event_id)"
+        "CREATE INDEX idx_church_event_regs_event ON church_event_registrations (event_id)",
+        "CREATE INDEX `idx_church_event_regs_checkin` ON `church_event_registrations` (checkin_code)"
       ]
     },
     {
