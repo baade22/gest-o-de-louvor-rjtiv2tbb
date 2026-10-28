@@ -58,6 +58,10 @@ const STATUS_BADGE: Record<WhatsAppMessageStatus, { label: string; className: st
     label: 'Na fila',
     className: 'bg-amber-50 text-amber-800 border-amber-200',
   },
+  PAUSADO: {
+    label: 'Pausada',
+    className: 'bg-orange-50 text-orange-800 border-orange-200',
+  },
   ENVIADO: {
     label: 'Enviada',
     className: 'bg-emerald-50 text-emerald-800 border-emerald-200',

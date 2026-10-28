@@ -737,6 +737,18 @@ export default function ChurchEventDetail() {
                     Ver página de inscrição
                   </a>
                 </Button>
+                {can('culto.avisos.novo') && (
+                  <Button
+                    size="sm"
+                    className="rounded-lg gap-1.5 bg-teal-700 hover:bg-teal-800 text-white"
+                    asChild
+                  >
+                    <Link to={`/avisos/novo?evento=${event.id}`}>
+                      <Megaphone className="h-3.5 w-3.5" />
+                      Mandar pelo WhatsApp
+                    </Link>
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-slate-500">
                 Quem se inscreve pelo link entra como "a pagar" (se o evento for pago) e, no fim, vê
