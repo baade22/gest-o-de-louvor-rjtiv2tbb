@@ -110,8 +110,10 @@ onRecordAfterDeleteSuccess((e) => {
 
 // Envio da fila, a cada minuto
 cronAdd('whatsapp_send_queue', '* * * * *', () => {
-  const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '').replace(/\/+$/, '')
-  const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '')
+  const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
+    .replace(/\s+/g, '') // espaços colados pelo celular quebram a URL
+    .replace(/\/+$/, '')
+  const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
   if (!apiUrl || !apiKey) return
 
   const PER_CHURCH = 6
