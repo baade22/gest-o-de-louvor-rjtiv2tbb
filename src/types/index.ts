@@ -55,6 +55,9 @@ export interface ChurchMember {
   user_id: string
   role: AppRole
   operational_roles?: OperationalRole[]
+  /** Perfis de acesso (ids de access_profiles) e as chaves somadas deles */
+  access_profiles?: string[]
+  permissions?: string[]
   phone?: string
   is_active: boolean
   created: string
@@ -75,6 +78,26 @@ export interface UserPermissions {
   is_leader: boolean
   permissions: string[]
   modules: string[]
+  /** Chaves modulo.tela.acao dos perfis de acesso; MASTER recebe ['*'] */
+  access_keys?: string[]
+  /** Por módulo com congregação: ['*'] = todas */
+  congregations?: Record<string, string[]>
+  profiles?: { id: string; name: string }[]
+}
+
+export interface AccessProfile {
+  id: string
+  church_id: string
+  name: string
+  description?: string
+  permissions: string[]
+  /** Vazio = vale para todas as congregações */
+  congregations: string[]
+  is_active: boolean
+  is_system: boolean
+  system_key?: string
+  created: string
+  updated: string
 }
 
 export interface Invitation {
@@ -85,6 +108,8 @@ export interface Invitation {
   token: string
   role: AppRole
   operational_roles?: OperationalRole[]
+  /** Perfis que a pessoa recebe ao aceitar (vazio em convites antigos) */
+  access_profiles?: { id: string; name: string }[]
   status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'CANCELLED'
   expires_at: string
   accepted_at?: string | null

@@ -45,6 +45,7 @@ import {
   ShieldCheck,
   Flag,
   Target,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -92,9 +93,9 @@ export default function Layout() {
     userChurches,
     role,
     isMaster,
-    isAdmin,
-    isLeader,
-    hasOperationalRole,
+    can,
+    canAny,
+    accessProfiles,
     switchChurch,
     logout,
     isAuthenticated,
@@ -112,61 +113,47 @@ export default function Layout() {
     )
   }
 
-  // Regras de visibilidade por papel e função operacional:
-  // MÚSICO (somente): Início, Minhas Escalas, Músicas, Meu Perfil
-  // SOM / PROJEÇÃO / MÍDIA / ILUMINAÇÃO: Agenda + o módulo da sua equipe
-  // Usuário com várias funções operacionais vê a união dos módulos
-  // Som e Projeção também veem músicas/letras (só leitura; editar exige gestor)
-  const canSeeSongs =
-    isMaster ||
-    isAdmin ||
-    isLeader ||
-    hasOperationalRole('MUSICO') ||
-    hasOperationalRole('SOM') ||
-    hasOperationalRole('PROJECAO')
-  const canSeeEvents =
-    isMaster ||
-    isAdmin ||
-    isLeader ||
-    hasOperationalRole('SOM') ||
-    hasOperationalRole('PROJECAO') ||
-    hasOperationalRole('MIDIA') ||
-    hasOperationalRole('ILUMINACAO')
-  const canSeeSound = isMaster || isAdmin || hasOperationalRole('SOM')
-  const canSeeProjection = isMaster || isAdmin || hasOperationalRole('PROJECAO')
-  const canSeeMedia =
-    isMaster || isAdmin || hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
-  const canSeeLighting = isMaster || isAdmin || hasOperationalRole('ILUMINACAO')
-  const canSeeTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
-  const canSeeMusicians = isMaster || isAdmin || isLeader
-  const canSeeAdmin = isMaster || isAdmin
-  // Financeiro é delegado pelo MASTER: só o MASTER ou quem recebeu FINANCEIRO/AUDITOR.
-  // ADMIN não vê por padrão (precisa receber a função), igual à Membresia.
-  const canSeeFinance =
-    isMaster || hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
-  // Membresia é delegada pelo MASTER: só o MASTER ou quem recebeu a função MEMBRESIA.
-  // ADMIN não vê por padrão (precisa receber a função), coerente com o acesso delegado.
-  const canSeeMembership = isMaster || hasOperationalRole('MEMBRESIA')
-  // Eventos da igreja: a Membresia ou quem recebeu só a função EVENTOS
-  const canSeeChurchEvents = canSeeMembership || hasOperationalRole('EVENTOS')
-
+  // O menu segue as chaves dos perfis de acesso (modulo.tela.acao): cada item aparece para
+  // quem pode consultar aquela tela. As regras do servidor conferem as mesmas chaves.
+  const fin = (screen: string) => can(`financeiro.${screen}.ver`)
+  const mem = (screen: string) => can(`membresia.${screen}.ver`)
   const sections: NavSection[] = [
     {
       items: [
         { to: '/dashboard', label: 'Início', icon: LayoutDashboard, allowed: true },
-        { to: '/events', label: 'Agenda de cultos', icon: CalendarDays, allowed: canSeeEvents },
-        { to: '/minhas-escalas', label: 'Minhas escalas', icon: CalendarCheck2, allowed: true },
-        { to: '/songs', label: 'Músicas', icon: Music2, allowed: canSeeSongs },
+        {
+          to: '/events',
+          label: 'Agenda de cultos',
+          icon: CalendarDays,
+          allowed: can('louvor.cultos.ver'),
+        },
+        {
+          to: '/minhas-escalas',
+          label: 'Minhas escalas',
+          icon: CalendarCheck2,
+          allowed: can('louvor.minhas_escalas.ver') || canAny('louvor') || canAny('culto'),
+        },
+        { to: '/songs', label: 'Músicas', icon: Music2, allowed: can('louvor.musicas.ver') },
       ],
     },
     {
       label: 'Equipes',
       items: [
-        { to: '/som', label: 'Som', icon: SlidersHorizontal, allowed: canSeeSound },
-        { to: '/projecao', label: 'Projeção', icon: MonitorPlay, allowed: canSeeProjection },
-        { to: '/midias', label: 'Mídias', icon: Images, allowed: canSeeMedia },
-        { to: '/iluminacao', label: 'Iluminação', icon: LampCeiling, allowed: canSeeLighting },
-        { to: '/tarefas', label: 'Tarefas', icon: ListChecks, allowed: canSeeTasks },
+        { to: '/som', label: 'Som', icon: SlidersHorizontal, allowed: can('culto.som.ver') },
+        {
+          to: '/projecao',
+          label: 'Projeção',
+          icon: MonitorPlay,
+          allowed: can('culto.projecao.ver'),
+        },
+        { to: '/midias', label: 'Mídias', icon: Images, allowed: can('culto.midias.ver') },
+        {
+          to: '/iluminacao',
+          label: 'Iluminação',
+          icon: LampCeiling,
+          allowed: can('culto.iluminacao.ver'),
+        },
+        { to: '/tarefas', label: 'Tarefas', icon: ListChecks, allowed: can('louvor.tarefas.ver') },
       ],
     },
     {
@@ -176,143 +163,159 @@ export default function Layout() {
           to: '/financeiro',
           label: 'Painel financeiro',
           icon: Wallet,
-          allowed: canSeeFinance,
+          allowed: fin('painel'),
           end: true,
         },
         {
           to: '/financeiro/lancamentos',
           label: 'Lançamentos',
           icon: ArrowLeftRight,
-          allowed: canSeeFinance,
+          allowed: fin('lancamentos'),
         },
         {
           to: '/financeiro/contagem',
           label: 'Contagem do culto',
           icon: HandCoins,
-          allowed: canSeeFinance,
+          allowed: fin('contagem'),
         },
         {
           to: '/financeiro/contas',
           label: 'Contas a pagar e receber',
           icon: CalendarClock,
-          allowed: canSeeFinance,
+          allowed: fin('contas_pagar'),
         },
         {
           to: '/financeiro/saldos',
           label: 'Saldos e extratos',
           icon: Coins,
-          allowed: canSeeFinance,
+          allowed: fin('conciliacao'),
         },
         {
           to: '/financeiro/conciliacao',
           label: 'Conciliação bancária',
           icon: Landmark,
-          allowed: canSeeFinance,
+          allowed: fin('conciliacao'),
         },
         {
           to: '/financeiro/fluxo-de-caixa',
           label: 'Fluxo de caixa',
           icon: TrendingUp,
-          allowed: canSeeFinance,
+          allowed: fin('fluxo'),
         },
         {
           to: '/financeiro/campanhas',
           label: 'Campanhas',
           icon: Flag,
-          allowed: canSeeFinance,
+          allowed: fin('campanhas'),
         },
         {
           to: '/financeiro/orcamento',
           label: 'Orçamento',
           icon: Target,
-          allowed: canSeeFinance,
+          allowed: fin('orcamento'),
         },
         {
           to: '/financeiro/fechamento',
           label: 'Fechamento do mês',
           icon: LockKeyhole,
-          allowed: canSeeFinance,
+          allowed: fin('fechamento'),
         },
         {
           to: '/financeiro/auditoria',
           label: 'Auditoria',
           icon: ShieldCheck,
-          allowed: canSeeFinance,
+          allowed: fin('auditoria'),
         },
         {
           to: '/financeiro/relatorios',
           label: 'Relatórios',
           icon: FileBarChart,
-          allowed: canSeeFinance,
+          allowed: fin('relatorios'),
         },
         {
           to: '/financeiro/cadastros',
           label: 'Cadastros',
           icon: FolderCog,
-          allowed: canSeeFinance,
+          allowed: fin('cadastros'),
         },
       ],
     },
     {
       label: 'Membresia',
       items: [
-        { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: canSeeMembership },
-        { to: '/membros', label: 'Membros', icon: Contact, allowed: canSeeMembership, end: true },
+        { to: '/membros/painel', label: 'Painel', icon: PieChart, allowed: mem('painel') },
+        { to: '/membros', label: 'Membros', icon: Contact, allowed: mem('pessoas'), end: true },
         {
           to: '/membros/acompanhamento',
           label: 'Visitantes',
           icon: Footprints,
-          allowed: canSeeMembership,
+          allowed: mem('acompanhamento'),
         },
         {
           to: '/membros/grupos',
           label: 'Grupos e ministérios',
           icon: UsersRound,
-          allowed: canSeeMembership,
+          allowed: mem('grupos'),
         },
         {
           to: '/membros/eventos',
           label: 'Eventos da igreja',
           icon: Ticket,
-          allowed: canSeeChurchEvents,
+          allowed: can('eventos.eventos.ver'),
         },
         {
           to: '/membros/aniversarios',
           label: 'Aniversariantes',
           icon: Cake,
-          allowed: canSeeMembership,
+          allowed: mem('painel'),
         },
         {
           to: '/membros/cadastros',
           label: 'Cadastros (QR)',
           icon: QrCode,
-          allowed: canSeeMembership,
+          allowed: mem('cadastros'),
         },
         {
           to: '/membros/relatorios',
           label: 'Relatórios',
           icon: FileBarChart,
-          allowed: canSeeMembership,
+          allowed: mem('relatorios'),
         },
       ],
     },
     {
       label: 'Administração',
       items: [
-        { to: '/musicians', label: 'Equipe do louvor', icon: Users, allowed: canSeeMusicians },
-        { to: '/convites', label: 'Convites', icon: UserPlus, allowed: canSeeAdmin },
-        { to: '/roles', label: 'Funções e instrumentos', icon: Guitar, allowed: canSeeAdmin },
+        {
+          to: '/musicians',
+          label: 'Equipe do louvor',
+          icon: Users,
+          allowed: can('admin.pessoas.ver'),
+        },
+        { to: '/convites', label: 'Convites', icon: UserPlus, allowed: can('admin.pessoas.novo') },
+        {
+          to: '/perfis-acesso',
+          label: 'Perfis de acesso',
+          icon: KeyRound,
+          allowed: can('admin.pessoas.ver'),
+        },
+        {
+          to: '/roles',
+          label: 'Funções e instrumentos',
+          icon: Guitar,
+          allowed: can('admin.funcoes.ver'),
+        },
         {
           to: '/configuracoes/integracoes',
           label: 'Integrações',
           icon: Plug,
-          allowed: canSeeAdmin,
+          allowed: can('admin.integracoes.ver'),
         },
         {
           to: '/configuracoes',
           label: 'Configurações',
           icon: Settings,
-          allowed: canSeeAdmin,
+          allowed: can('admin.configuracoes.ver'),
           end: true,
         },
       ],
@@ -326,18 +329,11 @@ export default function Layout() {
     navigate('/login')
   }
 
-  // Quem só cuida do financeiro aparece como "Financeiro" (ou "Conselho fiscal"), não como "Músico"
-  const onlyFinance =
-    role === 'MUSICO' && hasOperationalRole('FINANCEIRO') && !hasOperationalRole('MUSICO')
-  const onlyAudit =
-    role === 'MUSICO' &&
-    hasOperationalRole('AUDITOR') &&
-    !hasOperationalRole('FINANCEIRO') &&
-    !hasOperationalRole('MUSICO')
-  const roleLabel = onlyFinance
-    ? 'Financeiro'
-    : onlyAudit
-      ? 'Conselho fiscal'
+  // Abaixo do nome aparece o perfil de acesso (ou "Master")
+  const roleLabel = isMaster
+    ? ROLE_LABELS.MASTER
+    : accessProfiles.length > 0
+      ? accessProfiles[0].name + (accessProfiles.length > 1 ? ` +${accessProfiles.length - 1}` : '')
       : role
         ? ROLE_LABELS[role] || role
         : ''

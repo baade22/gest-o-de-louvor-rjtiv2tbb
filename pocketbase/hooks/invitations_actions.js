@@ -44,7 +44,14 @@ routerAdd(
         return e.json(403, { message: 'Sem acesso a esta congregação' })
       }
       const callerRole = callerMemberships[0].getString('role')
-      if (callerRole !== 'MASTER' && callerRole !== 'ADMIN') {
+      const callerRolePerms = (() => {
+        try {
+          return JSON.parse(callerMemberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (callerRole !== 'MASTER' && callerRolePerms.indexOf('admin.pessoas.alterar') === -1) {
         return e.json(403, { message: 'Apenas MASTER ou Administrador pode alterar convites.' })
       }
       if (inv.getString('role') === 'MASTER' && callerRole !== 'MASTER') {

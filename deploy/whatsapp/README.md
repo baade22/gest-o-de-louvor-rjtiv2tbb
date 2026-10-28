@@ -43,7 +43,7 @@ chave nova e sobe tudo. O HTTPS sai sozinho (Caddy). No fim ele mostra os dois s
 1. No Skip, em segredos do backend, cadastre:
    - `WHATSAPP_API_URL` = `https://zap.ibmaldeia.com.br`
    - `WHATSAPP_API_KEY` = a chave que o script mostrou (está no `.env` do servidor)
-2. Sincronize o Skip e peça para aplicar as migrações pendentes (a nova é a **0070**).
+2. Sincronize o Skip e peça para aplicar as migrações pendentes (a nova é a **0074**).
    Depois, todo mundo sai e entra de novo.
 3. No LouvorFlow, como MASTER: **Configurações > Integrações > WhatsApp > Configurar WhatsApp >
    Conectar WhatsApp**. No celular da igreja: WhatsApp > **Aparelhos conectados** >

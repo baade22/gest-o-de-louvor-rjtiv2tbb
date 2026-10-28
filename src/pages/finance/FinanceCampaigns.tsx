@@ -543,7 +543,7 @@ function ShareDialog({
 export default function FinanceCampaigns() {
   const { currentChurch } = useAuth()
   const churchId = currentChurch?.id
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('campanhas')
   const { toast } = useToast()
   const { lookups, loading: loadingLookups, reload } = useFinanceLookups(churchId)
   const [txs, setTxs] = useState<FinTransaction[]>([])

@@ -158,7 +158,7 @@ function Summary({ summary, month }: { summary: FinClosingSummary; month: string
 export default function FinanceClosing() {
   const { currentChurch, isMaster } = useAuth()
   const churchId = currentChurch?.id
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('fechamento')
   const { toast } = useToast()
 
   const [closings, setClosings] = useState<FinClosing[]>([])

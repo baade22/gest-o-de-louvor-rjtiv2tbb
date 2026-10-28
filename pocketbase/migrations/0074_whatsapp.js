@@ -1,4 +1,4 @@
-// Migração 0070: WhatsApp conectado por QR Code (como o Eklesia).
+// Migração 0074: WhatsApp conectado por QR Code (como o Eklesia).
 //
 // O WhatsApp da igreja fica pareado num servidor próprio com a Evolution API
 // (deploy/whatsapp). O PocketBase só guarda a configuração e a fila de mensagens; quem

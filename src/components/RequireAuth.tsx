@@ -6,24 +6,36 @@ import { Button } from '@/components/ui/button'
 
 interface RouteGuardProps {
   children: React.ReactNode
-  requireRole?:
-    | 'MASTER'
-    | 'ADMIN'
-    | 'LIDER'
-    | 'CONTENT_MANAGER'
-    | 'MEMBERSHIP'
-    | 'EVENTS'
-    | 'FINANCE'
-  requireModule?: string
+  requireRole?: 'MASTER'
+  /**
+   * Chave(s) dos perfis de acesso. Basta ter uma. Chave completa (modulo.tela.acao) confere
+   * a ação exata; chave curta (ex.: 'financeiro') aceita qualquer ação do módulo.
+   */
+  requirePermission?: string | string[]
 }
+
+const Blocked: React.FC<{ title: string; text: string }> = ({ title, text }) => (
+  <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+      <ShieldAlert className="h-8 w-8" />
+    </div>
+    <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+    <p className="mt-2 max-w-md text-sm text-slate-600">{text}</p>
+    <Link to="/dashboard" className="mt-6">
+      <Button variant="outline" className="gap-2">
+        <ArrowLeft className="h-4 w-4" />
+        Voltar ao Início
+      </Button>
+    </Link>
+  </div>
+)
 
 export const RequireAuth: React.FC<RouteGuardProps> = ({
   children,
   requireRole,
-  requireModule,
+  requirePermission,
 }) => {
-  const { isAuthenticated, isLoading, isMaster, isAdmin, isLeader, hasModule, hasOperationalRole } =
-    useAuth()
+  const { isAuthenticated, isLoading, isMaster, can, canAny } = useAuth()
   const location = useLocation()
 
   if (isLoading) {
@@ -43,188 +55,22 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
 
   if (requireRole === 'MASTER' && !isMaster) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Acesso Restrito ao MASTER</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-600">
-          Esta funcionalidade exige privilégio de Administrador Máximo (MASTER) da igreja.
-        </p>
-        <Link to="/dashboard" className="mt-6">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Início
-          </Button>
-        </Link>
-      </div>
+      <Blocked
+        title="Acesso Restrito ao MASTER"
+        text="Esta funcionalidade exige privilégio de Administrador Máximo (MASTER) da igreja."
+      />
     )
   }
 
-  if (requireRole === 'ADMIN' && !isAdmin) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Acesso Restrito</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-600">
-          Você precisa de permissão de Administrador da igreja para acessar esta página.
-        </p>
-        <Link to="/dashboard" className="mt-6">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Início
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  // Membresia é delegada pelo MASTER: só o MASTER ou quem recebeu a função MEMBRESIA.
-  // ADMIN não entra por padrão (precisa da função), coerente com o acesso delegado.
-  if (requireRole === 'MEMBERSHIP' && !isMaster && !hasOperationalRole('MEMBRESIA')) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Acesso à Membresia</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-600">
-          Esta área guarda os dados pessoais dos membros. Peça ao MASTER da igreja a função
-          Membresia / Secretaria para acessá-la.
-        </p>
-        <Link to="/dashboard" className="mt-6">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Início
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  // Eventos da igreja: MASTER, Membresia ou quem recebeu a função EVENTOS (sem ver a membresia).
-  if (
-    requireRole === 'EVENTS' &&
-    !isMaster &&
-    !hasOperationalRole('MEMBRESIA') &&
-    !hasOperationalRole('EVENTOS')
-  ) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Acesso aos eventos</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-600">
-          Os eventos guardam os dados de quem se inscreveu. Peça ao MASTER da igreja a função
-          Eventos da igreja para acessá-los.
-        </p>
-        <Link to="/dashboard" className="mt-6">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Início
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  // Financeiro é delegado pelo MASTER: só o MASTER ou quem recebeu FINANCEIRO/AUDITOR.
-  // ADMIN não entra por padrão (precisa da função), igual à Membresia.
-  if (
-    requireRole === 'FINANCE' &&
-    !isMaster &&
-    !hasOperationalRole('FINANCEIRO') &&
-    !hasOperationalRole('AUDITOR')
-  ) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Acesso ao Financeiro</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-600">
-          Esta área é restrita. Peça ao MASTER da igreja a função Financeiro ou Conselho fiscal para
-          acessá-la.
-        </p>
-        <Link to="/dashboard" className="mt-6">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Início
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  if (requireRole === 'CONTENT_MANAGER' && !isAdmin && !isLeader) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Acesso de Gestão</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-600">
-          Esta área é reservada para Líderes de Louvor e Administradores da igreja.
-        </p>
-        <Link to="/dashboard" className="mt-6">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Início
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  if (requireModule && !isMaster && !isAdmin) {
-    let hasAccess = false
-    if (requireModule === 'sound') hasAccess = hasOperationalRole('SOM')
-    else if (requireModule === 'projection') hasAccess = hasOperationalRole('PROJECAO')
-    else if (requireModule === 'media')
-      hasAccess = hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
-    else if (requireModule === 'lighting') hasAccess = hasOperationalRole('ILUMINACAO')
-    else if (requireModule === 'finance')
-      hasAccess = hasOperationalRole('FINANCEIRO') || hasOperationalRole('AUDITOR')
-    else if (requireModule === 'tasks') hasAccess = hasOperationalRole('MIDIA') || isLeader
-    else if (requireModule === 'songs')
-      hasAccess =
-        hasOperationalRole('MUSICO') ||
-        hasOperationalRole('SOM') ||
-        hasOperationalRole('PROJECAO') ||
-        isLeader
-    else if (requireModule === 'events') {
-      hasAccess =
-        hasOperationalRole('SOM') ||
-        hasOperationalRole('PROJECAO') ||
-        hasOperationalRole('MIDIA') ||
-        hasOperationalRole('ILUMINACAO') ||
-        isLeader
-    } else {
-      hasAccess = hasModule(requireModule)
-    }
-
-    if (!hasAccess) {
+  if (requirePermission) {
+    const wanted = Array.isArray(requirePermission) ? requirePermission : [requirePermission]
+    const ok = wanted.some((k) => (k.split('.').length === 3 ? can(k) : canAny(k)))
+    if (!ok) {
       return (
-        <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
-            <ShieldAlert className="h-8 w-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900">Módulo Não Autorizado</h2>
-          <p className="mt-2 max-w-md text-sm text-slate-600">
-            Sua função operacional não possui acesso ao módulo{' '}
-            <strong className="text-slate-800">{requireModule.toUpperCase()}</strong>. Entre em
-            contato com a administração se precisar deste acesso.
-          </p>
-          <Link to="/dashboard" className="mt-6">
-            <Button variant="outline" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar ao Início
-            </Button>
-          </Link>
-        </div>
+        <Blocked
+          title="Acesso não liberado"
+          text="Seu perfil de acesso não libera esta tela. Peça ao MASTER da igreja para incluí-la no seu perfil."
+        />
       )
     }
   }

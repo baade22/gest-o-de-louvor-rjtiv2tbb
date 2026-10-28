@@ -65,14 +65,15 @@ describe('Musicians E2E Contract & Business Rules Validation', () => {
       name: 'Vinni Silva',
       email: 'viniciuslva.ferreira@gmail.com',
       phone: '8199999999',
-      role: 'LIDER',
+      is_master: false,
+      access_profiles: ['perfil_lider'],
       is_active: true,
       role_ids: ['dnyfiyj4zrfryo9'],
     }
 
     expect(editPayload.name.trim().length).toBeGreaterThanOrEqual(2)
     expect(editPayload.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
-    expect(['ADMIN', 'LIDER', 'MUSICO']).toContain(editPayload.role)
+    expect(editPayload.access_profiles.length).toBeGreaterThan(0)
     expect(editPayload.role_ids.length).toBeGreaterThan(0)
     expect(editPayload.church_id).toBe('8minai50ybqzkek')
   })

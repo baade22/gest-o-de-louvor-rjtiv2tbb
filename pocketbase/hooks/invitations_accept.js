@@ -85,6 +85,30 @@ routerAdd('POST', '/backend/v1/invitations/accept', (e) => {
     opRoles = ['MUSICO']
   }
 
+  // Perfis de acesso do convite (convites antigos não têm: aí valem papel + funções, que o
+  // hook church_members_access.js converte nos perfis prontos equivalentes)
+  const invProfiles = []
+  try {
+    const ids = JSON.parse(inv.getString('access_profiles') || '[]') || []
+    for (const id of ids) {
+      try {
+        const p = $app.findRecordById('access_profiles', String(id))
+        if (p.getString('church_id') === churchId) invProfiles.push(p.id)
+      } catch (_) {}
+    }
+  } catch (_) {}
+  const applyInvitationAccess = (rec) => {
+    // Um convite não rebaixa quem já é MASTER nesta igreja
+    if (rec.getString('role') === 'MASTER') return
+    if (invProfiles.length > 0) {
+      rec.set('role', appRole === 'MASTER' ? 'MASTER' : 'MUSICO')
+      rec.set('access_profiles', invProfiles)
+    } else {
+      rec.set('role', appRole)
+      rec.set('operational_roles', opRoles)
+    }
+  }
+
   let roleIds = []
   try {
     const rawR = inv.get('role_ids')
@@ -144,16 +168,14 @@ routerAdd('POST', '/backend/v1/invitations/accept', (e) => {
 
     if (existingMembers.length > 0) {
       memberRecord = existingMembers[0]
-      memberRecord.set('role', appRole)
-      memberRecord.set('operational_roles', opRoles)
+      applyInvitationAccess(memberRecord)
       memberRecord.set('is_active', true)
       $app.save(memberRecord)
     } else {
       memberRecord = new Record(membersCol)
       memberRecord.set('church_id', churchId)
       memberRecord.set('user_id', userRecord.id)
-      memberRecord.set('role', appRole)
-      memberRecord.set('operational_roles', opRoles)
+      applyInvitationAccess(memberRecord)
       memberRecord.set('is_active', true)
       $app.save(memberRecord)
     }
