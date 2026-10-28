@@ -220,12 +220,20 @@ export default function WhatsAppSettings() {
 
   const toggleAuto = async (kind: WhatsAppAutoKind, on: boolean) => {
     if (!status) return
-    const auto = { ...status.auto, [kind]: on }
+    const previousAuto = status.auto
+    const auto = { ...previousAuto, [kind]: on }
     setStatus({ ...status, auto })
     try {
-      await saveWhatsAppAuto(churchId, auto)
+      const res = await saveWhatsAppAuto(churchId, auto)
+      if (res?.auto) {
+        setStatus((prev) => (prev ? { ...prev, auto: res.auto } : prev))
+      }
+      toast({
+        title: 'Configurações salvas',
+        description: `${WHATSAPP_AUTO.find((a) => a.kind === kind)?.label || 'Envio automático'}: ${on ? 'ativado' : 'desativado'}.`,
+      })
     } catch (err) {
-      setStatus({ ...status })
+      setStatus((prev) => (prev ? { ...prev, auto: previousAuto } : prev))
       toast({
         title: 'Não foi possível salvar',
         description: errorText(err),

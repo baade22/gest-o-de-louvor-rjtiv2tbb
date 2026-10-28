@@ -77,14 +77,21 @@ routerAdd(
           c: churchId,
         })
       } catch (_) {
-        const col = $app.findCollectionByNameOrId('whatsapp_settings')
-        const rec = new Record(col)
-        rec.set('church_id', churchId)
-        rec.set('instance', 'lf-' + churchId)
-        rec.set('auto', {})
-        rec.set('status', 'close')
-        $app.save(rec)
-        return rec
+        try {
+          const col = $app.findCollectionByNameOrId('whatsapp_settings')
+          const rec = new Record(col)
+          rec.set('church_id', churchId)
+          rec.set('instance', 'lf-' + churchId)
+          rec.set('auto', {})
+          rec.set('status', 'close')
+          $app.save(rec)
+          return rec
+        } catch (saveErr) {
+          // Se outro processo acabou de criar (corrida com índice único), busca novamente
+          return $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
+            c: churchId,
+          })
+        }
       }
     }
 
@@ -174,7 +181,16 @@ routerAdd(
       const auto = {}
       for (const k of AUTO_KINDS) auto[k] = incoming[k] === true
       rec.set('auto', auto)
-      $app.save(rec)
+      try {
+        $app.save(rec)
+      } catch (err) {
+        // Se houve conflito ou erro de gravação, recarrega o registro existente e tenta salvar novamente
+        const fresh = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
+          c: churchId,
+        })
+        fresh.set('auto', auto)
+        $app.save(fresh)
+      }
       return e.json(200, { auto: auto })
     }
 
