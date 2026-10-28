@@ -387,3 +387,48 @@ export interface FinBudget extends BaseRecord {
   category_id: string
   amount_cents: number
 }
+
+/** Conjunto de credenciais de um banco cadastrado em Integrações (só o resumo). */
+export interface BankSecretSet {
+  id: string
+  kind: FinBankProvider
+  environment: FinBankEnvironment
+  credential_key: string
+  summary: {
+    client_id?: string
+    has_secret?: boolean
+    has_cert?: boolean
+    has_key?: boolean
+    cert_fingerprint?: string
+  }
+  updated: string
+  updated_by_name: string
+}
+
+export interface BankSecretsInfo {
+  /** O servidor tem LOUVORFLOW_CREDENTIALS_KEY: sem ela nada é salvo. */
+  encryption_ready: boolean
+  /** O servidor tem BANK_SYNC_TOKEN (chave antiga, por variável de ambiente). */
+  server_token: boolean
+  /** O servidor tem BANK_SYNC_GITHUB_TOKEN e BANK_SYNC_GITHUB_REPO. */
+  server_github: boolean
+  sets: BankSecretSet[]
+  connector: {
+    has_key: boolean
+    key_prefix?: string
+    key_created_at?: string
+    github_repo: string
+    has_github_token: boolean
+    updated_by_name?: string
+  }
+}
+
+export interface BankSecretInput {
+  kind: FinBankProvider
+  environment: FinBankEnvironment
+  credential_key?: string
+  client_id?: string
+  client_secret?: string
+  cert?: string
+  key?: string
+}

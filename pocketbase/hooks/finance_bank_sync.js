@@ -2,9 +2,11 @@
 //
 // Os bancos exigem certificado digital do cliente (mTLS) em cada chamada, e o $http.send do
 // PocketBase não envia certificado. Por isso quem fala com o banco é o conector bancário
-// (pasta bank-sync/ do repositório), que guarda as credenciais e conversa com estas rotas
-// usando o cabeçalho x-bank-sync-token = variável de ambiente BANK_SYNC_TOKEN do servidor
-// (no mínimo 32 caracteres aleatórios).
+// (pasta bank-sync/ do repositório), que conversa com estas rotas usando o cabeçalho
+// x-bank-sync-token: a chave do conector gerada em Configurações > Integrações (vale só para
+// aquela igreja) ou a variável de ambiente BANK_SYNC_TOKEN do servidor (vale para todas).
+// As credenciais dos bancos cadastradas na mesma tela (fin_bank_secrets, cifradas) seguem
+// para o conector junto com cada conta; sem elas ele usa as próprias variáveis de ambiente.
 //
 // GET  /backend/v1/finance/bank-sync/connections     (conector) contas ativas e o período a buscar
 // POST /backend/v1/finance/bank-sync/push            (conector) entrega o resultado de uma conta:
@@ -14,23 +16,78 @@
 //      Grava os movimentos novos como linhas do extrato (o id do banco vira o FITID) e, quando
 //      a conexão permite, concilia sozinho o movimento que tem um único lançamento igual.
 // POST /backend/v1/finance/bank-sync/request         (usuário do financeiro) "Atualizar agora":
-//      { church_id } marca as conexões da igreja e, se o servidor tiver BANK_SYNC_GITHUB_TOKEN
-//      e BANK_SYNC_GITHUB_REPO, dispara o conector no GitHub Actions.
+//      { church_id } marca as conexões da igreja e, se houver acesso ao GitHub (variáveis
+//      BANK_SYNC_GITHUB_TOKEN e BANK_SYNC_GITHUB_REPO ou o cadastrado na tela de Integrações),
+//      dispara o conector no GitHub Actions.
 
 routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
+  // Quem é o conector: o BANK_SYNC_TOKEN do servidor vale para todas as igrejas; a chave
+  // gerada na tela de Integrações vale só para a igreja que a gerou (o banco guarda o hash)
+  const given = e.request.header.get('x-bank-sync-token') || ''
   const expected = $os.getenv('BANK_SYNC_TOKEN') || ''
-  if (expected.length < 32) {
-    return e.json(503, { message: 'BANK_SYNC_TOKEN não configurado no servidor.' })
-  }
+  let scope = null
   // Comparação em tempo constante, para o tempo de resposta não revelar o token
-  if (!$security.equal(e.request.header.get('x-bank-sync-token') || '', expected)) {
-    return e.json(401, { message: 'Token do conector inválido.' })
+  if (expected.length >= 32 && $security.equal(given, expected)) scope = '*'
+  else if (given.length >= 32) {
+    try {
+      scope = $app
+        .findFirstRecordByFilter('fin_bank_secrets', "kind = 'CONECTOR' && token_hash = {:h}", {
+          h: $security.sha256(given),
+        })
+        .getString('church_id')
+    } catch (_) {}
   }
+  if (!scope) return e.json(401, { message: 'Chave do conector inválida.' })
   const ymd = (ms) => new Date(ms).toISOString().slice(0, 10)
   const day = 24 * 60 * 60 * 1000
   // Dia de hoje no horário de Brasília
   const now = Date.now() - 3 * 60 * 60 * 1000
-  const rows = $app.findRecordsByFilter('fin_bank_connections', 'enabled = true', 'created', 500, 0)
+  const rows =
+    scope === '*'
+      ? $app.findRecordsByFilter('fin_bank_connections', 'enabled = true', 'created', 500, 0)
+      : $app.findRecordsByFilter(
+          'fin_bank_connections',
+          'enabled = true && church_id = {:c}',
+          'created',
+          500,
+          0,
+          { c: scope },
+        )
+  // Credenciais cadastradas na tela de Integrações (cifradas); sem elas o conector usa as
+  // variáveis de ambiente / segredos do GitHub, como antes
+  let encKey = ''
+  try {
+    encKey = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+  } catch (_) {}
+  const credentialsFor = (c) => {
+    if (encKey.length !== 32) return null
+    const ck = (c.getString('credential_key') || '').toUpperCase()
+    try {
+      // Parâmetro vazio no filtro não casa com texto vazio: sem nome, compara com '' direto
+      const rec = $app.findFirstRecordByFilter(
+        'fin_bank_secrets',
+        'church_id = {:c} && kind = {:k} && environment = {:env} && credential_key = ' +
+          (ck ? '{:ck}' : "''"),
+        {
+          c: c.getString('church_id'),
+          k: c.getString('provider'),
+          env: c.getString('environment'),
+          ck: ck,
+        },
+      )
+      const d = JSON.parse(rec.getString('data') || 'null')
+      if (!d || d.enc !== 'v1') return null
+      const v = JSON.parse($security.decrypt(d.data, encKey)) || {}
+      return {
+        client_id: v.client_id || '',
+        client_secret: v.client_secret || '',
+        cert: v.cert || '',
+        key: v.key || '',
+      }
+    } catch (_) {
+      return null
+    }
+  }
   const out = []
   for (const c of rows) {
     let accountName = ''
@@ -58,6 +115,7 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
       account_number: c.getString('account_number'),
       account_type: c.getString('account_type') || 'CC',
       credential_key: c.getString('credential_key'),
+      credentials: credentialsFor(c),
       from: from,
       to: ymd(now),
     })
@@ -66,20 +124,31 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
 })
 
 routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
+  // Quem é o conector: o BANK_SYNC_TOKEN do servidor vale para todas as igrejas; a chave
+  // gerada na tela de Integrações vale só para a igreja que a gerou (o banco guarda o hash)
+  const given = e.request.header.get('x-bank-sync-token') || ''
   const expected = $os.getenv('BANK_SYNC_TOKEN') || ''
-  if (expected.length < 32) {
-    return e.json(503, { message: 'BANK_SYNC_TOKEN não configurado no servidor.' })
-  }
+  let scope = null
   // Comparação em tempo constante, para o tempo de resposta não revelar o token
-  if (!$security.equal(e.request.header.get('x-bank-sync-token') || '', expected)) {
-    return e.json(401, { message: 'Token do conector inválido.' })
+  if (expected.length >= 32 && $security.equal(given, expected)) scope = '*'
+  else if (given.length >= 32) {
+    try {
+      scope = $app
+        .findFirstRecordByFilter('fin_bank_secrets', "kind = 'CONECTOR' && token_hash = {:h}", {
+          h: $security.sha256(given),
+        })
+        .getString('church_id')
+    } catch (_) {}
   }
+  if (!scope) return e.json(401, { message: 'Chave do conector inválida.' })
   const body = e.requestInfo().body || {}
   let conn = null
   try {
     conn = $app.findRecordById('fin_bank_connections', String(body.connection_id || ''))
   } catch (_) {}
-  if (!conn) return e.json(404, { message: 'Conexão não encontrada' })
+  if (!conn || (scope !== '*' && conn.getString('church_id') !== scope)) {
+    return e.json(404, { message: 'Conexão não encontrada' })
+  }
 
   const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))
   const pbDate = (ymd) => ymd + ' 12:00:00.000Z'
@@ -315,8 +384,25 @@ routerAdd(
       c.set('sync_requested_at', nowIso)
       $app.save(c)
     }
-    const token = $os.getenv('BANK_SYNC_GITHUB_TOKEN') || ''
-    const repo = $os.getenv('BANK_SYNC_GITHUB_REPO') || ''
+    let token = $os.getenv('BANK_SYNC_GITHUB_TOKEN') || ''
+    let repo = $os.getenv('BANK_SYNC_GITHUB_REPO') || ''
+    if (!token || !repo) {
+      // Acesso ao GitHub cadastrado na tela de Integrações (cifrado)
+      try {
+        const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+        const rec = $app.findFirstRecordByFilter(
+          'fin_bank_secrets',
+          "church_id = {:c} && kind = 'CONECTOR'",
+          { c: churchId },
+        )
+        const d = JSON.parse(rec.getString('data') || 'null')
+        if (k.length === 32 && d && d.enc === 'v1') {
+          const v = JSON.parse($security.decrypt(d.data, k)) || {}
+          token = v.github_token || ''
+          repo = v.github_repo || ''
+        }
+      } catch (_) {}
+    }
     if (!token || !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
       // Sem disparo remoto: o conector pega o pedido na próxima rodada agendada
       return e.json(200, { dispatched: false })
