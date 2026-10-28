@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   MonitorPlay,
   Images,
+  Megaphone,
   LampCeiling,
   ListChecks,
   UserPlus,
@@ -147,6 +148,7 @@ export default function Layout() {
           allowed: can('culto.projecao.ver'),
         },
         { to: '/midias', label: 'Mídias', icon: Images, allowed: can('culto.midias.ver') },
+        { to: '/avisos', label: 'Avisos', icon: Megaphone, allowed: can('culto.avisos.ver') },
         {
           to: '/iluminacao',
           label: 'Iluminação',

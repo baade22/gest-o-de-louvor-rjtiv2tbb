@@ -2,7 +2,7 @@ import pb from '@/lib/pocketbase/client'
 import type { WhatsAppAutoKind } from '@/lib/whatsapp'
 
 export type WhatsAppState = 'unconfigured' | 'open' | 'connecting' | 'close' | 'error'
-export type WhatsAppMessageStatus = 'FILA' | 'ENVIADO' | 'ERRO' | 'CANCELADO'
+export type WhatsAppMessageStatus = 'FILA' | 'PAUSADO' | 'ENVIADO' | 'ERRO' | 'CANCELADO'
 
 export interface WhatsAppStatus {
   configured: boolean
@@ -16,7 +16,7 @@ export interface WhatsAppStatus {
 
 export interface WhatsAppMessage {
   id: string
-  kind: WhatsAppAutoKind | 'TESTE'
+  kind: WhatsAppAutoKind | 'TESTE' | 'AVISO'
   phone: string
   name: string
   text: string

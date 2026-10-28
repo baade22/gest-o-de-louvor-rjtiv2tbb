@@ -10,7 +10,8 @@
 //   minuto, com "digitando..." antes), para o WhatsApp não estranhar. Se o celular estiver
 //   desconectado, espera; depois de 2 dias desiste e marca erro.
 // Inscrição e pagamento de eventos entram na fila pelos hooks church_event_signup.js e
-// church_event_payments.js.
+// church_event_payments.js; os avisos da Mídia (com imagem, vídeo, documento ou áudio), pelo
+// whatsapp_avisos.js, já com o horário de cada pessoa e a janela de envio.
 //
 // Cada envio automático só acontece se estiver ligado em Configurações > WhatsApp.
 
@@ -177,14 +178,32 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
     }
 
     if (!c.open) {
-      // Desconectado: espera; passados 2 dias desiste
-      const created = new Date(msg.getString('created').replace(' ', 'T')).getTime()
-      if (created && Date.now() - created > 2 * 24 * 3600 * 1000) {
+      // Desconectado: espera; passados 2 dias da hora marcada desiste
+      const dueAt = new Date(msg.getString('send_after').replace(' ', 'T')).getTime()
+      if (dueAt && Date.now() - dueAt > 2 * 24 * 3600 * 1000) {
         msg.set('status', 'ERRO')
         msg.set('error', 'WhatsApp da igreja desconectado')
         $app.save(msg)
       }
       continue
+    }
+    // Avisos em massa só saem dentro da janela (horário de Brasília); fora dela, ficam para
+    // o começo da próxima (por exemplo, depois de o WhatsApp ficar desconectado)
+    const win = /^(\d\d):(\d\d)-(\d\d):(\d\d)$/.exec(msg.getString('window'))
+    if (win) {
+      const ws = parseInt(win[1], 10) * 60 + parseInt(win[2], 10)
+      const we = parseInt(win[3], 10) * 60 + parseInt(win[4], 10)
+      const b = new Date(Date.now() - 3 * 3600 * 1000)
+      const min = b.getUTCHours() * 60 + b.getUTCMinutes()
+      if (min < ws || min >= we) {
+        const day = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate())
+        const next = day + (min >= we ? 24 * 3600 * 1000 : 0) + ws * 60000 + 3 * 3600 * 1000
+        msg.set('send_after', new Date(next + Math.floor(Math.random() * 20) * 60000).toISOString())
+        try {
+          $app.save(msg)
+        } catch (_) {}
+        continue
+      }
     }
     if (c.sent >= PER_CHURCH) continue
     c.sent++
@@ -192,11 +211,61 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
     const attempts = msg.getInt('attempts') + 1
     msg.set('attempts', attempts)
     try {
-      const r = evo('POST', '/message/sendText/' + encodeURIComponent(c.inst), {
-        number: msg.getString('phone'),
-        text: msg.getString('text'),
-        delay: 1200 + Math.floor(Math.random() * 1500),
-      })
+      const inst = encodeURIComponent(c.inst)
+      const number = msg.getString('phone')
+      const text = msg.getString('text')
+      const delay = 1200 + Math.floor(Math.random() * 1500)
+      const mediaType = msg.getString('media_type')
+      const mediaUrl = msg.getString('media_url')
+      let r = null
+      if (mediaUrl && mediaType === 'AUDIO') {
+        // Áudio vai como "gravado na hora"; o texto, se tiver, sai logo depois
+        r = evo('POST', '/message/sendWhatsAppAudio/' + inst, {
+          number: number,
+          audio: mediaUrl,
+          delay: delay,
+        })
+        if (r.code >= 200 && r.code < 300 && text.trim()) {
+          evo('POST', '/message/sendText/' + inst, { number: number, text: text, delay: 800 })
+        }
+      } else if (mediaUrl && ['IMAGEM', 'VIDEO', 'DOCUMENTO'].indexOf(mediaType) !== -1) {
+        const fileName = msg.getString('file_name') || 'arquivo'
+        const ext = fileName.toLowerCase().split('.').pop()
+        const MIME = {
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          png: 'image/png',
+          webp: 'image/webp',
+          mp4: 'video/mp4',
+          '3gp': 'video/3gpp',
+          mov: 'video/quicktime',
+          pdf: 'application/pdf',
+          doc: 'application/msword',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          xls: 'application/vnd.ms-excel',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ppt: 'application/vnd.ms-powerpoint',
+          pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        }
+        // O nome guardado pelo PocketBase tem um sufixo aleatório: tira para a pessoa ver
+        const shown = fileName.replace(/_[a-z0-9]{10}(\.[a-z0-9]+)$/i, '$1')
+        r = evo('POST', '/message/sendMedia/' + inst, {
+          number: number,
+          mediatype:
+            mediaType === 'IMAGEM' ? 'image' : mediaType === 'VIDEO' ? 'video' : 'document',
+          mimetype: MIME[ext] || 'application/octet-stream',
+          caption: text,
+          media: mediaUrl,
+          fileName: shown,
+          delay: delay,
+        })
+      } else {
+        r = evo('POST', '/message/sendText/' + inst, {
+          number: number,
+          text: text,
+          delay: delay,
+        })
+      }
       if (r.code >= 200 && r.code < 300) {
         msg.set('status', 'ENVIADO')
         msg.set('error', '')
