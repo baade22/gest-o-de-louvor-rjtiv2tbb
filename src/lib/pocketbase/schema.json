@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T21:47:38.259Z",
+  "generatedAt": "2026-10-28T23:07:05.556Z",
   "collections": [
     {
       "name": "users",
@@ -5098,7 +5098,8 @@
             "PAGAMENTO",
             "ANIVERSARIO",
             "CASAMENTO",
-            "TESTE"
+            "TESTE",
+            "AVISO"
           ]
         },
         {
@@ -5116,7 +5117,7 @@
         {
           "name": "text",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
@@ -5124,7 +5125,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["FILA", "ENVIADO", "ERRO", "CANCELADO"]
+          "selectValues": ["FILA", "PAUSADO", "ENVIADO", "ERRO", "CANCELADO"]
         },
         {
           "name": "error",
@@ -5169,12 +5170,270 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "campaign_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "window",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
         "CREATE INDEX idx_whatsapp_messages_queue ON whatsapp_messages (status, send_after)",
         "CREATE INDEX idx_whatsapp_messages_church ON whatsapp_messages (church_id, created)",
-        "CREATE INDEX idx_whatsapp_messages_ref ON whatsapp_messages (ref_id, kind)"
+        "CREATE INDEX idx_whatsapp_messages_ref ON whatsapp_messages (ref_id, kind)",
+        "CREATE INDEX `idx_whatsapp_messages_campaign` ON `whatsapp_messages` (campaign_id, status)"
+      ]
+    },
+    {
+      "name": "whatsapp_campaigns",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["AVULSO", "REGRA_CULTO", "CULTO"]
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "media_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["TEXTO", "IMAGEM", "VIDEO", "DOCUMENTO", "AUDIO"]
+        },
+        {
+          "name": "media",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "media_base",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "use_event_cover",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audience",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "RASCUNHO",
+            "PROGRAMADO",
+            "AGUARDANDO",
+            "ENVIANDO",
+            "PAUSADO",
+            "CONCLUIDO",
+            "CANCELADO",
+            "ATIVA",
+            "INATIVA"
+          ]
+        },
+        {
+          "name": "starts_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "window_start",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "window_end",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pace_min",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pace_max",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eta",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "weekday",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "title_match",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "days_before",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "send_time",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "missing_media",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["SO_TEXTO", "ESPERAR"]
+        },
+        {
+          "name": "rule_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "event_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "church_event_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "started_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "finished_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_whatsapp_campaigns_church ON whatsapp_campaigns (church_id, type, status)",
+        "CREATE INDEX idx_whatsapp_campaigns_rule ON whatsapp_campaigns (rule_id, event_id)",
+        "CREATE INDEX idx_whatsapp_campaigns_token ON whatsapp_campaigns (media_token)"
       ]
     }
   ]
