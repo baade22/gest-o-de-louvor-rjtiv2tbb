@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T10:17:13.048Z",
+  "generatedAt": "2026-10-28T16:37:12.742Z",
   "collections": [
     {
       "name": "users",
@@ -5465,6 +5465,203 @@
       ],
       "indexes": [
         "CREATE INDEX idx_access_profiles_church ON access_profiles (church_id)"
+      ]
+    },
+    {
+      "name": "whatsapp_settings",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "instance",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "auto",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "profile_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_whatsapp_settings_church ON whatsapp_settings (church_id)"
+      ]
+    },
+    {
+      "name": "whatsapp_messages",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "ESCALA",
+            "LEMBRETE_ESCALA",
+            "INSCRICAO",
+            "PAGAMENTO",
+            "ANIVERSARIO",
+            "CASAMENTO",
+            "TESTE"
+          ]
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "FILA",
+            "ENVIADO",
+            "ERRO",
+            "CANCELADO"
+          ]
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ref_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "attempts",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "send_after",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sent_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_whatsapp_messages_queue ON whatsapp_messages (status, send_after)",
+        "CREATE INDEX idx_whatsapp_messages_church ON whatsapp_messages (church_id, created)",
+        "CREATE INDEX idx_whatsapp_messages_ref ON whatsapp_messages (ref_id, kind)"
       ]
     }
   ]
