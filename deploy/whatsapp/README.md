@@ -69,6 +69,10 @@ não use para propaganda e peça para as pessoas salvarem o contato da igreja.
 - **Ver se está no ar:** `docker compose ps`
 - **Atualizar a Evolution:** troque a versão da imagem em `docker-compose.yml`, depois
   `docker compose pull && docker compose up -d`.
+- **Celular diz "não é possível conectar novos dispositivos":** atualize o WhatsApp do celular,
+  apague a conexão antiga (`curl -X DELETE https://zap.ibmaldeia.com.br/instance/delete/lf-... -H "apikey: $WHATSAPP_API_KEY"`)
+  e gere um QR novo. Se continuar, ponha a versão atual do WhatsApp Web em
+  `CONFIG_SESSION_PHONE_VERSION` no `.env` e rode `docker compose up -d evolution`.
 - **Se a conexão cair:** a tela do LouvorFlow mostra "Desconectado"; é só ler o QR Code de novo.
   As mensagens esperam na fila por até 2 dias.
 - **Servidor perdido:** basta instalar de novo e ler o QR Code. Nenhum dado da igreja fica aqui:

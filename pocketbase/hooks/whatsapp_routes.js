@@ -52,8 +52,10 @@ routerAdd(
       return e.json(403, { message: 'Permissão insuficiente' })
     }
 
-    const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '').replace(/\/+$/, '')
-    const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '')
+    const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
+      .replace(/\s+/g, '') // espaços colados pelo celular quebram a URL
+      .replace(/\/+$/, '')
+    const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
     const configured = !!(apiUrl && apiKey)
 
     const evo = (method, path, payload) => {
@@ -291,6 +293,15 @@ routerAdd(
     const inst = rec.getString('instance')
 
     if (action === 'connect') {
+      // Resposta da Evolution em poucas palavras, para a tela dizer o motivo
+      const why = (r) => {
+        let m = ''
+        try {
+          const resp = r.json && r.json.response ? r.json.response.message : ''
+          m = Array.isArray(resp) ? resp.join(' ') : String(resp || (r.json && r.json.error) || '')
+        } catch (_) {}
+        return ' (código ' + r.code + (m ? ': ' + m.slice(0, 200) : '') + ')'
+      }
       try {
         const state = refreshState(rec)
         if (state === 'open') return e.json(200, { state: 'open', phone: rec.getString('phone') })
@@ -303,7 +314,7 @@ routerAdd(
           })
           if (r.code >= 300) {
             return e.json(502, {
-              message: 'Não foi possível criar a conexão no servidor do WhatsApp.',
+              message: 'Não foi possível criar a conexão no servidor do WhatsApp' + why(r) + '.',
             })
           }
           const created = r.json && r.json.qrcode ? r.json.qrcode : null
@@ -314,7 +325,7 @@ routerAdd(
         const qr = r.json && r.json.base64 ? String(r.json.base64) : ''
         if (!qr) {
           return e.json(502, {
-            message: 'O servidor do WhatsApp não devolveu o QR Code. Tente de novo.',
+            message: 'O servidor do WhatsApp não devolveu o QR Code' + why(r) + '. Tente de novo.',
           })
         }
         rec.set('status', 'connecting')

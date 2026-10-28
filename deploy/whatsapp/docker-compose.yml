@@ -28,6 +28,10 @@ services:
       QRCODE_LIMIT: '30'
       CONFIG_SESSION_PHONE_CLIENT: LouvorFlow
       CONFIG_SESSION_PHONE_NAME: Chrome
+      # Sem isto o celular recusa o QR ("não é possível conectar novos dispositivos"):
+      # a 2.3.7 se apresenta com uma versão antiga do WhatsApp Web (EvolutionAPI issue #2437).
+      # Se o erro voltar, troque pela versão atual do WhatsApp Web.
+      CONFIG_SESSION_PHONE_VERSION: ${CONFIG_SESSION_PHONE_VERSION:-2.3000.1033773198}
       LOG_LEVEL: ERROR,WARN
       LANGUAGE: pt-BR
     volumes:
