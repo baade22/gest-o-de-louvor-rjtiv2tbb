@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T01:04:23.986Z",
+  "generatedAt": "2026-10-28T10:17:13.048Z",
   "collections": [
     {
       "name": "users",
@@ -56,7 +56,7 @@
         "list": "@request.auth.id != ''",
         "view": "@request.auth.id != ''",
         "create": null,
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.configuracoes.alterar\"')",
         "delete": null
       },
       "fields": [
@@ -160,11 +160,11 @@
       "name": "roles",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.' || @collection.church_members.permissions ?~ '\"admin.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.' || @collection.church_members.permissions ?~ '\"admin.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.funcoes.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.funcoes.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.funcoes.excluir\"')"
       },
       "fields": [
         {
@@ -222,9 +222,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
         "view": "@request.auth.id != '' && (user_id = @request.auth.id || @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true)",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.role ?= 'ADMIN' && @request.body.role != 'MASTER'))",
-        "update": "@request.auth.id != '' && (user_id = @request.auth.id && @request.body.role:isset = false && @request.body.operational_roles:isset = false && @request.body.is_active:isset = false && @request.body.church_id:isset = false && @request.body.user_id:isset = false || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.role ?= 'ADMIN' && @request.body.role != 'MASTER'))))",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"admin.pessoas.novo\"' && @request.body.role != 'MASTER'))",
+        "update": "@request.auth.id != '' && (user_id = @request.auth.id && @request.body.role:isset = false && @request.body.operational_roles:isset = false && @request.body.access_profiles:isset = false && @request.body.is_active:isset = false && @request.body.church_id:isset = false && @request.body.user_id:isset = false || (@collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"admin.pessoas.alterar\"' && @request.body.role != 'MASTER' && role != 'MASTER'))))",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"admin.pessoas.excluir\"' && role != 'MASTER'))"
       },
       "fields": [
         {
@@ -289,6 +289,36 @@
           "type": "json",
           "required": false,
           "system": false
+        },
+        {
+          "name": "access_profiles",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "permissions",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cong_membresia",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cong_eventos",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cong_financeiro",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -300,11 +330,11 @@
       "name": "member_roles",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.' || @collection.church_members.permissions ?~ '\"admin.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.' || @collection.church_members.permissions ?~ '\"admin.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.funcoes.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.funcoes.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.funcoes.excluir\"')"
       },
       "fields": [
         {
@@ -358,11 +388,11 @@
       "name": "songs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.musicas.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.musicas.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.musicas.excluir\"')"
       },
       "fields": [
         {
@@ -479,11 +509,11 @@
       "name": "events",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.cultos.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.cultos.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.cultos.excluir\"')"
       },
       "fields": [
         {
@@ -571,11 +601,11 @@
       "name": "event_songs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.repertorio.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.repertorio.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.repertorio.excluir\"')"
       },
       "fields": [
         {
@@ -697,11 +727,11 @@
       "name": "event_members",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER' || member_id.user_id ?= @request.auth.id)",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.escalas.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.escalas.alterar\"' || (member_id.user_id ?= @request.auth.id && @collection.church_members.permissions ?~ '\"louvor.minhas_escalas.confirmar\"'))",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.escalas.excluir\"')"
       },
       "fields": [
         {
@@ -798,11 +828,11 @@
       "name": "song_videos",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.musicas.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.musicas.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.musicas.excluir\"')"
       },
       "fields": [
         {
@@ -974,8 +1004,8 @@
       "name": "invitations",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.pessoas.novo\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.pessoas.novo\"')",
         "create": null,
         "update": null,
         "delete": null
@@ -1072,6 +1102,12 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "access_profiles",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1084,11 +1120,11 @@
       "name": "event_tasks",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.tarefas.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.tarefas.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.tarefas.excluir\"')"
       },
       "fields": [
         {
@@ -1218,11 +1254,11 @@
       "name": "media_assets",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER' || @collection.church_members.operational_roles ?~ '\"MIDIA\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER' || @collection.church_members.operational_roles ?~ '\"MIDIA\"')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER' || @collection.church_members.operational_roles ?~ '\"MIDIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"culto.midias.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"culto.midias.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"culto.midias.excluir\"')"
       },
       "fields": [
         {
@@ -1505,8 +1541,8 @@
       "name": "audit_logs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.pessoas.ver\"' || @collection.church_members.permissions ?~ '\"admin.configuracoes.ver\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.pessoas.ver\"' || @collection.church_members.permissions ?~ '\"admin.configuracoes.ver\"')",
         "create": null,
         "update": null,
         "delete": null
@@ -1970,11 +2006,11 @@
       "name": "event_moments",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.role ?= 'LIDER')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.' || @collection.church_members.permissions ?~ '\"culto.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.repertorio.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.repertorio.alterar\"')",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"louvor.repertorio.excluir\"')"
       },
       "fields": [
         {
@@ -2071,11 +2107,11 @@
       "name": "people",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.followup_owner:isset = false || @request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)) || @collection.church_members.permissions ?~ '\"financeiro.contribuintes.ver\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)) || @collection.church_members.permissions ?~ '\"financeiro.contribuintes.ver\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"membresia.pessoas.novo\"' || @collection.church_members.permissions ?~ '\"membresia.cadastros.aprovar\"') && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)) || @collection.church_members.permissions ?~ '\"financeiro.contribuintes.novo\"') && (@request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"membresia.pessoas.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.pessoas.situacao\"' || @collection.church_members.permissions ?~ '\"membresia.acompanhamento.alterar\"') && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)) || @collection.church_members.permissions ?~ '\"financeiro.contribuintes.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.followup_owner:isset = false || @request.body.followup_owner = '' || @request.body.followup_owner.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.pessoas.excluir\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))"
       },
       "fields": [
         {
@@ -2341,11 +2377,11 @@
       "name": "people_events",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && @request.body.person_id.church_id = @request.body.church_id",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.person_id:isset = false || @request.body.person_id.church_id = church_id)",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.pessoas.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.pessoas.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"membresia.pessoas.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.pessoas.situacao\"' || @collection.church_members.permissions ?~ '\"membresia.acompanhamento.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.painel.parabens\"') && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation))) && @request.body.person_id.church_id = @request.body.church_id",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"membresia.pessoas.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.pessoas.situacao\"' || @collection.church_members.permissions ?~ '\"membresia.acompanhamento.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.painel.parabens\"') && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.person_id:isset = false || @request.body.person_id.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"membresia.pessoas.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.pessoas.situacao\"' || @collection.church_members.permissions ?~ '\"membresia.acompanhamento.alterar\"' || @collection.church_members.permissions ?~ '\"membresia.painel.parabens\"') && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation)))"
       },
       "fields": [
         {
@@ -2441,11 +2477,11 @@
       "name": "people_relations",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && @request.body.person_id.church_id = @request.body.church_id && @request.body.relative_id.church_id = @request.body.church_id && @request.body.person_id != @request.body.relative_id",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.person_id:isset = false && @request.body.relative_id:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.familias.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.familias.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.familias.novo\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation))) && @request.body.person_id.church_id = @request.body.church_id && @request.body.relative_id.church_id = @request.body.church_id && @request.body.person_id != @request.body.relative_id",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.familias.alterar\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.person_id:isset = false && @request.body.relative_id:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.familias.excluir\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ person_id.congregation)))"
       },
       "fields": [
         {
@@ -2518,11 +2554,11 @@
       "name": "people_signup_links",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.key:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.novo\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.novo\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.key:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.excluir\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))"
       },
       "fields": [
         {
@@ -2591,11 +2627,11 @@
       "name": "people_signups",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
         "create": null,
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id)",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.aprovar\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.cadastros.excluir\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))"
       },
       "fields": [
         {
@@ -2783,11 +2819,11 @@
       "name": "church_events",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"')) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.public_key:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ congregation)) || (@collection.church_members.permissions ?~ '\"membresia.' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ congregation)) || (@collection.church_members.permissions ?~ '\"membresia.' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.eventos.novo\"' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ congregation)))",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.eventos.alterar\"' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.public_key:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.eventos.excluir\"' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ congregation)))"
       },
       "fields": [
         {
@@ -3068,11 +3104,11 @@
       "name": "church_event_registrations",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"')) && @request.body.event_id.church_id = @request.body.church_id && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = @request.body.church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false && @request.body.checkin_code:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"')) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.event_id:isset = false && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false && @request.body.checkin_code:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.operational_roles ?~ '\"MEMBRESIA\"' || @collection.church_members.operational_roles ?~ '\"EVENTOS\"'))"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"eventos.inscricoes.ver\"' || @collection.church_members.permissions ?~ '\"eventos.pagamentos.ver\"' || @collection.church_members.permissions ?~ '\"eventos.checkin.ver\"') && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ event_id.congregation)) || (@collection.church_members.permissions ?~ '\"membresia.pessoas.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ event_id.congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"eventos.inscricoes.ver\"' || @collection.church_members.permissions ?~ '\"eventos.pagamentos.ver\"' || @collection.church_members.permissions ?~ '\"eventos.checkin.ver\"') && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ event_id.congregation)) || (@collection.church_members.permissions ?~ '\"membresia.pessoas.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ event_id.congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.inscricoes.novo\"' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ event_id.congregation))) && @request.body.event_id.church_id = @request.body.church_id && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = @request.body.church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false && @request.body.checkin_code:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || ((@collection.church_members.permissions ?~ '\"eventos.inscricoes.alterar\"' || @collection.church_members.permissions ?~ '\"eventos.pagamentos.baixa\"' || @collection.church_members.permissions ?~ '\"eventos.checkin.fazer\"') && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ event_id.congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.event_id:isset = false && (@request.body.person_id:isset = false || @request.body.person_id = '' || @request.body.person_id.church_id = church_id) && @request.body.fin_transaction_id:isset = false && @request.body.fin_note:isset = false && @request.body.checkin_code:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"eventos.inscricoes.excluir\"' && (@collection.church_members.cong_eventos ?~ '\"*\"' || @collection.church_members.cong_eventos ?~ event_id.congregation)))"
       },
       "fields": [
         {
@@ -3251,11 +3287,11 @@
       "name": "church_groups",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.leader_id:isset = false || @request.body.leader_id = '' || @request.body.leader_id.church_id = @request.body.church_id)",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.leader_id:isset = false || @request.body.leader_id = '' || @request.body.leader_id.church_id = church_id)",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.novo\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation))) && (@request.body.leader_id:isset = false || @request.body.leader_id = '' || @request.body.leader_id.church_id = @request.body.church_id)",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.alterar\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && (@request.body.leader_id:isset = false || @request.body.leader_id = '' || @request.body.leader_id.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.excluir\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ congregation)))"
       },
       "fields": [
         {
@@ -3365,11 +3401,11 @@
       "name": "church_group_members",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && @request.body.group_id.church_id = @request.body.church_id && @request.body.person_id.church_id = @request.body.church_id",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.group_id:isset = false && @request.body.person_id:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"MEMBRESIA\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ group_id.congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.ver\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ group_id.congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.alterar\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ group_id.congregation))) && @request.body.group_id.church_id = @request.body.church_id && @request.body.person_id.church_id = @request.body.church_id",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.alterar\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ group_id.congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && @request.body.group_id:isset = false && @request.body.person_id:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"membresia.grupos.alterar\"' && (@collection.church_members.cong_membresia ?~ '\"*\"' || @collection.church_members.cong_membresia ?~ group_id.congregation)))"
       },
       "fields": [
         {
@@ -3439,10 +3475,10 @@
       "name": "fin_accounts",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.cadastros.novo\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.cadastros.alterar\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
         "delete": null
       },
       "fields": [
@@ -3553,10 +3589,10 @@
       "name": "fin_categories",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
         "delete": null
       },
       "fields": [
@@ -3636,10 +3672,10 @@
       "name": "fin_cost_centers",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
         "delete": null
       },
       "fields": [
@@ -3690,10 +3726,10 @@
       "name": "fin_suppliers",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.novo\"' || @collection.church_members.permissions ?~ '\"financeiro.contas_pagar.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
         "delete": null
       },
       "fields": [
@@ -3768,10 +3804,10 @@
       "name": "fin_transactions",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && account_id.church_id = church_id && (category_id = '' || category_id.church_id = church_id) && (cost_center_id = '' || cost_center_id.church_id = church_id) && (person_id = '' || person_id.church_id = church_id) && (supplier_id = '' || supplier_id.church_id = church_id) && (event_id = '' || event_id.church_id = church_id) && @request.body.created_by = @request.auth.id && @request.body.status != 'ESTORNADO' && (type != 'TRANSFERENCIA' || (to_account_id != '' && to_account_id != account_id && to_account_id.church_id = church_id)) && @request.body.count_id:isset = false && @request.body.bill_id:isset = false && @request.body.bank_line_id:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && account_id.church_id = church_id && (category_id = '' || category_id.church_id = church_id) && (cost_center_id = '' || cost_center_id.church_id = church_id) && (person_id = '' || person_id.church_id = church_id) && (supplier_id = '' || supplier_id.church_id = church_id) && (event_id = '' || event_id.church_id = church_id) && status != 'ESTORNADO' && @request.body.created_by:isset = false && (type != 'TRANSFERENCIA' || (to_account_id != '' && to_account_id != account_id && to_account_id.church_id = church_id)) && @request.body.count_id:isset = false && @request.body.bill_id:isset = false && @request.body.bank_line_id:isset = false",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.lancamentos.novo\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation))) && account_id.church_id = church_id && (category_id = '' || category_id.church_id = church_id) && (cost_center_id = '' || cost_center_id.church_id = church_id) && (person_id = '' || person_id.church_id = church_id) && (supplier_id = '' || supplier_id.church_id = church_id) && (event_id = '' || event_id.church_id = church_id) && @request.body.created_by = @request.auth.id && @request.body.status != 'ESTORNADO' && (type != 'TRANSFERENCIA' || (to_account_id != '' && to_account_id != account_id && to_account_id.church_id = church_id)) && @request.body.count_id:isset = false && @request.body.bill_id:isset = false && @request.body.bank_line_id:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.lancamentos.alterar\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && account_id.church_id = church_id && (category_id = '' || category_id.church_id = church_id) && (cost_center_id = '' || cost_center_id.church_id = church_id) && (person_id = '' || person_id.church_id = church_id) && (supplier_id = '' || supplier_id.church_id = church_id) && (event_id = '' || event_id.church_id = church_id) && status != 'ESTORNADO' && @request.body.created_by:isset = false && (type != 'TRANSFERENCIA' || (to_account_id != '' && to_account_id != account_id && to_account_id.church_id = church_id)) && @request.body.count_id:isset = false && @request.body.bill_id:isset = false && @request.body.bank_line_id:isset = false",
         "delete": null
       },
       "fields": [
@@ -3975,10 +4011,10 @@
       "name": "fin_counts",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && account_id.church_id = church_id && offering_category_id.church_id = church_id && (event_id = '' || event_id.church_id = church_id) && @request.body.counted_by = @request.auth.id && @request.body.status = 'CONTADO' && @request.body.approved_by:isset = false && @request.body.approved_at:isset = false && @request.body.approved_by_name:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && account_id.church_id = church_id && offering_category_id.church_id = church_id && (event_id = '' || event_id.church_id = church_id) && status = 'CONTADO' && (@request.body.status:isset = false || @request.body.status = 'CONTADO' || @request.body.status = 'CANCELADO') && @request.body.counted_by:isset = false && @request.body.counted_by_name:isset = false && @request.body.approved_by:isset = false && @request.body.approved_at:isset = false && @request.body.approved_by_name:isset = false",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.contagem.novo\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation))) && account_id.church_id = church_id && offering_category_id.church_id = church_id && (event_id = '' || event_id.church_id = church_id) && @request.body.counted_by = @request.auth.id && @request.body.status = 'CONTADO' && @request.body.approved_by:isset = false && @request.body.approved_at:isset = false && @request.body.approved_by_name:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.contagem.alterar\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ account_id.congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && account_id.church_id = church_id && offering_category_id.church_id = church_id && (event_id = '' || event_id.church_id = church_id) && status = 'CONTADO' && (@request.body.status:isset = false || @request.body.status = 'CONTADO' || @request.body.status = 'CANCELADO') && @request.body.counted_by:isset = false && @request.body.counted_by_name:isset = false && @request.body.approved_by:isset = false && @request.body.approved_at:isset = false && @request.body.approved_by_name:isset = false",
         "delete": null
       },
       "fields": [
@@ -4111,10 +4147,10 @@
       "name": "fin_bills",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && @request.body.status = 'ABERTO' && @request.body.paid_at:isset = false && @request.body.paid_amount_cents:isset = false && @request.body.paid_account_id:isset = false && @request.body.transaction_id:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && status = 'ABERTO' && (@request.body.status:isset = false || @request.body.status = 'ABERTO' || @request.body.status = 'CANCELADO') && @request.body.paid_at:isset = false && @request.body.paid_amount_cents:isset = false && @request.body.paid_account_id:isset = false && @request.body.transaction_id:isset = false",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.contas_pagar.novo\"') && @request.body.status = 'ABERTO' && @request.body.paid_at:isset = false && @request.body.paid_amount_cents:isset = false && @request.body.paid_account_id:isset = false && @request.body.transaction_id:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.contas_pagar.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id) && status = 'ABERTO' && (@request.body.status:isset = false || @request.body.status = 'ABERTO' || @request.body.status = 'CANCELADO') && @request.body.paid_at:isset = false && @request.body.paid_amount_cents:isset = false && @request.body.paid_account_id:isset = false && @request.body.transaction_id:isset = false",
         "delete": null
       },
       "fields": [
@@ -4318,8 +4354,8 @@
       "name": "fin_bank_imports",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
         "create": null,
         "update": null,
         "delete": null
@@ -4421,10 +4457,10 @@
       "name": "fin_bank_lines",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
         "create": null,
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && status != 'CONCILIADO' && (@request.body.status = 'PENDENTE' || @request.body.status = 'IGNORADO') && @request.body.church_id:isset = false && @request.body.account_id:isset = false && @request.body.import_id:isset = false && @request.body.fitid:isset = false && @request.body.date:isset = false && @request.body.amount_cents:isset = false && @request.body.description:isset = false && @request.body.transaction_id:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && status != 'CONCILIADO' && (@request.body.status = 'PENDENTE' || @request.body.status = 'IGNORADO') && @request.body.church_id:isset = false && @request.body.account_id:isset = false && @request.body.import_id:isset = false && @request.body.fitid:isset = false && @request.body.date:isset = false && @request.body.amount_cents:isset = false && @request.body.description:isset = false && @request.body.transaction_id:isset = false",
         "delete": null
       },
       "fields": [
@@ -4532,11 +4568,11 @@
       "name": "fin_bank_connections",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.church_id:isset = false",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.church_id:isset = false",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"')"
       },
       "fields": [
         {
@@ -4711,8 +4747,8 @@
       "name": "fin_closings",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
         "create": null,
         "update": null,
         "delete": null
@@ -4831,11 +4867,11 @@
       "name": "fin_signers",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
-        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')"
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.excluir\"')"
       },
       "fields": [
         {
@@ -4897,8 +4933,8 @@
       "name": "fin_audits",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
         "create": null,
         "update": null,
         "delete": null
@@ -4988,8 +5024,8 @@
       "name": "fin_audit_comments",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
         "create": null,
         "update": null,
         "delete": null
@@ -5068,10 +5104,10 @@
       "name": "fin_settings",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.role ?= 'ADMIN' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.novo\"')",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.cadastros.alterar\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
         "delete": null
       },
       "fields": [
@@ -5170,10 +5206,10 @@
       "name": "fin_campaigns",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"')",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"') && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.campanhas.novo\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.campanhas.alterar\"' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation))) && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
         "delete": null
       },
       "fields": [
@@ -5278,8 +5314,8 @@
       "name": "fin_budgets",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
-        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.operational_roles ?~ '\"FINANCEIRO\"' || @collection.church_members.operational_roles ?~ '\"AUDITOR\"')",
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || (@collection.church_members.permissions ?~ '\"financeiro.' && (@collection.church_members.cong_financeiro ?~ '\"*\"' || @collection.church_members.cong_financeiro ?~ congregation)))",
         "create": null,
         "update": null,
         "delete": null
@@ -5345,6 +5381,90 @@
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_fin_budgets_line ON fin_budgets (church_id, year, congregation, category_id)"
+      ]
+    },
+    {
+      "name": "access_profiles",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.pessoas.ver\"')",
+        "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"admin.pessoas.ver\"')",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && @collection.church_members.role ?= 'MASTER'",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && @collection.church_members.role ?= 'MASTER' && (@request.body.church_id:isset = false || @request.body.church_id = church_id)",
+        "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && @collection.church_members.role ?= 'MASTER'"
+      },
+      "fields": [
+        {
+          "name": "church_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "churches"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "permissions",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "congregations",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_system",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "system_key",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_access_profiles_church ON access_profiles (church_id)"
       ]
     }
   ]
