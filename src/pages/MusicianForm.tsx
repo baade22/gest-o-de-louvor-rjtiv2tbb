@@ -27,6 +27,7 @@ const OPERATIONAL_ROLE_OPTIONS: { key: string; label: string }[] = [
   { key: 'FINANCEIRO', label: 'Financeiro' },
   { key: 'AUDITOR', label: 'Conselho fiscal' },
   { key: 'MEMBRESIA', label: 'Membresia / Secretaria' },
+  { key: 'EVENTOS', label: 'Eventos da igreja' },
 ]
 
 export default function MusicianForm() {
@@ -362,10 +363,9 @@ export default function MusicianForm() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {OPERATIONAL_ROLE_OPTIONS.map((op) => {
                 const isSelected = formData.operational_roles.includes(op.key)
-                // Só o MASTER dá ou tira Financeiro, Conselho fiscal e Membresia (o servidor confere também)
+                // Só o MASTER dá ou tira Financeiro, Conselho fiscal, Membresia e Eventos (o servidor confere também)
                 const locked =
-                  (op.key === 'FINANCEIRO' || op.key === 'AUDITOR' || op.key === 'MEMBRESIA') &&
-                  !isMaster
+                  ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA', 'EVENTOS'].includes(op.key) && !isMaster
                 return (
                   <button
                     key={op.key}

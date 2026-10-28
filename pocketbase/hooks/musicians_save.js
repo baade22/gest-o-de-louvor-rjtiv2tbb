@@ -53,16 +53,19 @@ routerAdd(
       'FINANCEIRO',
       'AUDITOR',
       'MEMBRESIA',
+      'EVENTOS',
     ]
     for (const op of operationalRoles) {
       if (knownOps.indexOf(op) === -1) {
         return e.json(400, { message: 'Função operacional inválida: ' + op })
       }
     }
-    // Funções sensíveis que só o MASTER delega: Financeiro, Conselho fiscal e Membresia
-    // (acesso ao dinheiro e aos dados pessoais dos membros).
+    // Funções sensíveis que só o MASTER delega: Financeiro, Conselho fiscal, Membresia e
+    // Eventos (acesso ao dinheiro e aos dados pessoais dos membros e inscritos).
     const moneyRoles = (ops) =>
-      ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA'].filter((r) => ops.indexOf(r) !== -1).join(',')
+      ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA', 'EVENTOS']
+        .filter((r) => ops.indexOf(r) !== -1)
+        .join(',')
     const wantsFinance = moneyRoles(operationalRoles)
     const hasFinance = (rec) => {
       let ops = []
@@ -73,7 +76,7 @@ routerAdd(
     }
     const financeOnlyMaster = {
       message:
-        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro, Conselho fiscal e Membresia.',
+        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro, Conselho fiscal, Membresia e Eventos.',
     }
 
     if (!['MASTER', 'ADMIN', 'LIDER', 'MUSICO'].includes(role)) {

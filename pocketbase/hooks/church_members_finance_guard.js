@@ -21,7 +21,9 @@ onRecordCreateRequest((e) => {
       }
     }
     if (!Array.isArray(ops)) return ''
-    return ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA'].filter((r) => ops.indexOf(r) !== -1).join(',')
+    return ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA', 'EVENTOS']
+      .filter((r) => ops.indexOf(r) !== -1)
+      .join(',')
   }
   const rec = e.record
   const after = hasFinance(rec.getString('operational_roles'))
@@ -38,7 +40,7 @@ onRecordCreateRequest((e) => {
     } catch (_) {}
     if (!isMaster) {
       throw new ForbiddenError(
-        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro, Conselho fiscal e Membresia.',
+        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro, Conselho fiscal, Membresia e Eventos.',
       )
     }
   }
@@ -62,7 +64,9 @@ onRecordUpdateRequest((e) => {
       }
     }
     if (!Array.isArray(ops)) return ''
-    return ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA'].filter((r) => ops.indexOf(r) !== -1).join(',')
+    return ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA', 'EVENTOS']
+      .filter((r) => ops.indexOf(r) !== -1)
+      .join(',')
   }
   const rec = e.record
   const after = hasFinance(rec.getString('operational_roles'))
@@ -79,7 +83,7 @@ onRecordUpdateRequest((e) => {
     } catch (_) {}
     if (!isMaster) {
       throw new ForbiddenError(
-        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro, Conselho fiscal e Membresia.',
+        'Só o MASTER da igreja pode dar ou tirar as funções Financeiro, Conselho fiscal, Membresia e Eventos.',
       )
     }
   }

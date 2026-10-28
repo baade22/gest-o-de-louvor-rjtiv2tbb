@@ -598,12 +598,17 @@ export default function InvitationsManagement() {
                     { key: 'ILUMINACAO', label: 'Iluminação', desc: 'Luzes cênicas e cenas' },
                     { key: 'FINANCEIRO', label: 'Financeiro', desc: 'Dízimos, ofertas e contas' },
                     { key: 'AUDITOR', label: 'Conselho fiscal', desc: 'Confere o financeiro' },
+                    { key: 'MEMBRESIA', label: 'Membresia', desc: 'Cadastro dos membros' },
+                    { key: 'EVENTOS', label: 'Eventos da igreja', desc: 'Inscrições e check-in' },
                   ].map((op) => {
                     const isSelected = formData.operational_roles.includes(
                       op.key as OperationalRole,
                     )
-                    // Só o MASTER convida com Financeiro ou Conselho fiscal (o servidor confere também)
-                    const locked = (op.key === 'FINANCEIRO' || op.key === 'AUDITOR') && !isMaster
+                    // Só o MASTER convida com Financeiro, Conselho fiscal, Membresia ou Eventos
+                    // (o servidor confere também)
+                    const locked =
+                      ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA', 'EVENTOS'].includes(op.key) &&
+                      !isMaster
                     return (
                       <button
                         key={op.key}

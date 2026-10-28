@@ -8,6 +8,7 @@ export type OperationalRole =
   | 'FINANCEIRO'
   | 'AUDITOR'
   | 'MEMBRESIA'
+  | 'EVENTOS'
 
 export interface User {
   id: string
@@ -592,9 +593,29 @@ export interface ChurchEvent {
   /** Conta do Financeiro que recebe; vazio = o servidor escolhe pela congregação. */
   fin_account_id?: string
   closed_at?: string
+  /** Perguntas extras do formulário de inscrição. */
+  questions?: EventQuestion[] | null
+  /** Equipe de apoio (recepção, check-in, cozinha...). */
+  staff?: EventStaffMember[] | null
   created_by?: string
   created: string
   updated: string
+}
+
+export interface EventQuestion {
+  id: string
+  label: string
+  /** TEXT = resposta livre; CHOICE = uma das opções; YESNO = Sim ou Não. */
+  kind: 'TEXT' | 'CHOICE' | 'YESNO'
+  options?: string[]
+  required?: boolean
+}
+
+export interface EventStaffMember {
+  name: string
+  phone?: string
+  /** O que a pessoa faz no evento (ex.: recepção, check-in). */
+  task?: string
 }
 
 export interface EventCoupon {
@@ -632,6 +653,12 @@ export interface EventRegistration {
   fin_transaction_id?: string
   /** Aviso do servidor quando não deu para lançar no Financeiro. */
   fin_note?: string
+  /** Respostas do questionário: { id da pergunta: resposta }. */
+  answers?: Record<string, string> | null
+  /** Código do comprovante (QR de check-in), gerado pelo servidor. */
+  checkin_code?: string
+  attended_at?: string
+  checked_out_at?: string
   created: string
   updated: string
 }

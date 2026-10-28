@@ -35,6 +35,8 @@ import {
 import { eventDateLabel, formatBRL } from '@/lib/churchEvents'
 import {
   CLOSED_REASON_LABELS,
+  checkinUrl,
+  cleanAnswers,
   addressLines,
   eventColor,
   hasAddress,
@@ -101,6 +103,7 @@ export default function PublicEventSignup() {
   const [couponInput, setCouponInput] = useState('')
   const [coupon, setCoupon] = useState<{ code: string; amount: number } | null>(null)
   const [couponMsg, setCouponMsg] = useState('')
+  const [answers, setAnswers] = useState<Record<string, string>>({})
   const [website, setWebsite] = useState('')
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
@@ -150,6 +153,8 @@ export default function PublicEventSignup() {
     if (phone.replace(/\D/g, '').length < 10) return setError('Informe o telefone com DDD.')
     if (info?.couple_only && partnerName.trim().split(/\s+/).length < 2)
       return setError('Informe o nome completo do cônjuge.')
+    const quiz = cleanAnswers(info?.questions, answers)
+    if (quiz.missing) return setError(`Responda: ${quiz.missing.label}`)
     if (!consent) return setError('Marque a autorização para enviar.')
     setSending(true)
     try {
@@ -161,6 +166,7 @@ export default function PublicEventSignup() {
         partner_name: info?.couple_only ? partnerName : undefined,
         partner_phone: info?.couple_only ? partnerPhone : undefined,
         coupon: coupon?.code,
+        answers: quiz.answers,
         consent,
         website,
       })
@@ -381,6 +387,20 @@ export default function PublicEventSignup() {
             )}
           </section>
         )}
+        {result.checkin_code && (
+          <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm text-center space-y-2">
+            <h2 className="font-bold text-slate-900">Seu comprovante</h2>
+            <PixQr
+              payload={checkinUrl(result.checkin_code)}
+              label="QR do comprovante de inscrição"
+              className="mx-auto h-44 w-44"
+            />
+            <p className="text-sm text-slate-600">
+              Mostre este QR na entrada do evento. Tire um print desta tela para guardar.
+            </p>
+            <p className="font-mono text-xs text-slate-400">{result.checkin_code}</p>
+          </section>
+        )}
         {infoCard}
       </>
     )
@@ -498,6 +518,45 @@ export default function PublicEventSignup() {
                 </div>
               </div>
             )}
+            {(info.questions || []).map((q) => (
+              <div key={q.id} className="space-y-1.5">
+                <Label htmlFor={`ev-q-${q.id}`} className="text-sm font-semibold">
+                  {q.label} {q.required && <span className="text-red-500">*</span>}
+                </Label>
+                {q.kind === 'TEXT' ? (
+                  <Input
+                    id={`ev-q-${q.id}`}
+                    value={answers[q.id] || ''}
+                    onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                    className={inputClass}
+                    maxLength={500}
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2" role="radiogroup" id={`ev-q-${q.id}`}>
+                    {(q.kind === 'YESNO' ? ['Sim', 'Não'] : q.options || []).map((opt) => {
+                      const on = answers[q.id] === opt
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => setAnswers((a) => ({ ...a, [q.id]: on ? '' : opt }))}
+                          className="h-10 min-w-12 px-4 rounded-xl border text-sm font-medium"
+                          style={
+                            on
+                              ? { background: accent, borderColor: accent, color: '#fff' }
+                              : { borderColor: '#e2e8f0', color: '#334155' }
+                          }
+                        >
+                          {opt}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
             {info.has_coupons && (
               <div className="space-y-1.5">
                 <Label
