@@ -31,7 +31,10 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { formatCalendarDateDisplay, getLocalTodayYMD, toCalendarYMD } from '@/lib/dateUtils'
 
 export default function EventsList() {
-  const { currentChurch, canManageContent } = useAuth()
+  const { currentChurch, can } = useAuth()
+  const canCreate = can('louvor.cultos.novo')
+  const canEdit = can('louvor.cultos.alterar')
+  const canDelete = can('louvor.cultos.excluir')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -140,7 +143,7 @@ export default function EventsList() {
           </p>
         </div>
 
-        {canManageContent && (
+        {canCreate && (
           <Link to="/events/new">
             <Button className="h-10 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
@@ -171,7 +174,7 @@ export default function EventsList() {
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
               Crie o próximo culto dominical ou ensaio de louvor da igreja.
             </p>
-            {canManageContent && (
+            {canCreate && (
               <Link to="/events/new" className="mt-4 inline-block">
                 <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs">
                   Agendar Culto
@@ -236,7 +239,7 @@ export default function EventsList() {
                     </Button>
                   </Link>
 
-                  {canManageContent && (
+                  {(canEdit || canDelete) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -249,23 +252,27 @@ export default function EventsList() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            window.location.href = `/events/${ev.id}/edit`
-                          }}
-                          className="gap-2 text-xs"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                          Editar Detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => handleDeleteEvent(ev.id, e)}
-                          className="gap-2 text-xs text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Excluir Culto
-                        </DropdownMenuItem>
+                        {canEdit && (
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              window.location.href = `/events/${ev.id}/edit`
+                            }}
+                            className="gap-2 text-xs"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                            Editar Detalhes
+                          </DropdownMenuItem>
+                        )}
+                        {canDelete && (
+                          <DropdownMenuItem
+                            onClick={(e) => handleDeleteEvent(ev.id, e)}
+                            className="gap-2 text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Excluir Culto
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}

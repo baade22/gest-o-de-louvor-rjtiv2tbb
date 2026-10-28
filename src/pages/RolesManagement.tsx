@@ -20,7 +20,8 @@ import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 
 export default function RolesManagement() {
-  const { currentChurch, isAdmin } = useAuth()
+  const { currentChurch, can } = useAuth()
+  const isAdmin = can('admin.funcoes.alterar')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 

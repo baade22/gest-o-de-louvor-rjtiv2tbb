@@ -260,7 +260,7 @@ interface Built {
 export default function FinanceReports() {
   const { currentChurch } = useAuth()
   const churchId = currentChurch?.id
-  const { canView } = useFinanceAccess()
+  const { canView } = useFinanceAccess('relatorios')
   const { toast } = useToast()
   const sheetRef = useRef<HTMLDivElement>(null)
 

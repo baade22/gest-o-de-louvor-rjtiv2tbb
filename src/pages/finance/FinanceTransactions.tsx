@@ -85,7 +85,7 @@ function detail(tx: FinTransaction) {
 
 export default function FinanceTransactions() {
   const { currentChurch } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('lancamentos')
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
   const churchId = currentChurch?.id

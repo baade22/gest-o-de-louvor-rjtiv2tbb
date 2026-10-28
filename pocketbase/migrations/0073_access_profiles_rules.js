@@ -156,7 +156,8 @@ function newGroups() {
   g.member_roles = withRead(READ_ROLES, 'admin.funcoes')
   g.audit_logs = [or(P('admin.pessoas.ver'), P('admin.configuracoes.ver')), null, null, null, null]
   g.audit_logs[1] = g.audit_logs[0]
-  g.invitations = [or(P('admin.pessoas.ver')), or(P('admin.pessoas.ver')), null, null, null]
+  // Convites trazem o link (token) de quem foi convidado: só quem pode convidar os vê
+  g.invitations = [or(P('admin.pessoas.novo')), or(P('admin.pessoas.novo')), null, null, null]
   g.churches = [null, null, null, or(P('admin.configuracoes.alterar')), null]
   g.church_members = [
     null,

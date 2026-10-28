@@ -153,7 +153,7 @@ function Stat({
 
 export default function FinanceBills() {
   const { currentChurch } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('contas_pagar')
   const { toast } = useToast()
   const { confirm, dialog } = useConfirm()
   const [params, setParams] = useSearchParams()

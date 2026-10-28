@@ -29,6 +29,7 @@ export default function InviteAccept() {
     email?: string
     role?: string
     operational_roles?: string[]
+    access_profiles?: { id: string; name: string }[]
     message?: string
   } | null>(null)
 
@@ -55,6 +56,7 @@ export default function InviteAccept() {
           email?: string
           role?: string
           operational_roles?: string[]
+          access_profiles?: { id: string; name: string }[]
           message?: string
         }>(`/backend/v1/invitations/validate?token=${token}`, { method: 'GET' })
 
@@ -214,19 +216,25 @@ export default function InviteAccept() {
           </CardDescription>
 
           <div className="pt-2 flex flex-wrap gap-1.5">
-            <Badge variant="secondary" className="text-[10px] font-semibold bg-slate-100">
-              Perfil: {inviteData.role}
-            </Badge>
-            {inviteData.operational_roles &&
-              inviteData.operational_roles.map((op) => (
-                <Badge
-                  key={op}
-                  variant="outline"
-                  className="text-[10px] bg-teal-50 text-teal-800 border-teal-200"
-                >
-                  {op}
-                </Badge>
-              ))}
+            {inviteData.role === 'MASTER' && (
+              <Badge variant="secondary" className="text-[10px] font-semibold bg-slate-100">
+                Acesso: Master
+              </Badge>
+            )}
+            {(inviteData.access_profiles?.length
+              ? inviteData.access_profiles.map((p) => p.name)
+              : inviteData.role === 'MASTER'
+                ? []
+                : inviteData.operational_roles || []
+            ).map((op) => (
+              <Badge
+                key={op}
+                variant="outline"
+                className="text-[10px] bg-teal-50 text-teal-800 border-teal-200"
+              >
+                {op}
+              </Badge>
+            ))}
           </div>
         </CardHeader>
 

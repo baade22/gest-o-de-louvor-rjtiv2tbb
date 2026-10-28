@@ -21,6 +21,8 @@ import MyScales from '@/pages/MyScales'
 import MusiciansList from '@/pages/MusiciansList'
 import MusicianForm from '@/pages/MusicianForm'
 import RolesManagement from '@/pages/RolesManagement'
+import AccessProfiles from '@/pages/access/AccessProfiles'
+import AccessProfileForm from '@/pages/access/AccessProfileForm'
 import UserProfile from '@/pages/UserProfile'
 import ChurchSettings from '@/pages/ChurchSettings'
 import IntegrationsSettings from '@/pages/IntegrationsSettings'
@@ -85,7 +87,7 @@ const App = () => (
           <Route
             path="/membros/:id/documentos"
             element={
-              <RequireAuth requireRole="MEMBERSHIP">
+              <RequireAuth requirePermission="membresia.documentos.ver">
                 <PersonDocuments />
               </RequireAuth>
             }
@@ -93,7 +95,7 @@ const App = () => (
           <Route
             path="/membros/carteirinhas"
             element={
-              <RequireAuth requireRole="MEMBERSHIP">
+              <RequireAuth requirePermission="membresia.documentos.ver">
                 <MemberCards />
               </RequireAuth>
             }
@@ -127,7 +129,7 @@ const App = () => (
             <Route
               path="/songs"
               element={
-                <RequireAuth>
+                <RequireAuth requirePermission="louvor.musicas.ver">
                   <SongsList />
                 </RequireAuth>
               }
@@ -135,7 +137,7 @@ const App = () => (
             <Route
               path="/songs/new"
               element={
-                <RequireAuth requireRole="CONTENT_MANAGER">
+                <RequireAuth requirePermission="louvor.musicas.novo">
                   <SongForm />
                 </RequireAuth>
               }
@@ -143,7 +145,7 @@ const App = () => (
             <Route
               path="/songs/:id"
               element={
-                <RequireAuth>
+                <RequireAuth requirePermission="louvor.musicas.ver">
                   <SongDetail />
                 </RequireAuth>
               }
@@ -151,7 +153,7 @@ const App = () => (
             <Route
               path="/songs/:id/edit"
               element={
-                <RequireAuth requireRole="CONTENT_MANAGER">
+                <RequireAuth requirePermission="louvor.musicas.alterar">
                   <SongForm />
                 </RequireAuth>
               }
@@ -161,7 +163,7 @@ const App = () => (
             <Route
               path="/events"
               element={
-                <RequireAuth requireRole="CONTENT_MANAGER">
+                <RequireAuth requirePermission="louvor.cultos.ver">
                   <EventsList />
                 </RequireAuth>
               }
@@ -169,7 +171,7 @@ const App = () => (
             <Route
               path="/events/new"
               element={
-                <RequireAuth requireRole="CONTENT_MANAGER">
+                <RequireAuth requirePermission="louvor.cultos.novo">
                   <EventForm />
                 </RequireAuth>
               }
@@ -177,7 +179,7 @@ const App = () => (
             <Route
               path="/events/:id/edit"
               element={
-                <RequireAuth requireRole="CONTENT_MANAGER">
+                <RequireAuth requirePermission="louvor.cultos.alterar">
                   <EventForm />
                 </RequireAuth>
               }
@@ -205,7 +207,7 @@ const App = () => (
             <Route
               path="/som"
               element={
-                <RequireAuth requireModule="sound">
+                <RequireAuth requirePermission="culto.som.ver">
                   <SoundModule />
                 </RequireAuth>
               }
@@ -214,7 +216,7 @@ const App = () => (
             <Route
               path="/projecao"
               element={
-                <RequireAuth requireModule="projection">
+                <RequireAuth requirePermission="culto.projecao.ver">
                   <ProjectionModule />
                 </RequireAuth>
               }
@@ -223,7 +225,7 @@ const App = () => (
             <Route
               path="/midias"
               element={
-                <RequireAuth requireModule="media">
+                <RequireAuth requirePermission="culto.midias.ver">
                   <MediaModule />
                 </RequireAuth>
               }
@@ -232,7 +234,7 @@ const App = () => (
             <Route
               path="/tarefas"
               element={
-                <RequireAuth requireModule="tasks">
+                <RequireAuth requirePermission="louvor.tarefas.ver">
                   <TasksModule />
                 </RequireAuth>
               }
@@ -241,7 +243,7 @@ const App = () => (
             <Route
               path="/iluminacao"
               element={
-                <RequireAuth requireModule="lighting">
+                <RequireAuth requirePermission="culto.iluminacao.ver">
                   <LightingModule />
                 </RequireAuth>
               }
@@ -251,7 +253,7 @@ const App = () => (
             <Route
               path="/financeiro"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.painel.ver">
                   <FinancePanel />
                 </RequireAuth>
               }
@@ -259,7 +261,7 @@ const App = () => (
             <Route
               path="/financeiro/lancamentos"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.lancamentos.ver">
                   <FinanceTransactions />
                 </RequireAuth>
               }
@@ -267,7 +269,7 @@ const App = () => (
             <Route
               path="/financeiro/contagem"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.contagem.ver">
                   <FinanceCounts />
                 </RequireAuth>
               }
@@ -275,7 +277,7 @@ const App = () => (
             <Route
               path="/financeiro/contas"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.contas_pagar.ver">
                   <FinanceBills />
                 </RequireAuth>
               }
@@ -283,7 +285,7 @@ const App = () => (
             <Route
               path="/financeiro/saldos"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.conciliacao.ver">
                   <FinanceBalances />
                 </RequireAuth>
               }
@@ -291,7 +293,7 @@ const App = () => (
             <Route
               path="/financeiro/conciliacao"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.conciliacao.ver">
                   <FinanceReconcile />
                 </RequireAuth>
               }
@@ -299,7 +301,7 @@ const App = () => (
             <Route
               path="/financeiro/fluxo-de-caixa"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.fluxo.ver">
                   <FinanceCashFlow />
                 </RequireAuth>
               }
@@ -307,7 +309,7 @@ const App = () => (
             <Route
               path="/financeiro/campanhas"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.campanhas.ver">
                   <FinanceCampaigns />
                 </RequireAuth>
               }
@@ -315,7 +317,7 @@ const App = () => (
             <Route
               path="/financeiro/orcamento"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.orcamento.ver">
                   <FinanceBudget />
                 </RequireAuth>
               }
@@ -323,7 +325,7 @@ const App = () => (
             <Route
               path="/financeiro/fechamento"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.fechamento.ver">
                   <FinanceClosing />
                 </RequireAuth>
               }
@@ -331,7 +333,7 @@ const App = () => (
             <Route
               path="/financeiro/auditoria"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.auditoria.ver">
                   <FinanceAudit />
                 </RequireAuth>
               }
@@ -339,7 +341,7 @@ const App = () => (
             <Route
               path="/financeiro/relatorios"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.relatorios.ver">
                   <FinanceReports />
                 </RequireAuth>
               }
@@ -347,7 +349,7 @@ const App = () => (
             <Route
               path="/financeiro/informes"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.relatorios.ver">
                   <FinanceStatements />
                 </RequireAuth>
               }
@@ -355,7 +357,7 @@ const App = () => (
             <Route
               path="/financeiro/cadastros"
               element={
-                <RequireAuth requireRole="FINANCE">
+                <RequireAuth requirePermission="financeiro.cadastros.ver">
                   <FinanceRegistry />
                 </RequireAuth>
               }
@@ -365,7 +367,7 @@ const App = () => (
             <Route
               path="/convites"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requirePermission="admin.pessoas.novo">
                   <InvitationsManagement />
                 </RequireAuth>
               }
@@ -375,7 +377,7 @@ const App = () => (
             <Route
               path="/membros"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.pessoas.ver">
                   <PeopleList />
                 </RequireAuth>
               }
@@ -383,7 +385,7 @@ const App = () => (
             <Route
               path="/membros/novo"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.pessoas.novo">
                   <PersonForm />
                 </RequireAuth>
               }
@@ -391,7 +393,7 @@ const App = () => (
             <Route
               path="/membros/aniversarios"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.painel.ver">
                   <Birthdays />
                 </RequireAuth>
               }
@@ -399,7 +401,7 @@ const App = () => (
             <Route
               path="/membros/painel"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.painel.ver">
                   <MembershipDashboard />
                 </RequireAuth>
               }
@@ -407,7 +409,7 @@ const App = () => (
             <Route
               path="/membros/cadastros"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.cadastros.ver">
                   <Signups />
                 </RequireAuth>
               }
@@ -415,7 +417,7 @@ const App = () => (
             <Route
               path="/membros/acompanhamento"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.acompanhamento.ver">
                   <FollowUp />
                 </RequireAuth>
               }
@@ -423,7 +425,7 @@ const App = () => (
             <Route
               path="/membros/relatorios"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.relatorios.ver">
                   <Reports />
                 </RequireAuth>
               }
@@ -431,7 +433,7 @@ const App = () => (
             <Route
               path="/membros/grupos"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.grupos.ver">
                   <Groups />
                 </RequireAuth>
               }
@@ -439,7 +441,7 @@ const App = () => (
             <Route
               path="/membros/grupos/:id"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.grupos.ver">
                   <GroupDetail />
                 </RequireAuth>
               }
@@ -447,7 +449,7 @@ const App = () => (
             <Route
               path="/membros/eventos"
               element={
-                <RequireAuth requireRole="EVENTS">
+                <RequireAuth requirePermission="eventos.eventos.ver">
                   <ChurchEvents />
                 </RequireAuth>
               }
@@ -455,7 +457,7 @@ const App = () => (
             <Route
               path="/membros/eventos/novo"
               element={
-                <RequireAuth requireRole="EVENTS">
+                <RequireAuth requirePermission="eventos.eventos.novo">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -463,7 +465,7 @@ const App = () => (
             <Route
               path="/membros/eventos/:id"
               element={
-                <RequireAuth requireRole="EVENTS">
+                <RequireAuth requirePermission="eventos.eventos.ver">
                   <ChurchEventDetail />
                 </RequireAuth>
               }
@@ -471,7 +473,7 @@ const App = () => (
             <Route
               path="/checkin/:code"
               element={
-                <RequireAuth requireRole="EVENTS">
+                <RequireAuth requirePermission="eventos.checkin.fazer">
                   <EventCheckin />
                 </RequireAuth>
               }
@@ -479,7 +481,7 @@ const App = () => (
             <Route
               path="/membros/eventos/:id/editar"
               element={
-                <RequireAuth requireRole="EVENTS">
+                <RequireAuth requirePermission="eventos.eventos.alterar">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -487,7 +489,7 @@ const App = () => (
             <Route
               path="/membros/:id"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.pessoas.ver">
                   <PersonProfile />
                 </RequireAuth>
               }
@@ -495,7 +497,7 @@ const App = () => (
             <Route
               path="/membros/:id/editar"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requirePermission="membresia.pessoas.alterar">
                   <PersonForm />
                 </RequireAuth>
               }
@@ -505,7 +507,7 @@ const App = () => (
             <Route
               path="/musicians"
               element={
-                <RequireAuth requireRole="CONTENT_MANAGER">
+                <RequireAuth requirePermission="admin.pessoas.ver">
                   <MusiciansList />
                 </RequireAuth>
               }
@@ -513,7 +515,7 @@ const App = () => (
             <Route
               path="/musicians/new"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requirePermission="admin.pessoas.novo">
                   <MusicianForm />
                 </RequireAuth>
               }
@@ -521,7 +523,7 @@ const App = () => (
             <Route
               path="/musicians/:id/edit"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requirePermission="admin.pessoas.alterar">
                   <MusicianForm />
                 </RequireAuth>
               }
@@ -531,8 +533,33 @@ const App = () => (
             <Route
               path="/roles"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requirePermission="admin.funcoes.ver">
                   <RolesManagement />
+                </RequireAuth>
+              }
+            />
+            {/* Perfis de acesso (estilo Eklesia): só o MASTER altera; quem gerencia pessoas consulta */}
+            <Route
+              path="/perfis-acesso"
+              element={
+                <RequireAuth requirePermission="admin.pessoas.ver">
+                  <AccessProfiles />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/perfis-acesso/novo"
+              element={
+                <RequireAuth requireRole="MASTER">
+                  <AccessProfileForm />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/perfis-acesso/:id"
+              element={
+                <RequireAuth requirePermission="admin.pessoas.ver">
+                  <AccessProfileForm />
                 </RequireAuth>
               }
             />
@@ -551,7 +578,7 @@ const App = () => (
             <Route
               path="/configuracoes"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requirePermission="admin.configuracoes.ver">
                   <ChurchSettings />
                 </RequireAuth>
               }
@@ -559,7 +586,7 @@ const App = () => (
             <Route
               path="/configuracoes/integracoes"
               element={
-                <RequireAuth requireRole="ADMIN">
+                <RequireAuth requirePermission="admin.integracoes.ver">
                   <IntegrationsSettings />
                 </RequireAuth>
               }

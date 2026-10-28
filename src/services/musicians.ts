@@ -7,10 +7,11 @@ export interface MusicianPayload {
   name: string
   email: string
   phone?: string
-  role: 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
-  operational_roles?: string[]
   is_active: boolean
   role_ids: string[]
+  /** Perfis de acesso (ids). Ignorado quando is_master. */
+  access_profiles: string[]
+  is_master: boolean
 }
 
 export interface MusicianDetailResponse {
@@ -19,6 +20,10 @@ export interface MusicianDetailResponse {
   user_id: string
   role: 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
   operational_roles?: string[]
+  /** Perfis de acesso (só para quem gere as pessoas ou para a própria pessoa) */
+  access_profiles?: { id: string; name: string }[]
+  /** Chaves somadas dos perfis (só no detalhe) */
+  permissions?: string[]
   phone?: string
   is_active: boolean
   created: string

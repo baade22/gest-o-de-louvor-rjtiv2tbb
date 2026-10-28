@@ -65,11 +65,10 @@ function detectMediaTypeFromExtension(
 }
 
 export default function MediaModule() {
-  const { currentChurch, currentMember, isAdmin, isMaster, isLeader, hasOperationalRole } =
-    useAuth()
-  // Incluir/excluir mídia = gestor ou função MÍDIA (igual à regra do servidor em media_assets).
+  const { currentChurch, currentMember, can } = useAuth()
+  // Incluir/excluir mídia = culto.midias.novo/alterar (igual à regra do servidor em media_assets).
   // Projeção vê a mídia e opera a playlist no Holyrics, mas não cadastra nem exclui arquivos.
-  const canManageMedia = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
+  const canManageMedia = can('culto.midias.novo') || can('culto.midias.alterar')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 

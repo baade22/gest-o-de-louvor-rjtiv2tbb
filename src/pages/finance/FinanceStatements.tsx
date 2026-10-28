@@ -40,11 +40,11 @@ interface Row extends AnnualStatement {
 }
 
 export default function FinanceStatements() {
-  const { currentChurch, isMaster, isAdmin } = useAuth()
+  const { currentChurch, can } = useAuth()
   // A ficha do membro só abre para MASTER e ADMIN
-  const canOpenProfile = isMaster || isAdmin
+  const canOpenProfile = can('membresia.pessoas.ver')
   const churchId = currentChurch?.id
-  const { canView } = useFinanceAccess()
+  const { canView } = useFinanceAccess('relatorios')
   const { toast } = useToast()
   const printRef = useRef<HTMLDivElement>(null)
 

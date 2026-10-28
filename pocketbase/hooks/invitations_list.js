@@ -51,8 +51,8 @@ routerAdd(
           return []
         }
       })()
-      if (callerRole !== 'MASTER' && callerRolePerms.indexOf('admin.pessoas.ver') === -1) {
-        return e.json(403, { message: 'Apenas MASTER ou Administrador pode visualizar convites.' })
+      if (callerRole !== 'MASTER' && callerRolePerms.indexOf('admin.pessoas.novo') === -1) {
+        return e.json(403, { message: 'Só quem pode convidar pessoas vê os convites.' })
       }
     } catch (err) {
       return e.json(403, { message: 'Permissão insuficiente' })

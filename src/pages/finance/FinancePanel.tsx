@@ -107,7 +107,7 @@ function Stat({
 
 export default function FinancePanel() {
   const { currentChurch } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('painel')
   const churchId = currentChurch?.id
   const [month, setMonth] = useState(() => getLocalTodayYMD().slice(0, 7))
   const [accounts, setAccounts] = useState<FinAccount[]>([])
