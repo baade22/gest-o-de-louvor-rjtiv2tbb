@@ -2,10 +2,10 @@
 //
 // POST /backend/v1/finance/audit
 // Body: { church_id, action: 'approve' | 'objection' | 'reply', transaction_ids: [...], text? }
-// - approve: aprova um ou vários lançamentos (AUDITOR ou MASTER). Também resolve a ressalva.
+// - approve: aprova um ou vários lançamentos (financeiro.auditoria.auditar ou MASTER). Também resolve a ressalva.
 //   Quem lançou não aprova o próprio lançamento; num lote, esses ficam de fora e voltam contados.
-// - objection: registra uma ressalva com texto num lançamento (AUDITOR ou MASTER).
-// - reply: a tesouraria responde a ressalva (FINANCEIRO ou MASTER).
+// - objection: registra uma ressalva com texto num lançamento (auditar ou MASTER).
+// - reply: a tesouraria responde a ressalva (financeiro.auditoria.responder ou MASTER).
 // fin_audits e fin_audit_comments só são gravados aqui.
 
 routerAdd(
@@ -50,13 +50,14 @@ routerAdd(
     } catch (_) {}
     if (!member) return e.json(403, { message: 'Sem acesso ao financeiro desta igreja.' })
     const role = member.getString('role')
-    let opRoles = []
+    let perms = []
     try {
-      opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
+      perms = JSON.parse(member.getString('permissions') || '[]') || []
     } catch (_) {}
     const isMaster = role === 'MASTER'
-    const isAuditor = opRoles.indexOf('AUDITOR') !== -1
-    const isFin = opRoles.indexOf('FINANCEIRO') !== -1
+    // Perfis de acesso: auditar = conselho fiscal; responder ressalva = tesouraria
+    const isAuditor = perms.indexOf('financeiro.auditoria.auditar') !== -1
+    const isFin = perms.indexOf('financeiro.auditoria.responder') !== -1
     if (action === 'reply' ? !isMaster && !isFin : !isMaster && !isAuditor) {
       return e.json(403, {
         message:

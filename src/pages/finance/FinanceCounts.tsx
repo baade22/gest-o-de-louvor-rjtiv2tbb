@@ -91,7 +91,7 @@ function StatusBadge({ status }: { status: FinCount['status'] }) {
 
 export default function FinanceCounts() {
   const { currentChurch, user } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('contagem')
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
   const churchId = currentChurch?.id

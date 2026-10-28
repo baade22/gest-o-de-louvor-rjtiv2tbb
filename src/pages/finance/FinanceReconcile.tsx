@@ -107,7 +107,7 @@ function txLabel(tx: FinTransaction) {
 
 export default function FinanceReconcile() {
   const { currentChurch } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('conciliacao')
   const { toast } = useToast()
   const churchId = currentChurch?.id
   const { lookups, reload: reloadLookups } = useFinanceLookups(churchId)

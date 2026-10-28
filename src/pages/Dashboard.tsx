@@ -172,7 +172,7 @@ function StatCard({
 }
 
 export default function Dashboard() {
-  const { currentChurch, currentMember, user, isAdmin, isLeader, isMaster } = useAuth()
+  const { currentChurch, currentMember, user, can, canManageContent } = useAuth()
   const { toast } = useToast()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -374,7 +374,7 @@ export default function Dashboard() {
   }
 
   const todayDisplay = formatCalendarDateDisplay(getLocalTodayYMD(), 'full')
-  const canManage = isAdmin || isLeader
+  const canManage = canManageContent
   const next = upcomingEvents[0]
   const nextDays = next ? daysUntil(next.event.date) : 0
   const nextPendencies = next?.pendencies ?? 0
@@ -535,7 +535,7 @@ export default function Dashboard() {
           hint="Cadastradas"
           isLoading={isLoading}
         />
-        {isMaster || isAdmin ? (
+        {can('culto.midias.alterar') ? (
           <StatCard
             icon={ImageIcon}
             iconClass="bg-amber-50 text-amber-700"

@@ -63,12 +63,18 @@ routerAdd(
         })
       }
       const role = memberships[0].getString('role')
-      if (role === 'MUSICO') {
+      const rolePerms = (() => {
+        try {
+          return JSON.parse(memberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (role !== 'MASTER' && rolePerms.indexOf('culto.computadores.enviar') === -1) {
         return e.json(403, {
           success: false,
           error_code: 'INSUFFICIENT_PERMISSIONS',
-          message:
-            'Apenas Administradores e Líderes possuem permissão para sincronizar com o Holyrics (holyrics.sync). Músicos não possuem autorização.',
+          message: 'Seu perfil de acesso não permite enviar o culto ao Holyrics.',
         })
       }
     } catch (err) {

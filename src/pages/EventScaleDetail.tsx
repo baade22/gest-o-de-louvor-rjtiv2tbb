@@ -33,38 +33,32 @@ export default function EventScaleDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const {
-    currentChurch,
-    canManageContent,
-    currentMember,
-    isMaster,
-    isAdmin,
-    isLeader,
-    hasOperationalRole,
-    hasPermission,
-  } = useAuth()
+  const { currentChurch, currentMember, can } = useAuth()
 
-  // Quem vê e opera cada parte da central
-  const canSeeRepertoire = isMaster || isAdmin || isLeader || hasOperationalRole('MUSICO')
-  const canSeeSound = isMaster || isAdmin || hasOperationalRole('SOM')
-  const canSeeProjection = isMaster || isAdmin || hasOperationalRole('PROJECAO')
-  const canSeeLighting = isMaster || isAdmin || hasOperationalRole('ILUMINACAO')
-  const canSeeMedia =
-    isMaster || isAdmin || hasOperationalRole('MIDIA') || hasOperationalRole('PROJECAO')
-  // Incluir/ordenar/excluir mídia = gestor ou função MÍDIA (igual à regra do servidor em media_assets).
-  const canManageMedia = canManageContent || hasOperationalRole('MIDIA')
-  // Enviar ao computador e montar a playlist no Holyrics = gestor, MÍDIA ou Projeção (quem opera o culto).
-  const canOperateMedia = canManageMedia || hasOperationalRole('PROJECAO')
-  const canSeeAllTasks = isMaster || isAdmin || isLeader || hasOperationalRole('MIDIA')
+  // Quem vê e opera cada parte da central (chaves dos perfis de acesso)
+  const canSeeRepertoire = can('louvor.repertorio.ver')
+  const canSeeSound = can('culto.som.ver')
+  const canSeeProjection = can('culto.projecao.ver')
+  const canSeeLighting = can('culto.iluminacao.ver')
+  const canSeeMedia = can('culto.midias.ver')
+  // Incluir/ordenar/excluir mídia (igual à regra do servidor em media_assets)
+  const canManageMedia = can('culto.midias.novo') || can('culto.midias.alterar')
+  // Enviar ao computador e montar a playlist no Holyrics
+  const canOperateMedia = canManageMedia || can('culto.midias.enviar')
+  const canEditEvent = can('louvor.cultos.alterar')
+  const canEditRepertoire = can('louvor.repertorio.alterar')
+  const canEditTeam = can('louvor.escalas.alterar')
+  const canSeeAllTasks = can('louvor.tarefas.alterar')
   const taskAreas: TeamArea[] | null = canSeeAllTasks
     ? null
     : ([
         canSeeSound && 'SOM',
         canSeeProjection && 'PROJECAO',
         canSeeLighting && 'ILUMINACAO',
+        can('louvor.tarefas.ver') && canManageMedia && 'MIDIA',
       ].filter(Boolean) as TeamArea[])
   const canSeeTasks = taskAreas === null || taskAreas.length > 0
-  const canSyncHolyrics = isMaster || isAdmin || isLeader || hasPermission('holyrics.sync')
+  const canSyncHolyrics = can('culto.computadores.enviar')
 
   const center = useEventCenter(id, currentChurch?.id, canSyncHolyrics)
   const { event, songs, members, medias, tasks, moments } = center
@@ -246,7 +240,7 @@ export default function EventScaleDetail() {
         songsCount={songs.length}
         agents={center.agents}
         linkState={linkState}
-        canEdit={canManageContent}
+        canEdit={canEditEvent}
         canSync={canSyncHolyrics}
         isSyncing={isSyncing}
         isResolvingLink={isResolvingLink}
@@ -286,7 +280,7 @@ export default function EventScaleDetail() {
             moments={moments}
             runSheetAvailable={center.runSheetAvailable}
             agents={center.agents}
-            canEdit={canManageContent}
+            canEdit={canEditEvent || canEditRepertoire}
             onChanged={center.reload}
             onOpenTab={openTab}
           />
@@ -301,7 +295,7 @@ export default function EventScaleDetail() {
               members={members}
               churchMembers={center.churchMembers}
               moments={moments}
-              canEdit={canManageContent}
+              canEdit={canEditRepertoire}
               patch={center.patch}
               reload={center.reload}
             />
@@ -315,7 +309,7 @@ export default function EventScaleDetail() {
             churchMembers={center.churchMembers}
             roles={center.roles}
             currentMemberId={currentMember?.id}
-            canEdit={canManageContent}
+            canEdit={canEditTeam}
             reload={center.reload}
           />
         </TabsContent>
@@ -344,7 +338,7 @@ export default function EventScaleDetail() {
               allowedAreas={taskAreas}
               initialArea={taskArea}
               canCreate={canSeeAllTasks}
-              canDelete={canManageContent}
+              canDelete={can('louvor.tarefas.excluir')}
               patch={center.patch}
               reload={center.reload}
             />

@@ -128,7 +128,7 @@ function bankBalance(conn?: FinBankConnection, imp?: FinBankImport) {
 
 export default function FinanceBalances() {
   const { currentChurch } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('conciliacao')
   const { toast } = useToast()
   const churchId = currentChurch?.id
   const { lookups } = useFinanceLookups(churchId)

@@ -16,18 +16,26 @@ import {
 import type { FinAccountKind, FinBillDocumentType, FinPaymentMethod } from '@/types/finance'
 
 /**
- * Quem vê o Financeiro: MASTER, ADMIN, quem tem a função FINANCEIRO e o conselho fiscal (AUDITOR).
- * Quem lança e edita: MASTER e FINANCEIRO (ADMIN e conselho fiscal só acompanham).
- * Quem audita (aprova ou registra ressalva): MASTER e conselho fiscal.
+ * Acesso a uma tela do Financeiro pelos perfis de acesso (financeiro.<tela>.<ação>):
+ * canView = Consultar a tela; canEdit = alguma ação de mudança nela; canAudit = auditar.
+ * O MASTER tem tudo. O servidor confere as mesmas chaves e a congregação.
  */
-export function useFinanceAccess() {
-  const { isMaster, isAdmin, operationalRoles } = useAuth()
-  const isTreasurer = operationalRoles.includes('FINANCEIRO')
-  const isAuditor = operationalRoles.includes('AUDITOR')
+export function useFinanceAccess(screen = 'painel') {
+  const { can, canAny } = useAuth()
+  const base = `financeiro.${screen}.`
+  // Mudar nesta tela = qualquer ação além de Consultar (na auditoria, responder ressalvas)
+  const changeKeys =
+    screen === 'auditoria'
+      ? [`${base}responder`]
+      : screen === 'painel'
+        ? ['financeiro.lancamentos.novo']
+        : ['novo', 'alterar', 'excluir', 'baixa', 'aprovar', 'fechar', 'exportar'].map(
+            (a) => base + a,
+          )
   return {
-    canView: isMaster || isAdmin || isTreasurer || isAuditor,
-    canEdit: isMaster || isTreasurer,
-    canAudit: isMaster || isAuditor,
+    canView: can(`${base}ver`) || (screen === 'painel' && canAny('financeiro')),
+    canEdit: changeKeys.some((k) => can(k)),
+    canAudit: can('financeiro.auditoria.auditar'),
   }
 }
 
@@ -140,13 +148,13 @@ export function PageHeader({
 }
 
 export function ReadOnlyNotice() {
-  const { operationalRoles } = useAuth()
+  const { can } = useAuth()
   return (
     <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
       <Lock className="h-4 w-4 shrink-0 text-slate-400" />
-      {operationalRoles.includes('AUDITOR')
+      {can('financeiro.auditoria.auditar')
         ? 'Você acompanha o financeiro como conselho fiscal. Aprovações e ressalvas ficam em Auditoria.'
-        : 'Você acompanha o financeiro em modo leitura. Para lançar, peça a função Financeiro a um administrador.'}
+        : 'Nesta tela seu perfil de acesso só permite consultar. Para mudar, peça ao MASTER.'}
     </div>
   )
 }

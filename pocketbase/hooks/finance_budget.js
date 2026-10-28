@@ -3,7 +3,7 @@
 // POST /backend/v1/finance/budget
 // Body: { church_id, year, congregation, lines: [{ category_id, amount_cents }] }
 // Substitui o orçamento daquele ano e congregação (vazio = igreja toda) pelas linhas
-// enviadas, numa transação só. Linha com valor 0 é removida. MASTER ou FINANCEIRO.
+// enviadas, numa transação só. Linha com valor 0 é removida. MASTER ou financeiro.orcamento.alterar.
 
 routerAdd(
   'POST',
@@ -33,12 +33,29 @@ routerAdd(
         { c: churchId, u: auth.id },
       )
     } catch (_) {}
-    let ops = []
+    let perms = []
     try {
-      ops = JSON.parse((member && member.getString('operational_roles')) || '[]') || []
+      perms = JSON.parse((member && member.getString('permissions')) || '[]') || []
     } catch (_) {}
-    if (!member || (member.getString('role') !== 'MASTER' && ops.indexOf('FINANCEIRO') === -1)) {
-      return e.json(403, { message: 'Só a tesouraria monta o orçamento.' })
+    if (
+      !member ||
+      (member.getString('role') !== 'MASTER' &&
+        perms.indexOf('financeiro.orcamento.alterar') === -1)
+    ) {
+      return e.json(403, { message: 'Seu perfil de acesso não permite montar o orçamento.' })
+    }
+    let cong = []
+    try {
+      cong = JSON.parse(member.getString('cong_financeiro') || '[]') || []
+    } catch (_) {}
+    // Perfil restrito a congregações: só mexe nas contas delas (conta sem congregação vale para todos)
+    const congOk = (c) =>
+      member.getString('role') === 'MASTER' ||
+      cong.indexOf('*') !== -1 ||
+      !c ||
+      cong.indexOf(c) !== -1
+    if (!congOk(congregation)) {
+      return e.json(403, { message: 'Esta congregação está fora do seu perfil de acesso.' })
     }
 
     // Confere tudo antes de gravar

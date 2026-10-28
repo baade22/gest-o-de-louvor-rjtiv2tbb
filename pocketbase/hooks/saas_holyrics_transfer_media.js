@@ -75,30 +75,17 @@ routerAdd(
       })
     }
 
-    // Validação de autorização: apenas MASTER, ADMIN ou membros com função operacional PROJECAO
+    // Validação de autorização: MASTER ou perfil com culto.midias.enviar
     const appRole = member.getString('role') || ''
     const isMaster = appRole === 'MASTER'
-    const isAdmin = appRole === 'ADMIN' || isMaster
 
-    let opRoles = []
+    let accessKeys = []
     try {
-      const raw = member.get('operational_roles')
-      if (typeof raw === 'string' && raw) {
-        opRoles = JSON.parse(raw)
-      } else if (Array.isArray(raw)) {
-        if (raw.length > 0 && typeof raw[0] === 'number') {
-          let str = ''
-          for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
-          opRoles = JSON.parse(str)
-        } else {
-          opRoles = raw
-        }
-      }
+      accessKeys = JSON.parse(member.getString('permissions') || '[]') || []
     } catch (_) {}
-    if (!Array.isArray(opRoles)) opRoles = []
-
-    const hasProjectionRole = opRoles.includes('PROJECAO')
-    if (!isAdmin && !hasProjectionRole) {
+    // Perfis de acesso: culto.midias.enviar (Enviar ao Holyrics)
+    const hasProjectionRole = accessKeys.indexOf('culto.midias.enviar') !== -1
+    if (!isMaster && !hasProjectionRole) {
       return e.json(403, {
         success: false,
         error_code: 'FORBIDDEN_PROJECTION_ROLE',

@@ -23,7 +23,7 @@ interface MusicianItem {
   church_id: string
   user_id: string
   role: 'MASTER' | 'ADMIN' | 'LIDER' | 'MUSICO'
-  operational_roles?: string[]
+  access_profiles: { id: string; name: string }[]
   phone?: string
   is_active: boolean
   name: string
@@ -32,7 +32,9 @@ interface MusicianItem {
 }
 
 export default function MusiciansList() {
-  const { currentChurch, isAdmin } = useAuth()
+  const { currentChurch, can } = useAuth()
+  const canCreate = can('admin.pessoas.novo')
+  const isAdmin = can('admin.pessoas.alterar')
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -51,7 +53,7 @@ export default function MusiciansList() {
           church_id: m.church_id,
           user_id: m.user_id,
           role: m.role,
-          operational_roles: m.operational_roles || [],
+          access_profiles: m.access_profiles || [],
           phone: m.phone,
           is_active: m.is_active,
           name: m.name || 'Membro',
@@ -133,7 +135,7 @@ export default function MusiciansList() {
           </p>
         </div>
 
-        {isAdmin && (
+        {canCreate && (
           <div className="flex items-center gap-2">
             <Link to="/musicians/new">
               <Button className="h-10 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold gap-2 shadow-sm">
@@ -174,7 +176,7 @@ export default function MusiciansList() {
               ? 'Tente buscar com outro termo ou limpe a busca.'
               : 'Cadastre os músicos da sua igreja para começar a compor as escalas.'}
           </p>
-          {isAdmin && !search && (
+          {canCreate && !search && (
             <Link to="/musicians/new" className="mt-5 inline-block">
               <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">
                 Cadastrar Primeiro Músico
@@ -217,27 +219,24 @@ export default function MusiciansList() {
                       >
                         {member.is_active ? 'Ativo' : 'Inativo'}
                       </Badge>
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] font-semibold ${
-                          member.role === 'MASTER'
-                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
-                            : member.role === 'ADMIN'
-                              ? 'bg-teal-50 text-teal-800 border-teal-200'
-                              : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {member.role}
-                      </Badge>
-                      {member.operational_roles &&
-                        member.operational_roles.map((op) => (
+                      {/* Acesso: Master ou os perfis de acesso da pessoa */}
+                      {member.role === 'MASTER' ? (
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] font-bold bg-amber-100 text-amber-900 border-amber-300"
+                        >
+                          Master
+                        </Badge>
+                      ) : (
+                        member.access_profiles.map((p) => (
                           <span
-                            key={op}
-                            className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-50 text-slate-600 border border-slate-200"
+                            key={p.id}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200"
                           >
-                            {op}
+                            {p.name}
                           </span>
-                        ))}
+                        ))
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">

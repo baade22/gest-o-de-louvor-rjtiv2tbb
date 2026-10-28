@@ -1,7 +1,7 @@
 // Baixa de contas a pagar e a receber (Financeiro)
 // POST /backend/v1/finance/bills/settle
 // Body: { bill_id, date: 'YYYY-MM-DD', account_id, amount_cents, payment_method }
-// Quem dá baixa precisa ser MASTER ou ter a função FINANCEIRO na igreja do título. Numa
+// Quem dá baixa precisa ser MASTER ou ter financeiro.contas_pagar.baixa na igreja do título. Numa
 // transação só: cria o lançamento (saída para conta a pagar, entrada para conta a receber)
 // e marca o título como PAGO, guardando a data, o valor e a conta usados.
 //
@@ -56,23 +56,41 @@ routerAdd(
     if (!member) {
       return e.json(404, { message: 'Conta não encontrada' })
     }
-    let opRoles = []
+    let perms = []
     try {
-      opRoles = JSON.parse(member.getString('operational_roles') || '[]') || []
+      perms = JSON.parse(member.getString('permissions') || '[]') || []
     } catch (_) {}
-    if (member.getString('role') !== 'MASTER' && opRoles.indexOf('FINANCEIRO') === -1) {
-      return e.json(403, { message: 'Só quem cuida do financeiro pode dar baixa.' })
+    if (
+      member.getString('role') !== 'MASTER' &&
+      perms.indexOf('financeiro.contas_pagar.baixa') === -1
+    ) {
+      return e.json(403, { message: 'Seu perfil de acesso não permite dar baixa em contas.' })
     }
+    let cong = []
+    try {
+      cong = JSON.parse(member.getString('cong_financeiro') || '[]') || []
+    } catch (_) {}
+    // Perfil restrito a congregações: só mexe nas contas delas (conta sem congregação vale para todos)
+    const congOk = (c) =>
+      member.getString('role') === 'MASTER' ||
+      cong.indexOf('*') !== -1 ||
+      !c ||
+      cong.indexOf(c) !== -1
 
     if (bill.getString('status') !== 'ABERTO') {
       return e.json(400, { message: 'Esta conta já foi paga ou cancelada.' })
     }
+    let payAccount = null
     try {
-      if ($app.findRecordById('fin_accounts', accountId).getString('church_id') !== churchId) {
+      payAccount = $app.findRecordById('fin_accounts', accountId)
+      if (payAccount.getString('church_id') !== churchId) {
         throw new Error('outra igreja')
       }
     } catch (_) {
       return e.json(400, { message: 'Conta bancária inválida.' })
+    }
+    if (!congOk(payAccount.getString('congregation'))) {
+      return e.json(403, { message: 'Esta conta é de uma congregação fora do seu perfil.' })
     }
 
     const isPay = bill.getString('kind') === 'PAGAR'

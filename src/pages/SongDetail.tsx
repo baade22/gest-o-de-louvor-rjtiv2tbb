@@ -62,7 +62,8 @@ import { Radio, Send } from 'lucide-react'
 
 export default function SongDetail() {
   const { id } = useParams<{ id: string }>()
-  const { canManageContent, currentChurch } = useAuth()
+  const { can, currentChurch } = useAuth()
+  const canManageContent = can('louvor.musicas.alterar')
   const navigate = useNavigate()
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()

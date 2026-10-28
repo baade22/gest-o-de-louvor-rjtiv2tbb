@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
-import type { Invitation, OperationalRole, AppRole, Role } from '@/types'
+import type { AccessProfile, Invitation, Role } from '@/types'
+import { canGrantProfile, summarizeProfile } from '@/lib/accessCatalog'
+import { listAccessProfiles } from '@/services/accessProfiles'
 import {
   UserPlus,
   Mail,
@@ -27,23 +29,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 
 export default function InvitationsManagement() {
-  const { currentChurch, isMaster, isAdmin } = useAuth()
+  const { currentChurch, isMaster, accessKeys } = useAuth()
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [availableRoles, setAvailableRoles] = useState<Role[]>([])
+  const [profiles, setProfiles] = useState<AccessProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -52,8 +49,8 @@ export default function InvitationsManagement() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'MUSICO' as AppRole,
-    operational_roles: ['MUSICO'] as OperationalRole[],
+    is_master: false,
+    access_profiles: [] as string[],
     role_ids: [] as string[],
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -103,16 +100,18 @@ export default function InvitationsManagement() {
       }
     }
     loadRoles()
+    listAccessProfiles(currentChurch.id)
+      .then((list) => setProfiles(list.filter((p) => p.is_active)))
+      .catch(() => {})
   }, [currentChurch?.id])
 
-  const toggleOpRole = (op: OperationalRole) => {
-    setFormData((prev) => {
-      const exists = prev.operational_roles.includes(op)
-      const updated = exists
-        ? prev.operational_roles.filter((r) => r !== op)
-        : [...prev.operational_roles, op]
-      return { ...prev, operational_roles: updated }
-    })
+  const toggleProfile = (profileId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      access_profiles: prev.access_profiles.includes(profileId)
+        ? prev.access_profiles.filter((r) => r !== profileId)
+        : [...prev.access_profiles, profileId],
+    }))
   }
 
   const toggleInstrument = (roleId: string) => {
@@ -147,11 +146,10 @@ export default function InvitationsManagement() {
       return
     }
 
-    if (formData.operational_roles.length === 0) {
+    if (!formData.is_master && formData.access_profiles.length === 0) {
       toast({
-        title: 'Função operacional obrigatória',
-        description:
-          'Selecione pelo menos uma função (Músico, Som, Projeção, Mídia, Iluminação, Financeiro).',
+        title: 'Perfil de acesso obrigatório',
+        description: 'Marque ao menos um perfil (Músico, Som, Financeiro...).',
         variant: 'destructive',
       })
       return
@@ -167,8 +165,8 @@ export default function InvitationsManagement() {
             church_id: currentChurch.id,
             name: formData.name.trim(),
             email: formData.email.trim(),
-            role: formData.role,
-            operational_roles: formData.operational_roles,
+            is_master: formData.is_master,
+            access_profiles: formData.is_master ? [] : formData.access_profiles,
             role_ids: formData.role_ids,
           },
         },
@@ -294,8 +292,8 @@ export default function InvitationsManagement() {
             setFormData({
               name: '',
               email: '',
-              role: 'MUSICO',
-              operational_roles: ['MUSICO'],
+              is_master: false,
+              access_profiles: [],
               role_ids: [],
             })
             setCreateModalOpen(true)
@@ -393,9 +391,11 @@ export default function InvitationsManagement() {
                         Cancelado
                       </Badge>
                     )}
-                    <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700">
-                      {inv.role}
-                    </Badge>
+                    {inv.role === 'MASTER' && (
+                      <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-800">
+                        Master
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -413,17 +413,21 @@ export default function InvitationsManagement() {
                     </span>
                   </div>
 
-                  {/* Funções operacionais */}
+                  {/* Perfis de acesso (convites antigos mostram as funções) */}
                   <div className="flex flex-wrap gap-1 pt-1">
-                    {inv.operational_roles &&
-                      inv.operational_roles.map((op) => (
-                        <span
-                          key={op}
-                          className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-semibold"
-                        >
-                          {op}
-                        </span>
-                      ))}
+                    {(inv.access_profiles?.length
+                      ? inv.access_profiles.map((p) => p.name)
+                      : inv.role === 'MASTER'
+                        ? []
+                        : inv.operational_roles || []
+                    ).map((label) => (
+                      <span
+                        key={label}
+                        className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-semibold"
+                      >
+                        {label}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
@@ -548,93 +552,71 @@ export default function InvitationsManagement() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Nível Administrativo</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(val) => setFormData({ ...formData, role: val as AppRole })}
-                >
-                  <SelectTrigger className="rounded-xl text-xs">
-                    <SelectValue placeholder="Selecione o nível" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MUSICO">Operacional (Músico / Técnico / Mídia)</SelectItem>
-                    <SelectItem value="LIDER">
-                      Líder (Cria eventos, repertórios e cultos)
-                    </SelectItem>
-                    <SelectItem value="ADMIN">
-                      Administrador (Gestão de membros e igreja)
-                    </SelectItem>
-                    {isMaster && (
-                      <SelectItem value="MASTER" className="font-bold text-amber-900">
-                        MASTER (Acesso 100% irrestrito a todos os módulos)
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                {!isMaster && (
-                  <p className="text-[11px] text-slate-400">
-                    O nível MASTER só pode ser concedido pelo usuário MASTER atual.
+              {isMaster && (
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-2.5">
+                  <span className="text-xs">
+                    <span className="font-semibold text-slate-800">Master</span>
+                    <span className="block text-[11px] text-slate-500">
+                      Acesso total, inclusive criar perfis de acesso
+                    </span>
+                  </span>
+                  <Switch
+                    checked={formData.is_master}
+                    onCheckedChange={(v) => setFormData({ ...formData, is_master: v })}
+                  />
+                </label>
+              )}
+
+              {/* Perfis de acesso: os acessos somam */}
+              {!formData.is_master && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <Label className="text-xs font-semibold text-slate-700 block">
+                    Perfis de acesso (um ou mais) <span className="text-red-500">*</span>
+                  </Label>
+                  <p className="text-[11px] text-slate-500">
+                    A pessoa recebe a soma do que cada perfil libera. Você só pode dar perfis com
+                    acessos que você mesmo tem.
                   </p>
-                )}
-              </div>
-
-              {/* Múltiplas Funções Operacionais (Músico, Som, Projeção, Mídia, Iluminação) */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <Label className="text-xs font-semibold text-slate-700 block">
-                  Funções Operacionais (Selecione uma ou mais){' '}
-                  <span className="text-red-500">*</span>
-                </Label>
-                <p className="text-[11px] text-slate-500">
-                  O usuário verá exatamente a união dos módulos das funções selecionadas.
-                </p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'MUSICO', label: 'Músico / Louvor', desc: 'Músicas e repertório' },
-                    { key: 'SOM', label: 'Som & Áudio', desc: 'Mesa e microfones' },
-                    { key: 'PROJECAO', label: 'Projeção', desc: 'Slides e Holyrics' },
-                    { key: 'MIDIA', label: 'Mídia & Comunicação', desc: 'Artes e tarefas' },
-                    { key: 'ILUMINACAO', label: 'Iluminação', desc: 'Luzes cênicas e cenas' },
-                    { key: 'FINANCEIRO', label: 'Financeiro', desc: 'Dízimos, ofertas e contas' },
-                    { key: 'AUDITOR', label: 'Conselho fiscal', desc: 'Confere o financeiro' },
-                    { key: 'MEMBRESIA', label: 'Membresia', desc: 'Cadastro dos membros' },
-                    { key: 'EVENTOS', label: 'Eventos da igreja', desc: 'Inscrições e check-in' },
-                  ].map((op) => {
-                    const isSelected = formData.operational_roles.includes(
-                      op.key as OperationalRole,
-                    )
-                    // Só o MASTER convida com Financeiro, Conselho fiscal, Membresia ou Eventos
-                    // (o servidor confere também)
-                    const locked =
-                      ['FINANCEIRO', 'AUDITOR', 'MEMBRESIA', 'EVENTOS'].includes(op.key) &&
-                      !isMaster
-                    return (
-                      <button
-                        key={op.key}
-                        type="button"
-                        disabled={locked}
-                        title={locked ? 'Só o MASTER da igreja pode dar esta função' : undefined}
-                        onClick={() => toggleOpRole(op.key as OperationalRole)}
-                        className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-                          isSelected
-                            ? 'bg-teal-50 border-teal-600 text-teal-900 font-semibold shadow-xs'
-                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>{op.label}</span>
-                          {isSelected && <Check className="h-4 w-4 text-teal-700" />}
-                        </div>
-                        <p className="text-[10px] text-slate-400 font-normal mt-0.5">{op.desc}</p>
-                      </button>
-                    )
-                  })}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-0.5">
+                    {profiles.map((p) => {
+                      const isSelected = formData.access_profiles.includes(p.id)
+                      const locked = !isMaster && !canGrantProfile(accessKeys, p.permissions)
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={locked}
+                          title={
+                            locked
+                              ? 'Este perfil libera coisas que você não tem. Só o MASTER pode dar.'
+                              : undefined
+                          }
+                          onClick={() => toggleProfile(p.id)}
+                          className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+                            isSelected
+                              ? 'bg-teal-50 border-teal-600 text-teal-900 font-semibold shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate">{p.name}</span>
+                            {isSelected && <Check className="h-4 w-4 shrink-0 text-teal-700" />}
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-normal mt-0.5 line-clamp-2">
+                            {summarizeProfile(p.permissions)
+                              .map((x) => x.label)
+                              .join(' · ') || 'nada liberado'}
+                            {p.congregations.length ? ` · ${p.congregations.join(', ')}` : ''}
+                          </p>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Se Músico estiver selecionado, permite marcar instrumentos */}
-              {formData.operational_roles.includes('MUSICO') && availableRoles.length > 0 && (
+              {availableRoles.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-slate-100">
                   <Label className="text-xs font-semibold text-slate-700 block">
                     Instrumentos / Voz (Opcional)

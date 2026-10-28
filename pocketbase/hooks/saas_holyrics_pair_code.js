@@ -35,11 +35,18 @@ routerAdd(
         return e.json(403, { success: false, message: 'Acesso negado a esta congregação.' })
       }
       const role = memberships[0].getString('role')
-      if (role === 'MUSICO') {
+      const rolePerms = (() => {
+        try {
+          return JSON.parse(memberships[0].getString('permissions') || '[]') || []
+        } catch (_) {
+          return []
+        }
+      })()
+      if (role !== 'MASTER' && rolePerms.indexOf('culto.computadores.parear') === -1) {
         return e.json(403, {
           success: false,
           error_code: 'INSUFFICIENT_PERMISSIONS',
-          message: 'Músicos não possuem permissão para gerenciar agentes Holyrics.',
+          message: 'Seu perfil de acesso não permite parear computadores do Holyrics.',
         })
       }
     } catch (err) {

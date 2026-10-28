@@ -115,9 +115,9 @@ function chip(active: boolean) {
 
 export default function ChurchEventDetail() {
   const { id = '' } = useParams<{ id: string }>()
-  const { currentChurch, isMaster, hasOperationalRole } = useAuth()
-  // Quem tem só a função EVENTOS não vê as fichas da membresia
-  const canSeePeople = isMaster || hasOperationalRole('MEMBRESIA')
+  const { currentChurch, can } = useAuth()
+  // Quem só cuida dos eventos não vê as fichas da membresia
+  const canSeePeople = can('membresia.pessoas.ver')
   const { toast } = useToast()
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()

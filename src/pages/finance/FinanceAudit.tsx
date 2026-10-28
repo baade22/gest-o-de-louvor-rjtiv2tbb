@@ -81,7 +81,7 @@ function txDetail(tx: FinTransaction) {
 export default function FinanceAudit() {
   const { currentChurch, user } = useAuth()
   const churchId = currentChurch?.id
-  const { canView, canEdit, canAudit } = useFinanceAccess()
+  const { canView, canEdit, canAudit } = useFinanceAccess('auditoria')
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
 

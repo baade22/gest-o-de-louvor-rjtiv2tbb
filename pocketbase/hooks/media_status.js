@@ -56,28 +56,16 @@ routerAdd(
 
     const appRole = member.getString('role')
     const isMaster = appRole === 'MASTER'
-    const isAdmin = appRole === 'ADMIN' || isMaster
-    const isLider = appRole === 'LIDER' || isAdmin
 
-    let opRoles = []
+    let accessKeys = []
     try {
-      const raw = member.get('operational_roles')
-      if (typeof raw === 'string' && raw) opRoles = JSON.parse(raw)
-      else if (Array.isArray(raw)) {
-        if (raw.length > 0 && typeof raw[0] === 'number') {
-          let str = ''
-          for (let b = 0; b < raw.length; b++) str += String.fromCharCode(raw[b])
-          opRoles = JSON.parse(str)
-        } else opRoles = raw
-      }
+      accessKeys = JSON.parse(member.getString('permissions') || '[]') || []
     } catch (_) {}
-    if (!Array.isArray(opRoles)) opRoles = []
-
+    // Perfis de acesso: quem altera ou envia mídias, ou o operador designado
     const canOperateMedia =
-      isAdmin ||
-      isLider ||
-      opRoles.includes('MIDIA') ||
-      opRoles.includes('PROJECAO') ||
+      isMaster ||
+      accessKeys.indexOf('culto.midias.alterar') !== -1 ||
+      accessKeys.indexOf('culto.midias.enviar') !== -1 ||
       media.getString('assigned_operator') === member.id
 
     if (!canOperateMedia) {

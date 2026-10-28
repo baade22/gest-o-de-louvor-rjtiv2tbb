@@ -786,7 +786,7 @@ const CHURCH_TAB = 'igreja'
 
 export default function FinanceRegistry() {
   const { currentChurch } = useAuth()
-  const { canEdit } = useFinanceAccess()
+  const { canEdit } = useFinanceAccess('cadastros')
   const [params] = useSearchParams()
   const [tab, setTab] = useState<string>(
     params.get('aba') === CHURCH_TAB ? CHURCH_TAB : TABS[0].key,
