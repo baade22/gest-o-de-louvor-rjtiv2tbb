@@ -147,6 +147,8 @@ export default function Layout() {
   // Membresia é delegada pelo MASTER: só o MASTER ou quem recebeu a função MEMBRESIA.
   // ADMIN não vê por padrão (precisa receber a função), coerente com o acesso delegado.
   const canSeeMembership = isMaster || hasOperationalRole('MEMBRESIA')
+  // Eventos da igreja: a Membresia ou quem recebeu só a função EVENTOS
+  const canSeeChurchEvents = canSeeMembership || hasOperationalRole('EVENTOS')
 
   const sections: NavSection[] = [
     {
@@ -272,7 +274,7 @@ export default function Layout() {
           to: '/membros/eventos',
           label: 'Eventos da igreja',
           icon: Ticket,
-          allowed: canSeeMembership,
+          allowed: canSeeChurchEvents,
         },
         {
           to: '/membros/aniversarios',

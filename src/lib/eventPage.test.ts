@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { EventRegistration } from '@/types'
 import { registrationDue, summarizeRegistrations } from './churchEvents'
+import type { ChurchEvent } from '@/types'
 import {
   addressLines,
+  cleanAnswers,
+  eventsDashboard,
+  eventsOnDay,
+  monthWeeks,
+  registrationsTable,
+  timeBrazil,
   eventColor,
   fillMessage,
   findCoupon,
@@ -185,5 +192,145 @@ describe('valor devido com cupom', () => {
     expect(s.toCollect).toBe(70)
     expect(s.collected).toBe(30)
     expect(s.pending).toBe(2)
+  })
+})
+
+describe('questionário', () => {
+  const questions = [
+    {
+      id: 'q1',
+      label: 'Camiseta',
+      kind: 'CHOICE' as const,
+      options: ['P', 'M', 'G'],
+      required: true,
+    },
+    { id: 'q2', label: 'Tem filhos?', kind: 'YESNO' as const },
+    { id: 'q3', label: 'Restrição alimentar', kind: 'TEXT' as const },
+  ]
+  it('guarda só respostas válidas e aponta a obrigatória que falta', () => {
+    expect(cleanAnswers(questions, { q1: 'M', q2: 'Talvez', q3: ' glúten ', x: 'y' })).toEqual({
+      answers: { q1: 'M', q3: 'glúten' },
+      missing: null,
+    })
+    expect(cleanAnswers(questions, { q1: 'XG' }).missing?.label).toBe('Camiseta')
+    expect(cleanAnswers(undefined, { a: 'b' })).toEqual({ answers: {}, missing: null })
+  })
+})
+
+const ev = (over: Partial<ChurchEvent>): ChurchEvent => ({
+  id: 'e',
+  church_id: 'c',
+  title: 'Evento',
+  starts_on: '2026-11-21 00:00:00.000Z',
+  registration_open: true,
+  public_key: 'k',
+  created: '',
+  updated: '',
+  ...over,
+})
+
+describe('planilha dos inscritos', () => {
+  it('traz cônjuge, pagamento, presença e respostas', () => {
+    const table = registrationsTable(
+      ev({
+        price: 80,
+        couple_only: true,
+        questions: [{ id: 'q1', label: 'Camiseta', kind: 'TEXT' }],
+      }),
+      [
+        {
+          id: 'r1',
+          church_id: 'c',
+          event_id: 'e',
+          name: 'Bia',
+          partner_name: 'Caio',
+          phone: '81',
+          paid: true,
+          payment_method: 'PIX',
+          amount_due: 70,
+          coupon_code: 'CASAL10',
+          attended: true,
+          attended_at: '2026-11-21 12:05:00.000Z',
+          source: 'LINK',
+          answers: { q1: 'M' },
+          created: '',
+          updated: '',
+        },
+      ],
+    )
+    expect(table[0]).toEqual([
+      'Nome',
+      'Cônjuge',
+      'Telefone',
+      'E-mail',
+      'Origem',
+      'Valor',
+      'Cupom',
+      'Pagamento',
+      'Forma',
+      'Presença',
+      'Camiseta',
+    ])
+    expect(table[1]).toEqual([
+      'Bia',
+      'Caio',
+      '81',
+      '',
+      'Link',
+      '70,00',
+      'CASAL10',
+      'Pago',
+      'PIX',
+      'Presente 09:05',
+      'M',
+    ])
+  })
+  it('converte o horário para Brasília', () => {
+    expect(timeBrazil('2026-11-21 22:30:00.000Z')).toBe('19:30')
+    expect(timeBrazil('')).toBe('')
+  })
+})
+
+describe('painel e calendário', () => {
+  const events = [
+    ev({ id: 'a', price: 50, starts_on: '2026-10-01 00:00:00.000Z' }),
+    ev({
+      id: 'b',
+      price: 0,
+      starts_on: '2026-11-21 00:00:00.000Z',
+      ends_on: '2026-11-22 00:00:00.000Z',
+    }),
+    ev({
+      id: 'c',
+      price: 30,
+      starts_on: '2026-09-01 00:00:00.000Z',
+      closed_at: '2026-09-02 10:00:00Z',
+    }),
+  ]
+  it('conta ativos, pendências e o que falta encerrar', () => {
+    const d = eventsDashboard(
+      events,
+      [
+        { event_id: 'a', paid: false, amount_due: 40 },
+        { event_id: 'a', paid: false },
+        { event_id: 'a', paid: true },
+        { event_id: 'b', paid: true },
+        { event_id: 'c', paid: false },
+      ],
+      '2026-10-28',
+    )
+    expect(d.active).toBe(1)
+    expect(d.registrations).toBe(4)
+    expect(d.unpaid).toBe(2)
+    expect(d.unpaidAmount).toBe(90)
+    expect(d.toClose.map((e) => e.id)).toEqual(['a'])
+  })
+  it('monta as semanas do mês e acha eventos de vários dias', () => {
+    const weeks = monthWeeks(2026, 11)
+    expect(weeks[0][0]).toBe('2026-11-01')
+    expect(weeks.every((w) => w.length === 7)).toBe(true)
+    expect(weeks.flat().filter(Boolean)).toHaveLength(30)
+    expect(eventsOnDay(events, '2026-11-22').map((e) => e.id)).toEqual(['b'])
+    expect(eventsOnDay(events, '2026-11-23')).toEqual([])
   })
 })

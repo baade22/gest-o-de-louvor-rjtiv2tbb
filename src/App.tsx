@@ -46,6 +46,7 @@ import ChurchEvents from '@/pages/membership/ChurchEvents'
 import ChurchEventForm from '@/pages/membership/ChurchEventForm'
 import ChurchEventDetail from '@/pages/membership/ChurchEventDetail'
 import PublicEventSignup from '@/pages/membership/PublicEventSignup'
+import EventCheckin from '@/pages/membership/EventCheckin'
 import PersonDocuments from '@/pages/membership/documents/PersonDocuments'
 import MemberCards from '@/pages/membership/documents/MemberCards'
 import PublicSignup from '@/pages/membership/PublicSignup'
@@ -446,7 +447,7 @@ const App = () => (
             <Route
               path="/membros/eventos"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requireRole="EVENTS">
                   <ChurchEvents />
                 </RequireAuth>
               }
@@ -454,7 +455,7 @@ const App = () => (
             <Route
               path="/membros/eventos/novo"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requireRole="EVENTS">
                   <ChurchEventForm />
                 </RequireAuth>
               }
@@ -462,15 +463,23 @@ const App = () => (
             <Route
               path="/membros/eventos/:id"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requireRole="EVENTS">
                   <ChurchEventDetail />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/checkin/:code"
+              element={
+                <RequireAuth requireRole="EVENTS">
+                  <EventCheckin />
                 </RequireAuth>
               }
             />
             <Route
               path="/membros/eventos/:id/editar"
               element={
-                <RequireAuth requireRole="MEMBERSHIP">
+                <RequireAuth requireRole="EVENTS">
                   <ChurchEventForm />
                 </RequireAuth>
               }

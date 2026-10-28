@@ -1,5 +1,5 @@
 import pb from '@/lib/pocketbase/client'
-import type { ChurchEvent, EventRegistration } from '@/types'
+import type { ChurchEvent, EventQuestion, EventRegistration } from '@/types'
 import type { PixKeyType } from '@/lib/pix'
 import type { ClosedReason } from '@/lib/eventPage'
 import { newSignupKey } from '@/lib/signups'
@@ -40,6 +40,8 @@ export type ChurchEventPayload = Pick<
   | 'skip_finance'
   | 'fin_account_id'
   | 'closed_at'
+  | 'questions'
+  | 'staff'
 >
 
 export type CoverField = 'cover' | 'cover_side'
@@ -120,13 +122,22 @@ export async function getRegistration(id: string): Promise<EventRegistration> {
   return pb.collection('church_event_registrations').getOne<EventRegistration>(id)
 }
 
+/** Inscrição pelo código do comprovante (QR de check-in), com o evento. */
+export async function getRegistrationByCode(
+  code: string,
+): Promise<EventRegistration & { expand?: { event_id?: ChurchEvent } }> {
+  return pb
+    .collection('church_event_registrations')
+    .getFirstListItem(pb.filter('checkin_code = {:code}', { code }), { expand: 'event_id' })
+}
+
 export async function createRegistration(
   event: ChurchEvent,
   data: Pick<EventRegistration, 'name'> &
     Partial<
       Pick<
         EventRegistration,
-        'person_id' | 'phone' | 'email' | 'notes' | 'partner_name' | 'partner_phone'
+        'person_id' | 'phone' | 'email' | 'notes' | 'partner_name' | 'partner_phone' | 'answers'
       >
     >,
 ): Promise<EventRegistration> {
@@ -155,6 +166,9 @@ export async function updateRegistration(
       | 'person_id'
       | 'partner_name'
       | 'amount_due'
+      | 'answers'
+      | 'attended_at'
+      | 'checked_out_at'
     >
   >,
 ): Promise<EventRegistration> {
@@ -205,6 +219,7 @@ export interface EventSignupInfo {
   price?: number | null
   payment_info?: string
   has_coupons?: boolean
+  questions?: EventQuestion[]
   pix?: EventPix | null
   spots_left?: number | null
   message?: string
@@ -220,6 +235,8 @@ export interface EventSignupResult {
   payment_info?: string
   /** Mensagem de confirmação do evento, com os campos preenchidos. */
   message?: string
+  /** Código do comprovante: vira o QR que a equipe lê na entrada. */
+  checkin_code?: string
 }
 
 export async function getEventSignupInfo(key: string): Promise<EventSignupInfo> {
@@ -243,6 +260,7 @@ export async function submitEventSignup(payload: {
   partner_name?: string
   partner_phone?: string
   coupon?: string
+  answers?: Record<string, string>
   consent: boolean
   website?: string
 }): Promise<EventSignupResult> {

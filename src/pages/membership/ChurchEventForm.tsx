@@ -21,14 +21,18 @@ import {
   MESSAGE_FIELDS,
   eventColor,
   formatCep,
+  QUESTION_KIND_LABELS,
+  newQuestionId,
   normalizeCouponCode,
   parseViaCep,
 } from '@/lib/eventPage'
-import type { ChurchEvent, EventCoupon } from '@/types'
+import type { ChurchEvent, EventCoupon, EventQuestion, EventStaffMember } from '@/types'
 import type { FinAccount } from '@/types/finance'
 import {
   ArrowLeft,
   Bell,
+  ClipboardList,
+  HandHelping,
   Image as ImageIcon,
   Loader2,
   MapPin,
@@ -172,6 +176,14 @@ const EMPTY = {
   payment_message: DEFAULT_PAYMENT_MESSAGE,
   send_confirm_email: true,
   send_payment_email: true,
+  questions: [] as Array<{
+    id: string
+    label: string
+    kind: EventQuestion['kind']
+    options: string
+    required: boolean
+  }>,
+  staff: [] as Array<{ name: string; phone: string; task: string }>,
 }
 
 type FormState = typeof EMPTY
@@ -216,6 +228,18 @@ function fromEvent(e: ChurchEvent): FormState {
     payment_message: e.payment_message || '',
     send_confirm_email: !!e.send_confirm_email,
     send_payment_email: !!e.send_payment_email,
+    questions: (e.questions || []).map((q) => ({
+      id: q.id,
+      label: q.label,
+      kind: q.kind,
+      options: (q.options || []).join(', '),
+      required: !!q.required,
+    })),
+    staff: (e.staff || []).map((m) => ({
+      name: m.name,
+      phone: m.phone || '',
+      task: m.task || '',
+    })),
   }
 }
 
@@ -377,6 +401,17 @@ export default function ChurchEventForm() {
       form.coupons.map((c, j) => (j === i ? { ...c, ...patch } : c)),
     )
 
+  const setQuestion = (i: number, patch: Partial<FormState['questions'][number]>) =>
+    set(
+      'questions',
+      form.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)),
+    )
+  const setStaff = (i: number, patch: Partial<FormState['staff'][number]>) =>
+    set(
+      'staff',
+      form.staff.map((m, j) => (j === i ? { ...m, ...patch } : m)),
+    )
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentChurch) return
@@ -398,6 +433,27 @@ export default function ChurchEventForm() {
       return fail('Há dois cupons com o mesmo código.')
     if (coupons.some((c) => c.kind === 'PERCENT' && c.value > 100))
       return fail('Desconto em % vai até 100.')
+    const questions: EventQuestion[] = form.questions
+      .filter((q) => q.label.trim())
+      .map((q) => ({
+        id: q.id,
+        label: q.label.trim().slice(0, 200),
+        kind: q.kind,
+        options:
+          q.kind === 'CHOICE'
+            ? q.options
+                .split(/[,;\n]/)
+                .map((o) => o.trim())
+                .filter(Boolean)
+                .slice(0, 30)
+            : [],
+        required: q.required,
+      }))
+    if (questions.some((q) => q.kind === 'CHOICE' && (q.options?.length || 0) < 2))
+      return fail('Pergunta de escolher precisa de pelo menos duas opções, separadas por vírgula.')
+    const staff: EventStaffMember[] = form.staff
+      .filter((m) => m.name.trim())
+      .map((m) => ({ name: m.name.trim(), phone: m.phone.trim(), task: m.task.trim() }))
 
     const price = money(form.price)
     const payload: ChurchEventPayload = {
@@ -436,6 +492,8 @@ export default function ChurchEventForm() {
       payment_message: form.payment_message.trim(),
       send_confirm_email: form.send_confirm_email,
       send_payment_email: form.send_payment_email,
+      questions,
+      staff,
     }
     // Quem não vê o Financeiro não mexe na conta escolhida por outra pessoa
     if (!accounts.length) delete payload.fin_account_id
@@ -950,6 +1008,154 @@ export default function ChurchEventForm() {
             title="Inscrições abertas pelo link"
           />
         </div>
+      </Section>
+
+      <Section
+        icon={ClipboardList}
+        title="Questionário"
+        hint="Perguntas extras no formulário de inscrição. As respostas aparecem na lista e na planilha."
+      >
+        {form.questions.length === 0 && (
+          <p className="text-xs text-slate-500">
+            Nenhuma pergunta. Ex.: tamanho da camiseta, restrição alimentar, idade dos filhos.
+          </p>
+        )}
+        {form.questions.map((q, i) => (
+          <div key={q.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
+            <div className="grid sm:grid-cols-[1fr_12rem_auto] gap-2">
+              <Input
+                aria-label="Pergunta"
+                value={q.label}
+                onChange={(e) => setQuestion(i, { label: e.target.value })}
+                placeholder="Ex.: Tamanho da camiseta"
+                className={inputClass}
+                maxLength={200}
+              />
+              <Select
+                value={q.kind}
+                onValueChange={(v) => setQuestion(i, { kind: v as EventQuestion['kind'] })}
+              >
+                <SelectTrigger className={inputClass} aria-label="Tipo de resposta">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(QUESTION_KIND_LABELS) as EventQuestion['kind'][]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {QUESTION_KIND_LABELS[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-slate-400 hover:text-red-600"
+                aria-label="Tirar pergunta"
+                onClick={() =>
+                  set(
+                    'questions',
+                    form.questions.filter((_, j) => j !== i),
+                  )
+                }
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            {q.kind === 'CHOICE' && (
+              <Input
+                aria-label="Opções"
+                value={q.options}
+                onChange={(e) => setQuestion(i, { options: e.target.value })}
+                placeholder="Opções separadas por vírgula: P, M, G, GG"
+                className={inputClass}
+              />
+            )}
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <Checkbox
+                checked={q.required}
+                onCheckedChange={(c) => setQuestion(i, { required: c === true })}
+              />
+              Resposta obrigatória
+            </label>
+          </div>
+        ))}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="rounded-lg gap-1.5"
+          onClick={() =>
+            set('questions', [
+              ...form.questions,
+              { id: newQuestionId(), label: '', kind: 'TEXT', options: '', required: false },
+            ])
+          }
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Nova pergunta
+        </Button>
+      </Section>
+
+      <Section
+        icon={HandHelping}
+        title="Equipe de apoio"
+        hint="Quem ajuda no dia (recepção, check-in, cozinha). Aparece na tela do evento e na impressão."
+      >
+        {form.staff.map((m, i) => (
+          <div key={i} className="grid grid-cols-2 sm:grid-cols-[1fr_10rem_1fr_auto] gap-2">
+            <Input
+              aria-label="Nome"
+              value={m.name}
+              onChange={(e) => setStaff(i, { name: e.target.value })}
+              placeholder="Nome"
+              className={inputClass}
+              maxLength={120}
+            />
+            <Input
+              aria-label="Telefone"
+              type="tel"
+              value={m.phone}
+              onChange={(e) => setStaff(i, { phone: e.target.value })}
+              placeholder="Telefone"
+              className={inputClass}
+              maxLength={40}
+            />
+            <Input
+              aria-label="Tarefa"
+              value={m.task}
+              onChange={(e) => setStaff(i, { task: e.target.value })}
+              placeholder="Ex.: Check-in na entrada"
+              className={inputClass}
+              maxLength={120}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-slate-400 hover:text-red-600"
+              aria-label="Tirar da equipe"
+              onClick={() =>
+                set(
+                  'staff',
+                  form.staff.filter((_, j) => j !== i),
+                )
+              }
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="rounded-lg gap-1.5"
+          onClick={() => set('staff', [...form.staff, { name: '', phone: '', task: '' }])}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Adicionar pessoa
+        </Button>
       </Section>
 
       <Section
