@@ -1,0 +1,4 @@
+{$WHATSAPP_DOMAIN} {
+	encode gzip
+	reverse_proxy evolution:8080
+}
