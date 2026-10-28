@@ -52,8 +52,10 @@ routerAdd(
       return e.json(403, { message: 'Permissão insuficiente' })
     }
 
-    const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '').replace(/\/+$/, '')
-    const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '')
+    const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
+      .replace(/\s+/g, '') // espaços colados pelo celular quebram a URL
+      .replace(/\/+$/, '')
+    const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
     const configured = !!(apiUrl && apiKey)
 
     const evo = (method, path, payload) => {
