@@ -1,8 +1,8 @@
 # Conector bancário: busca saldo e extrato na Cora e no Bradesco e entrega ao LouvorFlow.
 # Configure os segredos do repositório (Settings > Secrets and variables > Actions):
-#   LOUVORFLOW_URL, BANK_SYNC_TOKEN, CORA_CLIENT_ID, CORA_CERT, CORA_KEY,
-#   BRADESCO_CLIENT_ID, BRADESCO_CLIENT_SECRET, BRADESCO_CERT, BRADESCO_KEY
-# Sem eles o job termina sem fazer nada. Detalhes em bank-sync/README.md.
+#   LOUVORFLOW_URL e BANK_SYNC_TOKEN (gerados em Configurações > Integrações > Bancos).
+# As credenciais dos bancos vêm do LouvorFlow; os segredos CORA_* e BRADESCO_* são opcionais.
+# Sem LOUVORFLOW_URL e BANK_SYNC_TOKEN o job termina sem fazer nada. Detalhes em bank-sync/README.md.
 name: Conector bancário
 
 on:

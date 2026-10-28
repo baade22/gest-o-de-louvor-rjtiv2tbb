@@ -7,6 +7,8 @@ import type { OfxStatement } from '@/lib/ofx'
 import type {
   FinAccount,
   FinBankConnection,
+  BankSecretInput,
+  BankSecretsInfo,
   FinBankImport,
   FinBankLine,
   FinBill,
@@ -726,5 +728,48 @@ export async function listTransactionsBetween(churchId: string, from: string, to
       to: `${to} 23:59:59`,
     }),
     fields: 'id,type,amount_cents,account_id,category_id,status,date',
+  })
+}
+
+// ---- Credenciais das APIs dos bancos (tela de Integrações) ----
+
+/** Resumo do que está cadastrado; o servidor nunca devolve o segredo. */
+export async function getBankSecrets(churchId: string): Promise<BankSecretsInfo> {
+  return pb.send('/backend/v1/finance/bank-secrets', { query: { church_id: churchId } })
+}
+
+export async function saveBankSecret(churchId: string, input: BankSecretInput) {
+  return pb.send('/backend/v1/finance/bank-secrets', {
+    method: 'POST',
+    body: { church_id: churchId, action: 'save', ...input },
+  })
+}
+
+export async function deleteBankSecret(churchId: string, id: string) {
+  return pb.send('/backend/v1/finance/bank-secrets', {
+    method: 'POST',
+    body: { church_id: churchId, action: 'delete', id },
+  })
+}
+
+/** Gera a chave do conector; ela só aparece nesta resposta. */
+export async function newBankConnectorKey(
+  churchId: string,
+): Promise<{ token: string; key_prefix: string }> {
+  return pb.send('/backend/v1/finance/bank-secrets', {
+    method: 'POST',
+    body: { church_id: churchId, action: 'new_key' },
+  })
+}
+
+export async function saveBankGithub(churchId: string, githubRepo: string, githubToken?: string) {
+  return pb.send('/backend/v1/finance/bank-secrets', {
+    method: 'POST',
+    body: {
+      church_id: churchId,
+      action: 'github',
+      github_repo: githubRepo,
+      github_token: githubToken,
+    },
   })
 }
