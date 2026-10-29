@@ -468,6 +468,10 @@ export type BankConnectionInput = Pick<
   | 'enabled'
   | 'auto_reconcile'
   | 'initial_days'
+  | 'purpose'
+  | 'reconcile_from'
+  | 'history_from'
+  | 'history_max'
 >
 
 export async function saveBankConnection(
