@@ -73,6 +73,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDENTE: 'A conciliar',
   CONCILIADO: 'Conciliado',
   IGNORADO: 'Ignorado',
+  EXTRATO: 'Só extrato',
 }
 const README_URL =
   'https://github.com/baade22/gest-o-de-louvor-rjtiv2tbb/blob/main/bank-sync/README.md'
@@ -81,6 +82,20 @@ const serverMessage = (err: unknown, fallback: string) =>
   (err as { response?: { message?: string } })?.response?.message || errorMessage(err, fallback)
 
 const today = () => brtDay(new Date().toISOString())
+// Datas do PocketBase ("2026-01-01 12:00:00.000Z") <-> dia do campo de data
+const dayOf = (s?: string) => (s || '').slice(0, 10)
+const pbDay = (ymd: string) => (ymd ? `${ymd} 12:00:00.000Z` : '')
+
+/** Situação do histórico pedido: buscando (até onde chegou) ou completo (desde quando). */
+function historyState(conn?: FinBankConnection) {
+  if (!conn) return null
+  const target = conn.history_max ? 'MAX' : dayOf(conn.history_from)
+  if (!target) return null
+  const loaded = dayOf(conn.history_loaded_from)
+  const done =
+    conn.history_done_for === target || (target !== 'MAX' && !!loaded && loaded <= target)
+  return { done, loaded }
+}
 const shiftDays = (ymd: string, n: number) => {
   const d = new Date(`${ymd}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
@@ -492,6 +507,12 @@ export default function FinanceBalances() {
                         {pending[a.id]} a conciliar
                       </Link>
                     )}
+                    {conn?.purpose === 'VISUALIZAR' && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        Só extrato
+                      </span>
+                    )}
+                    <HistoryNote conn={conn} />
                     {conn?.last_auto_reconciled ? (
                       <span className="text-xs text-slate-500">
                         {conn.last_auto_reconciled} conciliado(s) sozinho(s) na última busca
@@ -540,7 +561,29 @@ export default function FinanceBalances() {
       {bankAccounts.length > 0 && (
         <div id="extrato" className={cn(cardClass, 'scroll-mt-4')}>
           <div className="flex flex-col gap-3 border-b border-slate-200 p-3 lg:flex-row lg:items-center">
-            <h2 className="px-1 font-semibold text-slate-900">Extrato</h2>
+            <div className="px-1">
+              <h2 className="font-semibold text-slate-900">Extrato</h2>
+              {connOf(stAccount) && (
+                <p className="text-xs text-slate-500">
+                  {lastLineSync
+                    ? `Do banco, atualizado ${timeAgo(lastLineSync, now)}`
+                    : 'Aguardando a primeira busca no banco'}
+                  {canEdit && connOf(stAccount)?.enabled && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        onClick={syncNow}
+                        disabled={syncing || waiting}
+                        className="font-semibold text-teal-700 hover:underline disabled:text-slate-400 disabled:no-underline"
+                      >
+                        {waiting ? 'buscando no banco…' : 'buscar agora'}
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
               <Select
                 value={stAccount}
@@ -692,6 +735,8 @@ export default function FinanceBalances() {
                                 </span>
                               ) : l.status === 'IGNORADO' ? (
                                 <span className="text-slate-500">Ignorado</span>
+                              ) : l.status === 'EXTRATO' ? (
+                                <span className="text-slate-500">Só extrato</span>
                               ) : (
                                 <Link
                                   to={`/financeiro/conciliacao?conta=${l.account_id}`}
@@ -731,7 +776,18 @@ export default function FinanceBalances() {
             await saveBankConnection(churchId, input, editing.conn?.id)
             toast({ title: editing.conn ? 'Conexão atualizada' : 'Conta conectada ao banco' })
             setEditing(null)
-            load(true)
+            // Histórico novo pedido numa conta já conectada: já pede a busca ao conector
+            const old = editing.conn
+            if (
+              old?.enabled &&
+              input.enabled &&
+              (Boolean(old.history_max) !== Boolean(input.history_max) ||
+                dayOf(old.history_from) !== dayOf(input.history_from))
+            ) {
+              syncNow()
+            } else {
+              load(true)
+            }
           }}
           onDelete={
             editing.conn
@@ -746,6 +802,24 @@ export default function FinanceBalances() {
         />
       )}
     </div>
+  )
+}
+
+function HistoryNote({ conn }: { conn?: FinBankConnection }) {
+  const h = historyState(conn)
+  if (!h || !conn?.enabled) return null
+  if (h.done) {
+    return h.loaded ? (
+      <span className="text-xs text-slate-500">Histórico desde {shortDate(h.loaded, true)}</span>
+    ) : null
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      {h.loaded
+        ? `Buscando histórico, já em ${shortDate(h.loaded, true)}`
+        : 'Histórico na próxima busca'}
+    </span>
   )
 }
 
@@ -814,7 +888,15 @@ function ConnectionDialog({
     enabled: conn?.enabled ?? true,
     auto_reconcile: conn?.auto_reconcile ?? true,
     initial_days: conn?.initial_days || 30,
+    purpose: conn?.purpose || 'CONCILIAR',
+    reconcile_from: conn?.reconcile_from || '',
+    history_from: conn?.history_from || '',
+    history_max: conn?.history_max ?? false,
   })
+  const [history, setHistory] = useState<'none' | 'date' | 'max'>(
+    conn?.history_max ? 'max' : conn?.history_from ? 'date' : 'none',
+  )
+  const reconcile = form.purpose !== 'VISUALIZAR'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const set = (patch: Partial<BankConnectionInput>) => setForm((f) => ({ ...f, ...patch }))
@@ -826,10 +908,17 @@ function ConnectionDialog({
       setError('Informe a agência e a conta do Bradesco, sem o dígito.')
       return
     }
+    if (history === 'date' && !dayOf(form.history_from)) {
+      setError('Escolha a data de início do histórico.')
+      return
+    }
     setBusy(true)
     try {
       await onSave({
         ...form,
+        history_max: history === 'max',
+        history_from: history === 'date' ? form.history_from : '',
+        reconcile_from: reconcile ? form.reconcile_from : '',
         branch: bradesco ? form.branch : '',
         account_number: bradesco ? form.account_number : '',
         credential_key: (form.credential_key || '').toUpperCase(),
@@ -847,7 +936,8 @@ function ConnectionDialog({
         <DialogHeader>
           <DialogTitle>{conn ? 'Conexão com o banco' : 'Conectar ao banco'}</DialogTitle>
           <DialogDescription>
-            {account.name}: o LouvorFlow busca o saldo e o extrato sozinho e concilia o que bater.
+            {account.name}: o LouvorFlow busca o saldo e o extrato sozinho
+            {reconcile ? ' e concilia o que bater.' : '.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -928,6 +1018,88 @@ function ConnectionDialog({
             </div>
           )}
 
+          <div className="space-y-1.5">
+            <Label>O que fazer com o extrato</Label>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Uso do extrato">
+              {(
+                [
+                  ['CONCILIAR', 'Visualizar e conciliar', 'Os movimentos entram na Conciliação.'],
+                  ['VISUALIZAR', 'Só visualizar', 'Acompanha o extrato, sem pendências.'],
+                ] as const
+              ).map(([value, title, hint]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.purpose === value}
+                  onClick={() => set({ purpose: value })}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors',
+                    form.purpose === value
+                      ? 'border-teal-600 bg-teal-50/60 ring-1 ring-teal-600'
+                      : 'border-slate-200 hover:bg-slate-50',
+                  )}
+                >
+                  <span className="block text-sm font-semibold text-slate-800">{title}</span>
+                  <span className="block text-xs text-slate-500">{hint}</span>
+                </button>
+              ))}
+            </div>
+            {conn && (conn.purpose || 'CONCILIAR') !== form.purpose && (
+              <p className="text-xs text-slate-500">
+                {reconcile
+                  ? 'Os movimentos que estão só no extrato passam para a Conciliação.'
+                  : 'Os movimentos ainda não conciliados saem da Conciliação e ficam só no extrato.'}
+              </p>
+            )}
+          </div>
+
+          {reconcile && (
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-reconcile-from">Conciliar a partir de (opcional)</Label>
+              <Input
+                id="bank-reconcile-from"
+                type="date"
+                value={dayOf(form.reconcile_from)}
+                onChange={(e) => set({ reconcile_from: pbDay(e.target.value) })}
+                className="w-[170px]"
+              />
+              <p className="text-xs text-slate-500">
+                Movimentos de antes dessa data ficam só no extrato, sem pendência.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Histórico do extrato</Label>
+            <Select value={history} onValueChange={(v) => setHistory(v as typeof history)}>
+              <SelectTrigger aria-label="Histórico do extrato">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Só a partir da primeira busca</SelectItem>
+                <SelectItem value="date">Buscar desde uma data</SelectItem>
+                <SelectItem value="max">Buscar tudo o que o banco tiver</SelectItem>
+              </SelectContent>
+            </Select>
+            {history === 'date' && (
+              <Input
+                type="date"
+                aria-label="Histórico desde"
+                value={dayOf(form.history_from)}
+                max={today()}
+                onChange={(e) => set({ history_from: pbDay(e.target.value) })}
+                className="w-[170px]"
+              />
+            )}
+            {history !== 'none' && (
+              <p className="text-xs text-slate-500">
+                O conector busca em partes de 3 meses, do mais novo para o mais antigo, a cada
+                rodada. Anos de extrato podem levar algumas rodadas.
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="bank-days">Na primeira busca, trazer</Label>
@@ -959,18 +1131,22 @@ function ConnectionDialog({
             </div>
           </div>
 
-          <label className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3">
-            <span>
-              <span className="block text-sm font-semibold text-slate-800">Conciliar sozinho</span>
-              <span className="block text-xs text-slate-500">
-                Quando há um único lançamento com o mesmo valor e sentido em até 3 dias.
+          {reconcile && (
+            <label className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3">
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">
+                  Conciliar sozinho
+                </span>
+                <span className="block text-xs text-slate-500">
+                  Quando há um único lançamento com o mesmo valor e sentido em até 3 dias.
+                </span>
               </span>
-            </span>
-            <Switch
-              checked={form.auto_reconcile}
-              onCheckedChange={(v) => set({ auto_reconcile: v })}
-            />
-          </label>
+              <Switch
+                checked={form.auto_reconcile}
+                onCheckedChange={(v) => set({ auto_reconcile: v })}
+              />
+            </label>
+          )}
           <label className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3">
             <span>
               <span className="block text-sm font-semibold text-slate-800">Buscar no banco</span>

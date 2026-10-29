@@ -150,3 +150,78 @@ export function bradescoError(json) {
   }
   return null
 }
+
+// Histórico: do dia anterior a history.before para trás, em partes de até 3 meses, até
+// history.from ou, sem data (o máximo), até o banco parar de devolver movimentos. Cada parte
+// é entregue na hora (push); o que faltar continua na próxima rodada do conector.
+const HISTORY_WINDOW_DAYS = 92
+const HISTORY_WINDOWS_PER_RUN = 24
+const HISTORY_EMPTY_TO_STOP = 4 // um ano sem nenhum movimento: acabou o histórico
+const HISTORY_FLOOR = '2010-01-01'
+const shiftDays = (ymd, n) => {
+  const d = new Date(`${ymd}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Busca o histórico de uma conexão. bank.statement(from, to) devolve as linhas ou lança um erro
+ * com status (o código HTTP do banco); push(body) entrega uma parte ao LouvorFlow.
+ */
+export async function backfill(conn, bank, push, { log = console.log, wait = sleep } = {}) {
+  const floor = conn.history.from || HISTORY_FLOOR
+  let end = shiftDays(conn.history.before, -1)
+  let empty = 0
+  let total = 0
+  for (let i = 0; i < HISTORY_WINDOWS_PER_RUN && end >= floor; i++) {
+    let start = shiftDays(end, -(HISTORY_WINDOW_DAYS - 1))
+    if (start < floor) start = floor
+    // A Cora pede o fim depois do início
+    if (start === end) start = shiftDays(end, -1)
+    let lines
+    try {
+      lines = await bank.statement(start, end)
+    } catch (err) {
+      if (err.status && err.status < 500 && err.status !== 429 && err.status !== 401) {
+        // O banco recusou o período (antigo demais, por exemplo): o histórico termina aqui
+        log(`o banco não devolve extrato antes de ${shiftDays(end, 1)} (${err.message}).`)
+        await push({
+          connection_id: conn.id,
+          ok: true,
+          history: true,
+          history_done: true,
+          lines: [],
+        })
+        return { total, done: true }
+      }
+      // Instabilidade do banco: tenta mais uma vez; se falhar de novo, continua na próxima rodada
+      await wait(5000)
+      try {
+        lines = await bank.statement(start, end)
+      } catch (err2) {
+        log(`histórico parou em ${shiftDays(end, 1)}: ${err2.message}`)
+        return { total, done: false }
+      }
+    }
+    empty = lines.length ? 0 : empty + 1
+    total += lines.length
+    const done = start <= floor || (!conn.history.from && empty >= HISTORY_EMPTY_TO_STOP)
+    await push({
+      connection_id: conn.id,
+      ok: true,
+      history: true,
+      history_done: done,
+      start_date: start,
+      end_date: end,
+      lines,
+    })
+    if (done) {
+      log(`histórico completo (${total} movimento(s) nesta rodada).`)
+      return { total, done: true }
+    }
+    end = shiftDays(start, -1)
+  }
+  log(`histórico buscado até ${shiftDays(end, 1)}; continua na próxima rodada.`)
+  return { total, done: false }
+}

@@ -184,7 +184,8 @@ export interface FinBill extends BaseRecord {
   }
 }
 
-export type FinBankLineStatus = 'PENDENTE' | 'CONCILIADO' | 'IGNORADO'
+// EXTRATO: movimento só para consulta (conta "só para ver o extrato"), fora da conciliação
+export type FinBankLineStatus = 'PENDENTE' | 'CONCILIADO' | 'IGNORADO' | 'EXTRATO'
 
 /** Movimento do extrato bancário importado (OFX). Valor positivo entrou, negativo saiu. */
 export interface FinBankLine extends BaseRecord {
@@ -232,7 +233,16 @@ export interface FinBankConnection extends BaseRecord {
   enabled: boolean
   auto_reconcile: boolean
   initial_days?: number
+  // CONCILIAR (padrão) ou VISUALIZAR: só mostra o extrato, sem levar à conciliação
+  purpose?: 'CONCILIAR' | 'VISUALIZAR' | ''
+  // Movimentos antes desta data ficam só no extrato
+  reconcile_from?: string
+  // Histórico pedido: desde uma data ou o máximo que o banco devolver
+  history_from?: string
+  history_max?: boolean
   // Situação, gravada só pelo servidor
+  history_loaded_from?: string
+  history_done_for?: string
   last_sync_at?: string
   last_status?: 'OK' | 'ERRO' | ''
   last_error?: string

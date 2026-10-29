@@ -16,7 +16,14 @@
 
 import https from 'node:https'
 import { readFileSync } from 'node:fs'
-import { bradescoBalance, bradescoError, bradescoLines, coraLines, ddmmyyyy } from './banks.mjs'
+import {
+  backfill,
+  bradescoBalance,
+  bradescoError,
+  bradescoLines,
+  coraLines,
+  ddmmyyyy,
+} from './banks.mjs'
 
 const HOSTS = {
   CORA: {
@@ -134,7 +141,8 @@ function redact(text) {
 }
 const short = (r) => redact(`${r.status} ${(r.text || '').slice(0, 200)}`.trim())
 
-async function syncCora(conn, cred) {
+// Cada banco abre uma sessão (token) e oferece o saldo e o extrato de um período
+async function openCora(conn, cred) {
   const base = HOSTS.CORA[conn.environment]
   const tls = { cert: cred.cert, key: cred.key }
   const tok = await request(`${base}/token`, {
@@ -150,36 +158,37 @@ async function syncCora(conn, cred) {
     throw new Error(`Cora recusou o acesso: ${short(tok)}`)
   const auth = { Authorization: `Bearer ${tok.json.access_token}`, Accept: 'application/json' }
 
-  const bal = await request(`${base}/third-party/account/balance`, { headers: auth, ...tls })
-  if (bal.status !== 200) throw new Error(`Saldo da Cora: ${short(bal)}`)
-
-  const entries = []
-  let endBalance = null
-  for (let page = 1; page <= 40; page++) {
-    const qs = new URLSearchParams({
-      start: conn.from,
-      end: conn.to,
-      page: String(page),
-      perPage: '500',
-    })
-    const st = await request(`${base}/bank-statement/statement?${qs}`, { headers: auth, ...tls })
-    if (st.status !== 200) throw new Error(`Extrato da Cora: ${short(st)}`)
-    const list = st.json?.entries || []
-    entries.push(...list)
-    if (st.json?.end && Number.isInteger(st.json.end.balance)) endBalance = st.json.end.balance
-    if (list.length < 500) break
-  }
-  const balance = Number.isInteger(Number(bal.json?.balance))
-    ? Number(bal.json.balance)
-    : endBalance
   return {
-    balance_cents: balance,
-    available_cents: balance,
-    lines: coraLines(entries),
+    async balance() {
+      const bal = await request(`${base}/third-party/account/balance`, { headers: auth, ...tls })
+      if (bal.status !== 200) throw new Error(`Saldo da Cora: ${short(bal)}`)
+      const cents = Number.isInteger(Number(bal.json?.balance)) ? Number(bal.json.balance) : null
+      return { balance_cents: cents, available_cents: cents }
+    },
+    async statement(from, to) {
+      const entries = []
+      for (let page = 1; page <= 40; page++) {
+        const qs = new URLSearchParams({
+          start: from,
+          end: to,
+          page: String(page),
+          perPage: '500',
+        })
+        const st = await request(`${base}/bank-statement/statement?${qs}`, {
+          headers: auth,
+          ...tls,
+        })
+        if (st.status !== 200) throw new BankError(`Extrato da Cora: ${short(st)}`, st.status)
+        const list = st.json?.entries || []
+        entries.push(...list)
+        if (list.length < 500) break
+      }
+      return coraLines(entries)
+    },
   }
 }
 
-async function syncBradesco(conn, cred) {
+async function openBradesco(conn, cred) {
   const base = HOSTS.BRADESCO[conn.environment]
   const tls = { cert: cred.cert, key: cred.key }
   const tok = await request(`${base}${BRADESCO_TOKEN_PATH[conn.environment]}`, {
@@ -198,29 +207,42 @@ async function syncBradesco(conn, cred) {
   const auth = { Authorization: `Bearer ${tok.json.access_token}`, Accept: 'application/json' }
   const account = { agencia: conn.branch, conta: conn.account_number }
 
-  const bal = await request(
-    `${base}/v1/fornecimento-saldos-contas/saldos?${new URLSearchParams({ ...account, tipoOperacao: '1' })}`,
-    { headers: auth, ...tls },
-  )
-  if (bal.status !== 200) throw new Error(`Saldo do Bradesco: ${short(bal)}`)
-  const balErr = bradescoError(bal.json)
-  if (balErr) throw new Error(`Saldo do Bradesco: ${balErr}`)
+  return {
+    async balance() {
+      const bal = await request(
+        `${base}/v1/fornecimento-saldos-contas/saldos?${new URLSearchParams({ ...account, tipoOperacao: '1' })}`,
+        { headers: auth, ...tls },
+      )
+      if (bal.status !== 200) throw new Error(`Saldo do Bradesco: ${short(bal)}`)
+      const balErr = bradescoError(bal.json)
+      if (balErr) throw new Error(`Saldo do Bradesco: ${balErr}`)
+      return bradescoBalance(bal.json)
+    },
+    // O Bradesco consulta no máximo 1 ano por vez
+    async statement(from, to) {
+      const st = await request(
+        `${base}/v1/fornecimento-extratos-contas/extratos?${new URLSearchParams({
+          ...account,
+          dataInicio: ddmmyyyy(from),
+          dataFim: ddmmyyyy(to),
+          tipo: (conn.account_type || 'CC').toLowerCase(),
+          tipoOperacao: '1',
+        })}`,
+        { headers: auth, ...tls },
+      )
+      if (st.status !== 200) throw new BankError(`Extrato do Bradesco: ${short(st)}`, st.status)
+      const stErr = bradescoError(st.json)
+      if (stErr) throw new BankError(`Extrato do Bradesco: ${stErr}`, 400)
+      return bradescoLines(st.json)
+    },
+  }
+}
 
-  // O Bradesco consulta no máximo 1 ano por vez
-  const st = await request(
-    `${base}/v1/fornecimento-extratos-contas/extratos?${new URLSearchParams({
-      ...account,
-      dataInicio: ddmmyyyy(conn.from),
-      dataFim: ddmmyyyy(conn.to),
-      tipo: (conn.account_type || 'CC').toLowerCase(),
-      tipoOperacao: '1',
-    })}`,
-    { headers: auth, ...tls },
-  )
-  if (st.status !== 200) throw new Error(`Extrato do Bradesco: ${short(st)}`)
-  const stErr = bradescoError(st.json)
-  if (stErr) throw new Error(`Extrato do Bradesco: ${stErr}`)
-  return { ...bradescoBalance(bal.json), lines: bradescoLines(st.json) }
+class BankError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.status = status
+  }
 }
 
 async function louvorflow(path, body) {
@@ -256,21 +278,33 @@ async function main() {
         conn.credentials,
         conn.credentials_problem,
       )
-      const data =
-        conn.provider === 'CORA' ? await syncCora(conn, cred) : await syncBradesco(conn, cred)
+      const bank =
+        conn.provider === 'CORA' ? await openCora(conn, cred) : await openBradesco(conn, cred)
+      const bal = await bank.balance()
+      const lines = await bank.statement(conn.from, conn.to)
       const res = await louvorflow('/backend/v1/finance/bank-sync/push', {
         connection_id: conn.id,
         ok: true,
-        balance_cents: data.balance_cents,
-        available_cents: data.available_cents,
+        balance_cents: bal.balance_cents,
+        available_cents: bal.available_cents,
         balance_at: new Date().toISOString().replace('T', ' '),
         start_date: conn.from,
         end_date: conn.to,
-        lines: data.lines,
+        lines,
       })
       console.log(
-        `${name}: ${data.lines.length} movimento(s), ${res.created} novo(s), ${res.auto_reconciled} conciliado(s) sozinho(s).`,
+        `${name}: ${lines.length} movimento(s), ${res.created} novo(s), ${res.auto_reconciled} conciliado(s) sozinho(s).`,
       )
+      if (conn.history) {
+        await backfill(
+          conn,
+          bank,
+          (body) => louvorflow('/backend/v1/finance/bank-sync/push', body),
+          {
+            log: (msg) => console.log(`${name}: ${redact(msg)}`),
+          },
+        )
+      }
     } catch (err) {
       failures++
       console.error(`${name}: ${redact(err.message)}`)
