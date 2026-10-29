@@ -23,6 +23,7 @@ import {
   bradescoLines,
   coraLines,
   ddmmyyyy,
+  splitPeriod,
 } from './banks.mjs'
 
 const HOSTS = {
@@ -165,23 +166,29 @@ async function openCora(conn, cred) {
       const cents = Number.isInteger(Number(bal.json?.balance)) ? Number(bal.json.balance) : null
       return { balance_cents: cents, available_cents: cents }
     },
+    // Período longo de uma vez faz a Cora devolver 504: busca em partes de até 31 dias,
+    // páginas de 200, e tenta de novo uma vez quando a Cora está instável
     async statement(from, to) {
       const entries = []
-      for (let page = 1; page <= 40; page++) {
-        const qs = new URLSearchParams({
-          start: from,
-          end: to,
-          page: String(page),
-          perPage: '500',
-        })
-        const st = await request(`${base}/bank-statement/statement?${qs}`, {
-          headers: auth,
-          ...tls,
-        })
-        if (st.status !== 200) throw new BankError(`Extrato da Cora: ${short(st)}`, st.status)
-        const list = st.json?.entries || []
-        entries.push(...list)
-        if (list.length < 500) break
+      for (const [start, end] of splitPeriod(from, to, 31)) {
+        for (let page = 1; page <= 100; page++) {
+          const qs = new URLSearchParams({
+            start,
+            end,
+            page: String(page),
+            perPage: '200',
+          })
+          const url = `${base}/bank-statement/statement?${qs}`
+          let st = await request(url, { headers: auth, ...tls })
+          if (st.status >= 500 || st.status === 429) {
+            await new Promise((r) => setTimeout(r, 3000))
+            st = await request(url, { headers: auth, ...tls })
+          }
+          if (st.status !== 200) throw new BankError(`Extrato da Cora: ${short(st)}`, st.status)
+          const list = st.json?.entries || []
+          entries.push(...list)
+          if (list.length < 200) break
+        }
       }
       return coraLines(entries)
     },
