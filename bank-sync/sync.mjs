@@ -48,7 +48,7 @@ try {
 
 const env = (name) => (process.env[name] || '').trim()
 
-function credentials(provider, key, fromServer) {
+function credentials(provider, key, fromServer, serverProblem) {
   if (fromServer?.client_id && fromServer.cert && fromServer.key) {
     // Entram na lista do que nunca pode aparecer em log ou mensagem de erro
     serverSecrets.push(
@@ -79,7 +79,11 @@ function credentials(provider, key, fromServer) {
   if (provider === 'BRADESCO' && !c.clientSecret) missing.push(`${p}_CLIENT_SECRET`)
   if (!c.cert) missing.push(`${p}_CERT`)
   if (!c.key) missing.push(`${p}_KEY`)
-  if (missing.length) throw new Error(`Credenciais faltando no conector: ${missing.join(', ')}`)
+  if (missing.length) {
+    // O LouvorFlow explica o que não bateu (ex.: credencial cadastrada só para Teste)
+    if (serverProblem) throw new Error(serverProblem)
+    throw new Error(`Credenciais faltando no conector: ${missing.join(', ')}`)
+  }
   return c
 }
 
@@ -246,7 +250,12 @@ async function main() {
     try {
       if (!HOSTS[conn.provider]?.[conn.environment])
         throw new Error('Banco ou ambiente desconhecido')
-      const cred = credentials(conn.provider, conn.credential_key, conn.credentials)
+      const cred = credentials(
+        conn.provider,
+        conn.credential_key,
+        conn.credentials,
+        conn.credentials_problem,
+      )
       const data =
         conn.provider === 'CORA' ? await syncCora(conn, cred) : await syncBradesco(conn, cred)
       const res = await louvorflow('/backend/v1/finance/bank-sync/push', {

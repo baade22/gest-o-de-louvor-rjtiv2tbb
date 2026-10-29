@@ -59,33 +59,73 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
   try {
     encKey = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
   } catch (_) {}
+  // Devolve { credentials, problem }: o problema explica por que não há credencial, para o
+  // conector mostrar na conta (ambiente ou nome do conjunto que não bate, chave de cifragem)
   const credentialsFor = (c) => {
-    if (encKey.length !== 32) return null
+    const provider = c.getString('provider')
+    const env = c.getString('environment')
     const ck = (c.getString('credential_key') || '').toUpperCase()
-    try {
-      // Parâmetro vazio no filtro não casa com texto vazio: sem nome, compara com '' direto
-      const rec = $app.findFirstRecordByFilter(
-        'fin_bank_secrets',
-        'church_id = {:c} && kind = {:k} && environment = {:env} && credential_key = ' +
-          (ck ? '{:ck}' : "''"),
-        {
-          c: c.getString('church_id'),
-          k: c.getString('provider'),
-          env: c.getString('environment'),
-          ck: ck,
-        },
-      )
-      const d = JSON.parse(rec.getString('data') || 'null')
-      if (!d || d.enc !== 'v1') return null
-      const v = JSON.parse($security.decrypt(d.data, encKey)) || {}
+    const bank = provider === 'CORA' ? 'Cora' : 'Bradesco'
+    const label = (e, k) => (e === 'TESTE' ? 'Teste' : 'Produção') + (k ? ' · ' + k : '')
+    if (encKey.length !== 32) {
       return {
-        client_id: v.client_id || '',
-        client_secret: v.client_secret || '',
-        cert: v.cert || '',
-        key: v.key || '',
+        credentials: null,
+        problem: 'O servidor está sem a chave de cifragem (LOUVORFLOW_CREDENTIALS_KEY).',
+      }
+    }
+    const sets = $app.findRecordsByFilter(
+      'fin_bank_secrets',
+      'church_id = {:c} && kind = {:k}',
+      '',
+      50,
+      0,
+      { c: c.getString('church_id'), k: provider },
+    )
+    let rec = null
+    for (const r of sets) {
+      if (r.getString('environment') === env && r.getString('credential_key') === ck) rec = r
+    }
+    if (!rec) {
+      const have = sets.map((r) => label(r.getString('environment'), r.getString('credential_key')))
+      return {
+        credentials: null,
+        problem:
+          'Não há credencial da ' +
+          bank +
+          ' cadastrada em Integrações para ' +
+          label(env, ck) +
+          (ck ? '' : ' (sem nome)') +
+          '. ' +
+          (have.length
+            ? 'Cadastradas: ' +
+              have.join(', ') +
+              '. Ajuste o ambiente ou o campo Credencial da conexão.'
+            : 'Nenhuma cadastrada para este banco.'),
+      }
+    }
+    try {
+      const d = JSON.parse(rec.getString('data') || 'null')
+      const v = JSON.parse($security.decrypt(d.data, encKey)) || {}
+      if (!v.client_id || !v.cert || !v.key) throw new Error('incompleta')
+      return {
+        credentials: {
+          client_id: v.client_id || '',
+          client_secret: v.client_secret || '',
+          cert: v.cert || '',
+          key: v.key || '',
+        },
+        problem: '',
       }
     } catch (_) {
-      return null
+      return {
+        credentials: null,
+        problem:
+          'A credencial da ' +
+          bank +
+          ' (' +
+          label(env, ck) +
+          ') não pôde ser aberta. Cadastre de novo em Integrações.',
+      }
     }
   }
   const out = []
@@ -104,6 +144,7 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
     const from = last
       ? ymd(new Date(last.slice(0, 10) + 'T12:00:00Z').getTime() - 5 * day)
       : ymd(now - initial * day)
+    const cred = credentialsFor(c)
     out.push({
       id: c.id,
       church_id: c.getString('church_id'),
@@ -115,7 +156,8 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
       account_number: c.getString('account_number'),
       account_type: c.getString('account_type') || 'CC',
       credential_key: c.getString('credential_key'),
-      credentials: credentialsFor(c),
+      credentials: cred.credentials,
+      credentials_problem: cred.problem,
       from: from,
       to: ymd(now),
     })
