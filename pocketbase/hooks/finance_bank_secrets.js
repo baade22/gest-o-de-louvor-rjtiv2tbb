@@ -14,6 +14,9 @@
 //        servidor guarda só o hash). A anterior deixa de valer.
 //      { church_id, action: 'github', github_repo, github_token? }  acesso ao GitHub para o
 //        botão "Atualizar agora" disparar o conector na hora. { github_repo: '' } remove.
+//      Toda ação pede a senha do MASTER de novo (password); 5 senhas erradas em 15 minutos
+//      bloqueiam as mudanças da igreja. Cada mudança vai para o registro de segurança
+//      (fin_bank_audit) e é avisada por e-mail a todos os MASTERs da igreja.
 //
 // Tudo é cifrado com LOUVORFLOW_CREDENTIALS_KEY (32 caracteres). Sem ela, nada é salvo:
 // chave privada de banco não fica em texto puro no banco de dados.
@@ -97,7 +100,21 @@ routerAdd(
       envToken = $os.getenv('BANK_SYNC_TOKEN') || ''
       envGithub = !!($os.getenv('BANK_SYNC_GITHUB_TOKEN') && $os.getenv('BANK_SYNC_GITHUB_REPO'))
     } catch (_) {}
+    // Registro de segurança: mudanças, entregas ao conector e senhas erradas
+    const audit = $app
+      .findRecordsByFilter('fin_bank_audit', 'church_id = {:c}', '-created', 30, 0, {
+        c: churchId,
+      })
+      .map((r) => ({
+        id: r.id,
+        event: r.getString('event'),
+        detail: r.getString('detail'),
+        ip: r.getString('ip'),
+        user_name: r.getString('user_name'),
+        created: r.getString('created'),
+      }))
     return e.json(200, {
+      audit: audit,
       encryption_ready: encKey.length === 32,
       server_token: envToken.length >= 32,
       server_github: envGithub,
@@ -130,6 +147,112 @@ routerAdd(
       })
     }
 
+    const userName = e.auth.getString('name') || e.auth.getString('email')
+    const ip = e.realIP()
+    const audit = (event, detail) => {
+      try {
+        const r = new Record($app.findCollectionByNameOrId('fin_bank_audit'))
+        r.set('church_id', churchId)
+        r.set('event', event)
+        r.set('detail', String(detail || '').slice(0, 300))
+        r.set('ip', ip)
+        r.set('user_name', userName)
+        $app.save(r)
+      } catch (err) {
+        $app.logger().warn('bank audit failed', 'error', String(err))
+      }
+    }
+    // Aviso por e-mail a cada MASTER da igreja (o e-mail falhar não desfaz a mudança)
+    const notify = (what) => {
+      try {
+        const settings = $app.settings()
+        if (!settings.meta.senderAddress) return
+        const esc = (v) =>
+          String(v || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+        let churchName = ''
+        try {
+          churchName = $app.findRecordById('churches', churchId).getString('name')
+        } catch (_) {}
+        const brt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+        const when =
+          brt.slice(8, 10) + '/' + brt.slice(5, 7) + '/' + brt.slice(0, 4) + ' ' + brt.slice(11, 16)
+        const masters = $app.findRecordsByFilter(
+          'church_members',
+          "church_id = {:c} && role = 'MASTER' && is_active = true",
+          '',
+          50,
+          0,
+          { c: churchId },
+        )
+        for (const m of masters) {
+          let address = ''
+          try {
+            address = $app.findRecordById('users', m.getString('user_id')).getString('email')
+          } catch (_) {}
+          if (!address) continue
+          $app.newMailClient().send(
+            new MailerMessage({
+              from: {
+                address: settings.meta.senderAddress,
+                name: settings.meta.senderName || 'LouvorFlow',
+              },
+              to: [{ address: address }],
+              subject: 'LouvorFlow: ' + what,
+              html:
+                '<div style="font-family:Arial,sans-serif;font-size:15px;color:#1e293b">' +
+                '<p><b>' +
+                esc(what) +
+                '</b></p><p>Igreja: ' +
+                esc(churchName) +
+                '<br>Quem: ' +
+                esc(userName) +
+                '<br>Quando: ' +
+                when +
+                ' (horário de Brasília)<br>IP: ' +
+                esc(ip) +
+                '</p><p>Se não foi você ou alguém da liderança, entre no LouvorFlow, apague as ' +
+                'credenciais em Configurações › Integrações, gere uma chave nova do conector e ' +
+                'peça ao banco um certificado novo.</p></div>',
+            }),
+          )
+        }
+      } catch (err) {
+        $app.logger().warn('bank secrets alert email failed', 'error', String(err))
+      }
+    }
+
+    // Confirma a senha de novo: sessão aberta num computador esquecido não basta
+    const since = new Date(Date.now() - 15 * 60 * 1000).toISOString().replace('T', ' ')
+    const wrong = $app.findRecordsByFilter(
+      'fin_bank_audit',
+      "church_id = {:c} && event = 'SENHA_ERRADA' && created >= {:s}",
+      '',
+      5,
+      0,
+      { c: churchId, s: since },
+    )
+    if (wrong.length >= 5) {
+      return e.json(429, {
+        message: 'Muitas tentativas com senha errada. Espere 15 minutos para tentar de novo.',
+      })
+    }
+    const password = String(body.password || '')
+    if (!password || !e.auth.validatePassword(password)) {
+      const tried = {
+        save: 'ao salvar credencial',
+        delete: 'ao apagar credencial',
+        new_key: 'ao gerar chave do conector',
+        github: 'ao mudar o acesso ao GitHub',
+      }
+      audit('SENHA_ERRADA', tried[action] || action)
+      return e.json(400, {
+        message: 'Senha incorreta. Confirme a sua senha do LouvorFlow para mexer nas credenciais.',
+      })
+    }
+
     let encKey = ''
     try {
       encKey = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
@@ -148,7 +271,6 @@ routerAdd(
       } catch (_) {}
       return {}
     }
-    const userName = e.auth.getString('name') || e.auth.getString('email')
     const nowIso = new Date().toISOString().replace('T', ' ')
     const mask = (s) => {
       const v = String(s || '')
@@ -190,6 +312,9 @@ routerAdd(
         return e.json(404, { message: 'Credencial não encontrada.' })
       }
       $app.delete(rec)
+      const bankName = rec.getString('kind') === 'CORA' ? 'Cora' : 'Bradesco'
+      audit('CREDENCIAL_APAGADA', bankName + ' · ' + rec.getString('environment'))
+      notify('credenciais do ' + bankName + ' apagadas')
       return e.json(200, { success: true })
     }
 
@@ -205,6 +330,8 @@ routerAdd(
       rec.set('summary', summary)
       rec.set('updated_by_name', userName)
       $app.save(rec)
+      audit('CHAVE_NOVA', 'Chave ' + summary.key_prefix + '…')
+      notify('nova chave do conector bancário gerada')
       return e.json(200, { token: token, key_prefix: summary.key_prefix })
     }
 
@@ -238,6 +365,10 @@ routerAdd(
       rec.set('summary', summary)
       rec.set('updated_by_name', userName)
       $app.save(rec)
+      audit('GITHUB', repo ? 'Repositório ' + repo : 'Acesso removido')
+      notify(
+        repo ? 'acesso ao GitHub do conector alterado' : 'acesso ao GitHub do conector removido',
+      )
       return e.json(200, { success: true })
     }
 
@@ -343,6 +474,17 @@ routerAdd(
     })
     rec.set('updated_by_name', userName)
     $app.save(rec)
+    const bankName = kind === 'CORA' ? 'Cora' : 'Bradesco'
+    audit(
+      'CREDENCIAL_SALVA',
+      bankName +
+        ' · ' +
+        environment +
+        (credKey ? ' · ' + credKey : '') +
+        ' · client ID ' +
+        mask(merged.client_id),
+    )
+    notify('credenciais do ' + bankName + ' cadastradas ou alteradas')
     return e.json(200, { success: true, id: rec.id })
   },
   $apis.requireAuth(),

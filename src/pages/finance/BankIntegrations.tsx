@@ -13,6 +13,7 @@ import {
   Landmark,
   Pencil,
   PlugZap,
+  ShieldCheck,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -28,6 +29,7 @@ import {
   saveBankSecret,
 } from '@/services/finance'
 import type {
+  BankAuditEntry,
   BankSecretSet,
   BankSecretsInfo,
   FinBankConnection,
@@ -84,6 +86,75 @@ const shortDate = (s?: string) =>
         timeStyle: 'short',
       })
     : ''
+
+const AUDIT_LABEL: Record<BankAuditEntry['event'], string> = {
+  CREDENCIAL_SALVA: 'Credencial salva',
+  CREDENCIAL_APAGADA: 'Credencial apagada',
+  CHAVE_NOVA: 'Chave nova do conector',
+  GITHUB: 'Acesso ao GitHub',
+  CONECTOR_LEU: 'Conector buscou',
+  CHAVE_INVALIDA: 'Chave do conector errada',
+  SENHA_ERRADA: 'Senha errada',
+}
+
+/**
+ * Pede a senha do LouvorFlow de novo antes de mexer nas credenciais dos bancos.
+ * ask() devolve a senha digitada, ou null se a pessoa cancelar.
+ */
+function usePasswordPrompt() {
+  const [pending, setPending] = useState<((v: string | null) => void) | null>(null)
+  const [password, setPassword] = useState('')
+  const ask = () =>
+    new Promise<string | null>((resolve) => {
+      setPassword('')
+      setPending(() => resolve)
+    })
+  const finish = (v: string | null) => {
+    pending?.(v)
+    setPending(null)
+    setPassword('')
+  }
+  const dialog = (
+    <Dialog open={!!pending} onOpenChange={(o) => !o && finish(null)}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-teal-700" /> Confirme a sua senha
+          </DialogTitle>
+          <DialogDescription>
+            Para mexer nas credenciais do banco, digite de novo a sua senha do LouvorFlow. Os
+            MASTERs da igreja recebem um aviso por e-mail.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (password) finish(password)
+          }}
+          className="space-y-4"
+        >
+          <Input
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            aria-label="Sua senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => finish(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={!password} className="bg-teal-700 hover:bg-teal-800">
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+  return { ask, dialog }
+}
 
 /** Lê um arquivo de certificado ou chave; .cer/.der binário vira PEM. */
 async function readPem(file: File, kind: 'cert' | 'key') {
@@ -183,12 +254,14 @@ function CredentialDialog({
   churchId,
   initial,
   editing,
+  askPassword,
   onClose,
   onSaved,
 }: {
   churchId: string
   initial: FormState
   editing: BankSecretSet | null
+  askPassword: () => Promise<string | null>
   onClose: () => void
   onSaved: () => void
 }) {
@@ -201,17 +274,23 @@ function CredentialDialog({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const password = await askPassword()
+    if (!password) return
     setSaving(true)
     try {
-      await saveBankSecret(churchId, {
-        kind: form.kind,
-        environment: form.environment,
-        credential_key: form.credential_key,
-        client_id: form.client_id.trim(),
-        client_secret: form.client_secret.trim(),
-        cert: form.cert.trim(),
-        key: form.key.trim(),
-      })
+      await saveBankSecret(
+        churchId,
+        {
+          kind: form.kind,
+          environment: form.environment,
+          credential_key: form.credential_key,
+          client_id: form.client_id.trim(),
+          client_secret: form.client_secret.trim(),
+          cert: form.cert.trim(),
+          key: form.key.trim(),
+        },
+        password,
+      )
       toast({ title: `Credenciais do ${bank.name} salvas` })
       onSaved()
     } catch (err) {
@@ -369,6 +448,7 @@ function CopyLine({ label, value }: { label: string; value: string }) {
 export function BankIntegrations({ churchId, isMaster }: { churchId: string; isMaster: boolean }) {
   const { toast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
+  const { ask: askPassword, dialog: passwordDialog } = usePasswordPrompt()
   const [info, setInfo] = useState<BankSecretsInfo | null>(null)
   const [connections, setConnections] = useState<FinBankConnection[]>([])
   const [error, setError] = useState('')
@@ -440,8 +520,10 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
       confirmLabel: 'Apagar',
       destructive: true,
       onConfirm: async () => {
+        const password = await askPassword()
+        if (!password) return
         try {
-          await deleteBankSecret(churchId, s.id)
+          await deleteBankSecret(churchId, s.id, password)
           load()
         } catch (err) {
           toast({
@@ -454,8 +536,10 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
     })
   const generateKey = () => {
     const run = async () => {
+      const password = await askPassword()
+      if (!password) return
       try {
-        const res = await newBankConnectorKey(churchId)
+        const res = await newBankConnectorKey(churchId, password)
         setNewKey(res.token)
         load()
       } catch (err) {
@@ -479,8 +563,10 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
   const saveGithub = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!github) return
+    const password = await askPassword()
+    if (!password) return
     try {
-      await saveBankGithub(churchId, github.repo.trim(), github.token.trim() || undefined)
+      await saveBankGithub(churchId, password, github.repo.trim(), github.token.trim() || undefined)
       setGithub(null)
       toast({
         title: github.repo.trim() ? 'Acesso ao GitHub salvo' : 'Acesso ao GitHub removido',
@@ -718,11 +804,46 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
         </div>
       </div>
 
+      {isMaster && info.audit && info.audit.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <ShieldCheck className="h-4 w-4 text-teal-700" /> Registro de segurança
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Quem mexeu nas credenciais e quando o conector as usou. Algo que você não reconhece?
+            Apague as credenciais, gere uma chave nova e peça ao banco um certificado novo.
+          </p>
+          <ul className="mt-3 divide-y divide-slate-100 text-xs">
+            {info.audit.slice(0, 15).map((a) => (
+              <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
+                <span className="w-28 shrink-0 tabular-nums text-slate-400">
+                  {shortDate(a.created)}
+                </span>
+                <span
+                  className={
+                    a.event === 'SENHA_ERRADA' || a.event === 'CHAVE_INVALIDA'
+                      ? 'font-semibold text-red-700'
+                      : 'font-semibold text-slate-800'
+                  }
+                >
+                  {AUDIT_LABEL[a.event] || a.event}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-slate-500">
+                  {[a.user_name, a.detail].filter(Boolean).join(' · ')}
+                </span>
+                <span className="text-slate-400">{a.ip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {dialog && (
         <CredentialDialog
           churchId={churchId}
           initial={dialog.form}
           editing={dialog.editing}
+          askPassword={askPassword}
           onClose={() => setDialog(null)}
           onSaved={() => {
             setDialog(null)
@@ -808,6 +929,7 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
         </DialogContent>
       </Dialog>
       {confirmDialog}
+      {passwordDialog}
     </section>
   )
 }

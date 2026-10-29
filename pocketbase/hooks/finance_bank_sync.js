@@ -31,6 +31,20 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
   // gerada na tela de Integrações vale só para a igreja que a gerou (o banco guarda o hash)
   const given = e.request.header.get('x-bank-sync-token') || ''
   const expected = $os.getenv('BANK_SYNC_TOKEN') || ''
+  // Chave errada fica registrada pelo IP; 10 erros em 15 minutos bloqueiam o IP
+  const ip = e.realIP()
+  const since = new Date(Date.now() - 15 * 60 * 1000).toISOString().replace('T', ' ')
+  const fails = $app.findRecordsByFilter(
+    'fin_bank_audit',
+    "event = 'CHAVE_INVALIDA' && ip = {:ip} && created >= {:s}",
+    '',
+    10,
+    0,
+    { ip: ip, s: since },
+  )
+  if (fails.length >= 10) {
+    return e.json(429, { message: 'Muitas tentativas com chave inválida. Espere 15 minutos.' })
+  }
   let scope = null
   // Comparação em tempo constante, para o tempo de resposta não revelar o token
   if (expected.length >= 32 && $security.equal(given, expected)) scope = '*'
@@ -43,7 +57,16 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
         .getString('church_id')
     } catch (_) {}
   }
-  if (!scope) return e.json(401, { message: 'Chave do conector inválida.' })
+  if (!scope) {
+    try {
+      const bad = new Record($app.findCollectionByNameOrId('fin_bank_audit'))
+      bad.set('event', 'CHAVE_INVALIDA')
+      bad.set('ip', ip)
+      bad.set('detail', e.request.url.path)
+      $app.save(bad)
+    } catch (_) {}
+    return e.json(401, { message: 'Chave do conector inválida.' })
+  }
   const ymd = (ms) => new Date(ms).toISOString().slice(0, 10)
   const day = 24 * 60 * 60 * 1000
   // Dia de hoje no horário de Brasília
@@ -178,6 +201,22 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
       history: history,
     })
   }
+  // Cada entrega de credenciais ao conector fica no registro de segurança da igreja
+  const delivered = {}
+  for (const c of out) {
+    if (c.credentials) delivered[c.church_id] = (delivered[c.church_id] || 0) + 1
+  }
+  for (const church in delivered) {
+    try {
+      const log = new Record($app.findCollectionByNameOrId('fin_bank_audit'))
+      log.set('church_id', church)
+      log.set('event', 'CONECTOR_LEU')
+      log.set('ip', ip)
+      log.set('user_name', 'Conector bancário')
+      log.set('detail', 'Credenciais de ' + delivered[church] + ' conta(s)')
+      $app.save(log)
+    } catch (_) {}
+  }
   return e.json(200, { connections: out })
 })
 
@@ -186,6 +225,20 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   // gerada na tela de Integrações vale só para a igreja que a gerou (o banco guarda o hash)
   const given = e.request.header.get('x-bank-sync-token') || ''
   const expected = $os.getenv('BANK_SYNC_TOKEN') || ''
+  // Chave errada fica registrada pelo IP; 10 erros em 15 minutos bloqueiam o IP
+  const ip = e.realIP()
+  const since = new Date(Date.now() - 15 * 60 * 1000).toISOString().replace('T', ' ')
+  const fails = $app.findRecordsByFilter(
+    'fin_bank_audit',
+    "event = 'CHAVE_INVALIDA' && ip = {:ip} && created >= {:s}",
+    '',
+    10,
+    0,
+    { ip: ip, s: since },
+  )
+  if (fails.length >= 10) {
+    return e.json(429, { message: 'Muitas tentativas com chave inválida. Espere 15 minutos.' })
+  }
   let scope = null
   // Comparação em tempo constante, para o tempo de resposta não revelar o token
   if (expected.length >= 32 && $security.equal(given, expected)) scope = '*'
@@ -198,7 +251,16 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         .getString('church_id')
     } catch (_) {}
   }
-  if (!scope) return e.json(401, { message: 'Chave do conector inválida.' })
+  if (!scope) {
+    try {
+      const bad = new Record($app.findCollectionByNameOrId('fin_bank_audit'))
+      bad.set('event', 'CHAVE_INVALIDA')
+      bad.set('ip', ip)
+      bad.set('detail', e.request.url.path)
+      $app.save(bad)
+    } catch (_) {}
+    return e.json(401, { message: 'Chave do conector inválida.' })
+  }
   const body = e.requestInfo().body || {}
   let conn = null
   try {
