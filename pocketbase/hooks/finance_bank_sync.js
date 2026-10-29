@@ -8,13 +8,19 @@
 // As credenciais dos bancos cadastradas na mesma tela (fin_bank_secrets, cifradas) seguem
 // para o conector junto com cada conta; sem elas ele usa as próprias variáveis de ambiente.
 //
-// GET  /backend/v1/finance/bank-sync/connections     (conector) contas ativas e o período a buscar
+// GET  /backend/v1/finance/bank-sync/connections     (conector) contas ativas e o período a buscar;
+//      com histórico pedido, também history: { from: 'YYYY-MM-DD' ou '' (o máximo), before }
+//      (o conector busca de before para trás, em partes, até from)
 // POST /backend/v1/finance/bank-sync/push            (conector) entrega o resultado de uma conta:
 //      { connection_id, ok: true, balance_cents?, available_cents?, balance_at?,
 //        start_date, end_date, lines: [{ id, date: 'YYYY-MM-DD', amount_cents, description }] }
 //      { connection_id, ok: false, error }
+//      { connection_id, ok: true, history: true, start_date, end_date, history_done?, lines }
+//      (uma parte do histórico: não mexe no saldo nem na situação da última busca)
 //      Grava os movimentos novos como linhas do extrato (o id do banco vira o FITID) e, quando
 //      a conexão permite, concilia sozinho o movimento que tem um único lançamento igual.
+//      Conta "só para ver o extrato" (purpose VISUALIZAR), ou movimento anterior a
+//      reconcile_from, entra como EXTRATO: aparece no extrato e fica fora da conciliação.
 // POST /backend/v1/finance/bank-sync/request         (usuário do financeiro) "Atualizar agora":
 //      { church_id } marca as conexões da igreja e, se houver acesso ao GitHub (variáveis
 //      BANK_SYNC_GITHUB_TOKEN e BANK_SYNC_GITHUB_REPO ou o cadastrado na tela de Integrações),
@@ -144,6 +150,15 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
     const from = last
       ? ymd(new Date(last.slice(0, 10) + 'T12:00:00Z').getTime() - 5 * day)
       : ymd(now - initial * day)
+    // Histórico pedido (desde uma data ou o máximo) e ainda não terminado
+    const target = c.getBool('history_max') ? 'MAX' : c.getString('history_from').slice(0, 10)
+    let history = null
+    if (target && c.getString('history_done_for') !== target) {
+      const before = c.getString('history_loaded_from').slice(0, 10) || from
+      if (target === 'MAX' || before > target) {
+        history = { from: target === 'MAX' ? '' : target, before: before }
+      }
+    }
     const cred = credentialsFor(c)
     out.push({
       id: c.id,
@@ -160,6 +175,7 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
       credentials_problem: cred.problem,
       from: from,
       to: ymd(now),
+      history: history,
     })
   }
   return e.json(200, { connections: out })
@@ -221,7 +237,14 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   const churchId = conn.getString('church_id')
   const accountId = conn.getString('account_id')
   const prefix = 'api:' + provider.toLowerCase() + ':'
-  const hasBalance = body.balance_cents !== null && Number.isInteger(Number(body.balance_cents))
+  const isHistory = body.history === true
+  const hasBalance =
+    !isHistory && body.balance_cents !== null && Number.isInteger(Number(body.balance_cents))
+  // Só no extrato: conta para ver o extrato ou movimento antes do início da conciliação
+  const viewOnly = conn.getString('purpose') === 'VISUALIZAR'
+  const reconcileFrom = conn.getString('reconcile_from').slice(0, 10)
+  const statusFor = (ymd) =>
+    viewOnly || (reconcileFrom && ymd < reconcileFrom) ? 'EXTRATO' : 'PENDENTE'
 
   let created = 0
   let skipped = 0
@@ -270,7 +293,7 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           imp = new Record(txApp.findCollectionByNameOrId('fin_bank_imports'))
           imp.set('church_id', churchId)
           imp.set('account_id', accountId)
-          imp.set('file_name', 'API ' + label)
+          imp.set('file_name', 'API ' + label + (isHistory ? ' (histórico)' : ''))
           if (isYmd(body.start_date)) imp.set('start_date', pbDate(body.start_date))
           if (isYmd(body.end_date)) imp.set('end_date', pbDate(body.end_date))
           if (hasBalance) {
@@ -289,9 +312,9 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         rec.set('date', pbDate(l.date))
         rec.set('amount_cents', amount)
         rec.set('description', String(l.description || 'Movimento').slice(0, 500))
-        rec.set('status', 'PENDENTE')
+        rec.set('status', statusFor(l.date))
         txApp.save(rec)
-        newLines.push(rec)
+        if (rec.getString('status') === 'PENDENTE') newLines.push(rec)
         created++
       }
       if (imp) {
@@ -359,6 +382,39 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       }
 
       const fresh = txApp.findRecordById('fin_bank_connections', conn.id)
+      // Até onde o extrato já foi buscado; o histórico termina quando chega na data pedida
+      // ou quando o conector avisa que o banco não tem nada mais antigo
+      const target = fresh.getBool('history_max')
+        ? 'MAX'
+        : fresh.getString('history_from').slice(0, 10)
+      const loaded = fresh.getString('history_loaded_from').slice(0, 10)
+      if (isYmd(body.start_date) && (!loaded || body.start_date < loaded)) {
+        fresh.set('history_loaded_from', pbDate(body.start_date))
+      }
+      const reached = fresh.getString('history_loaded_from').slice(0, 10)
+      if (
+        target &&
+        ((isHistory && body.history_done === true) ||
+          (target !== 'MAX' && reached && reached <= target))
+      ) {
+        fresh.set('history_done_for', target)
+      }
+      if (target === 'MAX' && isHistory && body.history_done === true) {
+        // Mostra na tela a data do movimento mais antigo, não a da última parte vazia
+        const oldest = txApp.findRecordsByFilter(
+          'fin_bank_lines',
+          'account_id = {:a}',
+          'date',
+          1,
+          0,
+          { a: accountId },
+        )
+        if (oldest.length) fresh.set('history_loaded_from', oldest[0].getString('date'))
+      }
+      if (isHistory) {
+        txApp.save(fresh)
+        return
+      }
       fresh.set('last_sync_at', nowIso)
       fresh.set('last_status', 'OK')
       fresh.set('last_error', '')
@@ -474,3 +530,36 @@ routerAdd(
   },
   $apis.requireAuth(),
 )
+
+// A conexão passou a conciliar (ou mudou a data de início da conciliação): os movimentos que
+// vieram da API passam de "só no extrato" para "a conciliar" e vice-versa. Conciliados,
+// ignorados e os que vieram de arquivo OFX não mudam.
+onRecordUpdateRequest((e) => {
+  const old = e.record.original()
+  const changed =
+    old.getString('purpose') !== e.record.getString('purpose') ||
+    old.getString('reconcile_from') !== e.record.getString('reconcile_from')
+  e.next()
+  if (!changed) return
+  const conn = e.record
+  const viewOnly = conn.getString('purpose') === 'VISUALIZAR'
+  const reconcileFrom = conn.getString('reconcile_from').slice(0, 10)
+  const statusFor = (ymd) =>
+    viewOnly || (reconcileFrom && ymd < reconcileFrom) ? 'EXTRATO' : 'PENDENTE'
+  e.app.runInTransaction((txApp) => {
+    const lines = txApp.findRecordsByFilter(
+      'fin_bank_lines',
+      "account_id = {:a} && (status = 'PENDENTE' || status = 'EXTRATO') && fitid ~ 'api:%'",
+      '',
+      0,
+      0,
+      { a: conn.getString('account_id') },
+    )
+    for (const l of lines) {
+      const next = statusFor(l.getString('date').slice(0, 10))
+      if (l.getString('status') === next) continue
+      l.set('status', next)
+      txApp.save(l)
+    }
+  })
+}, 'fin_bank_connections')

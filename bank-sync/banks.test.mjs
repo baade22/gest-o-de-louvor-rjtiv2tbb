@@ -1,6 +1,7 @@
 // Roda junto com os testes do site (vitest)
 import { expect, test } from 'vitest'
 import {
+  backfill,
   bradescoBalance,
   bradescoError,
   bradescoLines,
@@ -178,4 +179,86 @@ test('saldo do Bradesco', () => {
       },
     }),
   ).toEqual({ balance_cents: -1000, available_cents: -1000 })
+})
+
+const fakeBank = (oldest, fail = {}) => ({
+  calls: [],
+  async statement(from, to) {
+    this.calls.push([from, to])
+    if (fail[from]) {
+      const f = fail[from].shift()
+      if (f) throw Object.assign(new Error('falhou'), { status: f })
+    }
+    return to < oldest ? [] : [{ id: from, date: to, amount_cents: 100, description: 'x' }]
+  },
+})
+const noWait = { log: () => {}, wait: async () => {} }
+
+test('histórico até a data pedida, em partes de 3 meses, do mais novo para o mais antigo', async () => {
+  const bank = fakeBank('2000-01-01')
+  const pushes = []
+  const res = await backfill(
+    { id: 'c1', history: { from: '2026-01-01', before: '2026-10-01' } },
+    bank,
+    async (b) => pushes.push(b),
+    noWait,
+  )
+  expect(res.done).toBe(true)
+  expect(bank.calls[0]).toEqual(['2026-07-01', '2026-09-30'])
+  expect(bank.calls.at(-1)[0]).toBe('2026-01-01')
+  expect(pushes.at(-1)).toMatchObject({
+    history: true,
+    history_done: true,
+    start_date: '2026-01-01',
+  })
+  expect(pushes.slice(0, -1).every((p) => p.history_done === false)).toBe(true)
+})
+
+test('o máximo para depois de um ano sem movimentos', async () => {
+  const bank = fakeBank('2024-03-01')
+  const pushes = []
+  const res = await backfill(
+    { id: 'c1', history: { from: '', before: '2026-10-01' } },
+    bank,
+    async (b) => pushes.push(b),
+    noWait,
+  )
+  expect(res.done).toBe(true)
+  const empties = pushes.filter((p) => p.lines.length === 0)
+  expect(empties).toHaveLength(4)
+  expect(pushes.at(-1).history_done).toBe(true)
+})
+
+test('período recusado pelo banco encerra; instabilidade tenta de novo', async () => {
+  const pushes = []
+  const refused = fakeBank('2000-01-01', { '2026-07-01': [400] })
+  let res = await backfill(
+    { id: 'c1', history: { from: '', before: '2026-10-01' } },
+    refused,
+    async (b) => pushes.push(b),
+    noWait,
+  )
+  expect(res.done).toBe(true)
+  expect(pushes).toEqual([
+    { connection_id: 'c1', ok: true, history: true, history_done: true, lines: [] },
+  ])
+
+  const flaky = fakeBank('2000-01-01', { '2026-07-01': [503] })
+  res = await backfill(
+    { id: 'c1', history: { from: '2026-07-01', before: '2026-10-01' } },
+    flaky,
+    async () => {},
+    noWait,
+  )
+  expect(res.done).toBe(true)
+  expect(flaky.calls).toHaveLength(2)
+
+  const down = fakeBank('2000-01-01', { '2026-07-01': [503, 503] })
+  res = await backfill(
+    { id: 'c1', history: { from: '2026-01-01', before: '2026-10-01' } },
+    down,
+    async () => {},
+    noWait,
+  )
+  expect(res.done).toBe(false)
 })

@@ -16,6 +16,20 @@ LouvorFlow (PocketBase) não consegue enviar certificado nas chamadas que faz. E
   já tiver vindo por um arquivo OFX) e concilia sozinho quando há um único lançamento com o
   mesmo valor e sentido em até 3 dias.
 
+## Histórico e conta "só para ver"
+
+Na conexão de cada conta (Financeiro › Saldos e extratos › Conexão):
+
+- **O que fazer com o extrato**: "Visualizar e conciliar" (os movimentos entram na
+  Conciliação) ou "Só visualizar" (aparecem no extrato, sem pendência). Em "Conciliar a partir
+  de", os movimentos mais antigos que a data ficam só no extrato. Trocar a opção move os
+  movimentos que vieram da API e ainda não foram conciliados nem ignorados.
+- **Histórico do extrato**: desde uma data ou tudo o que o banco tiver. A cada rodada o
+  conector busca até 24 partes de 3 meses, do mais novo para o mais antigo, e entrega cada
+  parte na hora; o que faltar continua na rodada seguinte. "Tudo" termina depois de um ano
+  seguido sem movimentos ou quando o banco recusa o período. A Cora não documenta um limite de
+  período; o Bradesco consulta até 1 ano por vez.
+
 ## O que cada banco pede
 
 | | Cora | Bradesco |
