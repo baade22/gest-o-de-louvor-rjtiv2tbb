@@ -742,36 +742,44 @@ export async function getBankSecrets(churchId: string): Promise<BankSecretsInfo>
   return pb.send('/backend/v1/finance/bank-secrets', { query: { church_id: churchId } })
 }
 
-export async function saveBankSecret(churchId: string, input: BankSecretInput) {
+// Toda mudança nas credenciais dos bancos pede a senha do MASTER de novo (password)
+export async function saveBankSecret(churchId: string, input: BankSecretInput, password: string) {
   return pb.send('/backend/v1/finance/bank-secrets', {
     method: 'POST',
-    body: { church_id: churchId, action: 'save', ...input },
+    body: { church_id: churchId, action: 'save', password, ...input },
   })
 }
 
-export async function deleteBankSecret(churchId: string, id: string) {
+export async function deleteBankSecret(churchId: string, id: string, password: string) {
   return pb.send('/backend/v1/finance/bank-secrets', {
     method: 'POST',
-    body: { church_id: churchId, action: 'delete', id },
+    body: { church_id: churchId, action: 'delete', id, password },
   })
 }
 
 /** Gera a chave do conector; ela só aparece nesta resposta. */
 export async function newBankConnectorKey(
   churchId: string,
+  password: string,
 ): Promise<{ token: string; key_prefix: string }> {
   return pb.send('/backend/v1/finance/bank-secrets', {
     method: 'POST',
-    body: { church_id: churchId, action: 'new_key' },
+    body: { church_id: churchId, action: 'new_key', password },
   })
 }
 
-export async function saveBankGithub(churchId: string, githubRepo: string, githubToken?: string) {
+export async function saveBankGithub(
+  churchId: string,
+  password: string,
+  githubRepo: string,
+  githubToken?: string,
+) {
   return pb.send('/backend/v1/finance/bank-secrets', {
     method: 'POST',
     body: {
       church_id: churchId,
       action: 'github',
+      password,
       github_repo: githubRepo,
       github_token: githubToken,
     },
