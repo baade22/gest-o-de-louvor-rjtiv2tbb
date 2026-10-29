@@ -255,7 +255,7 @@ export default function FinanceBalances() {
         title: res.dispatched ? 'Buscando nos bancos' : 'Atualização pedida',
         description: res.dispatched
           ? 'Os saldos e movimentos novos aparecem aqui em instantes.'
-          : 'O conector busca na próxima rodada agendada (de 2 em 2 horas).',
+          : 'Ainda não há acesso ao GitHub para buscar na hora: o MASTER cadastra em Configurações › Integrações › Conector bancário. Até lá, a busca fica para a próxima rodada agendada.',
       })
       load(true)
     } catch (err) {

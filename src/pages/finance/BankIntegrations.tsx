@@ -745,7 +745,12 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Conector bancário</h3>
-              <p className="text-xs font-medium text-slate-400">Roda no GitHub, de 2 em 2 horas</p>
+              <p className="text-xs font-medium text-slate-400">
+                Roda no GitHub,{' '}
+                {info.connector.has_github_token || info.server_github
+                  ? 'de hora em hora (7h às 22h)'
+                  : 'de 2 em 2 horas'}
+              </p>
             </div>
             <p className="text-xs leading-relaxed text-slate-600">
               Os bancos exigem certificado em cada chamada, então quem busca saldo e extrato é o
@@ -883,7 +888,8 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
             <DialogTitle>Botão "Atualizar agora"</DialogTitle>
             <DialogDescription>
               Opcional. Com acesso ao GitHub, o botão em Saldos e extratos roda o conector na hora.
-              Sem ele, a busca acontece na próxima rodada agendada.
+              Com ele, o servidor também roda o conector de hora em hora, das 7h às 22h. Sem ele,
+              fica só o agendamento do GitHub, que às vezes atrasa ou pula rodadas.
             </DialogDescription>
           </DialogHeader>
           {github && (
