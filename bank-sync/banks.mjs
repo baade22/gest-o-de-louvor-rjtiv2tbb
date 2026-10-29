@@ -225,3 +225,19 @@ export async function backfill(conn, bank, push, { log = console.log, wait = sle
   log(`histórico buscado até ${shiftDays(end, 1)}; continua na próxima rodada.`)
   return { total, done: false }
 }
+
+/**
+ * Divide o período (YYYY-MM-DD, os dois dias incluídos) em partes de até `days` dias, sem
+ * sobrar parte de um dia só: a Cora pede o fim depois do início.
+ */
+export function splitPeriod(from, to, days) {
+  const parts = []
+  let start = from
+  while (start <= to) {
+    let end = shiftDays(start, days - 1)
+    if (end >= to || shiftDays(end, 1) === to) end = to
+    parts.push([start, end === start ? shiftDays(end, 1) : end])
+    start = shiftDays(end, 1)
+  }
+  return parts
+}

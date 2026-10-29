@@ -2,6 +2,7 @@
 import { expect, test } from 'vitest'
 import {
   backfill,
+  splitPeriod,
   bradescoBalance,
   bradescoError,
   bradescoLines,
@@ -261,4 +262,14 @@ test('período recusado pelo banco encerra; instabilidade tenta de novo', async 
     noWait,
   )
   expect(res.done).toBe(false)
+})
+
+test('período longo vira partes de até 31 dias, sem parte de um dia só', () => {
+  const parts = splitPeriod('2025-11-02', '2026-10-28', 31)
+  expect(parts[0]).toEqual(['2025-11-02', '2025-12-02'])
+  expect(parts.at(-1)[1]).toBe('2026-10-28')
+  expect(parts.every(([a, b]) => a < b)).toBe(true)
+  for (let i = 1; i < parts.length; i++) expect(parts[i][0] > parts[i - 1][1]).toBe(true)
+  expect(splitPeriod('2026-10-01', '2026-11-01', 31)).toEqual([['2026-10-01', '2026-11-01']])
+  expect(splitPeriod('2026-10-28', '2026-10-28', 31)).toEqual([['2026-10-28', '2026-10-29']])
 })
