@@ -625,3 +625,59 @@ onRecordUpdateRequest((e) => {
     }
   })
 }, 'fin_bank_connections')
+
+// O agendamento do GitHub Actions atrasa ou pula rodadas quando o GitHub está cheio. Com o
+// acesso ao GitHub cadastrado (Integrações ou variáveis BANK_SYNC_GITHUB_*), o próprio servidor
+// dispara o conector de hora em hora, das 7h às 22h no horário de Brasília (10h às 1h UTC).
+// O agendamento do GitHub continua valendo como reserva.
+cronAdd('bank_sync_dispatch', '40 0,1,10-23 * * *', () => {
+  const targets = {}
+  const envToken = $os.getenv('BANK_SYNC_GITHUB_TOKEN') || ''
+  const envRepo = $os.getenv('BANK_SYNC_GITHUB_REPO') || ''
+  if (envToken && envRepo) targets[envRepo] = envToken
+  const k = $os.getenv('LOUVORFLOW_CREDENTIALS_KEY') || ''
+  if (k.length === 32) {
+    const recs = $app.findRecordsByFilter('fin_bank_secrets', "kind = 'CONECTOR'", '', 100, 0)
+    for (const rec of recs) {
+      // Só igrejas com alguma conta ligada ao banco
+      const conns = $app.findRecordsByFilter(
+        'fin_bank_connections',
+        'church_id = {:c} && enabled = true',
+        '',
+        1,
+        0,
+        { c: rec.getString('church_id') },
+      )
+      if (!conns.length) continue
+      try {
+        const d = JSON.parse(rec.getString('data') || 'null')
+        if (!d || d.enc !== 'v1') continue
+        const v = JSON.parse($security.decrypt(d.data, k)) || {}
+        if (v.github_token && v.github_repo && !targets[v.github_repo]) {
+          targets[v.github_repo] = v.github_token
+        }
+      } catch (_) {}
+    }
+  }
+  // Um disparo por repositório: uma rodada do conector busca todas as contas
+  for (const repo in targets) {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) continue
+    try {
+      const res = $http.send({
+        method: 'POST',
+        url: 'https://api.github.com/repos/' + repo + '/actions/workflows/bank-sync.yml/dispatches',
+        headers: {
+          Authorization: 'Bearer ' + targets[repo],
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'louvorflow',
+        },
+        body: JSON.stringify({ ref: $os.getenv('BANK_SYNC_GITHUB_REF') || 'main' }),
+        timeout: 15,
+      })
+      if (res.statusCode !== 204) console.log('bank-sync cron: GitHub respondeu ' + res.statusCode)
+    } catch (err) {
+      console.log('bank-sync cron: não foi possível disparar o conector: ' + err)
+    }
+  }
+})
