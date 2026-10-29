@@ -423,6 +423,8 @@ export interface BankSecretsInfo {
   /** O servidor tem BANK_SYNC_GITHUB_TOKEN e BANK_SYNC_GITHUB_REPO. */
   server_github: boolean
   sets: BankSecretSet[]
+  /** Registro de segurança: mudanças, entregas ao conector e senhas erradas (mais novo antes). */
+  audit?: BankAuditEntry[]
   connector: {
     has_key: boolean
     key_prefix?: string
@@ -431,6 +433,22 @@ export interface BankSecretsInfo {
     has_github_token: boolean
     updated_by_name?: string
   }
+}
+
+export interface BankAuditEntry {
+  id: string
+  event:
+    | 'CREDENCIAL_SALVA'
+    | 'CREDENCIAL_APAGADA'
+    | 'CHAVE_NOVA'
+    | 'GITHUB'
+    | 'CONECTOR_LEU'
+    | 'CHAVE_INVALIDA'
+    | 'SENHA_ERRADA'
+  detail: string
+  ip: string
+  user_name: string
+  created: string
 }
 
 export interface BankSecretInput {
