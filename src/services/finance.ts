@@ -490,7 +490,15 @@ export async function deleteBankConnection(id: string) {
 }
 
 /** "Atualizar agora": pede ao conector bancário uma busca fora do horário agendado. */
-export async function requestBankSync(churchId: string): Promise<{ dispatched: boolean }> {
+export type BankSyncRequestResult = {
+  dispatched: boolean
+  /** Por que não disparou: sem acesso cadastrado, GitHub recusou (status) ou falha de rede. */
+  reason?: 'SEM_ACESSO' | 'GITHUB' | 'ERRO'
+  status?: number
+  message?: string
+}
+
+export async function requestBankSync(churchId: string): Promise<BankSyncRequestResult> {
   return pb.send('/backend/v1/finance/bank-sync/request', {
     method: 'POST',
     body: { church_id: churchId },
