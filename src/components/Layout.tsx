@@ -33,6 +33,7 @@ import {
   CalendarClock,
   Coins,
   Landmark,
+  ReceiptText,
   LockKeyhole,
   Contact,
   Cake,
@@ -196,6 +197,12 @@ export default function Layout() {
           to: '/financeiro/conciliacao',
           label: 'Conciliação bancária',
           icon: Landmark,
+          allowed: fin('conciliacao'),
+        },
+        {
+          to: '/financeiro/comprovantes',
+          label: 'Comprovantes',
+          icon: ReceiptText,
           allowed: fin('conciliacao'),
         },
         {
