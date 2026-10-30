@@ -565,7 +565,7 @@ routerAdd(
     }
     if (!token || !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
       // Sem disparo remoto: o conector pega o pedido na próxima rodada agendada
-      return e.json(200, { dispatched: false })
+      return e.json(200, { dispatched: false, reason: 'SEM_ACESSO' })
     }
     try {
       const res = $http.send({
@@ -582,11 +582,21 @@ routerAdd(
       })
       if (res.statusCode !== 204) {
         console.log('bank-sync: GitHub respondeu ' + res.statusCode)
-        return e.json(200, { dispatched: false })
+        // O motivo vai para a tela, para o MASTER saber o que corrigir no token
+        let ghMessage = ''
+        try {
+          ghMessage = String((res.json && res.json.message) || '').slice(0, 200)
+        } catch (_) {}
+        return e.json(200, {
+          dispatched: false,
+          reason: 'GITHUB',
+          status: res.statusCode,
+          message: ghMessage,
+        })
       }
     } catch (err) {
       console.log('bank-sync: não foi possível disparar o conector: ' + err)
-      return e.json(200, { dispatched: false })
+      return e.json(200, { dispatched: false, reason: 'ERRO' })
     }
     return e.json(200, { dispatched: true })
   },

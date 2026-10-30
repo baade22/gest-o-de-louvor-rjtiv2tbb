@@ -28,6 +28,9 @@ import type {
   FinSigner,
   FinSupplier,
   FinTransaction,
+  FinReceipt,
+  FinReceiptSender,
+  FinReceiptsStatus,
   Person,
 } from '@/types/finance'
 
@@ -490,7 +493,15 @@ export async function deleteBankConnection(id: string) {
 }
 
 /** "Atualizar agora": pede ao conector bancário uma busca fora do horário agendado. */
-export async function requestBankSync(churchId: string): Promise<{ dispatched: boolean }> {
+export type BankSyncRequestResult = {
+  dispatched: boolean
+  /** Por que não disparou: sem acesso cadastrado, GitHub recusou (status) ou falha de rede. */
+  reason?: 'SEM_ACESSO' | 'GITHUB' | 'ERRO'
+  status?: number
+  message?: string
+}
+
+export async function requestBankSync(churchId: string): Promise<BankSyncRequestResult> {
   return pb.send('/backend/v1/finance/bank-sync/request', {
     method: 'POST',
     body: { church_id: churchId },
@@ -784,4 +795,54 @@ export async function saveBankGithub(
       github_token: githubToken,
     },
   })
+}
+
+// ---- Comprovantes pelo WhatsApp ----
+
+const receipts = <T>(churchId: string, action: string, body: Record<string, unknown> = {}) =>
+  pb.send<T>('/backend/v1/finance/receipts', {
+    method: 'POST',
+    body: { church_id: churchId, action, ...body },
+  })
+
+export const receiptsStatus = (churchId: string) => receipts<FinReceiptsStatus>(churchId, 'status')
+
+export const listReceipts = (
+  churchId: string,
+  filter: 'conferir' | 'andamento' | 'concluidos' | '',
+  page = 1,
+) => receipts<{ items: FinReceipt[]; has_more: boolean }>(churchId, 'list', { filter, page })
+
+export const listReceiptSenders = (churchId: string) =>
+  receipts<{ items: FinReceiptSender[] }>(churchId, 'senders').then((r) => r.items)
+
+export const saveReceiptSender = (
+  churchId: string,
+  input: { id?: string; name: string; phone: string; is_active?: boolean },
+) => receipts<{ id: string }>(churchId, 'sender_save', input)
+
+export const deleteReceiptSender = (churchId: string, id: string) =>
+  receipts(churchId, 'sender_delete', { id })
+
+/** Liga o comprovante a um movimento do extrato; o servidor concilia em instantes. */
+export const chooseReceiptLine = (
+  churchId: string,
+  id: string,
+  lineId: string,
+  categoryId: string,
+) => receipts(churchId, 'choose', { id, line_id: lineId, category_id: categoryId })
+
+export const discardReceipt = (churchId: string, id: string) =>
+  receipts(churchId, 'discard', { id })
+
+export const retryReceipt = (churchId: string, id: string) => receipts(churchId, 'retry', { id })
+
+/** Arquivo do comprovante como endereço local (a rota pede o login no cabeçalho). */
+export async function receiptFileUrl(id: string) {
+  const res = await fetch(
+    `${pb.baseURL.replace(/\/$/, '')}/backend/v1/finance/receipts/${id}/file`,
+    { headers: { Authorization: pb.authStore.token } },
+  )
+  if (!res.ok) throw new Error('Não foi possível abrir o comprovante.')
+  return URL.createObjectURL(await res.blob())
 }
