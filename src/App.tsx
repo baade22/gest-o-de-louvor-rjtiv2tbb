@@ -65,6 +65,7 @@ import FinanceCounts from '@/pages/finance/FinanceCounts'
 import FinanceBills from '@/pages/finance/FinanceBills'
 import FinanceReconcile from '@/pages/finance/FinanceReconcile'
 import FinanceBalances from '@/pages/finance/FinanceBalances'
+import FinanceReceipts from '@/pages/finance/FinanceReceipts'
 import FinanceClosing from '@/pages/finance/FinanceClosing'
 import FinanceReports from '@/pages/finance/FinanceReports'
 import FinanceStatements from '@/pages/finance/FinanceStatements'
@@ -357,6 +358,14 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="financeiro.conciliacao.ver">
                   <FinanceReconcile />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/comprovantes"
+              element={
+                <RequireAuth requirePermission="financeiro.conciliacao.ver">
+                  <FinanceReceipts />
                 </RequireAuth>
               }
             />

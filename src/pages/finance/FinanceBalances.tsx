@@ -29,6 +29,7 @@ import {
   requestBankSync,
   saveBankConnection,
   type BankConnectionInput,
+  type BankSyncRequestResult,
 } from '@/services/finance'
 import type {
   FinAccount,
@@ -85,6 +86,40 @@ const today = () => brtDay(new Date().toISOString())
 // Datas do PocketBase ("2026-01-01 12:00:00.000Z") <-> dia do campo de data
 const dayOf = (s?: string) => (s || '').slice(0, 10)
 const pbDay = (ymd: string) => (ymd ? `${ymd} 12:00:00.000Z` : '')
+
+const LATER = ' Até lá, a busca fica para a próxima rodada agendada.'
+
+/** Por que o "Atualizar agora" não chegou ao conector, em palavras de quem vai corrigir. */
+function syncFailureText(res: BankSyncRequestResult) {
+  if (res.reason === 'GITHUB') {
+    const where = ' Corrija em Configurações › Integrações › Conector bancário.'
+    if (res.status === 401)
+      return 'O GitHub recusou o token (vencido ou apagado). Gere um token novo.' + where + LATER
+    if (res.status === 403)
+      return (
+        'O token do GitHub não tem permissão para rodar o conector. Ao gerar o token, marque "Actions: Read and write" no repositório do LouvorFlow.' +
+        where +
+        LATER
+      )
+    if (res.status === 404)
+      return (
+        'O GitHub não achou o repositório ou o conector com esse token. Confira o nome do repositório e se o token dá acesso a ele.' +
+        where +
+        LATER
+      )
+    return (
+      `O GitHub respondeu ${res.status ?? '?'}${res.message ? ` (${res.message})` : ''}.` +
+      where +
+      LATER
+    )
+  }
+  if (res.reason === 'ERRO')
+    return 'Não deu para falar com o GitHub agora. Tente de novo em instantes.' + LATER
+  return (
+    'Ainda não há acesso ao GitHub para buscar na hora: o MASTER cadastra em Configurações › Integrações › Conector bancário.' +
+    LATER
+  )
+}
 
 /** Situação do histórico pedido: buscando (até onde chegou) ou completo (desde quando). */
 function historyState(conn?: FinBankConnection) {
@@ -252,10 +287,11 @@ export default function FinanceBalances() {
     try {
       const res = await requestBankSync(churchId)
       toast({
-        title: res.dispatched ? 'Buscando nos bancos' : 'Atualização pedida',
+        title: res.dispatched ? 'Buscando nos bancos' : 'Não deu para buscar na hora',
         description: res.dispatched
           ? 'Os saldos e movimentos novos aparecem aqui em instantes.'
-          : 'Ainda não há acesso ao GitHub para buscar na hora: o MASTER cadastra em Configurações › Integrações › Conector bancário. Até lá, a busca fica para a próxima rodada agendada.',
+          : syncFailureText(res),
+        variant: res.dispatched || res.reason === 'SEM_ACESSO' ? undefined : 'destructive',
       })
       load(true)
     } catch (err) {

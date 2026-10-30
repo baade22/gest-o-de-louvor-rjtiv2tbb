@@ -460,3 +460,70 @@ export interface BankSecretInput {
   cert?: string
   key?: string
 }
+
+/** Comprovante de pagamento mandado pelo WhatsApp da igreja (lido pela IA). */
+export type FinReceiptStatus =
+  | 'RECEBIDO'
+  | 'LENDO'
+  | 'AGUARDANDO'
+  | 'ANALISE'
+  | 'CONFIRMANDO'
+  | 'CONCILIADO'
+  | 'DESCARTADO'
+
+export interface FinReceiptData {
+  is_receipt: boolean
+  amount_cents: number
+  date: string
+  method: 'PIX' | 'BOLETO' | 'CARTAO' | 'TRANSFERENCIA' | 'OUTRO'
+  payee_name: string
+  payee_document: string
+  payer_name: string
+  transaction_code: string
+  description: string
+  category_id: string
+  notes: string
+}
+
+export interface FinReceiptLine {
+  id: string
+  date: string
+  description: string
+  amount_cents: number
+  status: FinBankLineStatus
+  account_name: string
+}
+
+export interface FinReceipt {
+  id: string
+  created: string
+  sender_name: string
+  sender_phone: string
+  caption: string
+  mime: string
+  has_file: boolean
+  status: FinReceiptStatus
+  reason: string
+  data: FinReceiptData | null
+  line: FinReceiptLine | null
+  candidates: FinReceiptLine[]
+  transaction_id: string
+  bill_id: string
+  done_by_name: string
+  can_retry: boolean
+}
+
+export interface FinReceiptSender {
+  id: string
+  name: string
+  phone: string
+  is_active: boolean
+}
+
+export interface FinReceiptsStatus {
+  ai: boolean
+  whatsapp: 'SEM_SERVIDOR' | 'DESCONECTADO' | 'CONECTADO'
+  webhook_error: string
+  counts: Partial<Record<FinReceiptStatus, number>>
+  can_edit: boolean
+}
