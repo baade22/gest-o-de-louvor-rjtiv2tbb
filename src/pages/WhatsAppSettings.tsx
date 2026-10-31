@@ -205,7 +205,7 @@ export default function WhatsAppSettings() {
     confirm({
       title: 'Desconectar o WhatsApp?',
       description:
-        'Os envios automáticos param até alguém ler o QR Code de novo. As mensagens na fila esperam até 2 dias.',
+        'Os envios automáticos param até alguém ler o QR Code de novo. As mensagens na fila esperam até 12 horas. Depois de conectar, os envios começam devagar (nada nos primeiros 30 minutos e uma mensagem a cada 3 minutos até completar 24 horas), para o WhatsApp não tirar o aparelho.',
       confirmLabel: 'Desconectar',
       destructive: true,
       onConfirm: async () => {

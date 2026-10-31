@@ -8,12 +8,27 @@
 //   igual ao botão da tela de Aniversariantes).
 // - A cada minuto o cron manda o que está na fila, devagar (no máximo 6 por igreja por
 //   minuto, com "digitando..." antes), para o WhatsApp não estranhar. Se o celular estiver
-//   desconectado, espera; depois de 2 dias desiste e marca erro.
+//   desconectado, espera; depois de 12 horas de atraso desiste e marca erro (para não despejar
+//   mensagens velhas quando ele voltar).
+// - Aquecimento: logo depois de conectar (ou reconectar) o celular, uma rajada de mensagens faz
+//   o WhatsApp desconfiar e tirar o aparelho (erro "device_removed" na Evolution). Por isso,
+//   nos primeiros 30 minutos não sai nada e, até completar 24 horas, sai no máximo uma
+//   mensagem a cada 3 minutos. O horário da conexão fica em whatsapp_settings.connected_at.
 // Inscrição e pagamento de eventos entram na fila pelos hooks church_event_signup.js e
 // church_event_payments.js; os avisos da Mídia (com imagem, vídeo, documento ou áudio), pelo
 // whatsapp_avisos.js, já com o horário de cada pessoa e a janela de envio.
 //
 // Cada envio automático só acontece se estiver ligado em Configurações > WhatsApp.
+
+// Guarda quando o celular conectou (status passou a 'open'), para o aquecimento da fila
+onRecordUpdate((e) => {
+  const rec = e.record
+  const before = rec.original() ? rec.original().getString('status') : ''
+  if (rec.getString('status') === 'open' && before !== 'open') {
+    rec.set('connected_at', new Date().toISOString())
+  }
+  e.next()
+}, 'whatsapp_settings')
 
 onRecordAfterCreateSuccess((e) => {
   e.next()
@@ -118,6 +133,10 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
   if (!apiUrl || !apiKey) return
 
   const PER_CHURCH = 6
+  const WARMUP_QUIET_MS = 30 * 60 * 1000 // nada sai nos primeiros 30 minutos
+  const WARMUP_MS = 24 * 3600 * 1000 // até 24 h: uma mensagem a cada 3 minutos
+  const WARMUP_GAP_MS = 3 * 60 * 1000
+  const EXPIRE_MS = 12 * 3600 * 1000 // atrasada mais que isso: não manda mais
   const nowIso = new Date().toISOString().replace('T', ' ')
   let due = []
   try {
@@ -154,7 +173,7 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
     const churchId = msg.getString('church_id')
     let c = churches[churchId]
     if (!c) {
-      c = churches[churchId] = { sent: 0, open: false, inst: '' }
+      c = churches[churchId] = { sent: 0, open: false, inst: '', limit: PER_CHURCH }
       try {
         const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
           c: churchId,
@@ -169,24 +188,48 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
               : 'close'
         c.open = state === 'open'
         if (st.getString('status') !== state) {
-          st.set('status', state)
+          st.set('status', state) // ao virar 'open', o hook acima marca connected_at
           $app.save(st)
+        }
+        if (c.open) {
+          const at = st.getString('connected_at')
+          const since = at ? Date.now() - new Date(at.replace(' ', 'T')).getTime() : Infinity
+          if (since < WARMUP_QUIET_MS) c.limit = 0
+          else if (since < WARMUP_MS) {
+            c.limit = 1
+            try {
+              const last = $app.findRecordsByFilter(
+                'whatsapp_messages',
+                "church_id = {:c} && status = 'ENVIADO' && sent_at != ''",
+                '-sent_at',
+                1,
+                0,
+                { c: churchId },
+              )
+              if (last.length > 0) {
+                const lastAt = new Date(last[0].getString('sent_at').replace(' ', 'T')).getTime()
+                if (Date.now() - lastAt < WARMUP_GAP_MS) c.limit = 0
+              }
+            } catch (_) {}
+          }
         }
       } catch (_) {
         c.open = false
       }
     }
 
-    if (!c.open) {
-      // Desconectado: espera; passados 2 dias da hora marcada desiste
-      const dueAt = new Date(msg.getString('send_after').replace(' ', 'T')).getTime()
-      if (dueAt && Date.now() - dueAt > 2 * 24 * 3600 * 1000) {
-        msg.set('status', 'ERRO')
-        msg.set('error', 'WhatsApp da igreja desconectado')
+    // Atrasada demais (o celular ficou desconectado): não manda mais, para não despejar
+    // mensagens velhas de uma vez quando ele voltar
+    const dueAt = new Date(msg.getString('send_after').replace(' ', 'T')).getTime()
+    if (dueAt && Date.now() - dueAt > EXPIRE_MS) {
+      msg.set('status', 'ERRO')
+      msg.set('error', 'Não enviada: o WhatsApp da igreja ficou desconectado por mais de 12 horas')
+      try {
         $app.save(msg)
-      }
+      } catch (_) {}
       continue
     }
+    if (!c.open) continue // desconectado: espera
     // Avisos em massa só saem dentro da janela (horário de Brasília); fora dela, ficam para
     // o começo da próxima (por exemplo, depois de o WhatsApp ficar desconectado)
     const win = /^(\d\d):(\d\d)-(\d\d):(\d\d)$/.exec(msg.getString('window'))
@@ -205,7 +248,7 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
         continue
       }
     }
-    if (c.sent >= PER_CHURCH) continue
+    if (c.sent >= c.limit) continue // limite do minuto (ou aquecimento)
     c.sent++
 
     const attempts = msg.getInt('attempts') + 1
