@@ -248,6 +248,8 @@ export interface FinBankConnection extends BaseRecord {
   last_error?: string
   balance_cents?: number
   available_cents?: number
+  // Aplicações do banco (ex.: Invest Fácil), fora do saldo da conta-corrente
+  invested_cents?: number
   balance_at?: string
   has_balance?: boolean
   last_created?: number

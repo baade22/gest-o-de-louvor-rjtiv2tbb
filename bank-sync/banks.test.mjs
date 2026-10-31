@@ -17,6 +17,8 @@ test('formatos de data e valor', () => {
   expect(brlToCents('6.759,00')).toBe(675900)
   expect(brlToCents('1,15')).toBe(115)
   expect(brlToCents('')).toBe(null)
+  expect(brlToCents(6759)).toBe(675900)
+  expect(brlToCents(1.15)).toBe(115)
   expect(brtDate('2023-04-06T09:00:00+00')).toBe('2023-04-06')
   // 1h da manhã em UTC ainda é o dia anterior em Brasília
   expect(brtDate('2023-04-06T01:00:00Z')).toBe('2023-04-05')
@@ -149,6 +151,16 @@ test('extrato do Bradesco junta as listas sem repetir', () => {
   expect(
     bradescoError({ extratoPorPeriodo: { codigoRetorno: '08', mensagem: 'ERRO NEGOCIO ' } }),
   ).toBe('08 ERRO NEGOCIO')
+  // em produção o código vem como número
+  expect(
+    bradescoError({
+      extratoPorPeriodo: { codigoRetorno: 0, mensagem: 'CTAS0673 - CONSULTA EFETUADA COM SUCESSO' },
+    }),
+  ).toBe(null)
+  expect(bradescoError({ saldoCC: { codigoRetorno: 1 } })).toBe(null)
+  expect(
+    bradescoError({ saldoCC: { codigoRetorno: '12', mensagem: 'SISTEMA INDISPONIVEL' } }),
+  ).toBe('12 SISTEMA INDISPONIVEL')
 })
 
 test('saldo do Bradesco', () => {
@@ -172,14 +184,46 @@ test('saldo do Bradesco', () => {
       ],
     },
   }
-  expect(bradescoBalance(json)).toEqual({ balance_cents: 7795, available_cents: 0 })
+  expect(bradescoBalance(json)).toEqual({
+    balance_cents: 7795,
+    available_cents: 7795,
+    invested_cents: null,
+  })
   expect(
     bradescoBalance({
       saldoCC: {
         lstLancamentosSaldos: [{ codigoProduto: 984, valorLancamento: '10,00', sinalSaldo: '-' }],
       },
     }),
-  ).toEqual({ balance_cents: -1000, available_cents: -1000 })
+  ).toEqual({ balance_cents: -1000, available_cents: -1000, invested_cents: null })
+
+  // Aplicação no Invest Fácil: o SALDO TOTAL soma a aplicação, a conta-corrente não
+  const cc = (total, checking) => ({
+    codigoRetorno: 0,
+    lstLancamentosSaldos: [
+      { codigoProduto: 998, valorLancamento: checking, sinalSaldo: '+' },
+      { codigoProduto: 977, valorLancamento: '', sinalSaldo: '' },
+      { codigoProduto: 984, valorLancamento: total, sinalSaldo: '+' },
+    ],
+  })
+  expect(
+    bradescoBalance({
+      saldoCC: cc('1.327,95', '1.077,95'),
+      saldoAplicacaoCC: {
+        codigoRetorno: 0,
+        lstLancamentosSaldos: [
+          { codigoProduto: 19, valorLancamento: '250,00', sinalSaldo: '+' },
+          { codigoProduto: 977, valorLancamento: '', sinalSaldo: '' },
+        ],
+      },
+    }),
+  ).toEqual({ balance_cents: 107795, available_cents: 107795, invested_cents: 25000 })
+  // Sem a lista das aplicações: a diferença entre o total e a conta-corrente
+  expect(bradescoBalance({ saldoCC: cc('1.327,95', '1.077,95') })).toEqual({
+    balance_cents: 107795,
+    available_cents: 107795,
+    invested_cents: 25000,
+  })
 })
 
 const fakeBank = (oldest, fail = {}) => ({

@@ -14,8 +14,9 @@ export function brDate(s) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
 }
 
-/** '6.759,00' → 675900 */
+/** '6.759,00' → 675900 (um número, 6759 → 675900) */
 export function brlToCents(s) {
+  if (typeof s === 'number') return Number.isFinite(s) ? Math.round(Math.abs(s) * 100) : null
   const t = String(s || '').trim()
   if (!/^\d{1,3}(\.?\d{3})*(,\d{1,2})?$/.test(t)) return null
   const [int, dec = ''] = t.replace(/\./g, '').split(',')
@@ -97,7 +98,7 @@ export function bradescoLines(json) {
     const inList = new Map()
     for (const r of list) {
       const desc = lastLine(r.descritivoLancamentoCompleto || r.descritivoLancamentoAbreviado)
-      if (/^saldo anterior$/i.test(desc) || r.codigoLancamento === '00000') continue
+      if (/^saldo anterior$/i.test(desc) || /^0+$/.test(lastLine(r.codigoLancamento))) continue
       const cents = brlToCents(r.valorLancamento)
       const date = brDate(r.dataLancamento)
       if (!cents || !date) continue
@@ -122,28 +123,47 @@ export function bradescoLines(json) {
 }
 
 /**
- * Saldo do Bradesco (GET /v1/fornecimento-saldos-contas/saldos): SALDO TOTAL (984) e
- * DISPONÍVEL (999) da conta-corrente (ou poupança). Valores em centavos, com sinal.
+ * Saldo do Bradesco (GET /v1/fornecimento-saldos-contas/saldos), em centavos e com sinal.
+ * O SALDO TOTAL (984) soma a conta-corrente e as aplicações: o saldo da conta é o
+ * "+ CTA CORRENTE" (998) e as aplicações vêm à parte (invested_cents), pela lista de
+ * saldoAplicacaoCC ou, sem ela, pela diferença entre o total e a conta-corrente.
  */
 export function bradescoBalance(json) {
   const block = json?.saldoCC || json?.saldoCP
-  const list = block?.lstLancamentosSaldos || []
-  const pick = (code) => {
-    const it = list.find((x) => Number(x.codigoProduto) === code)
+  const value = (it) => {
     const cents = it ? brlToCents(it.valorLancamento) : null
     return cents === null ? null : it.sinalSaldo === '-' ? -cents : cents
   }
+  const pick = (code) =>
+    value((block?.lstLancamentosSaldos || []).find((x) => Number(x.codigoProduto) === code))
   const total = pick(984)
-  const available = pick(999)
-  return { balance_cents: total ?? available, available_cents: available ?? total }
+  const checking = pick(998)
+
+  let invested = null
+  const apps = json?.saldoAplicacaoCC || json?.saldoAplicacaoCP
+  for (const it of apps?.lstLancamentosSaldos || []) {
+    if (Number(it.codigoProduto) === 977) continue // linha em branco
+    const cents = value(it)
+    if (cents !== null) invested = (invested || 0) + cents
+  }
+  if (invested === null && total !== null && checking !== null && total !== checking) {
+    invested = total - checking
+  }
+
+  const balance = checking ?? (total !== null ? total - (invested || 0) : null) ?? pick(999)
+  return { balance_cents: balance, available_cents: balance, invested_cents: invested }
 }
 
-/** Erro do Bradesco no corpo (codigoRetorno diferente de 00/01), ou null. */
+/**
+ * Erro do Bradesco no corpo (codigoRetorno diferente de 00/01), ou null. Em produção o código
+ * chega como número (0) e no sandbox como texto ("00"): compara pelo valor.
+ */
 export function bradescoError(json) {
   for (const key of Object.keys(json || {})) {
     const b = json[key]
     if (b && typeof b === 'object' && 'codigoRetorno' in b) {
-      if (b.codigoRetorno !== '00' && b.codigoRetorno !== '01') {
+      const code = Number(b.codigoRetorno)
+      if (code !== 0 && code !== 1) {
         return `${b.codigoRetorno} ${lastLine(b.mensagem)}`.trim()
       }
     }
