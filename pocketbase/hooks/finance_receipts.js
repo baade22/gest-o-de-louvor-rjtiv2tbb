@@ -1096,7 +1096,22 @@ routerAdd(
           }
           inboundBase = base
           const url = base + path
-          if (base && st.getString('instance') && st.getString('inbound_url') !== url) {
+          // A conexão pode ter sido apagada e criada de novo (novo QR Code): confere na
+          // Evolution se o aviso continua ligado com este endereço
+          let webhookOk = st.getString('inbound_url') === url
+          if (webhookOk && base && st.getString('instance')) {
+            try {
+              const f = $http.send({
+                url: apiUrl + '/webhook/find/' + encodeURIComponent(st.getString('instance')),
+                method: 'GET',
+                headers: { apikey: apiKey },
+                timeout: 10,
+              })
+              const w = f.json && f.json.webhook ? f.json.webhook : f.json
+              if (f.statusCode < 300) webhookOk = !!w && w.enabled === true && w.url === url
+            } catch (_) {}
+          }
+          if (base && st.getString('instance') && !webhookOk) {
             const res = $http.send({
               url: apiUrl + '/webhook/set/' + encodeURIComponent(st.getString('instance')),
               method: 'POST',
