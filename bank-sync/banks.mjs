@@ -124,9 +124,9 @@ export function bradescoLines(json) {
 
 /**
  * Saldo do Bradesco (GET /v1/fornecimento-saldos-contas/saldos), em centavos e com sinal.
- * O SALDO TOTAL (984) soma a conta-corrente e as aplicações: o saldo da conta é o
- * "+ CTA CORRENTE" (998) e as aplicações vêm à parte (invested_cents), pela lista de
- * saldoAplicacaoCC ou, sem ela, pela diferença entre o total e a conta-corrente.
+ * O SALDO TOTAL (984) soma a conta-corrente e as aplicações. O Invest Fácil é remuneração do
+ * caixa, não investimento: conta como saldo da conta-corrente ("+ CTA CORRENTE", 998). As
+ * outras aplicações de saldoAplicacaoCC ficam à parte (invested_cents).
  */
 export function bradescoBalance(json) {
   const block = json?.saldoCC || json?.saldoCP
@@ -139,18 +139,22 @@ export function bradescoBalance(json) {
   const total = pick(984)
   const checking = pick(998)
 
-  let invested = null
   const apps = json?.saldoAplicacaoCC || json?.saldoAplicacaoCP
+  let cash = null
+  let invested = null
   for (const it of apps?.lstLancamentosSaldos || []) {
     if (Number(it.codigoProduto) === 977) continue // linha em branco
     const cents = value(it)
-    if (cents !== null) invested = (invested || 0) + cents
-  }
-  if (invested === null && total !== null && checking !== null && total !== checking) {
-    invested = total - checking
+    if (cents === null) continue
+    if (/INVEST\s*FACIL/i.test(`${it.nomeProduto} ${it.nomeProdutoResumido}`)) {
+      cash = (cash || 0) + cents
+    } else invested = (invested || 0) + cents
   }
 
-  const balance = checking ?? (total !== null ? total - (invested || 0) : null) ?? pick(999)
+  // Sem a lista das aplicações não dá para separar: vale o total
+  const balance = apps
+    ? (checking ?? pick(999) ?? 0) + (cash || 0)
+    : (total ?? checking ?? pick(999))
   return { balance_cents: balance, available_cents: balance, invested_cents: invested }
 }
 
