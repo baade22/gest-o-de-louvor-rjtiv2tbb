@@ -1019,7 +1019,30 @@ routerAdd(
           const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
             c: churchId,
           })
-          if (st.getString('status') === 'open') whatsapp = 'CONECTADO'
+          // Estado real na Evolution: o salvo pode estar velho (o celular desconectou)
+          let state = st.getString('status')
+          if (st.getString('instance')) {
+            try {
+              const r = $http.send({
+                url:
+                  apiUrl +
+                  '/instance/connectionState/' +
+                  encodeURIComponent(st.getString('instance')),
+                method: 'GET',
+                headers: { apikey: apiKey },
+                timeout: 10,
+              })
+              if (r.statusCode === 404) state = 'close'
+              else if (r.json && r.json.instance && r.json.instance.state) {
+                state = String(r.json.instance.state)
+              } else if (r.json && r.json.state) state = String(r.json.state)
+              if (state && state !== st.getString('status')) {
+                st.set('status', state)
+                $app.save(st)
+              }
+            } catch (_) {}
+          }
+          if (state === 'open') whatsapp = 'CONECTADO'
           lastAt = st.getString('inbound_last_at')
           lastNote = st.getString('inbound_last_note')
           if (!st.getString('inbound_token')) {
