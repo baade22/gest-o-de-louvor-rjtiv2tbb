@@ -158,6 +158,7 @@ function bankBalance(conn?: FinBankConnection, imp?: FinBankImport) {
       ? {
           cents: conn.balance_cents || 0,
           available: conn.available_cents ?? conn.balance_cents ?? 0,
+          invested: conn.invested_cents || 0,
           day: brtDay(conn.balance_at),
           at: conn.balance_at,
           source: 'API' as const,
@@ -167,6 +168,7 @@ function bankBalance(conn?: FinBankConnection, imp?: FinBankImport) {
     ? {
         cents: imp.balance_cents || 0,
         available: imp.balance_cents || 0,
+        invested: 0,
         day: (imp.balance_date || imp.end_date || imp.created).slice(0, 10),
         at: '',
         source: 'OFX' as const,
@@ -501,6 +503,11 @@ export default function FinanceBalances() {
                     {!isCash && b && b.available !== b.cents && (
                       <div className="text-[11.5px] text-slate-500">
                         Disponível {formatCents(b.available)}
+                      </div>
+                    )}
+                    {!isCash && b && b.invested !== 0 && (
+                      <div className="text-[11.5px] font-medium text-slate-600">
+                        Aplicações {formatCents(b.invested)}
                       </div>
                     )}
                   </div>

@@ -164,7 +164,7 @@ async function openCora(conn, cred) {
       const bal = await request(`${base}/third-party/account/balance`, { headers: auth, ...tls })
       if (bal.status !== 200) throw new Error(`Saldo da Cora: ${short(bal)}`)
       const cents = Number.isInteger(Number(bal.json?.balance)) ? Number(bal.json.balance) : null
-      return { balance_cents: cents, available_cents: cents }
+      return { balance_cents: cents, available_cents: cents, invested_cents: null }
     },
     // Período longo de uma vez faz a Cora devolver 504: busca em partes de até 31 dias,
     // páginas de 200, e tenta de novo uma vez quando a Cora está instável
@@ -294,6 +294,7 @@ async function main() {
         ok: true,
         balance_cents: bal.balance_cents,
         available_cents: bal.available_cents,
+        invested_cents: bal.invested_cents,
         balance_at: new Date().toISOString().replace('T', ' '),
         start_date: conn.from,
         end_date: conn.to,

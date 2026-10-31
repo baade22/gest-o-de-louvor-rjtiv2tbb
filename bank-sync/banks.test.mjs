@@ -184,14 +184,46 @@ test('saldo do Bradesco', () => {
       ],
     },
   }
-  expect(bradescoBalance(json)).toEqual({ balance_cents: 7795, available_cents: 0 })
+  expect(bradescoBalance(json)).toEqual({
+    balance_cents: 7795,
+    available_cents: 7795,
+    invested_cents: null,
+  })
   expect(
     bradescoBalance({
       saldoCC: {
         lstLancamentosSaldos: [{ codigoProduto: 984, valorLancamento: '10,00', sinalSaldo: '-' }],
       },
     }),
-  ).toEqual({ balance_cents: -1000, available_cents: -1000 })
+  ).toEqual({ balance_cents: -1000, available_cents: -1000, invested_cents: null })
+
+  // Aplicação no Invest Fácil: o SALDO TOTAL soma a aplicação, a conta-corrente não
+  const cc = (total, checking) => ({
+    codigoRetorno: 0,
+    lstLancamentosSaldos: [
+      { codigoProduto: 998, valorLancamento: checking, sinalSaldo: '+' },
+      { codigoProduto: 977, valorLancamento: '', sinalSaldo: '' },
+      { codigoProduto: 984, valorLancamento: total, sinalSaldo: '+' },
+    ],
+  })
+  expect(
+    bradescoBalance({
+      saldoCC: cc('1.327,95', '1.077,95'),
+      saldoAplicacaoCC: {
+        codigoRetorno: 0,
+        lstLancamentosSaldos: [
+          { codigoProduto: 19, valorLancamento: '250,00', sinalSaldo: '+' },
+          { codigoProduto: 977, valorLancamento: '', sinalSaldo: '' },
+        ],
+      },
+    }),
+  ).toEqual({ balance_cents: 107795, available_cents: 107795, invested_cents: 25000 })
+  // Sem a lista das aplicações: a diferença entre o total e a conta-corrente
+  expect(bradescoBalance({ saldoCC: cc('1.327,95', '1.077,95') })).toEqual({
+    balance_cents: 107795,
+    available_cents: 107795,
+    invested_cents: 25000,
+  })
 })
 
 const fakeBank = (oldest, fail = {}) => ({
