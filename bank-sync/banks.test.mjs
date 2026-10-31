@@ -17,6 +17,8 @@ test('formatos de data e valor', () => {
   expect(brlToCents('6.759,00')).toBe(675900)
   expect(brlToCents('1,15')).toBe(115)
   expect(brlToCents('')).toBe(null)
+  expect(brlToCents(6759)).toBe(675900)
+  expect(brlToCents(1.15)).toBe(115)
   expect(brtDate('2023-04-06T09:00:00+00')).toBe('2023-04-06')
   // 1h da manhã em UTC ainda é o dia anterior em Brasília
   expect(brtDate('2023-04-06T01:00:00Z')).toBe('2023-04-05')
@@ -149,6 +151,16 @@ test('extrato do Bradesco junta as listas sem repetir', () => {
   expect(
     bradescoError({ extratoPorPeriodo: { codigoRetorno: '08', mensagem: 'ERRO NEGOCIO ' } }),
   ).toBe('08 ERRO NEGOCIO')
+  // em produção o código vem como número
+  expect(
+    bradescoError({
+      extratoPorPeriodo: { codigoRetorno: 0, mensagem: 'CTAS0673 - CONSULTA EFETUADA COM SUCESSO' },
+    }),
+  ).toBe(null)
+  expect(bradescoError({ saldoCC: { codigoRetorno: 1 } })).toBe(null)
+  expect(
+    bradescoError({ saldoCC: { codigoRetorno: '12', mensagem: 'SISTEMA INDISPONIVEL' } }),
+  ).toBe('12 SISTEMA INDISPONIVEL')
 })
 
 test('saldo do Bradesco', () => {
