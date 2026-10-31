@@ -1,0 +1,13 @@
+# Cabeçalhos de segurança do site (pentest 2026-10-31).
+#
+# O Vite copia este arquivo para dist/ e o Cloudflare Pages o aplica a todas as
+# respostas do site. Se o site não estiver no Cloudflare Pages, as mesmas regras
+# devem ser postas no Cloudflare (Transform Rules > Response Headers).
+#
+# CSP ficou de fora de propósito: precisa ser testada com o app aberto para não
+# quebrar scripts/estilos; entra num passo seguinte.
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
