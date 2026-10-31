@@ -316,10 +316,13 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       const linesCol = txApp.findCollectionByNameOrId('fin_bank_lines')
       const newLines = []
       let imp = null
+      // Aplicação e resgate automáticos do Invest Fácil (Bradesco) só mudam o dinheiro de
+      // lugar dentro do caixa: não entram no extrato (o rendimento, RENTAB., entra)
+      const investMove = (d) => /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
       for (const l of lines) {
         const fitid = (prefix + String(l.id).trim()).slice(0, 255)
         const amount = Number(l.amount_cents)
-        if (amount === 0) {
+        if (amount === 0 || investMove(String(l.description || ''))) {
           skipped++
           continue
         }

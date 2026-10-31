@@ -109,8 +109,15 @@ routerAdd(
 
           const linesCol = txApp.findCollectionByNameOrId('fin_bank_lines')
           const seen = {}
+          // Aplicação e resgate automáticos do Invest Fácil (Bradesco) só mudam o dinheiro de
+          // lugar dentro do caixa: não entram no extrato (o rendimento, RENTAB., entra)
+          const investMove = (d) => /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
           for (const l of lines) {
             const fitid = String(l.fitid).trim().slice(0, 255)
+            if (investMove(String(l.description || ''))) {
+              skipped++
+              continue
+            }
             if (seen[fitid]) {
               skipped++
               continue

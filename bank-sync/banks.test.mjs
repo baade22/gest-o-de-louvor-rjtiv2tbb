@@ -197,7 +197,7 @@ test('saldo do Bradesco', () => {
     }),
   ).toEqual({ balance_cents: -1000, available_cents: -1000, invested_cents: null })
 
-  // Aplicação no Invest Fácil: o SALDO TOTAL soma a aplicação, a conta-corrente não
+  // Invest Fácil é caixa: soma na conta-corrente; outra aplicação fica à parte
   const cc = (total, checking) => ({
     codigoRetorno: 0,
     lstLancamentosSaldos: [
@@ -208,21 +208,48 @@ test('saldo do Bradesco', () => {
   })
   expect(
     bradescoBalance({
-      saldoCC: cc('1.327,95', '1.077,95'),
+      saldoCC: cc('2.327,95', '1.077,95'),
       saldoAplicacaoCC: {
         codigoRetorno: 0,
         lstLancamentosSaldos: [
-          { codigoProduto: 19, valorLancamento: '250,00', sinalSaldo: '+' },
+          {
+            nomeProduto: 'INVEST FACIL BRADESCO',
+            codigoProduto: 19,
+            valorLancamento: '250,00',
+            sinalSaldo: '+',
+          },
+          {
+            nomeProduto: 'CDB-FACIL CDI',
+            codigoProduto: 1,
+            valorLancamento: '1.000,00',
+            sinalSaldo: '+',
+          },
           { codigoProduto: 977, valorLancamento: '', sinalSaldo: '' },
         ],
       },
     }),
-  ).toEqual({ balance_cents: 107795, available_cents: 107795, invested_cents: 25000 })
-  // Sem a lista das aplicações: a diferença entre o total e a conta-corrente
+  ).toEqual({ balance_cents: 132795, available_cents: 132795, invested_cents: 100000 })
+  // Só Invest Fácil: tudo é saldo da conta
+  expect(
+    bradescoBalance({
+      saldoCC: cc('1.327,95', '1.077,95'),
+      saldoAplicacaoCC: {
+        lstLancamentosSaldos: [
+          {
+            nomeProduto: 'INVEST FACIL BRADESCO',
+            codigoProduto: 19,
+            valorLancamento: '250,00',
+            sinalSaldo: '+',
+          },
+        ],
+      },
+    }),
+  ).toEqual({ balance_cents: 132795, available_cents: 132795, invested_cents: null })
+  // Sem a lista das aplicações: vale o total
   expect(bradescoBalance({ saldoCC: cc('1.327,95', '1.077,95') })).toEqual({
-    balance_cents: 107795,
-    available_cents: 107795,
-    invested_cents: 25000,
+    balance_cents: 132795,
+    available_cents: 132795,
+    invested_cents: null,
   })
 })
 
