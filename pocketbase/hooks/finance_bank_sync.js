@@ -12,7 +12,7 @@
 //      com histórico pedido, também history: { from: 'YYYY-MM-DD' ou '' (o máximo), before }
 //      (o conector busca de before para trás, em partes, até from)
 // POST /backend/v1/finance/bank-sync/push            (conector) entrega o resultado de uma conta:
-//      { connection_id, ok: true, balance_cents?, available_cents?, balance_at?,
+//      { connection_id, ok: true, balance_cents?, available_cents?, invested_cents?, balance_at?,
 //        start_date, end_date, lines: [{ id, date: 'YYYY-MM-DD', amount_cents, description }] }
 //      { connection_id, ok: false, error }
 //      { connection_id, ok: true, history: true, start_date, end_date, history_done?, lines }
@@ -491,6 +491,13 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           Number.isInteger(Number(body.available_cents)) && body.available_cents !== null
             ? Number(body.available_cents)
             : Number(body.balance_cents),
+        )
+        // Aplicações (Bradesco) ficam à parte do saldo da conta-corrente
+        fresh.set(
+          'invested_cents',
+          Number.isInteger(Number(body.invested_cents)) && body.invested_cents !== null
+            ? Number(body.invested_cents)
+            : 0,
         )
         fresh.set('balance_at', String(body.balance_at || nowIso))
       }
