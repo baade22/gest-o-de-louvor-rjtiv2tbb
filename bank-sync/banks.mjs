@@ -14,8 +14,9 @@ export function brDate(s) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
 }
 
-/** '6.759,00' → 675900 */
+/** '6.759,00' → 675900 (um número, 6759 → 675900) */
 export function brlToCents(s) {
+  if (typeof s === 'number') return Number.isFinite(s) ? Math.round(Math.abs(s) * 100) : null
   const t = String(s || '').trim()
   if (!/^\d{1,3}(\.?\d{3})*(,\d{1,2})?$/.test(t)) return null
   const [int, dec = ''] = t.replace(/\./g, '').split(',')
@@ -97,7 +98,7 @@ export function bradescoLines(json) {
     const inList = new Map()
     for (const r of list) {
       const desc = lastLine(r.descritivoLancamentoCompleto || r.descritivoLancamentoAbreviado)
-      if (/^saldo anterior$/i.test(desc) || r.codigoLancamento === '00000') continue
+      if (/^saldo anterior$/i.test(desc) || /^0+$/.test(lastLine(r.codigoLancamento))) continue
       const cents = brlToCents(r.valorLancamento)
       const date = brDate(r.dataLancamento)
       if (!cents || !date) continue
@@ -138,12 +139,16 @@ export function bradescoBalance(json) {
   return { balance_cents: total ?? available, available_cents: available ?? total }
 }
 
-/** Erro do Bradesco no corpo (codigoRetorno diferente de 00/01), ou null. */
+/**
+ * Erro do Bradesco no corpo (codigoRetorno diferente de 00/01), ou null. Em produção o código
+ * chega como número (0) e no sandbox como texto ("00"): compara pelo valor.
+ */
 export function bradescoError(json) {
   for (const key of Object.keys(json || {})) {
     const b = json[key]
     if (b && typeof b === 'object' && 'codigoRetorno' in b) {
-      if (b.codigoRetorno !== '00' && b.codigoRetorno !== '01') {
+      const code = Number(b.codigoRetorno)
+      if (code !== 0 && code !== 1) {
         return `${b.codigoRetorno} ${lastLine(b.mensagem)}`.trim()
       }
     }
