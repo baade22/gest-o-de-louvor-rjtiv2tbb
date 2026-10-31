@@ -258,7 +258,7 @@ export default function AvisoEnvio() {
             <thead>
               <tr className="bg-slate-50 text-left text-slate-600">
                 <th className="px-5 py-3 font-semibold">Pessoa</th>
-                <th className="px-5 py-3 font-semibold">Celular</th>
+                <th className="px-5 py-3 font-semibold">Celular ou grupo</th>
                 <th className="px-5 py-3 font-semibold">Situação</th>
                 <th className="px-5 py-3 font-semibold">Horário</th>
                 <th className="px-5 py-3">
@@ -270,7 +270,9 @@ export default function AvisoEnvio() {
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-slate-100">
                   <td className="px-5 py-3 text-slate-900">{r.name || '—'}</td>
-                  <td className="px-5 py-3 text-slate-700">•••• {r.phone_end}</td>
+                  <td className="px-5 py-3 text-slate-700">
+                    {r.group ? 'Grupo do WhatsApp' : `•••• ${r.phone_end}`}
+                  </td>
                   <td className="px-5 py-3">
                     <span
                       className={`text-xs font-semibold rounded-full px-2 py-0.5 ${R_STATUS[r.status].className}`}

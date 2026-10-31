@@ -75,6 +75,7 @@ export interface AvisoRecipient {
   id: string
   name: string
   phone_end: string
+  group?: boolean
   status: 'FILA' | 'PAUSADO' | 'ENVIADO' | 'ERRO' | 'CANCELADO'
   error: string
   send_after: string
@@ -118,6 +119,14 @@ export const deleteAviso = (churchId: string, id: string) =>
   call<{ id: string }>(churchId, 'delete', { id })
 export const countAudience = (churchId: string, audience: AvisoAudience) =>
   call<{ total: number; no_phone: number }>(churchId, 'audience_count', { audience })
+export interface WaGroup {
+  id: string
+  name: string
+  size: number
+  only_admins: boolean
+}
+/** Grupos de que o número da igreja participa, lidos na hora do WhatsApp */
+export const listWaGroups = (churchId: string) => call<{ items: WaGroup[] }>(churchId, 'wa_groups')
 export const getAvisoOptions = (
   churchId: string,
   extra: { q?: string; person_ids?: string[] } = {},

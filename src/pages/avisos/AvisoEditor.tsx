@@ -2,7 +2,7 @@
 // um culto específico. A arte sobe para o servidor, que guarda e manda o link à Evolution.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Clock, Loader2, Send, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Clock, Loader2, RefreshCw, Send, Trash2, Upload, Users, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -12,12 +12,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
   AUDIENCE_TYPES,
+  GROUP_PACE,
   MEDIA_TYPES,
   PERSON_STATUS_OPTIONS,
   TEXT_VARIABLES,
   WEEKDAYS,
   estimateEnd,
   fromLocalInput,
+  isGroupAudience,
   previewText,
   serverMs,
   toLocalInput,
@@ -31,6 +33,7 @@ import {
   deleteAviso,
   getAviso,
   getAvisoOptions,
+  listWaGroups,
   removeAvisoMedia,
   saveAviso,
   scheduleAviso,
@@ -39,6 +42,7 @@ import {
   type Aviso,
   type AvisoInput,
   type AvisoOptions,
+  type WaGroup,
 } from '@/services/whatsappAvisos'
 import { StatusBadge, errorText } from './AvisosPanel'
 
@@ -165,6 +169,10 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
   const [mode, setMode] = useState<'AGORA' | 'DATA'>('AGORA')
   const [startsAt, setStartsAt] = useState(() => toLocalInput(Date.now() + 3600 * 1000))
   const [localPreview, setLocalPreview] = useState('')
+  const [waGroups, setWaGroups] = useState<WaGroup[] | null>(null)
+  const [waError, setWaError] = useState('')
+  const [waLoading, setWaLoading] = useState(false)
+  const [waQ, setWaQ] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const type = aviso?.type || kind
@@ -246,6 +254,37 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [churchId, audKey, isCulto])
 
+  // Grupos do WhatsApp: lidos do celular da igreja quando esse público é escolhido
+  const toGroups = isGroupAudience(form.audience)
+  const loadWaGroups = useCallback(async () => {
+    if (!churchId) return
+    setWaLoading(true)
+    setWaError('')
+    try {
+      setWaGroups((await listWaGroups(churchId)).items)
+    } catch (err) {
+      setWaError(errorText(err))
+    } finally {
+      setWaLoading(false)
+    }
+  }, [churchId])
+  useEffect(() => {
+    if (toGroups && waGroups === null && !waLoading && !waError) void loadWaGroups()
+  }, [toGroups, waGroups, waLoading, waError, loadWaGroups])
+  const chosenGroups = form.audience.wa_groups || []
+  const toggleGroup = (g: { id: string; name: string }) => {
+    const on = chosenGroups.some((x) => x.id === g.id)
+    setAud({
+      wa_groups: on
+        ? chosenGroups.filter((x) => x.id !== g.id)
+        : [...chosenGroups, { id: g.id, name: g.name }],
+    })
+  }
+  const waFiltered = useMemo(() => {
+    const q = waQ.trim().toLowerCase()
+    return (waGroups || []).filter((g) => !q || g.name.toLowerCase().includes(q))
+  }, [waGroups, waQ])
+
   // Busca de pessoas
   useEffect(() => {
     if (!churchId || peopleQ.trim().length < 2) {
@@ -269,7 +308,11 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
     [localPreview],
   )
 
-  const pace = PACES.find((p) => p.value === form.pace) || PACES[0]
+  const pickedPace = PACES.find((p) => p.value === form.pace) || PACES[0]
+  const pace = useMemo(
+    () => (toGroups ? { ...pickedPace, ...GROUP_PACE } : pickedPace),
+    [toGroups, pickedPace],
+  )
   const selectedEvent = options.events.find((x) => x.id === form.church_event_id)
 
   const input = useCallback((): AvisoInput => {
@@ -398,7 +441,9 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
       const iso = mode === 'DATA' ? fromLocalInput(startsAt) : undefined
       confirm({
         title: mode === 'AGORA' ? 'Começar o envio agora?' : 'Programar o envio?',
-        description: `${count?.total ?? 'As'} pessoas vão receber este aviso pelo WhatsApp, uma a cada ${pace.min} a ${pace.max} minutos, das ${form.window_start} às ${form.window_end}.`,
+        description: toGroups
+          ? `O aviso vai para ${count?.total ?? 'os'} ${count?.total === 1 ? 'grupo' : 'grupos'} do WhatsApp, um a cada ${pace.min} a ${pace.max} minutos, das ${form.window_start} às ${form.window_end}.`
+          : `${count?.total ?? 'As'} pessoas vão receber este aviso pelo WhatsApp, uma a cada ${pace.min} a ${pace.max} minutos, das ${form.window_start} às ${form.window_end}.`,
         confirmLabel: mode === 'AGORA' ? 'Começar' : 'Programar',
         onConfirm: async () => {
           try {
@@ -441,8 +486,8 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
   const sample = useMemo(() => {
     const first = (user?.name || 'Ana').split(' ')[0]
     return {
-      primeiro_nome: first,
-      nome: user?.name || 'Ana Souza',
+      primeiro_nome: toGroups ? '' : first,
+      nome: toGroups ? '' : user?.name || 'Ana Souza',
       igreja: currentChurch?.name || 'Igreja',
       culto: 'Culto de Domingo',
       data: '08/11',
@@ -454,7 +499,7 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
       local: selectedEvent?.location || 'Local',
       link_inscricao: `${window.location.origin}/inscricao/…`,
     }
-  }, [user?.name, currentChurch?.name, selectedEvent])
+  }, [user?.name, currentChurch?.name, selectedEvent, toGroups])
 
   const estimate = useMemo(() => {
     const start = mode === 'DATA' ? serverMs(fromLocalInput(startsAt)) || Date.now() : Date.now()
@@ -659,7 +704,10 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                 ))}
               </div>
               <p className="text-xs text-slate-600">
-                Para negrito use **texto**. Cada pessoa recebe com o próprio nome.
+                Para negrito use **texto**.{' '}
+                {toGroups
+                  ? 'Nos grupos não vai nome de pessoa: {nome} e {primeiro_nome} ficam de fora.'
+                  : 'Cada pessoa recebe com o próprio nome.'}
               </p>
             </div>
             {!isRule && !isCulto && (
@@ -832,7 +880,94 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                   </div>
                 </div>
               )}
-              {form.audience.type !== 'EVENTO' && form.audience.type !== 'PESSOAS' && (
+              {toGroups && (
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-700">
+                    Sai uma mensagem em cada grupo escolhido. O número da igreja precisa estar no
+                    grupo e, se só administradores podem mandar mensagem, precisa ser administrador.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="Buscar grupo"
+                      value={waQ}
+                      onChange={(e) => setWaQ(e.target.value)}
+                      placeholder="Buscar grupo pelo nome"
+                      className="rounded-xl min-h-11"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11 rounded-xl shrink-0"
+                      disabled={waLoading}
+                      onClick={() => void loadWaGroups()}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1.5 ${waLoading ? 'animate-spin' : ''}`} />
+                      Atualizar
+                    </Button>
+                  </div>
+                  {waError && (
+                    <p className="text-sm text-red-700" role="alert">
+                      {waError}
+                    </p>
+                  )}
+                  {waLoading && waGroups === null && (
+                    <p className="text-sm text-slate-600 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Lendo os grupos do WhatsApp…
+                    </p>
+                  )}
+                  {waGroups !== null && waGroups.length === 0 && !waError && (
+                    <p className="text-sm text-slate-600">
+                      O número da igreja não está em nenhum grupo.
+                    </p>
+                  )}
+                  {waFiltered.length > 0 && (
+                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-auto">
+                      {waFiltered.map((g) => {
+                        const on = chosenGroups.some((x) => x.id === g.id)
+                        return (
+                          <label
+                            key={g.id}
+                            className="flex items-center gap-3 px-3 min-h-12 text-sm cursor-pointer hover:bg-slate-50"
+                          >
+                            <input type="checkbox" checked={on} onChange={() => toggleGroup(g)} />
+                            <span className="flex-1 min-w-0">
+                              <span className="block truncate font-medium text-slate-900">
+                                {g.name}
+                              </span>
+                              <span className="block text-xs text-slate-600">
+                                {g.size > 0 ? `${g.size} participantes` : 'Grupo'}
+                                {g.only_admins && ' · só administradores mandam mensagem'}
+                              </span>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {chosenGroups.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {chosenGroups.map((g) => (
+                        <span
+                          key={g.id}
+                          className="inline-flex items-center gap-1 text-sm bg-teal-50 text-teal-900 rounded-full pl-3 pr-1 py-1"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          {g.name}
+                          <button
+                            type="button"
+                            aria-label={`Tirar ${g.name}`}
+                            className="h-7 w-7 rounded-full hover:bg-teal-100 flex items-center justify-center"
+                            onClick={() => toggleGroup(g)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {form.audience.type !== 'EVENTO' && form.audience.type !== 'PESSOAS' && !toGroups && (
                 <div className="space-y-1.5 max-w-xs">
                   <label htmlFor="aud-cong" className="text-sm font-semibold text-slate-800">
                     Congregação
@@ -852,7 +987,14 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                 </div>
               )}
               <p className="text-sm text-slate-700">
-                {count ? (
+                {toGroups ? (
+                  <>
+                    <strong>
+                      {chosenGroups.length} {chosenGroups.length === 1 ? 'grupo' : 'grupos'}
+                    </strong>{' '}
+                    {chosenGroups.length === 1 ? 'escolhido' : 'escolhidos'} · 1 mensagem por grupo
+                  </>
+                ) : count ? (
                   <>
                     <strong>{count.total} pessoas</strong> com celular cadastrado
                     {count.no_phone > 0 && ` · ${count.no_phone} sem celular ficam de fora`}
@@ -1009,7 +1151,9 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                 <select
                   id="a-pace"
                   className={fieldClass}
-                  value={form.pace}
+                  value={toGroups ? '1-2' : form.pace}
+                  disabled={toGroups}
+                  title={toGroups ? 'Nos grupos sai um a cada 1 a 2 minutos' : undefined}
                   onChange={(e) => set('pace', e.target.value)}
                 >
                   {PACES.map((p) => (
@@ -1024,8 +1168,9 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
               <div className="flex gap-3 items-start bg-teal-50 rounded-xl p-3.5">
                 <Clock className="h-5 w-5 text-teal-700 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-sm text-teal-950">
-                  {count.total} mensagens, uma a cada {pace.min} a {pace.max} minutos, em horários
-                  um pouco diferentes para parecer envio manual.{' '}
+                  {toGroups
+                    ? `${count.total} ${count.total === 1 ? 'grupo' : 'grupos'}, um a cada ${pace.min} a ${pace.max} minutos.`
+                    : `${count.total} mensagens, uma a cada ${pace.min} a ${pace.max} minutos, em horários um pouco diferentes para parecer envio manual.`}{' '}
                   {isRule ? (
                     <>
                       Cada culto leva umas{' '}
@@ -1095,7 +1240,9 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
         </fieldset>
 
         <aside aria-label="Prévia no WhatsApp" className="flex-[1_1_320px] max-w-[380px] space-y-2">
-          <p className="text-sm font-semibold text-slate-700">Como a pessoa vai receber</p>
+          <p className="text-sm font-semibold text-slate-700">
+            {toGroups ? 'Como vai aparecer no grupo' : 'Como a pessoa vai receber'}
+          </p>
           <div className="rounded-[28px] border-[10px] border-slate-800 bg-[#EFE7DD] min-h-[480px] overflow-hidden">
             <div className="bg-[#075E54] text-white px-4 py-3 flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-full bg-teal-100 text-teal-800 text-xs font-bold flex items-center justify-center">

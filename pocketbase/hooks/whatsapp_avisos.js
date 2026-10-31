@@ -78,6 +78,8 @@ routerAdd(
       if (min >= we) return day + 24 * 3600 * 1000 + ws * 60000 + BRT
       return t
     }
+    const GROUP_JID = /^[\d-]{5,50}@g\.us$/
+    const isGroup = (phone) => String(phone || '').indexOf('@g.us') !== -1
     const fixPhone = (p) => {
       let d = String(p || '').replace(/\D/g, '')
       while (d.indexOf('0') === 0) d = d.slice(1)
@@ -189,6 +191,16 @@ routerAdd(
         out.push({ phone: p, name: String(name || '').trim() })
       }
       const type = String((aud && aud.type) || 'TODOS')
+      if (type === 'WHATSAPP') {
+        // Grupos do WhatsApp: uma mensagem por grupo, direto no endereço do grupo
+        for (const g of Array.isArray(aud.wa_groups) ? aud.wa_groups : []) {
+          const id = String((g && g.id) || '')
+          if (!GROUP_JID.test(id) || seen[id]) continue
+          seen[id] = true
+          out.push({ phone: id, name: String((g && g.name) || 'Grupo').trim() })
+        }
+        return { list: out, noPhone: 0 }
+      }
       const cong = String((aud && aud.congregation) || '')
       const okPerson = (p) =>
         p.getString('church_id') === churchId &&
@@ -259,7 +271,10 @@ routerAdd(
 
     const cleanAudience = (a) => {
       a = a && typeof a === 'object' ? a : {}
-      const type = ['TODOS', 'GRUPO', 'EVENTO', 'PESSOAS'].indexOf(a.type) !== -1 ? a.type : 'TODOS'
+      const type =
+        ['TODOS', 'GRUPO', 'EVENTO', 'PESSOAS', 'WHATSAPP'].indexOf(a.type) !== -1
+          ? a.type
+          : 'TODOS'
       const out = { type: type, congregation: String(a.congregation || '').slice(0, 50) }
       if (type === 'TODOS') {
         out.statuses = (Array.isArray(a.statuses) ? a.statuses : ['MEMBRO', 'CONGREGADO']).filter(
@@ -268,6 +283,20 @@ routerAdd(
       }
       if (type === 'GRUPO') out.group_id = String(a.group_id || '').slice(0, 40)
       if (type === 'EVENTO') out.event_id = String(a.event_id || '').slice(0, 40)
+      if (type === 'WHATSAPP') {
+        const seen = {}
+        out.wa_groups = (Array.isArray(a.wa_groups) ? a.wa_groups : [])
+          .map((g) => ({
+            id: String((g && g.id) || '').slice(0, 60),
+            name: String((g && g.name) || '').slice(0, 100),
+          }))
+          .filter((g) => {
+            if (!GROUP_JID.test(g.id) || seen[g.id]) return false
+            seen[g.id] = true
+            return true
+          })
+          .slice(0, 50)
+      }
       if (type === 'PESSOAS') {
         out.person_ids = (Array.isArray(a.person_ids) ? a.person_ids : [])
           .map((x) => String(x).slice(0, 40))
@@ -313,6 +342,8 @@ routerAdd(
         )
         .replace(/\*\*([^*]+)\*\*/g, '*$1*')
         .replace(/[ \t]{2,}/g, ' ')
+        .replace(/[ \t]+([,!?.])/g, '$1')
+        .replace(/,([!?.])/g, '$1')
         .trim()
     }
 
@@ -358,10 +389,11 @@ routerAdd(
       let t = from
       for (const m of rows) {
         t = nextSlot(t, ws, we)
+        const gap = isGroup(m.getString('phone')) ? 1 + Math.random() : 0
         m.set('status', 'FILA')
         m.set('send_after', iso(t))
         $app.save(m)
-        t += (pmin + Math.random() * (pmax - pmin)) * 60000
+        t += (gap || pmin + Math.random() * (pmax - pmin)) * 60000
       }
       return t
     }
@@ -414,6 +446,60 @@ routerAdd(
     if (action === 'audience_count') {
       const res = resolveAudience(cleanAudience(body.audience))
       return e.json(200, { total: res.list.length, no_phone: res.noPhone })
+    }
+
+    if (action === 'wa_groups') {
+      // Grupos de que o número da igreja participa (lidos na hora, direto da Evolution)
+      const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
+        .replace(/\s+/g, '')
+        .replace(/\/+$/, '')
+      const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
+      if (!apiUrl || !apiKey)
+        return e.json(400, { message: 'O WhatsApp ainda não foi configurado no servidor.' })
+      let inst = ''
+      try {
+        inst = $app
+          .findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', { c: churchId })
+          .getString('instance')
+      } catch (_) {}
+      if (!inst) return e.json(400, { message: 'Conecte o WhatsApp da igreja primeiro.' })
+      let res = null
+      try {
+        res = $http.send({
+          url:
+            apiUrl + '/group/fetchAllGroups/' + encodeURIComponent(inst) + '?getParticipants=false',
+          method: 'GET',
+          headers: { apikey: apiKey },
+          timeout: 40,
+        })
+      } catch (_) {
+        return e.json(502, { message: 'Não consegui falar com o servidor do WhatsApp.' })
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300)
+        return e.json(502, {
+          message:
+            'O WhatsApp não devolveu os grupos (código ' +
+            res.statusCode +
+            '). Confira se ele está conectado.',
+        })
+      let list = []
+      try {
+        list = res.json
+      } catch (_) {}
+      if (!Array.isArray(list)) list = []
+      const items = []
+      for (const g of list) {
+        const id = String((g && (g.id || g.jid)) || '')
+        if (!GROUP_JID.test(id)) continue
+        items.push({
+          id: id,
+          name: String((g && g.subject) || 'Grupo sem nome').slice(0, 100),
+          size: (g && (g.size || (Array.isArray(g.participants) ? g.participants.length : 0))) || 0,
+          only_admins: !!(g && g.announce),
+        })
+      }
+      items.sort((a, b) => a.name.localeCompare(b.name))
+      return e.json(200, { items: items.slice(0, 500) })
     }
 
     if (action === 'options') {
@@ -508,7 +594,8 @@ routerAdd(
         items: rows.slice(0, perPage).map((m) => ({
           id: m.id,
           name: m.getString('name'),
-          phone_end: m.getString('phone').slice(-4),
+          phone_end: isGroup(m.getString('phone')) ? 'grupo' : m.getString('phone').slice(-4),
+          group: isGroup(m.getString('phone')),
           status: m.getString('status'),
           error: m.getString('error'),
           send_after: m.getString('send_after'),
@@ -773,9 +860,15 @@ routerAdd(
         if (!at) return e.json(400, { message: 'Escolha o dia e a hora.' })
         if (at < Date.now() - 5 * 60000) return e.json(400, { message: 'Esse horário já passou.' })
       }
-      const res = resolveAudience(parseJson(r.getString('audience'), {}))
+      const aud = parseJson(r.getString('audience'), {})
+      const res = resolveAudience(aud)
       if (res.list.length === 0)
-        return e.json(400, { message: 'Ninguém do público escolhido tem celular cadastrado.' })
+        return e.json(400, {
+          message:
+            aud.type === 'WHATSAPP'
+              ? 'Escolha pelo menos um grupo do WhatsApp.'
+              : 'Ninguém do público escolhido tem celular cadastrado.',
+        })
       r.set('status', 'PROGRAMADO')
       r.set('starts_at', iso(at))
       r.set('total', res.list.length)
@@ -1090,9 +1183,19 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
   const msgCol = $app.findCollectionByNameOrId('whatsapp_messages')
   const campCol = $app.findCollectionByNameOrId('whatsapp_campaigns')
 
+  const GROUP_JID = /^[\d-]{5,50}@g\.us$/
   const resolveAudience = (churchId, aud) => {
     const out = []
     const seen = {}
+    if (aud && aud.type === 'WHATSAPP') {
+      for (const g of Array.isArray(aud.wa_groups) ? aud.wa_groups : []) {
+        const id = String((g && g.id) || '')
+        if (!GROUP_JID.test(id) || seen[id]) continue
+        seen[id] = true
+        out.push({ phone: id, name: String((g && g.name) || 'Grupo').trim(), group: true })
+      }
+      return out
+    }
     const push = (phone, name) => {
       const p = fixPhone(phone)
       if (!p || seen[p]) return
@@ -1235,7 +1338,12 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
     if (people.length === 0) {
       c.set('status', 'CONCLUIDO')
       c.set('total', 0)
-      c.set('note', 'Ninguém do público tem celular cadastrado')
+      c.set(
+        'note',
+        parseJson(c.getString('audience'), {}).type === 'WHATSAPP'
+          ? 'Nenhum grupo do WhatsApp escolhido'
+          : 'Ninguém do público tem celular cadastrado',
+      )
       c.set('finished_at', iso(now))
       $app.save(c)
       return
@@ -1249,7 +1357,9 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
     for (const p of people) {
       t = nextSlot(t, ws, we)
       const full = p.name
-      const v = Object.assign({}, vars, { nome: full, primeiro_nome: full.split(/\s+/)[0] || '' })
+      // No grupo não há um nome só: {nome} e {primeiro_nome} ficam vazios
+      const who = p.group ? '' : full
+      const v = Object.assign({}, vars, { nome: who, primeiro_nome: who.split(/\s+/)[0] || '' })
       const msg = new Record(msgCol)
       msg.set('church_id', churchId)
       msg.set('kind', 'AVISO')
@@ -1265,6 +1375,8 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
           )
           .replace(/\*\*([^*]+)\*\*/g, '*$1*')
           .replace(/[ \t]{2,}/g, ' ')
+          .replace(/[ \t]+([,!?.])/g, '$1')
+          .replace(/,([!?.])/g, '$1')
           .trim()
           .slice(0, 4000),
       )
@@ -1279,7 +1391,8 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
       msg.set('send_after', iso(t))
       $app.save(msg)
       last = t
-      t += (pmin + Math.random() * (pmax - pmin)) * 60000
+      // Grupos saem com 1 a 2 minutos entre um e outro
+      t += (p.group ? 1 + Math.random() : pmin + Math.random() * (pmax - pmin)) * 60000
     }
     c.set('status', 'ENVIANDO')
     c.set('total', people.length)

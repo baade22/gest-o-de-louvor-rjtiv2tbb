@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   estimateEnd,
   fromLocalInput,
+  isGroupAudience,
   nextSlot,
   previewText,
   toLocalInput,
@@ -52,6 +53,13 @@ describe('textos', () => {
         evento: 'Retiro',
       }),
     ).toBe('Olá, Ana! *Retiro* {x}')
+  })
+  it('nos grupos tira o nome sem deixar vírgula sobrando', () => {
+    expect(
+      previewText('Olá, {primeiro_nome}! Hoje tem culto, {nome}.', { primeiro_nome: '', nome: '' }),
+    ).toBe('Olá! Hoje tem culto.')
+    expect(isGroupAudience({ type: 'WHATSAPP' })).toBe(true)
+    expect(isGroupAudience({ type: 'PESSOAS' })).toBe(false)
   })
   it('diz quando, em palavras', () => {
     expect(whenLabel(at(16, 40), SAT_10)).toBe('hoje às 16:40')
