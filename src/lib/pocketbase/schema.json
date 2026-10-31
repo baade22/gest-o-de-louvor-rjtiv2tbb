@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T19:57:44.865Z",
+  "generatedAt": "2026-10-31T20:53:08.270Z",
   "collections": [
     {
       "name": "users",
@@ -6416,6 +6416,56 @@
         "CREATE INDEX idx_fin_receipts_queue ON fin_receipts (status, next_try)",
         "CREATE INDEX idx_fin_receipts_msg ON fin_receipts (church_id, wa_message_id)",
         "CREATE INDEX idx_fin_receipts_line ON fin_receipts (line_id)"
+      ]
+    },
+    {
+      "name": "login_attempts",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "ident",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "fails",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "locked_until",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_fail",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_login_attempts_ident ON login_attempts (ident)"
       ]
     }
   ]
