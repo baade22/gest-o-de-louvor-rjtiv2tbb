@@ -805,7 +805,12 @@ const receipts = <T>(churchId: string, action: string, body: Record<string, unkn
     body: { church_id: churchId, action, ...body },
   })
 
-export const receiptsStatus = (churchId: string) => receipts<FinReceiptsStatus>(churchId, 'status')
+// Manda o endereço do servidor que a tela usa: atrás de proxy, o servidor pode não saber o
+// próprio endereço público (ele confere antes de usar)
+export const receiptsStatus = (churchId: string) =>
+  receipts<FinReceiptsStatus>(churchId, 'status', {
+    base: new URL(pb.baseURL || '/', window.location.href).href,
+  })
 
 export const listReceipts = (
   churchId: string,
