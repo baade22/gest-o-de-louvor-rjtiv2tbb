@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T03:25:28.657Z",
+  "generatedAt": "2026-10-31T03:39:08.356Z",
   "collections": [
     {
       "name": "users",
@@ -5595,6 +5595,18 @@
         },
         {
           "name": "inbound_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inbound_last_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inbound_last_note",
           "type": "text",
           "required": false,
           "system": false
