@@ -23,6 +23,18 @@
 // A chave da IA vem do segredo ANTHROPIC_API_KEY (LOUVORFLOW_AI_MODEL troca o modelo).
 // Cada handler roda isolado no PocketBase: os helpers ficam dentro de cada um.
 
+// Conferência do endereço: a tela só entrega à Evolution um endereço que chega neste servidor
+routerAdd('GET', '/backend/v1/whatsapp/inbound/{token}', (e) => {
+  const token = String(e.request.pathValue('token') || '')
+  if (token.length < 32) return e.json(404, { message: 'Não encontrado' })
+  try {
+    $app.findFirstRecordByFilter('whatsapp_settings', 'inbound_token = {:t}', { t: token })
+  } catch (_) {
+    return e.json(404, { message: 'Não encontrado' })
+  }
+  return e.json(200, { ok: true })
+})
+
 routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
   const token = String(e.request.pathValue('token') || '')
   if (token.length < 32) return e.json(404, { message: 'Não encontrado' })
@@ -39,7 +51,23 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
     .toLowerCase()
     .replace(/_/g, '.')
   if (event !== 'messages.upsert') return e.json(200, { ok: true })
-  if (body.instance && String(body.instance) !== inst) return e.json(200, { ok: true })
+  // O que aconteceu com a última mensagem fica para a tela de Comprovantes (diagnóstico)
+  const mask = (p) => '…' + String(p || '').slice(-4)
+  const note = (text) => {
+    try {
+      st.set('inbound_last_at', new Date().toISOString().replace('T', ' '))
+      st.set('inbound_last_note', String(text).slice(0, 300))
+      $app.save(st)
+    } catch (_) {}
+  }
+  if (body.instance && String(body.instance) !== inst) {
+    note(
+      'Mensagem de outra instância do WhatsApp (' +
+        String(body.instance).slice(0, 40) +
+        '): ignorada.',
+    )
+    return e.json(200, { ok: true })
+  }
 
   const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
     .replace(/\s+/g, '')
@@ -105,7 +133,10 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
       { c: churchId },
     )
   } catch (_) {}
-  if (senders.length === 0) return e.json(200, { ok: true })
+  if (senders.length === 0) {
+    note('Mensagem recebida, mas nenhum celular está cadastrado para mandar comprovantes.')
+    return e.json(200, { ok: true })
+  }
 
   const data = body.data
   const items = Array.isArray(data)
@@ -126,7 +157,10 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
   for (const d of items) {
     try {
       const key = (d && d.key) || {}
-      if (key.fromMe === true) continue
+      if (key.fromMe === true) {
+        note('Mensagem enviada pelo próprio WhatsApp da igreja: ignorada.')
+        continue
+      }
       const remote = String(key.remoteJid || '')
       if (/@g\.us$|@broadcast$|@newsletter$/.test(remote)) continue
       // Contato com "LID" (número escondido): a Evolution manda o número em outro campo
@@ -138,9 +172,15 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
           break
         }
       }
-      if (!phone) continue
+      if (!phone) {
+        note('Mensagem de um contato sem número visível (' + remote.split('@')[1] + '): ignorada.')
+        continue
+      }
       const sender = senders.find((s) => phoneKey(s.getString('phone')) === phoneKey(phone))
-      if (!sender) continue
+      if (!sender) {
+        note('Mensagem do número terminado em ' + mask(phone) + ', que não está cadastrado.')
+        continue
+      }
       const name = sender.getString('name')
 
       let msg = d.message || {}
@@ -158,6 +198,7 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
         const text = String(
           msg.conversation || (msg.extendedTextMessage && msg.extendedTextMessage.text) || '',
         )
+        note('Texto (sem comprovante) de ' + name + '.')
         if (text) {
           // Ajuda no máximo uma vez a cada 6 horas para a mesma pessoa
           const since = new Date(Date.now() - 6 * 3600 * 1000).toISOString().replace('T', ' ')
@@ -187,6 +228,7 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
         .trim()
         .toLowerCase()
       if (!MIMES[mime]) {
+        note('Arquivo de ' + name + ' em formato que não dá para ler (' + mime + ').')
         reply(
           phone,
           name,
@@ -219,6 +261,7 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
       }
       b64 = b64.replace(/^data:[^,]*,/, '')
       if (!b64) {
+        note('Comprovante de ' + name + ' chegou sem o arquivo e não deu para baixar.')
         reply(
           phone,
           name,
@@ -257,8 +300,10 @@ routerAdd('POST', '/backend/v1/whatsapp/inbound/{token}', (e) => {
         console.log('comprovantes: arquivo recusado, guardando sem anexo: ' + err)
         save(false)
       }
+      note('Comprovante de ' + name + ' recebido.')
     } catch (err) {
       console.log('comprovantes: mensagem não foi guardada: ' + err)
+      note('Erro ao guardar a mensagem: ' + String(err).slice(0, 200))
     }
   }
   return e.json(200, { ok: true })
@@ -965,6 +1010,9 @@ routerAdd(
       const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
       let whatsapp = 'SEM_SERVIDOR'
       let webhookError = ''
+      let inboundBase = ''
+      let lastAt = ''
+      let lastNote = ''
       if (apiUrl && apiKey) {
         whatsapp = 'DESCONECTADO'
         try {
@@ -972,25 +1020,59 @@ routerAdd(
             c: churchId,
           })
           if (st.getString('status') === 'open') whatsapp = 'CONECTADO'
-          // Liga o aviso de mensagens recebidas na Evolution (uma vez, ou se o endereço mudar)
-          let base = String($os.getenv('WHATSAPP_MEDIA_BASE_URL') || '')
-            .replace(/\s+/g, '')
-            .replace(/\/+$/, '')
-          if (!base) {
-            const host = String(e.request.header.get('X-Forwarded-Host') || e.request.host || '')
-              .split(',')[0]
-              .trim()
-            let proto = String(e.request.header.get('X-Forwarded-Proto') || '')
-              .split(',')[0]
-              .trim()
-            if (!proto) proto = /^(localhost|127\.)/.test(host) ? 'http' : 'https'
-            if (host) base = proto + '://' + host
-          }
+          lastAt = st.getString('inbound_last_at')
+          lastNote = st.getString('inbound_last_note')
           if (!st.getString('inbound_token')) {
             st.set('inbound_token', $security.randomString(48))
             $app.save(st)
           }
-          const url = base + '/backend/v1/whatsapp/inbound/' + st.getString('inbound_token')
+          const path = '/backend/v1/whatsapp/inbound/' + st.getString('inbound_token')
+          // Endereço público deste servidor, nesta ordem: o segredo WHATSAPP_MEDIA_BASE_URL, o
+          // endereço pelo qual a tela chegou aqui e o endereço do servidor que a tela usa. Fora
+          // o segredo, só vale o que for conferido (chamada a este mesmo servidor por ele).
+          const clean = (u) =>
+            String(u || '')
+              .replace(/\s+/g, '')
+              .replace(/\/+$/, '')
+          const env = clean($os.getenv('WHATSAPP_MEDIA_BASE_URL'))
+          const host = String(e.request.header.get('X-Forwarded-Host') || e.request.host || '')
+            .split(',')[0]
+            .trim()
+          let proto = String(e.request.header.get('X-Forwarded-Proto') || '')
+            .split(',')[0]
+            .trim()
+          if (!proto) proto = /^(localhost|127\.)/.test(host) ? 'http' : 'https'
+          const candidates = []
+          if (host) candidates.push(proto + '://' + host)
+          const fromScreen = clean(body.base)
+          if (canEdit && /^https?:\/\/[^\s?#]+$/.test(fromScreen)) candidates.push(fromScreen)
+          const reaches = (b) => {
+            try {
+              const r = $http.send({ url: b + path, method: 'GET', timeout: 10 })
+              return r.statusCode === 200 && !!r.json && r.json.ok === true
+            } catch (_) {
+              return false
+            }
+          }
+          let base = env
+          const current = st.getString('inbound_url')
+          if (!base && current && candidates.indexOf(current.slice(0, -path.length)) !== -1) {
+            base = current.slice(0, -path.length) // já conferido antes
+          }
+          if (!base) {
+            for (const c of candidates) {
+              if (/^https:/.test(c) && reaches(c)) {
+                base = c
+                break
+              }
+            }
+          }
+          if (!base) {
+            webhookError =
+              'não achei o endereço público do servidor; cadastre no Skip o segredo WHATSAPP_MEDIA_BASE_URL com o endereço do servidor'
+          }
+          inboundBase = base
+          const url = base + path
           if (base && st.getString('instance') && st.getString('inbound_url') !== url) {
             const res = $http.send({
               url: apiUrl + '/webhook/set/' + encodeURIComponent(st.getString('instance')),
@@ -1011,7 +1093,11 @@ routerAdd(
               st.set('inbound_url', url)
               $app.save(st)
             } else {
-              webhookError = 'O servidor do WhatsApp respondeu ' + res.statusCode
+              webhookError =
+                'O servidor do WhatsApp respondeu ' +
+                res.statusCode +
+                ' ' +
+                String(res.raw || '').slice(0, 150)
             }
           }
         } catch (err) {
@@ -1033,6 +1119,9 @@ routerAdd(
         ai: !!String($os.getenv('ANTHROPIC_API_KEY') || '').trim(),
         whatsapp: whatsapp,
         webhook_error: webhookError,
+        inbound_base: inboundBase,
+        inbound_last_at: lastAt,
+        inbound_last_note: lastNote,
         counts: counts,
         can_edit: canEdit,
       })

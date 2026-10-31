@@ -526,6 +526,10 @@ export interface FinReceiptsStatus {
   ai: boolean
   whatsapp: 'SEM_SERVIDOR' | 'DESCONECTADO' | 'CONECTADO'
   webhook_error: string
+  // Diagnóstico do recebimento: endereço entregue à Evolution e a última mensagem que chegou
+  inbound_base?: string
+  inbound_last_at?: string
+  inbound_last_note?: string
   counts: Partial<Record<FinReceiptStatus, number>>
   can_edit: boolean
 }

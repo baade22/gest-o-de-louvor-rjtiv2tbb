@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
+import { brtDateTime, timeAgo } from '@/lib/bankStatement'
 import {
   chooseReceiptLine,
   deleteReceiptSender,
@@ -211,12 +212,15 @@ export default function FinanceReceipts() {
           )}
         </div>
 
-        <SendersCard
-          churchId={churchId || ''}
-          senders={senders}
-          canEdit={canEdit}
-          onChanged={() => load(true)}
-        />
+        <div className="min-w-0 space-y-4">
+          <SendersCard
+            churchId={churchId || ''}
+            senders={senders}
+            canEdit={canEdit}
+            onChanged={() => load(true)}
+          />
+          {status && <InboundCard status={status} />}
+        </div>
       </div>
     </div>
   )
@@ -526,6 +530,37 @@ function ReceiptCard({
               Descartar
             </Button>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Diagnóstico: a última mensagem que chegou do WhatsApp e o que foi feito com ela. */
+function InboundCard({ status }: { status: FinReceiptsStatus }) {
+  if (status.whatsapp === 'SEM_SERVIDOR') return null
+  return (
+    <div className={cn(cardClass, 'space-y-1.5 p-4 text-sm')}>
+      <div className="font-semibold text-slate-900">Recebimento pelo WhatsApp</div>
+      {status.inbound_last_at ? (
+        <>
+          <div className="text-xs text-slate-500">
+            Última mensagem: {brtDateTime(status.inbound_last_at)} (
+            {timeAgo(status.inbound_last_at)})
+          </div>
+          <div className="text-slate-700">{status.inbound_last_note}</div>
+        </>
+      ) : (
+        <div className="text-slate-600">
+          Nenhuma mensagem chegou do WhatsApp até agora.
+          {status.inbound_base
+            ? ' Mande uma foto de teste de um celular cadastrado.'
+            : ' O recebimento ainda não está ligado.'}
+        </div>
+      )}
+      {status.inbound_base && (
+        <div className="break-all text-[11.5px] text-slate-400">
+          Endereço: {status.inbound_base}
         </div>
       )}
     </div>
