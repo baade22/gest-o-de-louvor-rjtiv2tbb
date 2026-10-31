@@ -271,9 +271,14 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
         msg.set('error', '')
         msg.set('sent_at', new Date().toISOString())
       } else if (r.code === 400) {
-        // Número sem WhatsApp ou inválido: não adianta repetir
+        // Número sem WhatsApp ou inválido (ou grupo de que a igreja saiu): não adianta repetir
         msg.set('status', 'ERRO')
-        msg.set('error', 'Número sem WhatsApp ou inválido')
+        msg.set(
+          'error',
+          number.indexOf('@g.us') !== -1
+            ? 'Grupo não encontrado ou só administradores podem mandar mensagem nele'
+            : 'Número sem WhatsApp ou inválido',
+        )
       } else if (attempts >= 3) {
         msg.set('status', 'ERRO')
         msg.set('error', 'O servidor do WhatsApp recusou (código ' + r.code + ')')

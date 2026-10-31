@@ -17,7 +17,13 @@ export type AvisoStatus =
   | 'CANCELADO'
   | 'ATIVA'
   | 'INATIVA'
-export type AudienceType = 'TODOS' | 'GRUPO' | 'EVENTO' | 'PESSOAS'
+export type AudienceType = 'TODOS' | 'GRUPO' | 'EVENTO' | 'PESSOAS' | 'WHATSAPP'
+
+/** Grupo do WhatsApp escolhido no público (id = endereço "…@g.us") */
+export interface WaGroupRef {
+  id: string
+  name: string
+}
 
 export interface AvisoAudience {
   type: AudienceType
@@ -26,6 +32,7 @@ export interface AvisoAudience {
   group_id?: string
   event_id?: string
   person_ids?: string[]
+  wa_groups?: WaGroupRef[]
 }
 
 export const MEDIA_TYPES: Array<{
@@ -91,7 +98,15 @@ export const AUDIENCE_TYPES: Array<{ value: AudienceType; label: string }> = [
   { value: 'GRUPO', label: 'Um ministério ou grupo' },
   { value: 'EVENTO', label: 'Inscritos de um evento' },
   { value: 'PESSOAS', label: 'Escolher pessoas' },
+  { value: 'WHATSAPP', label: 'Grupos do WhatsApp' },
 ]
+
+/** Público em grupos do WhatsApp: uma mensagem por grupo, sem nome de pessoa */
+export const isGroupAudience = (a: Pick<AvisoAudience, 'type'> | null | undefined) =>
+  a?.type === 'WHATSAPP'
+
+/** Nos grupos os envios saem com 1 a 2 minutos entre um e outro */
+export const GROUP_PACE = { min: 1, max: 2 }
 
 export const PERSON_STATUS_OPTIONS = [
   { value: 'MEMBRO', label: 'Membros' },
@@ -125,6 +140,9 @@ export function previewText(text: string, sample: Record<string, string>): strin
   return text
     .replace(/\{(\w+)\}/g, (all, k: string) => (k in sample ? sample[k] : all))
     .replace(/\*\*([^*]+)\*\*/g, '*$1*')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+([,!?.])/g, '$1')
+    .replace(/,([!?.])/g, '$1')
 }
 
 const BRT = 3 * 3600 * 1000
