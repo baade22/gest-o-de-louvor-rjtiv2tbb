@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T16:57:51.961Z",
+  "generatedAt": "2026-10-31T03:17:00.513Z",
   "collections": [
     {
       "name": "users",
@@ -4571,8 +4571,8 @@
       "apiRules": {
         "list": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
         "view": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.')",
-        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.history_loaded_from:isset = false && @request.body.history_done_for:isset = false",
-        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.church_id:isset = false && @request.body.history_loaded_from:isset = false && @request.body.history_done_for:isset = false",
+        "create": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.history_loaded_from:isset = false && @request.body.history_done_for:isset = false && @request.body.invested_cents:isset = false",
+        "update": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"') && @request.body.last_sync_at:isset = false && @request.body.last_status:isset = false && @request.body.last_error:isset = false && @request.body.balance_cents:isset = false && @request.body.available_cents:isset = false && @request.body.balance_at:isset = false && @request.body.has_balance:isset = false && @request.body.last_created:isset = false && @request.body.last_auto_reconciled:isset = false && @request.body.sync_requested_at:isset = false && @request.body.church_id:isset = false && @request.body.history_loaded_from:isset = false && @request.body.history_done_for:isset = false && @request.body.invested_cents:isset = false",
         "delete": "@request.auth.id != '' && @collection.church_members.church_id ?= church_id && @collection.church_members.user_id ?= @request.auth.id && @collection.church_members.is_active ?= true && (@collection.church_members.role ?= 'MASTER' || @collection.church_members.permissions ?~ '\"financeiro.conciliacao.alterar\"')"
       },
       "fields": [
@@ -4776,6 +4776,12 @@
         {
           "name": "history_done_for",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "invested_cents",
+          "type": "number",
           "required": false,
           "system": false
         }
