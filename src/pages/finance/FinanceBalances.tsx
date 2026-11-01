@@ -151,14 +151,20 @@ function periodRange(p: Period, from: string, to: string): [string, string] {
   return [from || t, to || t]
 }
 
-/** Saldo informado pelo banco: o mais recente entre a API e o último arquivo OFX com saldo. */
-function bankBalance(conn?: FinBankConnection, imp?: FinBankImport) {
+/**
+ * Saldo informado pelo banco: o mais recente entre a API e o último arquivo OFX com saldo.
+ * asInvest: a conta é a do fundo (aplicações) da conexão de outra conta.
+ */
+function bankBalance(conn?: FinBankConnection, imp?: FinBankImport, asInvest = false) {
   const api =
     conn?.has_balance && conn.balance_at
       ? {
-          cents: conn.balance_cents || 0,
-          available: conn.available_cents ?? conn.balance_cents ?? 0,
-          invested: conn.invested_cents || 0,
+          cents: asInvest ? conn.invested_cents || 0 : conn.balance_cents || 0,
+          available: asInvest
+            ? conn.invested_cents || 0
+            : (conn.available_cents ?? conn.balance_cents ?? 0),
+          // Com conta do fundo, as aplicações aparecem no cartão dela
+          invested: asInvest || conn.invest_account_id ? 0 : conn.invested_cents || 0,
           day: brtDay(conn.balance_at),
           at: conn.balance_at,
           source: 'API' as const,
@@ -259,7 +265,16 @@ export default function FinanceBalances() {
     return () => clearInterval(id)
   }, [load, waiting])
 
-  const connOf = (accountId: string) => connections.find((c) => c.account_id === accountId)
+  // A conta do fundo (aplicações) não tem conexão própria: vem da conexão da
+  // conta-corrente do Bradesco
+  const ownConn = (accountId: string) => connections.find((c) => c.account_id === accountId)
+  const investParent = (accountId: string) =>
+    ownConn(accountId)
+      ? undefined
+      : connections.find((c) => c.provider === 'BRADESCO' && c.invest_account_id === accountId)
+  const connOf = (accountId: string) => ownConn(accountId) || investParent(accountId)
+  const balanceOf = (accountId: string) =>
+    bankBalance(connOf(accountId), imports[accountId], !!investParent(accountId))
   const systemBalances = useMemo(
     () => accountBalances(lookups.accounts, ledger),
     [lookups.accounts, ledger],
@@ -270,9 +285,7 @@ export default function FinanceBalances() {
       ledger.filter((tx) => tx.date.slice(0, 10) <= day),
     )[account.id] || 0
 
-  const withBank = accounts
-    .map((a) => ({ a, b: bankBalance(connOf(a.id), imports[a.id]) }))
-    .filter((x) => x.b)
+  const withBank = accounts.map((a) => ({ a, b: balanceOf(a.id) })).filter((x) => x.b)
   const totalBank = withBank.reduce((s, x) => s + (x.b?.cents || 0), 0)
   const totalSystem = withBank.reduce((s, x) => s + systemBalanceOn(x.a, x.b!.day), 0)
   const activeConnections = connections.filter(
@@ -465,7 +478,8 @@ export default function FinanceBalances() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {accounts.map((a) => {
             const conn = connOf(a.id)
-            const b = bankBalance(conn, imports[a.id])
+            const parent = investParent(a.id)
+            const b = balanceOf(a.id)
             const system = b ? systemBalanceOn(a, b.day) : systemBalances[a.id] || 0
             const diff = b ? b.cents - system : 0
             const isCash = a.kind === 'CAIXA'
@@ -550,6 +564,13 @@ export default function FinanceBalances() {
                         {pending[a.id]} a conciliar
                       </Link>
                     )}
+                    {parent && (
+                      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                        Aplicação de{' '}
+                        {lookups.accounts.find((x) => x.id === parent.account_id)?.name ||
+                          'outra conta'}
+                      </span>
+                    )}
                     {conn?.purpose === 'VISUALIZAR' && (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                         Só extrato
@@ -574,7 +595,7 @@ export default function FinanceBalances() {
                       >
                         Ver extrato
                       </Button>
-                      {canEdit && (
+                      {canEdit && !parent && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -814,6 +835,17 @@ export default function FinanceBalances() {
         <ConnectionDialog
           account={editing.account}
           conn={editing.conn}
+          investChoices={lookups.accounts.filter(
+            (x) =>
+              x.is_active &&
+              x.kind !== 'CAIXA' &&
+              x.id !== editing.account.id &&
+              !connections.some(
+                (c) =>
+                  c.id !== editing.conn?.id &&
+                  (c.account_id === x.id || c.invest_account_id === x.id),
+              ),
+          )}
           onClose={() => setEditing(null)}
           onSave={async (input) => {
             await saveBankConnection(churchId, input, editing.conn?.id)
@@ -909,12 +941,14 @@ const withoutDigit = (s?: string) => (s || '').split(/[-–]/)[0].replace(/\D/g,
 function ConnectionDialog({
   account,
   conn,
+  investChoices,
   onClose,
   onSave,
   onDelete,
 }: {
   account: FinAccount
   conn?: FinBankConnection
+  investChoices: FinAccount[]
   onClose: () => void
   onSave: (input: BankConnectionInput) => Promise<void>
   onDelete?: () => Promise<void>
@@ -935,6 +969,7 @@ function ConnectionDialog({
     reconcile_from: conn?.reconcile_from || '',
     history_from: conn?.history_from || '',
     history_max: conn?.history_max ?? false,
+    invest_account_id: conn?.invest_account_id || '',
   })
   const [history, setHistory] = useState<'none' | 'date' | 'max'>(
     conn?.history_max ? 'max' : conn?.history_from ? 'date' : 'none',
@@ -964,6 +999,7 @@ function ConnectionDialog({
         reconcile_from: reconcile ? form.reconcile_from : '',
         branch: bradesco ? form.branch : '',
         account_number: bradesco ? form.account_number : '',
+        invest_account_id: bradesco ? form.invest_account_id || '' : '',
         credential_key: (form.credential_key || '').toUpperCase(),
       })
     } catch (err) {
@@ -1058,6 +1094,33 @@ function ConnectionDialog({
                 </Select>
               </div>
               <p className="col-span-3 -mt-1 text-xs text-slate-500">Sem o dígito.</p>
+            </div>
+          )}
+
+          {bradesco && (
+            <div className="space-y-1.5">
+              <Label>Conta do fundo (aplicações)</Label>
+              <Select
+                value={form.invest_account_id || 'NONE'}
+                onValueChange={(v) => set({ invest_account_id: v === 'NONE' ? '' : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Nenhuma: mostra as aplicações nesta conta</SelectItem>
+                  {investChoices.map((x) => (
+                    <SelectItem key={x.id} value={x.id}>
+                      {x.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">
+                {form.invest_account_id
+                  ? 'O saldo do fundo vai para essa conta. Aplicações e resgates do fundo aparecem nas duas contas, para conciliar como transferência. O Invest Fácil continua como saldo desta conta.'
+                  : 'Para separar, cadastre antes uma conta (ex.: Fundo Max DI) em Cadastros.'}
+              </p>
             </div>
           )}
 

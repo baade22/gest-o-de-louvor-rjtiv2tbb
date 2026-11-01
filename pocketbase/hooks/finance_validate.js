@@ -44,6 +44,7 @@ onRecordValidate(
       },
       fin_bank_connections: {
         account_id: 'fin_accounts',
+        invest_account_id: 'fin_accounts',
       },
     }[rec.collection().name]
 
@@ -72,6 +73,39 @@ onRecordValidate(
         (!rec.getString('branch') || !rec.getString('account_number'))
       ) {
         throw new BadRequestError('Informe a agência e a conta do Bradesco, sem o dígito.')
+      }
+      // Conta de aplicação (Invest Fácil): só no Bradesco, outra conta, sem conexão própria
+      const inv = rec.getString('invest_account_id')
+      if (inv) {
+        if (rec.getString('provider') !== 'BRADESCO') rec.set('invest_account_id', '')
+        else {
+          if (inv === rec.getString('account_id')) {
+            throw new BadRequestError('A conta da aplicação precisa ser outra conta.')
+          }
+          const taken = e.app.findRecordsByFilter(
+            'fin_bank_connections',
+            'id != {:id} && (account_id = {:a} || invest_account_id = {:a})',
+            '',
+            1,
+            0,
+            { id: rec.id || '-', a: inv },
+          )
+          if (taken.length) {
+            throw new BadRequestError('A conta da aplicação já está ligada a outra conexão.')
+          }
+        }
+      }
+      // Uma conta usada como aplicação de outra conexão não ganha conexão própria
+      const own = e.app.findRecordsByFilter(
+        'fin_bank_connections',
+        'id != {:id} && invest_account_id = {:a}',
+        '',
+        1,
+        0,
+        { id: rec.id || '-', a: rec.getString('account_id') },
+      )
+      if (own.length) {
+        throw new BadRequestError('Esta conta já recebe a aplicação de outra conexão.')
       }
     }
 
