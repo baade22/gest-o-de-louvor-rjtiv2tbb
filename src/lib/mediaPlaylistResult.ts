@@ -22,6 +22,14 @@ function stripRetryNote(text: string): string {
     .trim()
 }
 
+/** Diz qual culto do Holyrics o Agent leu, para conferir se é o certo. */
+function scheduleNote(result: any): string {
+  const snap = result?.playlist_after || result?.playlist_before
+  if (!snap || (!snap.name && !snap.datetime)) return ''
+  const label = [snap.name, snap.datetime].filter(Boolean).join(', ')
+  return ` (culto no Holyrics: ${label})`
+}
+
 export function describeMediaSyncResult(cmd: MediaSyncCommandStatus): MediaSyncSummary {
   const result = cmd.result && typeof cmd.result === 'object' ? cmd.result : {}
   const items: any[] = Array.isArray(result.items) ? result.items : []
@@ -50,9 +58,13 @@ export function describeMediaSyncResult(cmd: MediaSyncCommandStatus): MediaSyncS
     return {
       ok: false,
       title: 'Playlist montada em parte',
-      description: `${base} ${problems.length} não entrou: ${problemText}`,
+      description: `${base} ${problems.length} não entrou: ${problemText}${scheduleNote(result)}`,
     }
   }
 
-  return { ok: true, title: 'Playlist do Holyrics montada', description: base }
+  return {
+    ok: true,
+    title: 'Playlist do Holyrics montada',
+    description: base + scheduleNote(result),
+  }
 }

@@ -1,4 +1,4 @@
-# 🚀 Guia de Instalação e Uso do LouvorFlow Agent v0.0.40
+# 🚀 Guia de Instalação e Uso do LouvorFlow Agent v0.0.41
 
 Este guia passo a passo foi preparado para permitir que qualquer operador de multimídia, som ou projeção instale e execute o **LouvorFlow Agent** no computador da igreja (onde está instalado o Holyrics).
 
@@ -30,7 +30,7 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 
 ## 📥 Como Descompactar e Iniciar o Agent
 
-1. Descompacte o arquivo `LouvorFlow-Agent-0.0.40.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
+1. Descompacte o arquivo `LouvorFlow-Agent-0.0.41.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
 2. Abra o terminal na pasta descompactada:
    - **No Windows:** Abra a pasta, segure `Shift`, clique com o botão direito do mouse em um espaço vazio e escolha **"Abrir na janela do PowerShell"** (ou **"Abrir no Terminal"**).
 3. Como os arquivos compilados já estão na pasta `dist/`, você pode iniciar com um duplo clique no script ou via terminal:
@@ -42,7 +42,7 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 4. Ao iniciar, o terminal mostrará:
    ```text
    ====================================================
-         LouvorFlow Agent v0.0.40 — Holyrics Bridge
+         LouvorFlow Agent v0.0.41 — Holyrics Bridge
    ====================================================
    [Agent Web] Painel local disponível em http://localhost:8765
    [Agent] Serviço iniciado.

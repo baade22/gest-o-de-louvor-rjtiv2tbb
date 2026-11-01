@@ -57,4 +57,18 @@ describe('describeMediaSyncResult', () => {
       '1 mídia(s) colocada(s) na playlist do culto. 1 não entrou: não confirmada.',
     )
   })
+
+  it('mostra qual culto do Holyrics foi lido', () => {
+    const r = describeMediaSyncResult({
+      status: 'DONE',
+      result: {
+        synced_count: 1,
+        items: [],
+        playlist_after: { name: 'Culto Dominical', datetime: '2026-11-01 17:00', items: [] },
+      },
+    })
+    expect(r.description).toBe(
+      '1 mídia(s) colocada(s) na playlist do culto. (culto no Holyrics: Culto Dominical, 2026-11-01 17:00)',
+    )
+  })
 })
