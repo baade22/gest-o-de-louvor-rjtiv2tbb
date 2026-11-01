@@ -110,10 +110,9 @@ const TABS: TabConfig[] = [
         key: 'opening_balance_cents',
         label: 'Saldo inicial (R$)',
         type: 'money',
-        createOnly: true,
-        hint: 'Quanto havia na conta no dia em que você começou a usar o LouvorFlow.',
+        hint: 'Quanto havia na conta no dia em que você começou a usar o LouvorFlow. Dá para corrigir depois; em Saldos e extratos, "Ver de onde vem" sugere o valor que fecha com o banco.',
       },
-      { key: 'opening_date', label: 'Data do saldo inicial', type: 'date', createOnly: true },
+      { key: 'opening_date', label: 'Data do saldo inicial', type: 'date' },
       {
         key: 'min_balance_cents',
         label: 'Saldo mínimo (R$, opcional)',
