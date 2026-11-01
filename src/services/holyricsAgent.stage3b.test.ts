@@ -375,7 +375,7 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
   })
 
   // 8. Idempotência e duplicidade: item já presente não é reenviado
-  it('8. Item já presente na ocorrência de destino é marcado como ALREADY_PRESENT e não duplicado', async () => {
+  it('8. Item já presente na ocorrência de destino é marcado como ALREADY_PRESENT e o Holyrics não duplica (ignore_duplicates)', async () => {
     const agent = new LouvorFlowAgent(agentConfig)
     fs.writeFileSync(path.join(tempBaseDir, 'video', 'Video_Ja_Existe.mp4'), 'bytes')
 
@@ -384,7 +384,9 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
       tokenValid: true,
     })
     vi.spyOn((agent as any).holyrics, 'getFile').mockResolvedValue({ detected: true, fileInfo: {} })
-    const addMediaSpy = vi.spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+    const addMediaSpy = vi
+      .spyOn((agent as any).holyrics, 'addMediaToPlaylist')
+      .mockResolvedValue({ success: true })
 
     // GetSchedules já lista Video_Ja_Existe.mp4
     vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
@@ -411,7 +413,8 @@ describe('ETAPA 3B: Unificação AddToPlaylist e Vinculação de Ocorrência', (
     const res = await agent.handleSyncMediaPlaylist(cmd)
     expect(res.result?.already_present_count).toBe(1)
     expect(res.result?.items[0].status).toBe('ALREADY_PRESENT')
-    expect(addMediaSpy).not.toHaveBeenCalled()
+    // Sempre pede ao Holyrics com ignore_duplicates: ele mesmo evita a duplicação
+    expect(addMediaSpy).toHaveBeenCalledWith(expect.objectContaining({ ignoreDuplicates: true }))
   })
 
   // 9. Regressão musical: parsing, letra, cifras e transposição

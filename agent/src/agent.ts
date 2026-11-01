@@ -116,7 +116,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.40',
+          version: '0.0.41',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -262,7 +262,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.40',
+          version: '0.0.41',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -922,8 +922,8 @@ export class LouvorFlowAgent {
 
   /** Executa a leitura da playlist do culto sem deixar exceção escapar. */
   private async readEventMediaNamesSafe(
-    reader: () => Promise<{ found: boolean; names: Set<string>; error?: string }>,
-  ): Promise<{ found: boolean; names: Set<string>; error?: string }> {
+    reader: () => Promise<{ found: boolean; names: Set<string>; error?: string; snapshot?: any }>,
+  ): Promise<{ found: boolean; names: Set<string>; error?: string; snapshot?: any }> {
     try {
       return await reader()
     } catch (err: any) {
@@ -1016,10 +1016,12 @@ export class LouvorFlowAgent {
     // Playlist do culto: GetSchedules({ month, year }) → ocorrência por metadata.event.id →
     // itens em media_playlist (mídias aparecem com type video/image/audio/file e name).
     // Antes procurava em playlist.items e casava pelo id da lista, que nunca batia.
+    const MEDIA_ITEM_TYPES = new Set(['video', 'image', 'audio', 'file', 'automatic_presentation'])
     const readEventMediaNames = async (): Promise<{
       found: boolean
       names: Set<string>
       error?: string
+      snapshot?: any
     }> => {
       const names = new Set<string>()
       try {
@@ -1036,6 +1038,9 @@ export class LouvorFlowAgent {
               Array.isArray(x),
             ) || []
         for (const it of mediaItems) {
+          // Só mídias contam (músicas, títulos e versículos ficam de fora)
+          const itType = String(it?.type || '').toLowerCase()
+          if (itType && !MEDIA_ITEM_TYPES.has(itType)) continue
           const n = String(it?.name || it?.title || it?.file_name || '')
             .trim()
             .toLowerCase()
@@ -1046,7 +1051,18 @@ export class LouvorFlowAgent {
             if (base) names.add(base)
           }
         }
-        return { found: true, names }
+        // Retrato do que foi lido, para diagnóstico no registro do comando
+        const snapshot = {
+          name: schedule.name || schedule.metadata?.event?.name || '',
+          datetime: schedule.datetime || schedule.metadata?.event?.datetime || '',
+          type: schedule.type || '',
+          source: Array.isArray(schedule.media_playlist) ? 'media_playlist' : 'outro',
+          items: mediaItems.slice(0, 40).map((it: any) => ({
+            type: String(it?.type || ''),
+            name: String(it?.name || it?.title || '').slice(0, 120),
+          })),
+        }
+        return { found: true, names, snapshot }
       } catch (err: any) {
         return { found: false, names, error: err?.message || 'Erro em GetSchedules' }
       }
@@ -1219,18 +1235,8 @@ export class LouvorFlowAgent {
         continue
       }
 
-      // Prevenção de duplicações na playlist da ocorrência de destino
-      const lowerName = fileName.toLowerCase()
-      if (existingItemNames.has(lowerName)) {
-        detailedResults.push({
-          id: item.id,
-          name: fileName,
-          status: 'ALREADY_PRESENT',
-          media_type: holyricsType,
-        })
-        continue
-      }
-
+      // Não pula itens "já presentes": o AddToPlaylist usa ignore_duplicates=true, então o
+      // próprio Holyrics não duplica. Pular aqui escondia a mídia quando a leitura enganava.
       // Passo 4: Monta o item oficial com name (nome físico) e type ('image' | 'video' | 'audio' | 'file')
       itemsToAdd.push({
         type: holyricsType,
@@ -1240,6 +1246,7 @@ export class LouvorFlowAgent {
 
     let addedCount = 0
     let failedCount = 0
+    let afterSnapshot: any = null
 
     // Passo 5: Chamar AddToPlaylist com event_id obrigatório da ocorrência do culto
     if (itemsToAdd.length > 0) {
@@ -1268,6 +1275,7 @@ export class LouvorFlowAgent {
         // Consultamos a ocorrência via GetSchedules (payload mínimo {month, year})
         // com fallback para GetPlaylist({ type: 'all', event_id: eventId }).
         const after = await this.readEventMediaNamesSafe(readEventMediaNames)
+        afterSnapshot = after.snapshot || null
         const verifiedNames = after.names
         const verificationMethodUsed: string = 'GetSchedules'
         const postPlaylistError = after.found
@@ -1279,7 +1287,13 @@ export class LouvorFlowAgent {
         for (const added of itemsToAdd) {
           const isVerified = verifiedNames.has(added.name.toLowerCase())
           // Se a verificação confirmou o item na playlist da ocorrência
-          if (isVerified) {
+          if (isVerified && existingItemNames.has(added.name.toLowerCase())) {
+            detailedResults.push({
+              name: added.name,
+              status: 'ALREADY_PRESENT',
+              media_type: added.type,
+            })
+          } else if (isVerified) {
             detailedResults.push({
               name: added.name,
               status: 'ADDED',
@@ -1396,6 +1410,8 @@ export class LouvorFlowAgent {
         not_recognized_count: notRecognizedCount,
         failed_count: failedCount,
         items: detailedResults,
+        playlist_before: before.snapshot || null,
+        playlist_after: afterSnapshot,
       },
       error: summaryError,
       error_code: summaryErrorCode,

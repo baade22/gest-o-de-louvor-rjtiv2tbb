@@ -412,12 +412,17 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     expect(res.success).toBe(true)
     expect(res.result?.already_present_count).toBe(1)
     expect(res.result?.synced_count).toBe(1)
-    // Apenas Avisos.mp4 deve ter sido enviado na lista items
+    // Envia as duas com ignore_duplicates: o Holyrics não duplica a que já estava
     expect(addMediaSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        items: [{ type: 'video', name: 'Avisos.mp4' }],
+        items: [
+          { type: 'video', name: 'Abertura.mp4' },
+          { type: 'video', name: 'Avisos.mp4' },
+        ],
+        ignoreDuplicates: true,
       }),
     )
+    expect(res.result?.playlist_before?.items).toEqual([{ type: 'video', name: 'Abertura.mp4' }])
   })
 
   // 12. Preservação das músicas e demais itens já existentes
