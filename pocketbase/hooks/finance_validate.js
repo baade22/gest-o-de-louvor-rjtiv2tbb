@@ -85,11 +85,13 @@ onRecordValidate(
         rec.set('to_account_id', '')
       }
       // Lançamento conciliado com o extrato: valor, conta e tipo só mudam depois de desfazer
-      const lineId = rec.getString('bank_line_id')
+      // (transferência: o lado de destino fica em to_bank_line_id)
+      const lineId = rec.getString('bank_line_id') || rec.getString('to_bank_line_id')
       if (lineId && !rec.isNew()) {
         const old = rec.original()
         if (
-          old.getString('bank_line_id') === lineId &&
+          (old.getString('bank_line_id') === lineId ||
+            old.getString('to_bank_line_id') === lineId) &&
           (old.getInt('amount_cents') !== rec.getInt('amount_cents') ||
             old.getString('account_id') !== rec.getString('account_id') ||
             old.getString('to_account_id') !== rec.getString('to_account_id') ||

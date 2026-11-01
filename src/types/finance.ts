@@ -81,6 +81,8 @@ export interface FinTransaction extends BaseRecord {
   bill_id?: string
   /** Movimento do extrato com que o lançamento foi conciliado. */
   bank_line_id?: string
+  /** Transferência: movimento do extrato da conta de destino */
+  to_bank_line_id?: string
   category_id?: string
   cost_center_id?: string
   /** Campanha para a qual a entrada (ou saída) conta. */

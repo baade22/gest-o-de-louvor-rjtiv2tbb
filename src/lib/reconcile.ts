@@ -20,6 +20,7 @@ interface TxLike {
   amount_cents: number
   date: string
   bank_line_id?: string
+  to_bank_line_id?: string
 }
 
 interface BillLike {
@@ -50,6 +51,38 @@ export function sameSide(line: LineLike, tx: TxLike) {
       (tx.type === 'TRANSFERENCIA' && tx.to_account_id === line.account_id)
     )
   return (tx.type === 'SAIDA' || tx.type === 'TRANSFERENCIA') && tx.account_id === line.account_id
+}
+
+/**
+ * O lado do lançamento que corresponde a este movimento já foi conciliado? Numa transferência,
+ * a entrada na conta de destino fica em to_bank_line_id e a saída em bank_line_id.
+ */
+export function sideTaken(line: LineLike, tx: TxLike) {
+  const destination =
+    line.amount_cents > 0 && tx.type === 'TRANSFERENCIA' && tx.to_account_id === line.account_id
+  return Boolean(destination ? tx.to_bank_line_id : tx.bank_line_id)
+}
+
+/**
+ * Transferência entre contas da igreja: para cada movimento, o único movimento pendente de outra
+ * conta com o valor oposto (saiu de uma, entrou na outra) até `days` dias de diferença.
+ */
+export function suggestTransfers<L extends LineLike>(lines: L[], others: L[], days = 3) {
+  const out = new Map<string, L>()
+  const used = new Set<string>()
+  for (const line of [...lines].sort((a, b) => a.date.localeCompare(b.date))) {
+    const hits = others.filter(
+      (o) =>
+        o.account_id !== line.account_id &&
+        o.amount_cents === -line.amount_cents &&
+        Math.abs(daysBetween(line.date, o.date)) <= days,
+    )
+    if (hits.length === 1 && !used.has(hits[0].id)) {
+      out.set(line.id, hits[0])
+      used.add(hits[0].id)
+    }
+  }
+  return out
 }
 
 /** "JOÃO  Mendes" → ["JOAO", "MENDES"] */
@@ -99,7 +132,7 @@ export function suggestMatches<
     const s: LineSuggestion<T, B, P> = {}
     let best: { tx: T; d: number } | null = null
     for (const tx of txs) {
-      if (tx.status !== 'CONFIRMADO' || tx.bank_line_id || usedTx.has(tx.id)) continue
+      if (tx.status !== 'CONFIRMADO' || sideTaken(line, tx) || usedTx.has(tx.id)) continue
       if (tx.amount_cents !== abs || !sameSide(line, tx)) continue
       const d = Math.abs(daysBetween(line.date, tx.date))
       if (d <= txDays && (!best || d < best.d)) best = { tx, d }
