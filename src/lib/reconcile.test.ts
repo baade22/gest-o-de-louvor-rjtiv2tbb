@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { decodeOfx, ofxAmountToCents, ofxDate, parseOfx } from './ofx'
-import { personInDescription, suggestMatches, suggestTransfers } from './reconcile'
+import { personInDescription, ruleFor, suggestMatches, suggestTransfers } from './reconcile'
 
 // Fuso como os bancos mandam; montado em partes para o Tailwind não ler como classe
 const TZ = '[' + '-3:BRT]'
@@ -219,5 +219,29 @@ describe('transferência entre contas', () => {
     expect(s.get('c1')?.tx?.id).toBe('t1')
     const d = suggestMatches([l('b9', 'brad', '2026-10-01', 50000)], [tx], [], [])
     expect(d.get('b9')?.tx).toBeUndefined()
+  })
+})
+
+describe('regras aprendidas', () => {
+  const rule = (counterparty: string) => ({
+    account_id: 'brad',
+    direction: 'ENTRADA',
+    match_code: 'BRADESCO:3584',
+    counterparty,
+  })
+  const line = (counterparty: string, amount_cents = 115) => ({
+    id: 'l',
+    account_id: 'brad',
+    date: '2026-10-01',
+    amount_cents,
+    match_code: 'BRADESCO:3584',
+    counterparty,
+  })
+
+  it('vale para a mesma conta, sentido, código e pessoa', () => {
+    expect(ruleFor(line(''), [rule('')])).toBeTruthy()
+    expect(ruleFor(line('JOAO'), [rule('')])).toBeUndefined()
+    expect(ruleFor(line('JOAO'), [rule('MARIA'), rule('JOAO')])?.counterparty).toBe('JOAO')
+    expect(ruleFor(line('', -115), [rule('')])).toBeUndefined()
   })
 })

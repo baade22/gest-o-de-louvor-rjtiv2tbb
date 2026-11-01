@@ -201,9 +201,38 @@ export interface FinBankLine extends BaseRecord {
   transaction_id?: string
   reconciled_at?: string
   reconciled_by_name?: string
+  /** O que identifica o tipo de movimento (código do banco ou começo da descrição) */
+  match_code?: string
+  /** Quem pagou ou recebeu, quando o extrato diz */
+  counterparty?: string
   expand?: {
     transaction_id?: FinTransaction
   }
+}
+
+/** Regra aprendida na conciliação: o que a igreja faz com um tipo de movimento. */
+export interface FinReconcileRule {
+  id: string
+  account_id: string
+  direction: FinDirection
+  match_code: string
+  counterparty: string
+  action: 'LANCAR' | 'TRANSFERENCIA' | 'IGNORAR'
+  category_id: string
+  cost_center_id: string
+  campaign_id: string
+  person_id: string
+  is_anonymous: boolean
+  supplier_id: string
+  transfer_account_id: string
+  payment_method: string
+  example: string
+  hits: number
+  /** Concilia sozinho (alguém ligou) */
+  auto: boolean
+  auto_count: number
+  auto_by_name: string
+  last_used_at: string
 }
 
 /** Arquivo de extrato importado. */

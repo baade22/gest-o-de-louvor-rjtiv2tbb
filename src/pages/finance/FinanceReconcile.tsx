@@ -16,6 +16,8 @@ import {
   MoreHorizontal,
   Plus,
   Search,
+  Sparkles,
+  Trash2,
   Undo2,
   UserRound,
 } from 'lucide-react'
@@ -25,10 +27,13 @@ import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { decodeOfx, parseOfx } from '@/lib/ofx'
 import { accountBalances, daysBetween } from '@/lib/financeSummary'
-import { sameSide, suggestMatches, suggestTransfers } from '@/lib/reconcile'
+import { ruleFor, sameSide, suggestMatches, suggestTransfers } from '@/lib/reconcile'
 import { brtDay } from '@/lib/bankStatement'
 import {
   importStatement,
+  listReconcileRules,
+  setReconcileRuleAuto,
+  deleteReconcileRule,
   listPendingLinesElsewhere,
   listBankConnections,
   listBankImports,
@@ -43,6 +48,7 @@ import {
   type ReconcileTarget,
 } from '@/services/finance'
 import type {
+  FinReconcileRule,
   FinBankConnection,
   FinBankImport,
   FinBankLine,
@@ -56,6 +62,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -145,6 +152,9 @@ export default function FinanceReconcile() {
   }
   // Movimentos pendentes das outras contas (para reconhecer transferência entre contas)
   const [elsewhere, setElsewhere] = useState<FinBankLine[]>([])
+  // Regras aprendidas (o que a igreja fez com cada tipo de movimento)
+  const [rules, setRules] = useState<FinReconcileRule[]>([])
+  const [rulesOpen, setRulesOpen] = useState(false)
   const [choosing, setChoosing] = useState<FinBankLine | null>(null)
   // Movimentos marcados para lançar juntos
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -155,13 +165,14 @@ export default function FinanceReconcile() {
     setLoading(true)
     setSelected(new Set())
     try {
-      const [ls, imps, open, led, conns, others] = await Promise.all([
+      const [ls, imps, open, led, conns, others, learned] = await Promise.all([
         listBankLines(churchId, accountId),
         listBankImports(churchId, accountId).then((r) => r.items),
         listOpenBills(churchId),
         listLedger(churchId),
         listBankConnections(churchId).catch(() => [] as FinBankConnection[]),
         listPendingLinesElsewhere(churchId, accountId).catch(() => [] as FinBankLine[]),
+        listReconcileRules(churchId).catch(() => [] as FinReconcileRule[]),
       ])
       const pending = ls.filter((l) => l.status === 'PENDENTE').map((l) => l.date.slice(0, 10))
       let txs: FinTransaction[] = []
@@ -185,6 +196,7 @@ export default function FinanceReconcile() {
       setLedger(led)
       setCandidates(txs)
       setElsewhere(others)
+      setRules(learned)
     } catch (err) {
       console.error(err)
       toast({ title: 'Erro ao carregar o extrato', variant: 'destructive' })
@@ -210,6 +222,8 @@ export default function FinanceReconcile() {
   )
   const accountName = (id: string) =>
     lookups.accounts.find((a) => a.id === id)?.name || 'outra conta'
+  const ruleLabel = (r: FinReconcileRule) => describeRule(r, lookups)
+  const accountRules = rules.filter((r) => r.account_id === accountId)
 
   // Saldo do banco (o mais recente entre a busca pela API e o último arquivo com saldo) x
   // saldo no LouvorFlow na mesma data
@@ -324,6 +338,28 @@ export default function FinanceReconcile() {
       },
       'Transferência conciliada',
     )
+  /** Faz com o movimento o mesmo que da última vez (regra aprendida) */
+  const applyRule = (line: FinBankLine, r: FinReconcileRule) => {
+    if (r.action === 'IGNORAR')
+      return run(line, () => setLineIgnored(line.id, true), 'Movimento ignorado')
+    if (r.action === 'TRANSFERENCIA') return reconcileTransfer(line, r.transfer_account_id)
+    return reconcile(
+      line,
+      {
+        create: {
+          category_id: r.category_id,
+          cost_center_id: r.cost_center_id,
+          campaign_id: r.campaign_id,
+          person_id: r.is_anonymous ? '' : r.person_id,
+          is_anonymous: r.is_anonymous,
+          supplier_id: r.supplier_id,
+          description: (line.description || '').slice(0, 200),
+          payment_method: r.payment_method || (line.amount_cents > 0 ? 'PIX' : 'OUTRO'),
+        },
+      },
+      'Lançado e conciliado',
+    )
+  }
 
   const reconcileAll = async () => {
     setBulk(true)
@@ -568,6 +604,16 @@ export default function FinanceReconcile() {
                 Conciliar os {withTx.length} correspondentes
               </Button>
             )}
+            {accountRules.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setRulesOpen(true)}
+                className="h-9 gap-2 rounded-lg font-semibold"
+              >
+                <Sparkles className="h-4 w-4 text-violet-700" />
+                Regras aprendidas ({accountRules.length})
+              </Button>
+            )}
             <div className="relative sm:w-56">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -696,6 +742,11 @@ export default function FinanceReconcile() {
                             <Link2 className="mr-1 inline h-3.5 w-3.5" />
                             Corresponde a {txLabel(s.tx)} de {shortDate(s.tx.date)}
                           </span>
+                        ) : ruleFor(line, rules) ? (
+                          <span className="text-violet-800">
+                            <Sparkles className="mr-1 inline h-3.5 w-3.5" />
+                            Como da última vez: {ruleLabel(ruleFor(line, rules)!)}
+                          </span>
                         ) : transfers.get(line.id) ? (
                           <span className="text-sky-800">
                             <ArrowLeftRight className="mr-1 inline h-3.5 w-3.5" />
@@ -746,6 +797,20 @@ export default function FinanceReconcile() {
                               <Link2 className="h-3.5 w-3.5" />
                             )}
                             Conciliar
+                          </Button>
+                        ) : ruleFor(line, rules) ? (
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => applyRule(line, ruleFor(line, rules)!)}
+                            className="h-8 gap-1.5 rounded-lg bg-violet-700 font-semibold text-white hover:bg-violet-800"
+                          >
+                            {busyLine === line.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3.5 w-3.5" />
+                            )}
+                            Aplicar
                           </Button>
                         ) : transfers.get(line.id) ? (
                           <Button
@@ -806,7 +871,10 @@ export default function FinanceReconcile() {
                         <DropdownMenuContent align="end">
                           {line.status === 'PENDENTE' && (
                             <>
-                              {(s?.tx || s?.bill || transfers.get(line.id)) && (
+                              {(s?.tx ||
+                                s?.bill ||
+                                transfers.get(line.id) ||
+                                ruleFor(line, rules)) && (
                                 <DropdownMenuItem onClick={() => openCreate(line)}>
                                   <Plus className="mr-2 h-4 w-4" />{' '}
                                   {credit ? 'Lançar como entrada' : 'Lançar como saída'}
@@ -925,6 +993,15 @@ export default function FinanceReconcile() {
           setBulkOpen(false)
           launchSelected(choice)
         }}
+      />
+
+      <RulesDialog
+        open={rulesOpen}
+        rules={accountRules}
+        canEdit={canEdit}
+        describe={ruleLabel}
+        onClose={() => setRulesOpen(false)}
+        onChanged={load}
       />
 
       <ChooseTransactionDialog
@@ -1553,6 +1630,114 @@ function BulkLaunchDialog({
             Lançar e conciliar
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---- Regras aprendidas ----
+
+/** "Dízimos · João Silva", "Transferência para Cora", "Ignorar" */
+function describeRule(r: FinReconcileRule, lookups: FinanceLookups) {
+  if (r.action === 'IGNORAR') return 'ignorar'
+  if (r.action === 'TRANSFERENCIA') {
+    const other =
+      lookups.accounts.find((a) => a.id === r.transfer_account_id)?.name || 'outra conta'
+    return `transferência ${r.direction === 'ENTRADA' ? 'vinda de' : 'para'} ${other}`
+  }
+  const category = lookups.categories.find((c) => c.id === r.category_id)?.name || 'categoria'
+  const who = r.is_anonymous
+    ? 'anônimo'
+    : lookups.people.find((p) => p.id === r.person_id)?.name ||
+      lookups.suppliers.find((p) => p.id === r.supplier_id)?.name ||
+      ''
+  return who ? `${category} · ${who}` : category
+}
+
+function RulesDialog({
+  open,
+  rules,
+  canEdit,
+  describe,
+  onClose,
+  onChanged,
+}: {
+  open: boolean
+  rules: FinReconcileRule[]
+  canEdit: boolean
+  describe: (r: FinReconcileRule) => string
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState('')
+  const { toast } = useToast()
+  const act = async (id: string, action: () => Promise<unknown>) => {
+    setBusy(id)
+    try {
+      await action()
+      onChanged()
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Não deu certo',
+        description: serverMessage(err, 'Tente de novo em instantes.'),
+        variant: 'destructive',
+      })
+    } finally {
+      setBusy('')
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-xl sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Regras aprendidas</DialogTitle>
+          <DialogDescription>
+            O que foi feito com cada tipo de movimento desta conta. Elas viram sugestão de um
+            clique; com “Conciliar sozinho” ligado, o movimento é conciliado assim que chega do
+            banco. Se alguém conciliar diferente, a regra muda e o automático desliga.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {rules.map((r) => (
+            <li key={r.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-slate-900">
+                  {r.direction === 'ENTRADA' ? 'Entrada' : 'Saída'}: {r.example || r.match_code}
+                </div>
+                <div className="truncate text-xs text-slate-500">
+                  → {describe(r)} · {r.hits} {r.hits === 1 ? 'vez' : 'vezes'} na mão
+                  {r.auto_count ? ` · ${r.auto_count} sozinho` : ''}
+                  {r.auto && r.auto_by_name ? ` · ligado por ${r.auto_by_name}` : ''}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                  <Switch
+                    checked={r.auto}
+                    disabled={!canEdit || busy === r.id}
+                    onCheckedChange={(on) => act(r.id, () => setReconcileRuleAuto(r.id, on))}
+                    aria-label="Conciliar sozinho"
+                  />
+                  Conciliar sozinho
+                </label>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={busy === r.id}
+                    onClick={() => act(r.id, () => deleteReconcileRule(r.id))}
+                    className="h-8 w-8 text-slate-500"
+                    aria-label="Esquecer regra"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       </DialogContent>
     </Dialog>
   )

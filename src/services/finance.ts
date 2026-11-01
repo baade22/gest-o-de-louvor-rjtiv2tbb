@@ -29,6 +29,7 @@ import type {
   FinSupplier,
   FinTransaction,
   FinReceipt,
+  FinReconcileRule,
   FinReceiptSender,
   FinReceiptsStatus,
   Person,
@@ -374,14 +375,24 @@ export async function listUnreconciled(
   from: string,
   to: string,
 ) {
-  return pb.collection('fin_transactions').getFullList<FinTransaction>({
-    filter: pb.filter(
+  const params = { churchId, accountId, from: `${from} 00:00:00`, to: `${to} 23:59:59` }
+  const list = (filter: string) =>
+    pb.collection('fin_transactions').getFullList<FinTransaction>({
+      filter: pb.filter(filter, params),
+      sort: 'date',
+      expand: EXPAND,
+    })
+  try {
+    return await list(
       "church_id = {:churchId} && ((account_id = {:accountId} && bank_line_id = '') || (to_account_id = {:accountId} && to_bank_line_id = '')) && status = 'CONFIRMADO' && date >= {:from} && date <= {:to}",
-      { churchId, accountId, from: `${from} 00:00:00`, to: `${to} 23:59:59` },
-    ),
-    sort: 'date',
-    expand: EXPAND,
-  })
+    )
+  } catch (err) {
+    // Servidor ainda sem a migração 0086 (campo to_bank_line_id): busca como antes
+    if ((err as { status?: number })?.status !== 400) throw err
+    return list(
+      "church_id = {:churchId} && (account_id = {:accountId} || to_account_id = {:accountId}) && status = 'CONFIRMADO' && bank_line_id = '' && date >= {:from} && date <= {:to}",
+    )
+  }
 }
 
 export async function importStatement(
@@ -433,6 +444,27 @@ export async function listPendingLinesElsewhere(churchId: string, accountId: str
     ),
     fields: 'id,account_id,date,amount_cents,description,status',
   })
+}
+
+// ---- Regras aprendidas da conciliação ----
+
+export async function listReconcileRules(churchId: string) {
+  const res = await pb.send<{ items: FinReconcileRule[] }>('/backend/v1/finance/rules/list', {
+    method: 'POST',
+    body: { church_id: churchId },
+  })
+  return res.items
+}
+
+export async function setReconcileRuleAuto(ruleId: string, auto: boolean) {
+  return pb.send('/backend/v1/finance/rules/auto', {
+    method: 'POST',
+    body: { rule_id: ruleId, auto },
+  })
+}
+
+export async function deleteReconcileRule(ruleId: string) {
+  return pb.send('/backend/v1/finance/rules/delete', { method: 'POST', body: { rule_id: ruleId } })
 }
 
 /** linked_other_date: a outra ponta da transferência também foi conciliada (data dela). */
