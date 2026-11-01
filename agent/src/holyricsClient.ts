@@ -1033,6 +1033,20 @@ export class HolyricsClient {
     }
   }
 
+  /** Método da API do Holyrics para a aba do tipo de mídia (Get<Tipo> ou Get<Tipo>s). */
+  public static mediaApiAction(type: 'video' | 'image' | 'audio' | 'file', list: boolean): string {
+    const base =
+      type === 'video' ? 'Video' : type === 'image' ? 'Image' : type === 'audio' ? 'Audio' : 'File'
+    return `Get${base}${list ? 's' : ''}`
+  }
+
+  /** <Tipo>Exists da API do Holyrics (v2.21.0+). */
+  public static mediaExistsAction(type: 'video' | 'image' | 'audio' | 'file'): string {
+    const base =
+      type === 'video' ? 'Video' : type === 'image' ? 'Image' : type === 'audio' ? 'Audio' : 'File'
+    return `${base}Exists`
+  }
+
   /**
    * GetFile: Consulta se um arquivo específico foi detectado/indexado pelo Holyrics
    * POST /api/GetFile?token=...
@@ -1053,12 +1067,15 @@ export class HolyricsClient {
     rawResponse?: string
     payloadSent?: Record<string, any>
   }> {
-    // 1. Tenta payload oficial mínimo { name: fileName }
-    // A documentação oficial do Holyrics (GetFile v2.24.0+) especifica name como parâmetro primário.
-    const minimalPayload: Record<string, any> = { name: fileName }
-    if (folder) minimalPayload.folder = folder
+    // Cada aba do Holyrics tem o seu método (documentação oficial "API-Server", v2.24.0+):
+    // GetVideo / GetImage / GetAudio / GetFile. GetFile só olha a aba "Arquivos", então
+    // um vídeo nunca era achado por ele. { name } aceita subpasta ("pasta/arquivo.mp4").
+    const singleAction = HolyricsClient.mediaApiAction(type, false)
+    const minimalPayload: Record<string, any> = {
+      name: folder ? `${folder}/${fileName}` : fileName,
+    }
 
-    const resMin = await this.request('GetFile', minimalPayload, 3000)
+    const resMin = await this.request(singleAction, minimalPayload, 3000)
     if (resMin.status === 'ok' && resMin.data) {
       return {
         detected: true,
@@ -1090,11 +1107,16 @@ export class HolyricsClient {
       }
     }
 
-    // 2. Fallback: payload com type explícito { type, name }
-    const typedPayload: Record<string, any> = { type, name: fileName }
-    if (folder) typedPayload.folder = folder
-
-    const resTyped = await this.request('GetFile', typedPayload, 3000)
+    // 2. Fallback: <Tipo>Exists { file } (v2.21.0+), para versões sem Get<Tipo>
+    const existsAction = HolyricsClient.mediaExistsAction(type)
+    const typedPayload: Record<string, any> = { file: minimalPayload.name }
+    const resExists = await this.request(existsAction, typedPayload, 3000)
+    const resTyped =
+      resExists.status === 'ok' && resExists.data === true
+        ? { ...resExists, data: { name: minimalPayload.name } }
+        : resExists.status === 'ok'
+          ? { ...resExists, status: 'error' as const, error: 'File not found' }
+          : resExists
     if (resTyped.status === 'ok' && resTyped.data) {
       return {
         detected: true,
@@ -1138,15 +1160,8 @@ export class HolyricsClient {
     if (options?.filter) payload.filter = options.filter
     if (options?.folder) payload.folder = options.folder
 
-    let res = await this.request('GetFiles', payload, 3000)
-    // Se não encontrou ou deu erro de tipo, tenta adicionando type
-    if (res.status !== 'ok') {
-      const typedPayload: Record<string, any> = { type, ...payload }
-      const resTyped = await this.request('GetFiles', typedPayload, 3000)
-      if (resTyped.status === 'ok') {
-        res = resTyped
-      }
-    }
+    // GetVideos / GetImages / GetAudios / GetFiles: um método por aba
+    const res = await this.request(HolyricsClient.mediaApiAction(type, true), payload, 3000)
 
     if (res.status === 'ok') {
       const list = Array.isArray(res.data)

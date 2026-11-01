@@ -473,7 +473,7 @@ describe('Suíte de 16 Testes da Integração de Mídias LouvorFlow ↔ Holyrics
       if (urlStr.includes('/backend/v1/agent/media/')) {
         return new Response(imgBuffer, { status: 200 })
       }
-      if (urlStr.includes(':8091/api/GetFile')) {
+      if (urlStr.includes(':8091/api/GetImage')) {
         return new Response(JSON.stringify({ status: 'ok', data: { name: 'slide_avisos.jpg' } }), {
           status: 200,
         })
