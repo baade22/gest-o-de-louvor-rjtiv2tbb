@@ -142,6 +142,17 @@ function toFormData(input: TransactionInput) {
   return form
 }
 
+/** Lançamentos já trazidos do Eklesia (a marca fica nas observações), estornados também. */
+export async function listEklesiaImported(churchId: string) {
+  return pb.collection('fin_transactions').getFullList<Pick<FinTransaction, 'id' | 'notes'>>({
+    filter: pb.filter('church_id = {:churchId} && notes ~ {:mark}', {
+      churchId,
+      mark: 'Importado do Eklesia #',
+    }),
+    fields: 'id,notes',
+  })
+}
+
 export async function createTransaction(churchId: string, input: TransactionInput) {
   const form = toFormData(input)
   form.append('church_id', churchId)
