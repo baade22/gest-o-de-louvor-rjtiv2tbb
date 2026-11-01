@@ -11,6 +11,7 @@ import {
   Loader2,
   Printer,
   ReceiptText,
+  TrendingUp,
   Scale,
   Wallet,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ import {
   centsToText,
   contributionsReport,
   dreReport,
+  revenueReport,
   toCsv,
   type AccountingOptions,
   type ReportRow,
@@ -38,6 +40,7 @@ import {
   listAccounts,
   listApprovedCounts,
   listBills,
+  getFinSettings,
   listCategories,
   listPeople,
   listReportTransactions,
@@ -48,6 +51,7 @@ import type {
   FinBill,
   FinCategory,
   FinCount,
+  FinSettings,
   FinSigner,
   FinTransaction,
   Person,
@@ -84,7 +88,15 @@ import {
 } from './shared'
 import { download, printSheet } from './print'
 
-type ReportKey = 'dre' | 'contributions' | 'counts' | 'trial' | 'ledger' | 'availability' | 'bills'
+type ReportKey =
+  | 'dre'
+  | 'contributions'
+  | 'counts'
+  | 'trial'
+  | 'ledger'
+  | 'availability'
+  | 'bills'
+  | 'revenue'
 
 const REPORTS: { key: ReportKey; title: string; hint: string; icon: typeof FileText }[] = [
   { key: 'dre', title: 'DRE (resultado)', hint: 'Entradas e saídas por categoria', icon: Landmark },
@@ -113,6 +125,12 @@ const REPORTS: { key: ReportKey; title: string; hint: string; icon: typeof FileT
     title: 'Contas pagas e recebidas',
     hint: 'Baixas do período e o que ficou aberto',
     icon: ReceiptText,
+  },
+  {
+    key: 'revenue',
+    title: 'Declaração de faturamento',
+    hint: 'Receita mês a mês, para banco e cadastros',
+    icon: TrendingUp,
   },
 ]
 
@@ -277,6 +295,7 @@ export default function FinanceReports() {
   const [categories, setCategories] = useState<FinCategory[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [signers, setSigners] = useState<FinSigner[]>([])
+  const [settings, setSettings] = useState<FinSettings | null>(null)
   const [txs, setTxs] = useState<FinTransaction[]>([])
   const [counts, setCounts] = useState<FinCount[]>([])
   const [bills, setBills] = useState<FinBill[]>([])
@@ -295,8 +314,10 @@ export default function FinanceReports() {
       listPeople(churchId),
       listSigners(churchId),
       listBills(churchId),
+      getFinSettings(churchId).catch(() => null),
     ])
-      .then(([acc, cat, ppl, sig, bl]) => {
+      .then(([acc, cat, ppl, sig, bl, st]) => {
+        setSettings(st)
         setAccounts(acc)
         setCategories(cat)
         setPeople(ppl)
@@ -394,6 +415,68 @@ export default function FinanceReports() {
                 </tr>
               </tfoot>
             </table>
+          ),
+        }
+      }
+      case 'revenue': {
+        const r = revenueReport(txs, categories, from, to, accountSet)
+        const who = settings?.legal_name || currentChurch?.name || 'a igreja'
+        const where = [settings?.address, settings?.city].filter(Boolean).join(', ')
+        const city = settings?.city ? `${settings.city}, ` : ''
+        const longDate = new Intl.DateTimeFormat('pt-BR', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'UTC',
+        }).format(new Date(`${today()}T12:00:00Z`))
+        return {
+          title: 'Declaração de Faturamento',
+          csv: [
+            ['Mês', 'Contribuições (dízimos e ofertas)', 'Outras receitas', 'Total'],
+            ...r.months.map((x) => [
+              monthLabel(x.month),
+              centsToText(x.contributions),
+              centsToText(x.other),
+              centsToText(x.total),
+            ]),
+            ['Total', centsToText(r.contributions), centsToText(r.other), centsToText(r.total)],
+            ['Média mensal', '', '', centsToText(r.average)],
+          ],
+          body: (
+            <>
+              <p className="mb-5 text-justify text-[13.5px] leading-relaxed text-slate-800">
+                Declaramos, para os devidos fins, que <b>{who}</b>
+                {settings?.cnpj ? (
+                  <>
+                    , inscrita no CNPJ sob o nº <b>{settings.cnpj}</b>
+                  </>
+                ) : null}
+                {where ? `, com sede em ${where}` : ''}, teve no período de{' '}
+                <b>{periodLabel(from, to)}</b> a receita bruta mensal abaixo, num total de{' '}
+                <b>{money(r.total)}</b> e média mensal de <b>{money(r.average)}</b>.
+              </p>
+              <Table
+                head={['Mês', 'Contribuições', 'Outras receitas', 'Total']}
+                align={['l', 'r', 'r', 'r']}
+                rows={r.months.map((x) => [
+                  monthLabel(x.month),
+                  money(x.contributions),
+                  money(x.other),
+                  money(x.total),
+                ])}
+                foot={['Total', money(r.contributions), money(r.other), money(r.total)]}
+              />
+              <p className="mt-3 text-[12px] text-slate-500">
+                Contribuições são os dízimos e ofertas. Transferências entre contas da igreja não
+                entram.
+                {!settings?.cnpj &&
+                  ' Para o CNPJ e o endereço aparecerem aqui, preencha os dados da igreja em Cadastros.'}
+              </p>
+              <p className="mt-8 text-[13.5px] text-slate-800">
+                {city}
+                {longDate}.
+              </p>
+            </>
           ),
         }
       }
@@ -699,6 +782,8 @@ export default function FinanceReports() {
   }, [
     report,
     txs,
+    settings,
+    currentChurch?.name,
     accounts,
     categories,
     people,
@@ -717,7 +802,13 @@ export default function FinanceReports() {
     setTo(b.to)
   }
   const thisMonth = today().slice(0, 7)
+  // Últimos 12 meses fechados (o que banco e cadastros costumam pedir)
+  const last12 = () => {
+    setFrom(monthBounds(shiftMonth(thisMonth, -12)).from)
+    setTo(monthBounds(shiftMonth(thisMonth, -1)).to)
+  }
   const presets = [
+    ...(report === 'revenue' ? [{ label: 'Últimos 12 meses', apply: last12 }] : []),
     { label: 'Mês passado', apply: () => setMonth(shiftMonth(thisMonth, -1)) },
     { label: 'Este mês', apply: () => setMonth(thisMonth) },
     {
@@ -754,7 +845,10 @@ export default function FinanceReports() {
               <button
                 key={r.key}
                 type="button"
-                onClick={() => setReport(r.key)}
+                onClick={() => {
+                  setReport(r.key)
+                  if (r.key === 'revenue' && r.key !== report) last12()
+                }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0',

@@ -174,6 +174,73 @@ export function contributionsReport(
   }
 }
 
+// ---- Declaração de faturamento ----
+
+export interface RevenueMonth {
+  /** AAAA-MM */
+  month: string
+  contributions: number
+  other: number
+  total: number
+}
+
+export interface RevenueReport {
+  months: RevenueMonth[]
+  contributions: number
+  other: number
+  total: number
+  /** Média por mês do período */
+  average: number
+}
+
+/**
+ * Receita mês a mês (todas as entradas, sem transferências entre contas), separando as
+ * contribuições (dízimos e ofertas) das outras receitas. Meses sem entrada aparecem zerados.
+ */
+export function revenueReport(
+  txs: Tx[],
+  categories: Category[],
+  from: string,
+  to: string,
+  accounts: Set<string> | null = null,
+): RevenueReport {
+  const contribution = new Set(categories.filter((c) => c.is_contribution).map((c) => c.id))
+  const months: RevenueMonth[] = []
+  const index = new Map<string, RevenueMonth>()
+  let [y, m] = from.slice(0, 7).split('-').map(Number)
+  const last = to.slice(0, 7)
+  for (let i = 0; i < 240; i++) {
+    const ym = `${y}-${String(m).padStart(2, '0')}`
+    if (ym > last) break
+    const row = { month: ym, contributions: 0, other: 0, total: 0 }
+    months.push(row)
+    index.set(ym, row)
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+  for (const tx of txs) {
+    if (!valid(tx) || tx.type !== 'ENTRADA' || !inPeriod(tx, from, to)) continue
+    if (accounts && !accounts.has(tx.account_id)) continue
+    const row = index.get(day(tx.date).slice(0, 7))
+    if (!row) continue
+    if (tx.category_id && contribution.has(tx.category_id)) row.contributions += tx.amount_cents
+    else row.other += tx.amount_cents
+    row.total += tx.amount_cents
+  }
+  const sum = (k: 'contributions' | 'other' | 'total') => months.reduce((s, r) => s + r[k], 0)
+  const total = sum('total')
+  return {
+    months,
+    contributions: sum('contributions'),
+    other: sum('other'),
+    total,
+    average: months.length ? Math.round(total / months.length) : 0,
+  }
+}
+
 // ---- Balancete e disponibilidades ----
 
 export interface AccountMovement {
