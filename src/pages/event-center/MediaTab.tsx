@@ -39,6 +39,8 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { generateHolyricsFileName } from '@/lib/mediaNaming'
+import { describeMediaSyncResult } from '@/lib/mediaPlaylistResult'
+import { getHolyricsCommandStatus } from '@/services/holyricsAgent'
 import {
   deleteMediaAsset,
   getMediaFileUrl,
@@ -162,11 +164,55 @@ export function MediaTab({
     setIsSyncing(true)
     try {
       const res = await syncEventMediaPlaylistWithHolyrics(event.id, event.church_id)
-      toast({
-        title: res.success ? 'Playlist de mídias enviada' : 'Falha na sincronização de mídias',
-        description: res.success && res.warning ? `${res.message} (${res.warning})` : res.message,
-        variant: res.success ? 'default' : 'destructive',
-      })
+      if (!res.success || !res.command_id) {
+        toast({
+          title: 'Não foi possível montar a playlist',
+          description: res.message,
+          variant: 'destructive',
+        })
+        return
+      }
+      if (!res.agent_online) {
+        toast({
+          title: 'Pedido guardado',
+          description:
+            'O computador do Holyrics está desconectado. A playlist será montada quando o LouvorFlow Agent voltar.',
+        })
+        return
+      }
+
+      // Espera o Agent executar no computador do Holyrics e mostra o resultado real.
+      const commandId = res.command_id
+      const startedAt = Date.now()
+      let finished = false
+      while (Date.now() - startedAt < 60000) {
+        await new Promise((resolve) => setTimeout(resolve, 2500))
+        let statusRes
+        try {
+          statusRes = await getHolyricsCommandStatus(commandId)
+        } catch (_) {
+          continue
+        }
+        if (statusRes.status !== 'DONE' && statusRes.status !== 'FAILED') continue
+        finished = true
+        const summary = describeMediaSyncResult(statusRes)
+        const warning = res.warning ? ` ${res.warning}` : ''
+        toast({
+          title: summary.title,
+          description: summary.description + warning,
+          variant: summary.ok ? 'default' : 'destructive',
+        })
+        reload()
+        break
+      }
+      if (!finished) {
+        toast({
+          title: 'O Holyrics ainda não respondeu',
+          description:
+            'O pedido foi entregue ao computador do Holyrics, mas a resposta não chegou em 1 minuto. Confira se o LouvorFlow Agent e o Holyrics estão abertos.',
+          variant: 'destructive',
+        })
+      }
     } catch (err: any) {
       toast({
         title: 'Erro ao sincronizar a playlist',

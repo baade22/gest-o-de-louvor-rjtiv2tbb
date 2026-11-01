@@ -148,7 +148,7 @@ describe('Validação de Correções P1, P2 e P3 - LouvorFlow ↔ Holyrics Agent
     expect(pendingItem?.error).toContain('Ação recomendada')
   })
 
-  it('P3.2: SYNC_MEDIA_PLAYLIST ordena por presentation_order e verifica pós-operação via GetPlaylist', async () => {
+  it('P3.2: SYNC_MEDIA_PLAYLIST ordena por presentation_order e verifica pós-operação via GetSchedules (media_playlist)', async () => {
     const agent = new LouvorFlowAgent(agentConfig)
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
     vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
@@ -173,17 +173,24 @@ describe('Validação de Correções P1, P2 e P3 - LouvorFlow ↔ Holyrics Agent
     )
 
     // Na primeira chamada (leitura prévia), playlist vazia; na segunda (pós-operação), ambos verificados
+    // Formato real do GetSchedules: ocorrência em metadata.event.id, mídias em media_playlist
     let callCount = 0
-    vi.spyOn((agent as any).holyrics, 'getPlaylist').mockImplementation(async () => {
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockImplementation(async () => {
       callCount++
-      if (callCount === 1) {
-        return { success: true, items: [] }
-      }
       return {
         success: true,
-        items: [
-          { name: 'Video1.mp4', type: 'video' },
-          { name: 'Video2.mp4', type: 'video' },
+        schedules: [
+          {
+            type: 'service',
+            metadata: { event: { id: 'evt_p3_order' } },
+            media_playlist:
+              callCount === 1
+                ? []
+                : [
+                    { id: 'a', name: 'Video1.mp4', type: 'video' },
+                    { id: 'b', name: 'Video2.mp4', type: 'video' },
+                  ],
+          },
         ],
       }
     })
