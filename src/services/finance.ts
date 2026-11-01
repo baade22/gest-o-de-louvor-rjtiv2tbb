@@ -571,6 +571,29 @@ export async function listStatement(churchId: string, accountId: string, from: s
   })
 }
 
+/**
+ * Dia em que a conciliação de cada conta começa: o primeiro movimento do extrato que entra na
+ * conciliação (não o "só extrato"). Conta sem movimento assim fica de fora (vale tudo).
+ */
+export async function listReconcileStarts(churchId: string, accountIds: string[]) {
+  const out: Record<string, string> = {}
+  await Promise.all(
+    accountIds.map(async (accountId) => {
+      const res = await pb.collection('fin_bank_lines').getList<FinBankLine>(1, 1, {
+        filter: pb.filter(
+          "church_id = {:churchId} && account_id = {:accountId} && status != 'EXTRATO'",
+          { churchId, accountId },
+        ),
+        sort: 'date',
+        fields: 'date',
+        requestKey: null,
+      })
+      if (res.items[0]) out[accountId] = res.items[0].date.slice(0, 10)
+    }),
+  )
+  return out
+}
+
 /** Último arquivo ou busca de cada conta que trouxe saldo do banco. */
 export async function listLatestBankBalances(churchId: string) {
   const rows = await pb.collection('fin_bank_imports').getList<FinBankImport>(1, 200, {

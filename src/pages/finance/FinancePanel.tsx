@@ -57,6 +57,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { realizedFilter } from '@/lib/realizedBalance'
+import { useReconcileStarts } from './useReconcileStarts'
 import {
   MonthSwitcher,
   PageHeader,
@@ -167,8 +169,15 @@ export default function FinancePanel() {
     () => onlyAccounts(ledger, congregation ? new Set(scopedAccounts.map((a) => a.id)) : null),
     [ledger, scopedAccounts, congregation],
   )
-  const balances = useMemo(() => accountBalances(scopedAccounts, ledger), [scopedAccounts, ledger])
+  // Conta bancária: só vale o que foi conciliado com o extrato; o resto é previsto
+  const starts = useReconcileStarts(churchId, accounts)
+  const balances = useMemo(
+    () => accountBalances(scopedAccounts, ledger, realizedFilter(starts)),
+    [scopedAccounts, ledger, starts],
+  )
+  const forecast = useMemo(() => accountBalances(scopedAccounts, ledger), [scopedAccounts, ledger])
   const total = Object.values(balances).reduce((sum, v) => sum + v, 0)
+  const forecastTotal = Object.values(forecast).reduce((sum, v) => sum + v, 0)
   const monthTxs = useMemo(
     () => scopedLedger.filter((tx) => monthOf(tx.date) === month),
     [scopedLedger, month],
@@ -326,9 +335,13 @@ export default function FinancePanel() {
           <Stat
             icon={Wallet}
             tone="bg-teal-50 text-teal-700"
-            label="Saldo em todas as contas"
+            label="Saldo conciliado"
             value={formatCents(total)}
-            hint={`${visibleAccounts.length} ${visibleAccounts.length === 1 ? 'conta' : 'contas'}`}
+            hint={
+              forecastTotal !== total
+                ? `Previsto ${formatCents(forecastTotal)}, com o que falta conciliar`
+                : `${visibleAccounts.length} ${visibleAccounts.length === 1 ? 'conta' : 'contas'}`
+            }
           />
           <Stat
             icon={ArrowDownLeft}
@@ -525,6 +538,11 @@ export default function FinancePanel() {
                       )}
                     >
                       {formatCents(balances[a.id] || 0)}
+                      {(forecast[a.id] || 0) !== (balances[a.id] || 0) && (
+                        <div className="text-right text-[11px] font-normal text-slate-500">
+                          previsto {formatCents(forecast[a.id] || 0)}
+                        </div>
+                      )}
                     </div>
                   </li>
                 )

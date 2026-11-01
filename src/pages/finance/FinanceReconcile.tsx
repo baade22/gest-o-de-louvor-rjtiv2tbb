@@ -89,6 +89,8 @@ import {
 import type { FinanceLookups } from './TransactionSheet'
 import { useFinanceLookups } from './useFinanceLookups'
 import { BalanceDiffDialog } from './BalanceDiffDialog'
+import { useReconcileStarts } from './useReconcileStarts'
+import { realizedFilter } from '@/lib/realizedBalance'
 import {
   PAYMENT_METHOD_LABELS,
   PageHeader,
@@ -273,6 +275,8 @@ export default function FinanceReconcile() {
 
   // Saldo do banco (o mais recente entre a busca pela API e o último arquivo com saldo) x
   // saldo no LouvorFlow na mesma data
+  // Saldo no LouvorFlow = só o que foi conciliado (o resto é previsto)
+  const starts = useReconcileStarts(churchId, lookups.accounts, imports.length)
   const lastFile = imports.find((i) => i.has_balance)
   const fileDate = (lastFile?.balance_date || lastFile?.end_date || '').slice(0, 10)
   const apiDate = connection?.has_balance ? brtDay(connection.balance_at || '') : ''
@@ -284,8 +288,8 @@ export default function FinanceReconcile() {
   const systemBalance = useMemo(() => {
     if (!account) return 0
     const upTo = balanceDate ? ledger.filter((tx) => tx.date.slice(0, 10) <= balanceDate) : ledger
-    return accountBalances([account], upTo)[account.id] || 0
-  }, [account, ledger, balanceDate])
+    return accountBalances([account], upTo, realizedFilter(starts))[account.id] || 0
+  }, [account, ledger, balanceDate, starts])
   const balanceDiff = lastBalance ? (lastBalance.balance_cents || 0) - systemBalance : 0
 
   const visible = useMemo(() => {
@@ -1150,6 +1154,7 @@ export default function FinanceReconcile() {
           ledger={ledger}
           bankCents={lastBalance.balance_cents || 0}
           day={balanceDate}
+          starts={starts}
           onClose={() => setDiffOpen(false)}
         />
       )}
