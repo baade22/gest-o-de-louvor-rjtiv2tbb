@@ -302,6 +302,9 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   const isHistory = body.history === true
   const hasBalance =
     !isHistory && body.balance_cents !== null && Number.isInteger(Number(body.balance_cents))
+  // Conta do fundo (aplicações do Bradesco, ex.: Fundo Max DI) separada: as aplicações e
+  // resgates do fundo viram movimentos nas duas contas (transferência entre elas)
+  const investAccountId = provider === 'BRADESCO' ? conn.getString('invest_account_id') : ''
   // Só no extrato: conta para ver o extrato ou movimento antes do início da conciliação
   const viewOnly = conn.getString('purpose') === 'VISUALIZAR'
   const reconcileFrom = conn.getString('reconcile_from').slice(0, 10)
@@ -319,13 +322,65 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       // Aplicação e resgate automáticos do Invest Fácil (Bradesco) só mudam o dinheiro de
       // lugar dentro do caixa: não entram no extrato (o rendimento, RENTAB., entra)
       const investMove = (d) => /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
+      // Aplicação ou resgate de fundo (não Invest Fácil): com a conta do fundo escolhida,
+      // entra também no extrato dela
+      const fundMove = (d) =>
+        /^\s*(APLIC|RESG)/i.test(d) && /FUNDO|MAXI?\s*DI/i.test(d) && !/INVEST\s*FACIL/i.test(d)
+      let invImp = null
+      // O lado da conta de aplicação: mesmo dia, valor com o sinal trocado
+      const mirror = (l, amount) => {
+        const fitid = (prefix + String(l.id).trim() + '|inv').slice(0, 255)
+        try {
+          txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
+            a: investAccountId,
+            f: fitid,
+          })
+          return
+        } catch (_) {}
+        if (!invImp) {
+          invImp = new Record(txApp.findCollectionByNameOrId('fin_bank_imports'))
+          invImp.set('church_id', churchId)
+          invImp.set('account_id', investAccountId)
+          invImp.set(
+            'file_name',
+            'API ' + label + ' · aplicação' + (isHistory ? ' (histórico)' : ''),
+          )
+          if (isYmd(body.start_date)) invImp.set('start_date', pbDate(body.start_date))
+          if (isYmd(body.end_date)) invImp.set('end_date', pbDate(body.end_date))
+          if (
+            hasBalance &&
+            Number.isInteger(Number(body.invested_cents)) &&
+            body.invested_cents !== null
+          ) {
+            invImp.set('balance_cents', Number(body.invested_cents))
+            invImp.set('has_balance', true)
+            if (isYmd(body.end_date)) invImp.set('balance_date', pbDate(body.end_date))
+          }
+          invImp.set('imported_by_name', 'Conector bancário')
+          txApp.save(invImp)
+        }
+        const rec = new Record(linesCol)
+        rec.set('church_id', churchId)
+        rec.set('account_id', investAccountId)
+        rec.set('import_id', invImp.id)
+        rec.set('fitid', fitid)
+        rec.set('date', pbDate(l.date))
+        rec.set('amount_cents', -amount)
+        rec.set('description', String(l.description || 'Movimento').slice(0, 500))
+        rec.set('status', statusFor(l.date))
+        txApp.save(rec)
+        invImp.set('lines_created', invImp.getInt('lines_created') + 1)
+        txApp.save(invImp)
+      }
       for (const l of lines) {
         const fitid = (prefix + String(l.id).trim()).slice(0, 255)
         const amount = Number(l.amount_cents)
-        if (amount === 0 || investMove(String(l.description || ''))) {
+        const desc = String(l.description || '')
+        if (amount === 0 || investMove(desc)) {
           skipped++
           continue
         }
+        if (investAccountId && fundMove(desc)) mirror(l, amount)
         let exists = false
         try {
           txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
