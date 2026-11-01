@@ -368,23 +368,22 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
     const agent = new LouvorFlowAgent(agentConfig)
 
     vi.spyOn((agent as any).holyrics, 'testConnection').mockResolvedValue({ connected: true })
-    // Simula que 'Abertura.mp4' já está na playlist lida do Holyrics; após a inserção, Avisos.mp4 também
-    vi.spyOn((agent as any).holyrics, 'getPlaylist')
-      .mockResolvedValueOnce({
-        success: true,
-        items: [{ name: 'Abertura.mp4', type: 'video' } as any],
-      })
-      .mockResolvedValue({
-        success: true,
-        items: [
-          { name: 'Abertura.mp4', type: 'video' } as any,
-          { name: 'Avisos.mp4', type: 'video' },
-        ],
-      })
-    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
+    // Simula que 'Abertura.mp4' já está na playlist do culto; após a inserção, Avisos.mp4 também
+    const schedule = (names: string[]) => ({
       success: true,
-      schedules: [],
+      schedules: [
+        // Outro culto com id de lista igual ao do evento: não pode ser confundido
+        { id: 'evt_1', metadata: { event: { id: 'outro' } }, media_playlist: [] },
+        {
+          id: 'lista_xyz',
+          metadata: { event: { id: 'evt_1' } },
+          media_playlist: names.map((name) => ({ id: name, type: 'video', name })),
+        },
+      ],
     })
+    vi.spyOn((agent as any).holyrics, 'getSchedules')
+      .mockResolvedValueOnce(schedule(['Abertura.mp4']))
+      .mockResolvedValue(schedule(['Abertura.mp4', 'Avisos.mp4']))
     vi.spyOn((agent as any).holyrics, 'verifyMediaRecognition').mockResolvedValue({
       recognized: true,
       methodUsed: 'GetFile',
@@ -873,8 +872,9 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       expect(res.recognized).toBe(true)
       expect(res.methodUsed).toBe('GetFile')
       expect(res.fileInfo?.size).toBe(5392941)
+      // Áudio é procurado na aba Áudios (GetAudio), não na aba Arquivos (GetFile)
       expect(requestSpy).toHaveBeenCalledWith(
-        'GetFile',
+        'GetAudio',
         { name: 'teste - Eventos - 12-10 - Teste.mp3' },
         3000,
       )
@@ -963,7 +963,7 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
       // Simula GetFile retornando {"status":"error","error":"File not found"}
       // e GetFiles retornando a lista com o arquivo visível na biblioteca
       vi.spyOn(client as any, 'request').mockImplementation(async (action: string) => {
-        if (action === 'GetFile') {
+        if (action === 'GetAudio' || action === 'AudioExists') {
           return {
             status: 'error',
             error: 'File not found',
@@ -971,7 +971,7 @@ describe('Suíte de Testes Obrigatórios - Nomenclatura Automática e Playlist H
             rawText: '{"status":"error","error":"File not found"}',
           }
         }
-        if (action === 'GetFiles') {
+        if (action === 'GetAudios') {
           return {
             status: 'ok',
             httpStatus: 200,
