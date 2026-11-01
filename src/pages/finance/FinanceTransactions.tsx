@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   EyeOff,
+  FileUp,
   MoreHorizontal,
   Paperclip,
   Pencil,
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { TransactionSheet } from './TransactionSheet'
+import { EklesiaImportDialog } from './EklesiaImportDialog'
 import { ReceiptDialog, canIssueReceipt, type ReceiptData } from './ReceiptDialog'
 import { useFinanceLookups } from './useFinanceLookups'
 import {
@@ -100,6 +102,7 @@ export default function FinanceTransactions() {
   const [voiding, setVoiding] = useState<FinTransaction | null>(null)
   const [receipt, setReceipt] = useState<ReceiptData | null>(null)
   const [voidReason, setVoidReason] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const { lookups, reload: reloadLookups } = useFinanceLookups(churchId)
 
   const load = useCallback(async () => {
@@ -174,6 +177,12 @@ export default function FinanceTransactions() {
         subtitle="Entradas, saídas e transferências de todas as contas"
       >
         <MonthSwitcher value={month} onChange={setMonth} />
+        {canEdit && (
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <FileUp className="h-4 w-4" />
+            Importar do Eklesia
+          </Button>
+        )}
         {canEdit && (
           <Button onClick={openNew} className={primaryButtonClass}>
             <Plus className="h-4 w-4" />
@@ -395,6 +404,15 @@ export default function FinanceTransactions() {
           editing={editing}
           onSaved={load}
           onLookupsChanged={reloadLookups}
+        />
+      )}
+      {churchId && canEdit && (
+        <EklesiaImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          churchId={churchId}
+          lookups={lookups}
+          onImported={load}
         />
       )}
 
