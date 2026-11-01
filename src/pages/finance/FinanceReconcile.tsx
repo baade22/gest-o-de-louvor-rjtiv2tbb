@@ -19,6 +19,8 @@ import {
   Sparkles,
   Trash2,
   Undo2,
+  Clock3,
+  Save,
   UserRound,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -143,7 +145,6 @@ export default function FinanceReconcile() {
   const [status, setStatus] = useState<StatusFilter>('PENDENTE')
   const [search, setSearch] = useState('')
   const [busyLine, setBusyLine] = useState('')
-  const [bulk, setBulk] = useState(false)
   const [creating, setCreating] = useState<FinBankLine | null>(null)
   const [creatingMode, setCreatingMode] = useState<CreateMode>('LANCAMENTO')
   const openCreate = (line: FinBankLine, mode: CreateMode = 'LANCAMENTO') => {
@@ -158,7 +159,38 @@ export default function FinanceReconcile() {
   const [choosing, setChoosing] = useState<FinBankLine | null>(null)
   // Movimentos marcados para lançar juntos
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Rascunho: o que a pessoa já decidiu para cada movimento; só vale ao clicar em Salvar.
+  // Fica guardado no navegador (por conta) para não se perder ao recarregar a página.
+  const [draft, setDraft] = useState<{ accountId: string; items: Record<string, Draft> }>({
+    accountId: '',
+    items: {},
+  })
+  const [saving, setSaving] = useState(false)
+  const bulk = saving
   const [bulkOpen, setBulkOpen] = useState(false)
+
+  useEffect(() => {
+    if (!accountId) return
+    let items: Record<string, Draft> = {}
+    try {
+      items = JSON.parse(localStorage.getItem(draftKey(accountId)) || '{}') || {}
+    } catch (_) {
+      items = {}
+    }
+    setDraft({ accountId, items })
+  }, [accountId])
+  useEffect(() => {
+    if (!draft.accountId) return
+    try {
+      if (Object.keys(draft.items).length)
+        localStorage.setItem(draftKey(draft.accountId), JSON.stringify(draft.items))
+      else localStorage.removeItem(draftKey(draft.accountId))
+    } catch (_) {
+      // sem armazenamento no navegador: o rascunho vale só enquanto a página está aberta
+    }
+  }, [draft])
+  const drafts = draft.accountId === accountId ? draft.items : {}
+  const draftCount = Object.keys(drafts).length
 
   const load = useCallback(async () => {
     if (!churchId || !accountId) return
@@ -190,6 +222,17 @@ export default function FinanceReconcile() {
         )
       }
       setLines(ls)
+      // Tira do rascunho o que não está mais pendente (conciliado em outra tela, por exemplo)
+      const stillPending = new Set(ls.filter((l) => l.status === 'PENDENTE').map((l) => l.id))
+      setDraft((prev) => {
+        if (prev.accountId !== accountId) return prev
+        const items = Object.fromEntries(
+          Object.entries(prev.items).filter(([id]) => stillPending.has(id)),
+        )
+        return Object.keys(items).length === Object.keys(prev.items).length
+          ? prev
+          : { accountId, items }
+      })
       setImports(imps)
       setConnection(conns.find((c) => c.account_id === accountId))
       setBills(open)
@@ -216,6 +259,7 @@ export default function FinanceReconcile() {
     [pendingLines, candidates, bills, lookups.people],
   )
   const withTx = pendingLines.filter((l) => suggestions.get(l.id)?.tx)
+  const withTxToDo = withTx.filter((l) => !drafts[l.id])
   const transfers = useMemo(
     () => suggestTransfers(pendingLines, elsewhere),
     [pendingLines, elsewhere],
@@ -316,15 +360,78 @@ export default function FinanceReconcile() {
     }
   }
 
-  const reconcile = (line: FinBankLine, target: ReconcileTarget, done = 'Movimento conciliado') =>
-    run(
-      line,
-      () => reconcileLine(line.id, target),
-      (res) =>
-        res?.linked_other_date
-          ? `${done}. O movimento de ${shortDate(res.linked_other_date)} na outra conta também foi conciliado.`
-          : done,
-    )
+  /** O que vai acontecer com o movimento, em palavras (para o rascunho) */
+  const targetLabel = (line: FinBankLine, target: ReconcileTarget | 'IGNORAR') => {
+    if (target === 'IGNORAR') return 'ignorar'
+    if ('transaction_id' in target) {
+      const tx = candidates.find((t) => t.id === target.transaction_id)
+      return tx ? `ligar a ${txLabel(tx)} de ${shortDate(tx.date)}` : 'ligar ao lançamento'
+    }
+    if ('bill_id' in target) {
+      const bill = bills.find((b) => b.id === target.bill_id)
+      return `${line.amount_cents > 0 ? 'receber' : 'pagar'} a conta ${bill?.description || ''}`.trim()
+    }
+    const c = target.create
+    if (c.transfer_account_id)
+      return `transferência ${line.amount_cents > 0 ? 'vinda de' : 'para'} ${accountName(c.transfer_account_id)}`
+    const category = lookups.categories.find((k) => k.id === c.category_id)?.name || 'lançamento'
+    const who = c.is_anonymous
+      ? 'anônimo'
+      : lookups.people.find((p) => p.id === c.person_id)?.name ||
+        lookups.suppliers.find((p) => p.id === c.supplier_id)?.name ||
+        ''
+    return who ? `${category} · ${who}` : category
+  }
+  /** Guarda a decisão no rascunho; só é lançada ao salvar */
+  const stage = (line: FinBankLine, target: ReconcileTarget | 'IGNORAR') =>
+    setDraft((prev) => ({
+      accountId,
+      items: {
+        ...(prev.accountId === accountId ? prev.items : {}),
+        [line.id]: { target, label: targetLabel(line, target) },
+      },
+    }))
+  const unstage = (ids: string[]) =>
+    setDraft((prev) => {
+      const items = { ...prev.items }
+      for (const id of ids) delete items[id]
+      return { ...prev, items }
+    })
+  // As ações da tela só montam o rascunho
+  const reconcile = async (line: FinBankLine, target: ReconcileTarget, _done?: string) =>
+    stage(line, target)
+
+  /** Aplica o rascunho: concilia, lança e ignora tudo, na ordem das datas */
+  const saveDraft = async () => {
+    const byId = new Map(lines.map((l) => [l.id, l]))
+    const entries = Object.entries(drafts)
+      .filter(([id]) => byId.get(id)?.status === 'PENDENTE')
+      .sort(([a], [b]) => byId.get(a)!.date.localeCompare(byId.get(b)!.date))
+    setSaving(true)
+    const done: string[] = []
+    const failed: string[] = []
+    for (const [id, d] of entries) {
+      try {
+        if (d.target === 'IGNORAR') await setLineIgnored(id, true)
+        else await reconcileLine(id, d.target)
+        done.push(id)
+      } catch (err) {
+        console.error(err)
+        const l = byId.get(id)!
+        failed.push(`${shortDate(l.date)} ${l.description || ''}: ${serverMessage(err, 'erro')}`)
+      }
+    }
+    unstage(done)
+    setSaving(false)
+    toast({
+      title: `${done.length} ${done.length === 1 ? 'movimento salvo' : 'movimentos salvos'}`,
+      description: failed.length
+        ? `Ficaram no rascunho: ${failed.slice(0, 3).join(' · ')}`
+        : undefined,
+      variant: failed.length && !done.length ? 'destructive' : undefined,
+    })
+    load()
+  }
   /** Transferência entre contas da igreja, direto a partir da sugestão */
   const reconcileTransfer = (line: FinBankLine, other: string) =>
     reconcile(
@@ -340,8 +447,7 @@ export default function FinanceReconcile() {
     )
   /** Faz com o movimento o mesmo que da última vez (regra aprendida) */
   const applyRule = (line: FinBankLine, r: FinReconcileRule) => {
-    if (r.action === 'IGNORAR')
-      return run(line, () => setLineIgnored(line.id, true), 'Movimento ignorado')
+    if (r.action === 'IGNORAR') return stage(line, 'IGNORAR')
     if (r.action === 'TRANSFERENCIA') return reconcileTransfer(line, r.transfer_account_id)
     return reconcile(
       line,
@@ -361,26 +467,11 @@ export default function FinanceReconcile() {
     )
   }
 
-  const reconcileAll = async () => {
-    setBulk(true)
-    let ok = 0
+  const reconcileAll = () => {
     for (const line of withTx) {
       const tx = suggestions.get(line.id)?.tx
-      if (!tx) continue
-      try {
-        await reconcileLine(line.id, { transaction_id: tx.id })
-        ok++
-      } catch (err) {
-        console.error(err)
-      }
+      if (tx && !drafts[line.id]) stage(line, { transaction_id: tx.id })
     }
-    setBulk(false)
-    toast({
-      title: `${ok} ${ok === 1 ? 'movimento conciliado' : 'movimentos conciliados'}`,
-      description:
-        ok < withTx.length ? `${withTx.length - ok} não deram certo; confira um por um.` : '',
-    })
-    load()
   }
 
   const selectable = status === 'PENDENTE' && canEdit
@@ -400,42 +491,27 @@ export default function FinanceReconcile() {
    * Lança os marcados de uma vez: cada movimento vira um lançamento com o histórico do banco.
    * Quem já tem lançamento correspondente é só ligado a ele, para não lançar duas vezes.
    */
-  const launchSelected = async (choice: BulkChoice) => {
-    setBulk(true)
-    let ok = 0
-    const failed: string[] = []
+  const launchSelected = (choice: BulkChoice) => {
     for (const line of selectedLines) {
       const credit = line.amount_cents > 0
       const match = suggestions.get(line.id)?.tx
       const categoryId = credit ? choice.creditCategoryId : choice.debitCategoryId
       const category = lookups.categories.find((c) => c.id === categoryId)
-      try {
-        await reconcileLine(
-          line.id,
-          match
-            ? { transaction_id: match.id }
-            : {
-                create: {
-                  category_id: categoryId,
-                  is_anonymous: credit && Boolean(category?.is_contribution),
-                  description: (line.description || '').slice(0, 200),
-                  payment_method: choice.method,
-                },
+      stage(
+        line,
+        match
+          ? { transaction_id: match.id }
+          : {
+              create: {
+                category_id: categoryId,
+                is_anonymous: credit && Boolean(category?.is_contribution),
+                description: (line.description || '').slice(0, 200),
+                payment_method: choice.method,
               },
-        )
-        ok++
-      } catch (err) {
-        console.error(err)
-        failed.push(line.description || shortDate(line.date))
-      }
+            },
+      )
     }
-    setBulk(false)
-    toast({
-      title: `${ok} ${ok === 1 ? 'movimento lançado' : 'movimentos lançados'} e conciliados`,
-      description: failed.length ? `Não deu certo: ${failed.slice(0, 3).join(', ')}` : undefined,
-      variant: failed.length && !ok ? 'destructive' : undefined,
-    })
-    load()
+    setSelected(new Set())
   }
 
   const statusChips: { value: StatusFilter; label: string }[] = [
@@ -589,7 +665,7 @@ export default function FinanceReconcile() {
             ))}
           </div>
           <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:items-center">
-            {canEdit && status === 'PENDENTE' && withTx.length > 1 && (
+            {canEdit && status === 'PENDENTE' && withTxToDo.length > 1 && (
               <Button
                 variant="outline"
                 onClick={reconcileAll}
@@ -601,7 +677,7 @@ export default function FinanceReconcile() {
                 ) : (
                   <CheckCheck className="h-4 w-4" />
                 )}
-                Conciliar os {withTx.length} correspondentes
+                Conciliar os {withTxToDo.length} correspondentes
               </Button>
             )}
             {accountRules.length > 0 && (
@@ -737,6 +813,11 @@ export default function FinanceReconcile() {
                           </span>
                         ) : line.status === 'IGNORADO' ? (
                           'Ignorado: fica fora das pendências'
+                        ) : drafts[line.id] ? (
+                          <span className="font-semibold text-amber-800">
+                            <Clock3 className="mr-1 inline h-3.5 w-3.5" />A salvar:{' '}
+                            {drafts[line.id].label}
+                          </span>
                         ) : s?.tx ? (
                           <span className="text-teal-800">
                             <Link2 className="mr-1 inline h-3.5 w-3.5" />
@@ -781,150 +862,162 @@ export default function FinanceReconcile() {
                     </div>
                   </div>
 
-                  {canEdit && (
+                  {canEdit && line.status === 'PENDENTE' && drafts[line.id] ? (
                     <div className="flex shrink-0 items-center justify-end gap-1.5 pl-12 sm:pl-0">
-                      {line.status === 'PENDENTE' &&
-                        (s?.tx ? (
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => reconcile(line, { transaction_id: s.tx!.id })}
-                            className="h-8 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
-                          >
-                            {busyLine === line.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Link2 className="h-3.5 w-3.5" />
-                            )}
-                            Conciliar
-                          </Button>
-                        ) : ruleFor(line, rules) ? (
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => applyRule(line, ruleFor(line, rules)!)}
-                            className="h-8 gap-1.5 rounded-lg bg-violet-700 font-semibold text-white hover:bg-violet-800"
-                          >
-                            {busyLine === line.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3.5 w-3.5" />
-                            )}
-                            Aplicar
-                          </Button>
-                        ) : transfers.get(line.id) ? (
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() =>
-                              reconcileTransfer(line, transfers.get(line.id)!.account_id)
-                            }
-                            className="h-8 gap-1.5 rounded-lg bg-sky-700 font-semibold text-white hover:bg-sky-800"
-                          >
-                            {busyLine === line.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <ArrowLeftRight className="h-3.5 w-3.5" />
-                            )}
-                            Transferência
-                          </Button>
-                        ) : s?.bill ? (
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() =>
-                              reconcile(
-                                line,
-                                { bill_id: s.bill!.id, payment_method: credit ? 'PIX' : 'BOLETO' },
-                                credit ? 'Conta recebida e conciliada' : 'Conta paga e conciliada',
-                              )
-                            }
-                            className="h-8 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
-                          >
-                            <CalendarCheck className="h-3.5 w-3.5" />
-                            {credit ? 'Receber' : 'Pagar'} conta
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => openCreate(line)}
-                            className="h-8 gap-1.5 rounded-lg font-semibold"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            Lançar
-                          </Button>
-                        ))}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={busy}
-                            className="h-8 w-8"
-                            aria-label="Ações"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {line.status === 'PENDENTE' && (
-                            <>
-                              {(s?.tx ||
-                                s?.bill ||
-                                transfers.get(line.id) ||
-                                ruleFor(line, rules)) && (
-                                <DropdownMenuItem onClick={() => openCreate(line)}>
-                                  <Plus className="mr-2 h-4 w-4" />{' '}
-                                  {credit ? 'Lançar como entrada' : 'Lançar como saída'}
-                                </DropdownMenuItem>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={saving}
+                        onClick={() => unstage([line.id])}
+                        className="h-8 gap-1.5 rounded-lg font-semibold"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" />
+                        Desfazer
+                      </Button>
+                    </div>
+                  ) : (
+                    canEdit && (
+                      <div className="flex shrink-0 items-center justify-end gap-1.5 pl-12 sm:pl-0">
+                        {line.status === 'PENDENTE' &&
+                          (s?.tx ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => reconcile(line, { transaction_id: s.tx!.id })}
+                              className="h-8 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
+                            >
+                              {busyLine === line.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Link2 className="h-3.5 w-3.5" />
                               )}
-                              <DropdownMenuItem onClick={() => openCreate(line, 'TRANSFERENCIA')}>
-                                <ArrowLeftRight className="mr-2 h-4 w-4" /> Transferência entre
-                                contas
+                              Conciliar
+                            </Button>
+                          ) : ruleFor(line, rules) ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => applyRule(line, ruleFor(line, rules)!)}
+                              className="h-8 gap-1.5 rounded-lg bg-violet-700 font-semibold text-white hover:bg-violet-800"
+                            >
+                              {busyLine === line.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3.5 w-3.5" />
+                              )}
+                              Aplicar
+                            </Button>
+                          ) : transfers.get(line.id) ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                reconcileTransfer(line, transfers.get(line.id)!.account_id)
+                              }
+                              className="h-8 gap-1.5 rounded-lg bg-sky-700 font-semibold text-white hover:bg-sky-800"
+                            >
+                              {busyLine === line.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <ArrowLeftRight className="h-3.5 w-3.5" />
+                              )}
+                              Transferência
+                            </Button>
+                          ) : s?.bill ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                reconcile(
+                                  line,
+                                  {
+                                    bill_id: s.bill!.id,
+                                    payment_method: credit ? 'PIX' : 'BOLETO',
+                                  },
+                                  credit
+                                    ? 'Conta recebida e conciliada'
+                                    : 'Conta paga e conciliada',
+                                )
+                              }
+                              className="h-8 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
+                            >
+                              <CalendarCheck className="h-3.5 w-3.5" />
+                              {credit ? 'Receber' : 'Pagar'} conta
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => openCreate(line)}
+                              className="h-8 gap-1.5 rounded-lg font-semibold"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Lançar
+                            </Button>
+                          ))}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={busy}
+                              className="h-8 w-8"
+                              aria-label="Ações"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {line.status === 'PENDENTE' && (
+                              <>
+                                {(s?.tx ||
+                                  s?.bill ||
+                                  transfers.get(line.id) ||
+                                  ruleFor(line, rules)) && (
+                                  <DropdownMenuItem onClick={() => openCreate(line)}>
+                                    <Plus className="mr-2 h-4 w-4" />{' '}
+                                    {credit ? 'Lançar como entrada' : 'Lançar como saída'}
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => openCreate(line, 'TRANSFERENCIA')}>
+                                  <ArrowLeftRight className="mr-2 h-4 w-4" /> Transferência entre
+                                  contas
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setChoosing(line)}>
+                                  <Link2 className="mr-2 h-4 w-4" /> Escolher lançamento
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => stage(line, 'IGNORAR')}>
+                                  <EyeOff className="mr-2 h-4 w-4" /> Ignorar
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {line.status === 'CONCILIADO' && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  run(line, () => unreconcileLine(line.id), 'Conciliação desfeita')
+                                }
+                              >
+                                <Undo2 className="mr-2 h-4 w-4" /> Desfazer conciliação
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setChoosing(line)}>
-                                <Link2 className="mr-2 h-4 w-4" /> Escolher lançamento
-                              </DropdownMenuItem>
+                            )}
+                            {line.status === 'IGNORADO' && (
                               <DropdownMenuItem
                                 onClick={() =>
                                   run(
                                     line,
-                                    () => setLineIgnored(line.id, true),
-                                    'Movimento ignorado',
+                                    () => setLineIgnored(line.id, false),
+                                    'Movimento voltou para a conciliação',
                                   )
                                 }
                               >
-                                <EyeOff className="mr-2 h-4 w-4" /> Ignorar
+                                <Undo2 className="mr-2 h-4 w-4" /> Voltar para a conciliação
                               </DropdownMenuItem>
-                            </>
-                          )}
-                          {line.status === 'CONCILIADO' && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                run(line, () => unreconcileLine(line.id), 'Conciliação desfeita')
-                              }
-                            >
-                              <Undo2 className="mr-2 h-4 w-4" /> Desfazer conciliação
-                            </DropdownMenuItem>
-                          )}
-                          {line.status === 'IGNORADO' && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                run(
-                                  line,
-                                  () => setLineIgnored(line.id, false),
-                                  'Movimento voltou para a conciliação',
-                                )
-                              }
-                            >
-                              <Undo2 className="mr-2 h-4 w-4" /> Voltar para a conciliação
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )
                   )}
                 </li>
               )
@@ -932,6 +1025,32 @@ export default function FinanceReconcile() {
           </ul>
         )}
       </div>
+
+      {canEdit && draftCount > 0 && selectedLines.length === 0 && (
+        <div className="sticky bottom-3 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-lg">
+          <div className="min-w-0 flex-1 text-sm">
+            <div className="font-semibold text-slate-900">
+              {draftCount} {draftCount === 1 ? 'movimento pronto' : 'movimentos prontos'} para
+              salvar
+            </div>
+            <div className="text-xs text-slate-500">
+              Nada foi lançado ainda. Confira e clique em Salvar para aplicar tudo.
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            disabled={saving}
+            onClick={() => unstage(Object.keys(drafts))}
+            className="rounded-lg font-semibold"
+          >
+            Descartar
+          </Button>
+          <Button onClick={saveDraft} disabled={saving} className={primaryButtonClass}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar conciliação
+          </Button>
+        </div>
+      )}
 
       {selectable && selectedLines.length > 0 && (
         <div className="sticky bottom-3 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-lg">
@@ -979,7 +1098,7 @@ export default function FinanceReconcile() {
           suggestedAccountId={creating ? transfers.get(creating.id)?.account_id : undefined}
           onClose={() => setCreating(null)}
           onLookupsChanged={reloadLookups}
-          onDone={(target) => creating && reconcile(creating, target, 'Lançado e conciliado')}
+          onDone={(target) => (creating ? reconcile(creating, target) : Promise.resolve())}
         />
       )}
 
@@ -1008,7 +1127,9 @@ export default function FinanceReconcile() {
         line={choosing}
         candidates={candidates}
         onClose={() => setChoosing(null)}
-        onChoose={(tx) => choosing && reconcile(choosing, { transaction_id: tx.id })}
+        onChoose={(tx) =>
+          choosing ? reconcile(choosing, { transaction_id: tx.id }) : Promise.resolve()
+        }
       />
     </div>
   )
@@ -1017,6 +1138,13 @@ export default function FinanceReconcile() {
 // ---- Lançar a partir do movimento ----
 
 type CreateMode = 'LANCAMENTO' | 'TRANSFERENCIA'
+
+/** Decisão guardada no rascunho da conciliação */
+interface Draft {
+  target: ReconcileTarget | 'IGNORAR'
+  label: string
+}
+const draftKey = (accountId: string) => `louvorflow_conciliacao_rascunho_${accountId}`
 
 function CreateFromLineDialog({
   line,
@@ -1379,7 +1507,7 @@ function CreateFromLineDialog({
             className="gap-2 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Lançar e conciliar
+            Pôr no rascunho
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1627,7 +1755,7 @@ function BulkLaunchDialog({
             onClick={submit}
             className="rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
           >
-            Lançar e conciliar
+            Pôr no rascunho
           </Button>
         </DialogFooter>
       </DialogContent>
