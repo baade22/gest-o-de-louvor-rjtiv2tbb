@@ -188,7 +188,6 @@ test('saldo do Bradesco', () => {
     balance_cents: 7795,
     available_cents: 7795,
     invested_cents: null,
-    invest_cash_cents: null,
   })
   expect(
     bradescoBalance({
@@ -196,12 +195,7 @@ test('saldo do Bradesco', () => {
         lstLancamentosSaldos: [{ codigoProduto: 984, valorLancamento: '10,00', sinalSaldo: '-' }],
       },
     }),
-  ).toEqual({
-    balance_cents: -1000,
-    available_cents: -1000,
-    invested_cents: null,
-    invest_cash_cents: null,
-  })
+  ).toEqual({ balance_cents: -1000, available_cents: -1000, invested_cents: null })
 
   // Invest Fácil é caixa: soma na conta-corrente; outra aplicação fica à parte
   const cc = (total, checking) => ({
@@ -234,12 +228,7 @@ test('saldo do Bradesco', () => {
         ],
       },
     }),
-  ).toEqual({
-    balance_cents: 132795,
-    available_cents: 132795,
-    invested_cents: 100000,
-    invest_cash_cents: 25000,
-  })
+  ).toEqual({ balance_cents: 132795, available_cents: 132795, invested_cents: 100000 })
   // Só Invest Fácil: tudo é saldo da conta
   expect(
     bradescoBalance({
@@ -255,18 +244,12 @@ test('saldo do Bradesco', () => {
         ],
       },
     }),
-  ).toEqual({
-    balance_cents: 132795,
-    available_cents: 132795,
-    invested_cents: null,
-    invest_cash_cents: 25000,
-  })
+  ).toEqual({ balance_cents: 132795, available_cents: 132795, invested_cents: null })
   // Sem a lista das aplicações: vale o total
   expect(bradescoBalance({ saldoCC: cc('1.327,95', '1.077,95') })).toEqual({
     balance_cents: 132795,
     available_cents: 132795,
     invested_cents: null,
-    invest_cash_cents: null,
   })
 })
 

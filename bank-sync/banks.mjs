@@ -126,8 +126,7 @@ export function bradescoLines(json) {
  * Saldo do Bradesco (GET /v1/fornecimento-saldos-contas/saldos), em centavos e com sinal.
  * O SALDO TOTAL (984) soma a conta-corrente e as aplicações. O Invest Fácil é remuneração do
  * caixa, não investimento: conta como saldo da conta-corrente ("+ CTA CORRENTE", 998). As
- * outras aplicações de saldoAplicacaoCC ficam à parte (invested_cents). invest_cash_cents diz
- * quanto do saldo está no Invest Fácil, para quando ele tem uma conta própria no LouvorFlow.
+ * outras aplicações de saldoAplicacaoCC ficam à parte (invested_cents).
  */
 export function bradescoBalance(json) {
   const block = json?.saldoCC || json?.saldoCP
@@ -156,13 +155,7 @@ export function bradescoBalance(json) {
   const balance = apps
     ? (checking ?? pick(999) ?? 0) + (cash || 0)
     : (total ?? checking ?? pick(999))
-  return {
-    balance_cents: balance,
-    available_cents: balance,
-    invested_cents: invested,
-    // Parte do saldo que está no Invest Fácil (o LouvorFlow pode tratá-la como outra conta)
-    invest_cash_cents: apps ? cash || 0 : null,
-  }
+  return { balance_cents: balance, available_cents: balance, invested_cents: invested }
 }
 
 /**

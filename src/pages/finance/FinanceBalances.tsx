@@ -153,17 +153,18 @@ function periodRange(p: Period, from: string, to: string): [string, string] {
 
 /**
  * Saldo informado pelo banco: o mais recente entre a API e o último arquivo OFX com saldo.
- * asInvest: a conta é a aplicação (Invest Fácil) da conexão de outra conta.
+ * asInvest: a conta é a do fundo (aplicações) da conexão de outra conta.
  */
 function bankBalance(conn?: FinBankConnection, imp?: FinBankImport, asInvest = false) {
   const api =
     conn?.has_balance && conn.balance_at
       ? {
-          cents: asInvest ? conn.invest_cash_cents || 0 : conn.balance_cents || 0,
+          cents: asInvest ? conn.invested_cents || 0 : conn.balance_cents || 0,
           available: asInvest
-            ? conn.invest_cash_cents || 0
+            ? conn.invested_cents || 0
             : (conn.available_cents ?? conn.balance_cents ?? 0),
-          invested: asInvest ? 0 : conn.invested_cents || 0,
+          // Com conta do fundo, as aplicações aparecem no cartão dela
+          invested: asInvest || conn.invest_account_id ? 0 : conn.invested_cents || 0,
           day: brtDay(conn.balance_at),
           at: conn.balance_at,
           source: 'API' as const,
@@ -264,7 +265,7 @@ export default function FinanceBalances() {
     return () => clearInterval(id)
   }, [load, waiting])
 
-  // A conta de aplicação (Invest Fácil) não tem conexão própria: vem da conexão da
+  // A conta do fundo (aplicações) não tem conexão própria: vem da conexão da
   // conta-corrente do Bradesco
   const ownConn = (accountId: string) => connections.find((c) => c.account_id === accountId)
   const investParent = (accountId: string) =>
@@ -1098,7 +1099,7 @@ function ConnectionDialog({
 
           {bradesco && (
             <div className="space-y-1.5">
-              <Label>Conta da aplicação (Invest Fácil)</Label>
+              <Label>Conta do fundo (aplicações)</Label>
               <Select
                 value={form.invest_account_id || 'NONE'}
                 onValueChange={(v) => set({ invest_account_id: v === 'NONE' ? '' : v })}
@@ -1107,7 +1108,7 @@ function ConnectionDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NONE">Nenhuma: soma no saldo desta conta</SelectItem>
+                  <SelectItem value="NONE">Nenhuma: mostra as aplicações nesta conta</SelectItem>
                   {investChoices.map((x) => (
                     <SelectItem key={x.id} value={x.id}>
                       {x.name}
@@ -1117,8 +1118,8 @@ function ConnectionDialog({
               </Select>
               <p className="text-xs text-slate-500">
                 {form.invest_account_id
-                  ? 'O saldo aplicado vai para essa conta. Aplicações e resgates aparecem nas duas contas, para conciliar como transferência.'
-                  : 'Para separar, cadastre antes uma conta (ex.: Bradesco Invest Fácil) em Cadastros.'}
+                  ? 'O saldo do fundo vai para essa conta. Aplicações e resgates do fundo aparecem nas duas contas, para conciliar como transferência. O Invest Fácil continua como saldo desta conta.'
+                  : 'Para separar, cadastre antes uma conta (ex.: Fundo Max DI) em Cadastros.'}
               </p>
             </div>
           )}

@@ -295,7 +295,6 @@ async function main() {
         balance_cents: bal.balance_cents,
         available_cents: bal.available_cents,
         invested_cents: bal.invested_cents,
-        invest_cash_cents: bal.invest_cash_cents ?? null,
         balance_at: new Date().toISOString().replace('T', ' '),
         start_date: conn.from,
         end_date: conn.to,

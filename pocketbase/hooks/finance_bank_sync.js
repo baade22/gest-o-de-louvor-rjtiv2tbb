@@ -12,8 +12,7 @@
 //      com histórico pedido, também history: { from: 'YYYY-MM-DD' ou '' (o máximo), before }
 //      (o conector busca de before para trás, em partes, até from)
 // POST /backend/v1/finance/bank-sync/push            (conector) entrega o resultado de uma conta:
-//      { connection_id, ok: true, balance_cents?, available_cents?, invested_cents?,
-//        invest_cash_cents? (Invest Fácil, já somado em balance_cents), balance_at?,
+//      { connection_id, ok: true, balance_cents?, available_cents?, invested_cents?, balance_at?,
 //        start_date, end_date, lines: [{ id, date: 'YYYY-MM-DD', amount_cents, description }] }
 //      { connection_id, ok: false, error }
 //      { connection_id, ok: true, history: true, start_date, end_date, history_done?, lines }
@@ -303,17 +302,9 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   const isHistory = body.history === true
   const hasBalance =
     !isHistory && body.balance_cents !== null && Number.isInteger(Number(body.balance_cents))
-  // Conta de aplicação (Invest Fácil do Bradesco) separada: o saldo dela sai da conta-corrente
-  // e as aplicações e resgates viram movimentos nas duas contas (transferência entre elas)
+  // Conta do fundo (aplicações do Bradesco, ex.: Fundo Max DI) separada: as aplicações e
+  // resgates do fundo viram movimentos nas duas contas (transferência entre elas)
   const investAccountId = provider === 'BRADESCO' ? conn.getString('invest_account_id') : ''
-  const investCash =
-    body.invest_cash_cents !== null &&
-    body.invest_cash_cents !== undefined &&
-    Number.isInteger(Number(body.invest_cash_cents))
-      ? Number(body.invest_cash_cents)
-      : null
-  const ccBalance = (v) =>
-    investAccountId && investCash !== null ? Number(v) - investCash : Number(v)
   // Só no extrato: conta para ver o extrato ou movimento antes do início da conciliação
   const viewOnly = conn.getString('purpose') === 'VISUALIZAR'
   const reconcileFrom = conn.getString('reconcile_from').slice(0, 10)
@@ -330,8 +321,11 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       let imp = null
       // Aplicação e resgate automáticos do Invest Fácil (Bradesco) só mudam o dinheiro de
       // lugar dentro do caixa: não entram no extrato (o rendimento, RENTAB., entra)
-      // Com a conta de aplicação escolhida, entram no extrato das duas contas
       const investMove = (d) => /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
+      // Aplicação ou resgate de fundo (não Invest Fácil): com a conta do fundo escolhida,
+      // entra também no extrato dela
+      const fundMove = (d) =>
+        /^\s*(APLIC|RESG)/i.test(d) && /FUNDO|MAXI?\s*DI/i.test(d) && !/INVEST\s*FACIL/i.test(d)
       let invImp = null
       // O lado da conta de aplicação: mesmo dia, valor com o sinal trocado
       const mirror = (l, amount) => {
@@ -353,8 +347,12 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           )
           if (isYmd(body.start_date)) invImp.set('start_date', pbDate(body.start_date))
           if (isYmd(body.end_date)) invImp.set('end_date', pbDate(body.end_date))
-          if (hasBalance && investCash !== null) {
-            invImp.set('balance_cents', investCash)
+          if (
+            hasBalance &&
+            Number.isInteger(Number(body.invested_cents)) &&
+            body.invested_cents !== null
+          ) {
+            invImp.set('balance_cents', Number(body.invested_cents))
             invImp.set('has_balance', true)
             if (isYmd(body.end_date)) invImp.set('balance_date', pbDate(body.end_date))
           }
@@ -377,12 +375,12 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       for (const l of lines) {
         const fitid = (prefix + String(l.id).trim()).slice(0, 255)
         const amount = Number(l.amount_cents)
-        const isInvest = investMove(String(l.description || ''))
-        if (amount === 0 || (isInvest && !investAccountId)) {
+        const desc = String(l.description || '')
+        if (amount === 0 || investMove(desc)) {
           skipped++
           continue
         }
-        if (isInvest) mirror(l, amount)
+        if (investAccountId && fundMove(desc)) mirror(l, amount)
         let exists = false
         try {
           txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
@@ -419,7 +417,7 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           if (isYmd(body.start_date)) imp.set('start_date', pbDate(body.start_date))
           if (isYmd(body.end_date)) imp.set('end_date', pbDate(body.end_date))
           if (hasBalance) {
-            imp.set('balance_cents', ccBalance(body.balance_cents))
+            imp.set('balance_cents', Number(body.balance_cents))
             imp.set('has_balance', true)
             if (isYmd(body.end_date)) imp.set('balance_date', pbDate(body.end_date))
           }
@@ -550,18 +548,14 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       fresh.set('last_auto_reconciled', auto)
       fresh.set('sync_requested_at', '')
       if (hasBalance) {
-        fresh.set('balance_cents', ccBalance(body.balance_cents))
+        fresh.set('balance_cents', Number(body.balance_cents))
         fresh.set('has_balance', true)
         fresh.set(
           'available_cents',
-          ccBalance(
-            Number.isInteger(Number(body.available_cents)) && body.available_cents !== null
-              ? Number(body.available_cents)
-              : Number(body.balance_cents),
-          ),
+          Number.isInteger(Number(body.available_cents)) && body.available_cents !== null
+            ? Number(body.available_cents)
+            : Number(body.balance_cents),
         )
-        // Saldo do Invest Fácil: é o saldo da conta de aplicação, quando ela existe
-        fresh.set('invest_cash_cents', investCash === null ? 0 : investCash)
         // Aplicações (Bradesco) ficam à parte do saldo da conta-corrente
         fresh.set(
           'invested_cents',
