@@ -106,7 +106,7 @@ export async function listLedger(churchId: string) {
   return pb.collection('fin_transactions').getFullList<FinTransaction>({
     filter: byChurch(churchId),
     fields:
-      'id,type,amount_cents,account_id,to_account_id,category_id,person_id,is_anonymous,status,date',
+      'id,type,amount_cents,account_id,to_account_id,category_id,person_id,is_anonymous,status,date,description,bank_line_id,to_bank_line_id',
     sort: 'date',
   })
 }

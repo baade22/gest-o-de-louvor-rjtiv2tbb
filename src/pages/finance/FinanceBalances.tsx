@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useFinanceLookups } from './useFinanceLookups'
+import { BalanceDiffDialog } from './BalanceDiffDialog'
 import {
   PageHeader,
   ReadOnlyNotice,
@@ -202,6 +203,11 @@ export default function FinanceBalances() {
   const [editing, setEditing] = useState<{ account: FinAccount; conn?: FinBankConnection } | null>(
     null,
   )
+  const [diffFor, setDiffFor] = useState<{
+    account: FinAccount
+    cents: number
+    day: string
+  } | null>(null)
   // Relógio para "há 5 min" e para buscar de novo de tempos em tempos
   const [now, setNow] = useState(Date.now())
 
@@ -543,6 +549,15 @@ export default function FinanceBalances() {
                             : `Diferença de ${formatCents(Math.abs(diff))}`}
                         </div>
                       )}
+                      {b && diff !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setDiffFor({ account: a, cents: b.cents, day: b.day })}
+                          className="text-[11.5px] font-semibold text-teal-700 hover:underline"
+                        >
+                          Ver de onde vem
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -829,6 +844,17 @@ export default function FinanceBalances() {
             </div>
           )}
         </div>
+      )}
+
+      {diffFor && churchId && (
+        <BalanceDiffDialog
+          churchId={churchId}
+          account={diffFor.account}
+          ledger={ledger}
+          bankCents={diffFor.cents}
+          day={diffFor.day}
+          onClose={() => setDiffFor(null)}
+        />
       )}
 
       {editing && churchId && (

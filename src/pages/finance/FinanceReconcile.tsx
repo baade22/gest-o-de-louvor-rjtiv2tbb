@@ -88,6 +88,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { FinanceLookups } from './TransactionSheet'
 import { useFinanceLookups } from './useFinanceLookups'
+import { BalanceDiffDialog } from './BalanceDiffDialog'
 import {
   PAYMENT_METHOD_LABELS,
   PageHeader,
@@ -167,6 +168,7 @@ export default function FinanceReconcile() {
   })
   const [saving, setSaving] = useState(false)
   const bulk = saving
+  const [diffOpen, setDiffOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
 
   useEffect(() => {
@@ -631,6 +633,15 @@ export default function FinanceReconcile() {
                     ? 'Igual ao saldo no LouvorFlow'
                     : `LouvorFlow mostra ${formatCents(systemBalance)} (diferença de ${formatCents(Math.abs(balanceDiff))})`}
                 </div>
+                {balanceDiff !== 0 && balanceDate && (
+                  <button
+                    type="button"
+                    onClick={() => setDiffOpen(true)}
+                    className="mt-1 text-xs font-semibold text-teal-700 hover:underline"
+                  >
+                    Ver de onde vem a diferença
+                  </button>
+                )}
               </>
             ) : (
               <p className="mt-2 text-xs text-slate-500">
@@ -1131,6 +1142,17 @@ export default function FinanceReconcile() {
           choosing ? reconcile(choosing, { transaction_id: tx.id }) : Promise.resolve()
         }
       />
+
+      {diffOpen && churchId && account && lastBalance && balanceDate && (
+        <BalanceDiffDialog
+          churchId={churchId}
+          account={account}
+          ledger={ledger}
+          bankCents={lastBalance.balance_cents || 0}
+          day={balanceDate}
+          onClose={() => setDiffOpen(false)}
+        />
+      )}
     </div>
   )
 }
