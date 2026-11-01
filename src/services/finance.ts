@@ -29,6 +29,7 @@ import type {
   FinSupplier,
   FinTransaction,
   FinReceipt,
+  FinReconcileRule,
   FinReceiptSender,
   FinReceiptsStatus,
   Person,
@@ -443,6 +444,27 @@ export async function listPendingLinesElsewhere(churchId: string, accountId: str
     ),
     fields: 'id,account_id,date,amount_cents,description,status',
   })
+}
+
+// ---- Regras aprendidas da conciliação ----
+
+export async function listReconcileRules(churchId: string) {
+  const res = await pb.send<{ items: FinReconcileRule[] }>('/backend/v1/finance/rules/list', {
+    method: 'POST',
+    body: { church_id: churchId },
+  })
+  return res.items
+}
+
+export async function setReconcileRuleAuto(ruleId: string, auto: boolean) {
+  return pb.send('/backend/v1/finance/rules/auto', {
+    method: 'POST',
+    body: { rule_id: ruleId, auto },
+  })
+}
+
+export async function deleteReconcileRule(ruleId: string) {
+  return pb.send('/backend/v1/finance/rules/delete', { method: 'POST', body: { rule_id: ruleId } })
 }
 
 /** linked_other_date: a outra ponta da transferência também foi conciliada (data dela). */

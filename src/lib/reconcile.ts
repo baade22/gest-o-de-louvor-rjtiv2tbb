@@ -85,6 +85,32 @@ export function suggestTransfers<L extends LineLike>(lines: L[], others: L[], da
   return out
 }
 
+interface RuleLike {
+  account_id: string
+  direction: string
+  match_code: string
+  counterparty: string
+}
+
+/**
+ * Regra aprendida que vale para o movimento: mesma conta, sentido, tipo de movimento
+ * (match_code) e a mesma pessoa do outro lado (ou nenhuma, nos dois).
+ */
+export function ruleFor<R extends RuleLike>(
+  line: LineLike & { match_code?: string; counterparty?: string },
+  rules: R[],
+): R | undefined {
+  if (!line.match_code) return undefined
+  const direction = line.amount_cents > 0 ? 'ENTRADA' : 'SAIDA'
+  return rules.find(
+    (r) =>
+      r.account_id === line.account_id &&
+      r.direction === direction &&
+      r.match_code === line.match_code &&
+      (r.counterparty || '') === (line.counterparty || ''),
+  )
+}
+
 /** "JOÃO  Mendes" → ["JOAO", "MENDES"] */
 export const nameTokens = (s: string) =>
   (s || '')
