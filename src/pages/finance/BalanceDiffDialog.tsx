@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { explainBalanceDiff, type DiffGroup, type DiffKind } from '@/lib/balanceDiff'
 import { listStatement } from '@/services/finance'
+import { realizedFilter, type ReconcileStarts } from '@/lib/realizedBalance'
 import type { FinAccount, FinBankLine, FinTransaction } from '@/types/finance'
 import {
   Dialog,
@@ -44,8 +45,10 @@ export function BalanceDiffDialog({
   ledger,
   bankCents,
   day,
+  starts,
   onClose,
 }: {
+  starts: ReconcileStarts
   churchId: string
   account: FinAccount
   ledger: FinTransaction[]
@@ -68,8 +71,11 @@ export function BalanceDiffDialog({
   }, [churchId, account.id, day])
 
   const result = useMemo(
-    () => (lines ? explainBalanceDiff(account, ledger, lines, bankCents, day) : null),
-    [account, ledger, lines, bankCents, day],
+    () =>
+      lines
+        ? explainBalanceDiff(account, ledger, lines, bankCents, day, realizedFilter(starts))
+        : null,
+    [account, ledger, lines, bankCents, day, starts],
   )
   // Abre o grupo que mais pesa
   useEffect(() => {
@@ -103,7 +109,7 @@ export function BalanceDiffDialog({
                 <div className="font-bold tabular-nums">{formatCents(result.bank_cents)}</div>
               </div>
               <div>
-                <div className="text-xs text-slate-500">No LouvorFlow</div>
+                <div className="text-xs text-slate-500">Conciliado no LouvorFlow</div>
                 <div className="font-bold tabular-nums">{formatCents(result.system_cents)}</div>
               </div>
               <div>

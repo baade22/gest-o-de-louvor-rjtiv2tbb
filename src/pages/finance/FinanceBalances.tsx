@@ -60,6 +60,9 @@ import {
 } from '@/components/ui/select'
 import { useFinanceLookups } from './useFinanceLookups'
 import { BalanceDiffDialog } from './BalanceDiffDialog'
+import { LedgerStatement } from './LedgerStatement'
+import { useReconcileStarts } from './useReconcileStarts'
+import { realizedFilter } from '@/lib/realizedBalance'
 import {
   PageHeader,
   ReadOnlyNotice,
@@ -281,7 +284,18 @@ export default function FinanceBalances() {
   const connOf = (accountId: string) => ownConn(accountId) || investParent(accountId)
   const balanceOf = (accountId: string) =>
     bankBalance(connOf(accountId), imports[accountId], !!investParent(accountId))
+  // Saldo no LouvorFlow: na conta bancária só vale o que foi conciliado com o extrato
+  const starts = useReconcileStarts(
+    churchId,
+    lookups.accounts,
+    connections.map((c) => c.last_sync_at).join(),
+  )
+  const realized = useMemo(() => realizedFilter(starts), [starts])
   const systemBalances = useMemo(
+    () => accountBalances(lookups.accounts, ledger, realized),
+    [lookups.accounts, ledger, realized],
+  )
+  const forecastBalances = useMemo(
     () => accountBalances(lookups.accounts, ledger),
     [lookups.accounts, ledger],
   )
@@ -289,6 +303,7 @@ export default function FinanceBalances() {
     accountBalances(
       [account],
       ledger.filter((tx) => tx.date.slice(0, 10) <= day),
+      realized,
     )[account.id] || 0
 
   const withBank = accounts.map((a) => ({ a, b: balanceOf(a.id) })).filter((x) => x.b)
@@ -442,7 +457,7 @@ export default function FinanceBalances() {
           <div className={cn(cardClass, 'p-4')}>
             <div className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
               <Wallet className="h-4 w-4 text-slate-400" />
-              Saldo no LouvorFlow
+              Conciliado no LouvorFlow
             </div>
             <div className="mt-2 text-[22px] font-bold tabular-nums text-slate-900">
               {formatCents(
@@ -533,10 +548,15 @@ export default function FinanceBalances() {
                   </div>
                   {!isCash && (
                     <div>
-                      <div className="text-xs font-medium text-slate-500">No LouvorFlow</div>
+                      <div className="text-xs font-medium text-slate-500">Conciliado</div>
                       <div className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
                         {formatCents(system)}
                       </div>
+                      {(forecastBalances[a.id] || 0) !== (systemBalances[a.id] || 0) && (
+                        <div className="text-[11.5px] text-slate-500">
+                          Previsto {formatCents(forecastBalances[a.id] || 0)}
+                        </div>
+                      )}
                       {b && (
                         <div
                           className={cn(
@@ -846,6 +866,15 @@ export default function FinanceBalances() {
         </div>
       )}
 
+      {churchId && (
+        <LedgerStatement
+          churchAccounts={accounts}
+          ledger={ledger}
+          starts={starts}
+          lookups={lookups}
+        />
+      )}
+
       {diffFor && churchId && (
         <BalanceDiffDialog
           churchId={churchId}
@@ -853,6 +882,7 @@ export default function FinanceBalances() {
           ledger={ledger}
           bankCents={diffFor.cents}
           day={diffFor.day}
+          starts={starts}
           onClose={() => setDiffFor(null)}
         />
       )}

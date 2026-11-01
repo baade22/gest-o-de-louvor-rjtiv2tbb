@@ -87,9 +87,11 @@ export function explainBalanceDiff(
   lines: Line[],
   bankCents: number,
   balanceDay: string,
+  /** Quais lançamentos valem no saldo desta conta (ex.: só os conciliados) */
+  include?: (tx: Tx, accountId: string) => boolean,
 ): BalanceDiff {
   const id = account.id
-  const mine = txs.filter((tx) => txEffect(tx, id) !== 0)
+  const mine = txs.filter((tx) => txEffect(tx, id) !== 0 && (!include || include(tx, id)))
   const upTo = lines.filter((l) => day(l.date) <= balanceDay)
   const first = upTo.reduce((m, l) => (!m || day(l.date) < m ? day(l.date) : m), '')
   const byId = new Map(upTo.map((l) => [l.id, l]))

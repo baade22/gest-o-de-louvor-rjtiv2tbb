@@ -9,22 +9,28 @@ type TxLike = Pick<FinTransaction, 'type' | 'amount_cents' | 'account_id' | 'sta
 const counts = (tx: TxLike) => tx.status !== 'ESTORNADO'
 const signed = (tx: TxLike) => (tx.type === 'SAIDA' ? -tx.amount_cents : tx.amount_cents)
 
-/** Saldo de cada conta = saldo inicial + entradas - saídas ± transferências. */
+/**
+ * Saldo de cada conta = saldo inicial + entradas - saídas ± transferências.
+ * include: quando dado, diz se o lançamento entra no saldo daquela conta (ex.: só conciliados).
+ */
 export function accountBalances(
   accounts: Pick<FinAccount, 'id' | 'opening_balance_cents'>[],
   txs: TxLike[],
+  include?: (tx: TxLike, accountId: string) => boolean,
 ): Record<string, number> {
   const balances: Record<string, number> = {}
+  const ok = (tx: TxLike, id: string) => !include || include(tx, id)
   for (const a of accounts) balances[a.id] = a.opening_balance_cents || 0
   for (const tx of txs) {
     if (!counts(tx)) continue
     if (tx.type === 'TRANSFERENCIA') {
-      if (tx.account_id in balances) balances[tx.account_id] -= tx.amount_cents
-      if (tx.to_account_id && tx.to_account_id in balances)
+      if (tx.account_id in balances && ok(tx, tx.account_id))
+        balances[tx.account_id] -= tx.amount_cents
+      if (tx.to_account_id && tx.to_account_id in balances && ok(tx, tx.to_account_id))
         balances[tx.to_account_id] += tx.amount_cents
       continue
     }
-    if (tx.account_id in balances) balances[tx.account_id] += signed(tx)
+    if (tx.account_id in balances && ok(tx, tx.account_id)) balances[tx.account_id] += signed(tx)
   }
   return balances
 }
