@@ -7,6 +7,7 @@ import {
   categoryLedger,
   contributionsReport,
   dreReport,
+  revenueReport,
 } from './financeReports'
 import type { FinBill } from '@/types/finance'
 
@@ -205,5 +206,50 @@ describe('accountingExport', () => {
     expect(lines[4]).toBe('15/09/2026;Banco;1.1.1;8,00;Transferência entre contas')
     expect(r.lines).toBe(4)
     expect(r.missing).toEqual(['Categoria: Oferta', 'Conta: Banco'])
+  })
+})
+
+describe('revenueReport', () => {
+  it('soma as entradas por mês, separa contribuições e ignora transferências e estornos', () => {
+    const cats = [
+      { id: 'diz', name: 'Dízimos', direction: 'ENTRADA', is_contribution: true },
+      { id: 'alu', name: 'Aluguel do salão', direction: 'ENTRADA' },
+    ] as never
+    const t = (
+      date: string,
+      type: string,
+      cents: number,
+      category_id = '',
+      status = 'CONFIRMADO',
+    ) =>
+      ({
+        date: `${date} 12:00:00.000Z`,
+        type,
+        amount_cents: cents,
+        account_id: 'A',
+        category_id,
+        status,
+      }) as never
+    const r = revenueReport(
+      [
+        t('2026-01-05', 'ENTRADA', 1000, 'diz'),
+        t('2026-01-20', 'ENTRADA', 300, 'alu'),
+        t('2026-03-02', 'ENTRADA', 500, 'diz'),
+        t('2026-03-03', 'TRANSFERENCIA', 9999),
+        t('2026-03-04', 'SAIDA', 200),
+        t('2026-03-05', 'ENTRADA', 700, 'diz', 'ESTORNADO'),
+        t('2025-12-31', 'ENTRADA', 50, 'diz'),
+      ],
+      cats,
+      '2026-01-01',
+      '2026-03-31',
+    )
+    expect(r.months.map((x) => [x.month, x.contributions, x.other, x.total])).toEqual([
+      ['2026-01', 1000, 300, 1300],
+      ['2026-02', 0, 0, 0],
+      ['2026-03', 500, 0, 500],
+    ])
+    expect(r.total).toBe(1800)
+    expect(r.average).toBe(600)
   })
 })
