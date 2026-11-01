@@ -65,7 +65,8 @@ Eu vou confiar em Ti`
     expect(result.chords).toContain('Eu vou confiar em Ti')
 
     // Lyrics deve remover as linhas de cifras puras e manter a letra e seções
-    expect(result.lyrics).toContain('[INTRO]')
+    // INTRO só tem acordes: não tem o que cantar, então sai da letra
+    expect(result.lyrics).not.toContain('[INTRO]')
     expect(result.lyrics).toContain('[VERSO]')
     expect(result.lyrics).toContain('Eu sei que Tu estás aqui')
     expect(result.lyrics).toContain('Mesmo quando não posso ver')
@@ -151,5 +152,137 @@ Amém`
     expect(result.sections[0].name).toBe('BREAK')
     expect(result.sections[1].name).toBe('INSTRUMENTAL')
     expect(result.sections[2].name).toBe('TAG')
+  })
+
+  it('cifra colada do Cifra Club: letra sai só com o texto cantado (caso do Pedro)', () => {
+    const input = `[Intro] Dm7  C  Bb
+
+[Primeira Parte]
+
+Dm7
+    Todo o céu se dobra
+C                    Bb9
+  Para receber Jesus,   o grande Rei
+         C
+Rei dos reis
+Dm7
+   Dobro o meu coração
+C                            Bb9
+  Para sempre exaltarei ao que venceu
+         C
+Eu cantarei
+
+[Segunda Parte]
+
+Bb  C  Dm  C/E  F
+A|---------| le--luia 
+ Bb  C   Dm  Bb  F
+Sa_nto, sa_nto  rei
+Bb  C  Dm  C/E  F
+A|---------| le--luia 
+                  Bb
+Me amou naquela cruz
+               C
+Isso é que é amor
+
+[Refrão]
+
+             F
+O céu escureceu
+             Dm
+Rocha se partiu
+                 C
+Quando Jesus morreu
+                     Bb
+Mas em glória ressurgiu
+
+             F
+E o mesmo poder
+                Dm
+Que levantou Jesus
+            C
+Me fará vencer
+                    Bb  C
+Para glória do seu nome
+Bb          F       C
+Oh, oh, oh, oh, oh, oh
+      Dm
+Seu amor é tudo
+Bb          F       C  Dm
+Oh, oh, oh, oh, oh, oh
+
+[Final] Bb  F  C  Dm
+        Bb  F  C
+        Bb  F  C`
+
+    const result = parseSongContent(input)
+    expect(result.lyrics).toBe(`[PRIMEIRA PARTE]
+
+Todo o céu se dobra
+Para receber Jesus, o grande Rei
+Rei dos reis
+Dobro o meu coração
+Para sempre exaltarei ao que venceu
+Eu cantarei
+
+[SEGUNDA PARTE]
+
+Aleluia
+Santo, santo rei
+Aleluia
+Me amou naquela cruz
+Isso é que é amor
+
+[REFRÃO]
+
+O céu escureceu
+Rocha se partiu
+Quando Jesus morreu
+Mas em glória ressurgiu
+
+E o mesmo poder
+Que levantou Jesus
+Me fará vencer
+Para glória do seu nome
+Oh, oh, oh, oh, oh, oh
+Seu amor é tudo
+Oh, oh, oh, oh, oh, oh`)
+
+    // A cifra continua intacta, com acordes e alinhamento
+    expect(result.chords).toContain('A|---------| le--luia')
+    expect(result.chords).toContain('C                    Bb9')
+    expect(result.sections.map((s) => s.name)).toEqual([
+      'INTRO',
+      'PRIMEIRA PARTE',
+      'SEGUNDA PARTE',
+      'REFRÃO',
+      'FINAL',
+    ])
+  })
+
+  it('não apaga letra curta que começa com A/E nem hífen de palavra composta', () => {
+    const result = parseSongContent(`A Ele a glória
+E a Deus
+Aba-Pai`)
+    expect(result.lyrics).toBe('A Ele a glória\nE a Deus\nAba-Pai')
+  })
+
+  it('tira tablatura, (2x), espaço invisível e prolongamentos', () => {
+    const result = parseSongContent(`[Intro]
+e|---3---5---|
+B|--5h7------|
+[Verso]
+\u200BDm7\u00A0
+   Deus----   é fiel
+G  D  Em  (2x)
+(2x)
+Glo___ria`)
+    expect(result.lyrics).toBe('[VERSO]\nDeus é fiel\nGloria')
+  })
+
+  it('rótulo de seção na mesma linha dos acordes continua na letra quando há texto cantado', () => {
+    const result = parseSongContent(`[Refrão] G  D
+Tu és santo`)
+    expect(result.lyrics).toBe('[REFRÃO]\nTu és santo')
   })
 })
