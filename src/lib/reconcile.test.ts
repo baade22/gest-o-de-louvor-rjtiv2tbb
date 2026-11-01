@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { decodeOfx, ofxAmountToCents, ofxDate, parseOfx } from './ofx'
-import { personInDescription, suggestMatches } from './reconcile'
+import { personInDescription, suggestMatches, suggestTransfers } from './reconcile'
 
 // Fuso como os bancos mandam; montado em partes para o Tailwind não ler como classe
 const TZ = '[' + '-3:BRT]'
@@ -176,5 +176,48 @@ describe('sugestões da conciliação', () => {
     // t3 já está conciliado: sugere a conta a pagar que vence perto
     expect(s.get('l3')).toEqual({ bill: bills[0] })
     expect(s.get('l4')?.tx?.id).toBe('t4')
+  })
+})
+
+describe('transferência entre contas', () => {
+  const l = (id: string, account_id: string, date: string, amount_cents: number) => ({
+    id,
+    account_id,
+    date,
+    amount_cents,
+  })
+
+  it('reconhece a saída numa conta e a entrada na outra', () => {
+    const cora = [l('c1', 'cora', '2026-10-01', -50000)]
+    const brad = [l('b1', 'brad', '2026-10-02', 50000), l('b2', 'brad', '2026-10-02', 49999)]
+    expect(suggestTransfers(cora, brad).get('c1')?.id).toBe('b1')
+  })
+
+  it('não sugere quando há duas possibilidades ou passou do prazo', () => {
+    const cora = [l('c1', 'cora', '2026-10-01', -50000)]
+    expect(
+      suggestTransfers(cora, [
+        l('b1', 'brad', '2026-10-01', 50000),
+        l('x1', 'caixa', '2026-10-02', 50000),
+      ]).has('c1'),
+    ).toBe(false)
+    expect(suggestTransfers(cora, [l('b1', 'brad', '2026-10-06', 50000)]).has('c1')).toBe(false)
+  })
+
+  it('o lado de destino já conciliado não impede sugerir a saída', () => {
+    const tx = {
+      id: 't1',
+      type: 'TRANSFERENCIA',
+      status: 'CONFIRMADO',
+      account_id: 'cora',
+      to_account_id: 'brad',
+      amount_cents: 50000,
+      date: '2026-10-01',
+      to_bank_line_id: 'b1',
+    }
+    const s = suggestMatches([l('c1', 'cora', '2026-10-01', -50000)], [tx], [], [])
+    expect(s.get('c1')?.tx?.id).toBe('t1')
+    const d = suggestMatches([l('b9', 'brad', '2026-10-01', 50000)], [tx], [], [])
+    expect(d.get('b9')?.tx).toBeUndefined()
   })
 })

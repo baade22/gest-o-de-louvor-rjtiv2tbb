@@ -453,7 +453,8 @@ onRecordValidate(
     if (name === 'fin_transactions' || name === 'fin_counts') {
       const touchesLocked = locked(rec.getString('date')) || (old && locked(old.getString('date')))
       // Lançamento de mês fechado: só dá para anexar comprovante e conciliar com o extrato
-      const allowed = name === 'fin_transactions' ? ['attachment', 'bank_line_id'] : []
+      const allowed =
+        name === 'fin_transactions' ? ['attachment', 'bank_line_id', 'to_bank_line_id'] : []
       if (touchesLocked && changed(allowed)) {
         throw new BadRequestError(
           'O mês está fechado (até ' +
