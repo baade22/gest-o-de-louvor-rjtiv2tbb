@@ -25,10 +25,11 @@ import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { decodeOfx, parseOfx } from '@/lib/ofx'
 import { accountBalances, daysBetween } from '@/lib/financeSummary'
-import { sameSide, suggestMatches } from '@/lib/reconcile'
+import { sameSide, suggestMatches, suggestTransfers } from '@/lib/reconcile'
 import { brtDay } from '@/lib/bankStatement'
 import {
   importStatement,
+  listPendingLinesElsewhere,
   listBankConnections,
   listBankImports,
   listBankLines,
@@ -137,6 +138,13 @@ export default function FinanceReconcile() {
   const [busyLine, setBusyLine] = useState('')
   const [bulk, setBulk] = useState(false)
   const [creating, setCreating] = useState<FinBankLine | null>(null)
+  const [creatingMode, setCreatingMode] = useState<CreateMode>('LANCAMENTO')
+  const openCreate = (line: FinBankLine, mode: CreateMode = 'LANCAMENTO') => {
+    setCreatingMode(mode)
+    setCreating(line)
+  }
+  // Movimentos pendentes das outras contas (para reconhecer transferência entre contas)
+  const [elsewhere, setElsewhere] = useState<FinBankLine[]>([])
   const [choosing, setChoosing] = useState<FinBankLine | null>(null)
   // Movimentos marcados para lançar juntos
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -147,12 +155,13 @@ export default function FinanceReconcile() {
     setLoading(true)
     setSelected(new Set())
     try {
-      const [ls, imps, open, led, conns] = await Promise.all([
+      const [ls, imps, open, led, conns, others] = await Promise.all([
         listBankLines(churchId, accountId),
         listBankImports(churchId, accountId).then((r) => r.items),
         listOpenBills(churchId),
         listLedger(churchId),
         listBankConnections(churchId).catch(() => [] as FinBankConnection[]),
+        listPendingLinesElsewhere(churchId, accountId).catch(() => [] as FinBankLine[]),
       ])
       const pending = ls.filter((l) => l.status === 'PENDENTE').map((l) => l.date.slice(0, 10))
       let txs: FinTransaction[] = []
@@ -175,6 +184,7 @@ export default function FinanceReconcile() {
       setBills(open)
       setLedger(led)
       setCandidates(txs)
+      setElsewhere(others)
     } catch (err) {
       console.error(err)
       toast({ title: 'Erro ao carregar o extrato', variant: 'destructive' })
@@ -194,6 +204,12 @@ export default function FinanceReconcile() {
     [pendingLines, candidates, bills, lookups.people],
   )
   const withTx = pendingLines.filter((l) => suggestions.get(l.id)?.tx)
+  const transfers = useMemo(
+    () => suggestTransfers(pendingLines, elsewhere),
+    [pendingLines, elsewhere],
+  )
+  const accountName = (id: string) =>
+    lookups.accounts.find((a) => a.id === id)?.name || 'outra conta'
 
   // Saldo do banco (o mais recente entre a busca pela API e o último arquivo com saldo) x
   // saldo no LouvorFlow na mesma data
@@ -264,11 +280,15 @@ export default function FinanceReconcile() {
     }
   }
 
-  const run = async (line: FinBankLine, action: () => Promise<unknown>, done: string) => {
+  const run = async <R,>(
+    line: FinBankLine,
+    action: () => Promise<R>,
+    done: string | ((res: R) => string),
+  ) => {
     setBusyLine(line.id)
     try {
-      await action()
-      toast({ title: done })
+      const res = await action()
+      toast({ title: typeof done === 'function' ? done(res) : done })
       await load()
     } catch (err) {
       console.error(err)
@@ -283,7 +303,27 @@ export default function FinanceReconcile() {
   }
 
   const reconcile = (line: FinBankLine, target: ReconcileTarget, done = 'Movimento conciliado') =>
-    run(line, () => reconcileLine(line.id, target), done)
+    run(
+      line,
+      () => reconcileLine(line.id, target),
+      (res) =>
+        res?.linked_other_date
+          ? `${done}. O movimento de ${shortDate(res.linked_other_date)} na outra conta também foi conciliado.`
+          : done,
+    )
+  /** Transferência entre contas da igreja, direto a partir da sugestão */
+  const reconcileTransfer = (line: FinBankLine, other: string) =>
+    reconcile(
+      line,
+      {
+        create: {
+          transfer_account_id: other,
+          description: (line.description || '').slice(0, 200),
+          payment_method: 'TRANSFERENCIA',
+        },
+      },
+      'Transferência conciliada',
+    )
 
   const reconcileAll = async () => {
     setBulk(true)
@@ -656,6 +696,13 @@ export default function FinanceReconcile() {
                             <Link2 className="mr-1 inline h-3.5 w-3.5" />
                             Corresponde a {txLabel(s.tx)} de {shortDate(s.tx.date)}
                           </span>
+                        ) : transfers.get(line.id) ? (
+                          <span className="text-sky-800">
+                            <ArrowLeftRight className="mr-1 inline h-3.5 w-3.5" />
+                            Transferência {credit ? 'vinda de' : 'para'}{' '}
+                            {accountName(transfers.get(line.id)!.account_id)} (
+                            {shortDate(transfers.get(line.id)!.date)})
+                          </span>
                         ) : s?.bill ? (
                           <span className="text-amber-800">
                             <CalendarCheck className="mr-1 inline h-3.5 w-3.5" />
@@ -700,6 +747,22 @@ export default function FinanceReconcile() {
                             )}
                             Conciliar
                           </Button>
+                        ) : transfers.get(line.id) ? (
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              reconcileTransfer(line, transfers.get(line.id)!.account_id)
+                            }
+                            className="h-8 gap-1.5 rounded-lg bg-sky-700 font-semibold text-white hover:bg-sky-800"
+                          >
+                            {busyLine === line.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ArrowLeftRight className="h-3.5 w-3.5" />
+                            )}
+                            Transferência
+                          </Button>
                         ) : s?.bill ? (
                           <Button
                             size="sm"
@@ -721,7 +784,7 @@ export default function FinanceReconcile() {
                             size="sm"
                             variant="outline"
                             disabled={busy}
-                            onClick={() => setCreating(line)}
+                            onClick={() => openCreate(line)}
                             className="h-8 gap-1.5 rounded-lg font-semibold"
                           >
                             <Plus className="h-3.5 w-3.5" />
@@ -743,11 +806,16 @@ export default function FinanceReconcile() {
                         <DropdownMenuContent align="end">
                           {line.status === 'PENDENTE' && (
                             <>
-                              {(s?.tx || s?.bill) && (
-                                <DropdownMenuItem onClick={() => setCreating(line)}>
-                                  <Plus className="mr-2 h-4 w-4" /> Lançar como novo
+                              {(s?.tx || s?.bill || transfers.get(line.id)) && (
+                                <DropdownMenuItem onClick={() => openCreate(line)}>
+                                  <Plus className="mr-2 h-4 w-4" />{' '}
+                                  {credit ? 'Lançar como entrada' : 'Lançar como saída'}
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem onClick={() => openCreate(line, 'TRANSFERENCIA')}>
+                                <ArrowLeftRight className="mr-2 h-4 w-4" /> Transferência entre
+                                contas
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setChoosing(line)}>
                                 <Link2 className="mr-2 h-4 w-4" /> Escolher lançamento
                               </DropdownMenuItem>
@@ -836,9 +904,11 @@ export default function FinanceReconcile() {
       {churchId && (
         <CreateFromLineDialog
           line={creating}
+          initialMode={creatingMode}
           churchId={churchId}
           lookups={lookups}
           suggestedPerson={creating ? suggestions.get(creating.id)?.person : undefined}
+          suggestedAccountId={creating ? transfers.get(creating.id)?.account_id : undefined}
           onClose={() => setCreating(null)}
           onLookupsChanged={reloadLookups}
           onDone={(target) => creating && reconcile(creating, target, 'Lançado e conciliado')}
@@ -869,25 +939,32 @@ export default function FinanceReconcile() {
 
 // ---- Lançar a partir do movimento ----
 
+type CreateMode = 'LANCAMENTO' | 'TRANSFERENCIA'
+
 function CreateFromLineDialog({
   line,
+  initialMode = 'LANCAMENTO',
   churchId,
   lookups,
   suggestedPerson,
+  suggestedAccountId,
   onClose,
   onLookupsChanged,
   onDone,
 }: {
   line: FinBankLine | null
+  initialMode?: CreateMode
   churchId: string
   lookups: FinanceLookups
   suggestedPerson?: Person
+  /** Outra conta da transferência, quando o extrato dela tem o movimento de valor oposto */
+  suggestedAccountId?: string
   onClose: () => void
   onLookupsChanged: () => void
   onDone: (target: ReconcileTarget) => Promise<unknown>
 }) {
   const credit = (line?.amount_cents || 0) > 0
-  const [mode, setMode] = useState<'LANCAMENTO' | 'TRANSFERENCIA'>('LANCAMENTO')
+  const [mode, setMode] = useState<CreateMode>(initialMode)
   const [categoryId, setCategoryId] = useState('')
   const [costCenterId, setCostCenterId] = useState('')
   const [campaignId, setCampaignId] = useState('')
@@ -902,7 +979,7 @@ function CreateFromLineDialog({
 
   useEffect(() => {
     if (!line) return
-    setMode('LANCAMENTO')
+    setMode(initialMode)
     setCategoryId('')
     setCostCenterId('')
     setCampaignId('')
@@ -911,7 +988,7 @@ function CreateFromLineDialog({
     setSupplierId('')
     setDescription((line.description || '').slice(0, 200))
     setMethod(/TARIFA|TAR\b|CESTA|PACOTE/i.test(line.description || '') ? 'OUTRO' : 'PIX')
-    setOtherAccount('')
+    setOtherAccount(suggestedAccountId || '')
     // Só reinicia ao abrir outro movimento
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [line])

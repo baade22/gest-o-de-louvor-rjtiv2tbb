@@ -376,7 +376,7 @@ export async function listUnreconciled(
 ) {
   return pb.collection('fin_transactions').getFullList<FinTransaction>({
     filter: pb.filter(
-      "church_id = {:churchId} && (account_id = {:accountId} || to_account_id = {:accountId}) && status = 'CONFIRMADO' && bank_line_id = '' && date >= {:from} && date <= {:to}",
+      "church_id = {:churchId} && ((account_id = {:accountId} && bank_line_id = '') || (to_account_id = {:accountId} && to_bank_line_id = '')) && status = 'CONFIRMADO' && date >= {:from} && date <= {:to}",
       { churchId, accountId, from: `${from} 00:00:00`, to: `${to} 23:59:59` },
     ),
     sort: 'date',
@@ -421,7 +421,25 @@ export type ReconcileTarget =
   | { bill_id: string; payment_method?: string }
   | { create: ReconcileCreate }
 
-export async function reconcileLine(lineId: string, target: ReconcileTarget) {
+/**
+ * Movimentos pendentes das outras contas da igreja: servem para reconhecer transferência entre
+ * contas (sai de uma, entra na outra com o mesmo valor).
+ */
+export async function listPendingLinesElsewhere(churchId: string, accountId: string) {
+  return pb.collection('fin_bank_lines').getFullList<FinBankLine>({
+    filter: pb.filter(
+      "church_id = {:churchId} && account_id != {:accountId} && status = 'PENDENTE'",
+      { churchId, accountId },
+    ),
+    fields: 'id,account_id,date,amount_cents,description,status',
+  })
+}
+
+/** linked_other_date: a outra ponta da transferência também foi conciliada (data dela). */
+export async function reconcileLine(
+  lineId: string,
+  target: ReconcileTarget,
+): Promise<{ success: boolean; linked_other_date?: string }> {
   return pb.send('/backend/v1/finance/bank/reconcile', {
     method: 'POST',
     body: { line_id: lineId, ...target },

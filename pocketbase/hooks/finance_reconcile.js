@@ -10,6 +10,10 @@
 //             { line_id, create: { category_id, person_id, is_anonymous, supplier_id,
 //               cost_center_id, campaign_id, description, payment_method, transfer_account_id } }
 //             cria o lançamento a partir da linha (transferência quando vier transfer_account_id)
+//             Transferência entre contas da igreja: o lançamento concilia o movimento de saída
+//             (bank_line_id) e o de entrada (to_bank_line_id). Ao conciliar um lado, o outro é
+//             conciliado junto quando há um só movimento pendente de mesmo valor na outra conta
+//             (até 3 dias de diferença).
 // unreconcile { line_id }   desfaz a ligação; o lançamento continua como está
 //
 // Só MASTER ou quem tem financeiro.conciliacao.alterar (na congregação da conta). Tudo numa transação só.
@@ -65,6 +69,14 @@ routerAdd(
     const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))
     const userName = authRecord.getString('name') || authRecord.getString('email')
     const nowIso = new Date().toISOString().replace('T', ' ')
+    // Campo do lançamento que guarda o movimento desta conta: na transferência, o lado que
+    // recebe (crédito na conta de destino) fica em to_bank_line_id
+    const lineField = (tx, accountId, isCredit) =>
+      tx.getString('type') === 'TRANSFERENCIA' &&
+      isCredit &&
+      tx.getString('to_account_id') === accountId
+        ? 'to_bank_line_id'
+        : 'bank_line_id'
 
     // ---- importar ----
     if (action === 'import') {
@@ -196,10 +208,10 @@ routerAdd(
           if (txId) {
             try {
               const tx = txApp.findRecordById('fin_transactions', txId)
-              if (tx.getString('bank_line_id') === fresh.id) {
-                tx.set('bank_line_id', '')
-                txApp.save(tx)
+              for (const f of ['bank_line_id', 'to_bank_line_id']) {
+                if (tx.getString(f) === fresh.id) tx.set(f, '')
               }
+              txApp.save(tx)
             } catch (_) {}
           }
           fresh.set('status', 'PENDENTE')
@@ -234,7 +246,10 @@ routerAdd(
       if (!tx || tx.getString('church_id') !== churchId) {
         return e.json(400, { message: 'Lançamento não encontrado.' })
       }
-      if (tx.getString('status') !== 'CONFIRMADO' || tx.getString('bank_line_id')) {
+      if (
+        tx.getString('status') !== 'CONFIRMADO' ||
+        tx.getString(lineField(tx, accountId, isCredit))
+      ) {
         return e.json(400, { message: 'Este lançamento está estornado ou já foi conciliado.' })
       }
       const type = tx.getString('type')
@@ -285,6 +300,7 @@ routerAdd(
       }
     }
 
+    let linkedOther = ''
     try {
       $app.runInTransaction((txApp) => {
         const fresh = txApp.findRecordById('fin_bank_lines', line.id)
@@ -294,7 +310,9 @@ routerAdd(
         let tx = null
         if (mode === 'match') {
           tx = txApp.findRecordById('fin_transactions', String(body.transaction_id))
-          if (tx.getString('bank_line_id')) throw new Error('Lançamento já conciliado.')
+          if (tx.getString(lineField(tx, accountId, isCredit))) {
+            throw new Error('Lançamento já conciliado.')
+          }
         } else if (mode === 'bill') {
           const bill = txApp.findRecordById('fin_bills', String(body.bill_id))
           if (bill.getString('status') !== 'ABERTO') throw new Error('Conta já paga.')
@@ -355,40 +373,94 @@ routerAdd(
           }
           txApp.save(tx)
         }
-        tx.set('bank_line_id', fresh.id)
-        txApp.save(tx)
+        const field = lineField(tx, accountId, isCredit)
+        tx.set(field, fresh.id)
         fresh.set('status', 'CONCILIADO')
         fresh.set('transaction_id', tx.id)
         fresh.set('reconciled_at', nowIso)
         fresh.set('reconciled_by_name', userName)
         txApp.save(fresh)
+
+        // Transferência: concilia junto o movimento da outra conta, se for um só
+        const otherField = field === 'bank_line_id' ? 'to_bank_line_id' : 'bank_line_id'
+        if (tx.getString('type') === 'TRANSFERENCIA' && !tx.getString(otherField)) {
+          const otherAccount =
+            field === 'bank_line_id' ? tx.getString('to_account_id') : tx.getString('account_id')
+          const day = 24 * 60 * 60 * 1000
+          const shift = (ymd, n) =>
+            new Date(new Date(ymd + 'T12:00:00Z').getTime() + n * day).toISOString().slice(0, 10)
+          const ymd = fresh.getString('date').slice(0, 10)
+          const twins =
+            otherAccount && canManage(churchId, otherAccount)
+              ? txApp.findRecordsByFilter(
+                  'fin_bank_lines',
+                  "church_id = {:c} && account_id = {:a} && status = 'PENDENTE' && amount_cents = {:v}" +
+                    ' && date >= {:from} && date <= {:to}',
+                  '',
+                  2,
+                  0,
+                  {
+                    c: churchId,
+                    a: otherAccount,
+                    v: -lineAmount,
+                    from: shift(ymd, -3) + ' 00:00:00.000Z',
+                    to: shift(ymd, 3) + ' 23:59:59.999Z',
+                  },
+                )
+              : []
+          if (twins.length === 1) {
+            const twin = twins[0]
+            tx.set(otherField, twin.id)
+            twin.set('status', 'CONCILIADO')
+            twin.set('transaction_id', tx.id)
+            twin.set('reconciled_at', nowIso)
+            twin.set('reconciled_by_name', userName)
+            txApp.save(twin)
+            linkedOther = twin.getString('date').slice(0, 10)
+          }
+        }
+        txApp.save(tx)
       })
     } catch (err) {
       return e.json(400, { message: 'Não foi possível conciliar: ' + err.message })
     }
-    return e.json(200, { success: true })
+    return e.json(200, { success: true, linked_other_date: linkedOther })
   },
   $apis.requireAuth(),
 )
 
-// Estorno de um lançamento conciliado: o movimento do extrato volta a ficar pendente.
+// Estorno de um lançamento conciliado: o movimento do extrato (os dois, na transferência)
+// volta a ficar pendente.
 onRecordAfterUpdateSuccess((e) => {
   const tx = e.record
-  const lineId = tx.getString('bank_line_id')
-  if (lineId && tx.getString('status') === 'ESTORNADO') {
-    try {
-      const line = e.app.findRecordById('fin_bank_lines', lineId)
-      if (line.getString('transaction_id') === tx.id) {
-        line.set('status', 'PENDENTE')
-        line.set('transaction_id', '')
-        line.set('reconciled_at', '')
-        line.set('reconciled_by_name', '')
-        e.app.save(line)
+  if (tx.getString('status') === 'ESTORNADO') {
+    let changed = false
+    for (const f of ['bank_line_id', 'to_bank_line_id']) {
+      const lineId = tx.getString(f)
+      if (!lineId) continue
+      try {
+        const line = e.app.findRecordById('fin_bank_lines', lineId)
+        if (line.getString('transaction_id') === tx.id) {
+          line.set('status', 'PENDENTE')
+          line.set('transaction_id', '')
+          line.set('reconciled_at', '')
+          line.set('reconciled_by_name', '')
+          e.app.save(line)
+        }
+      } catch (err) {
+        console.log(
+          'finance_reconcile: não foi possível reabrir o movimento ' + lineId + ': ' + err,
+        )
       }
-      tx.set('bank_line_id', '')
-      e.app.save(tx)
-    } catch (err) {
-      console.log('finance_reconcile: não foi possível reabrir o movimento ' + lineId + ': ' + err)
+      tx.set(f, '')
+      changed = true
+    }
+    if (changed) {
+      try {
+        e.app.save(tx)
+      } catch (err) {
+        console.log('finance_reconcile: ' + err)
+      }
     }
   }
   e.next()

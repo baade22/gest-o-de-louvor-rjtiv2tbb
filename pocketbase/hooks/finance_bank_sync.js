@@ -398,13 +398,14 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         for (const line of newLines) {
           const amount = line.getInt('amount_cents')
           const date = line.getString('date').slice(0, 10)
+          // Transferência: o lado de destino concilia em to_bank_line_id
           const side =
             amount > 0
-              ? "((type = 'ENTRADA' && account_id = {:a}) || (type = 'TRANSFERENCIA' && to_account_id = {:a}))"
-              : "((type = 'SAIDA' || type = 'TRANSFERENCIA') && account_id = {:a})"
+              ? "((type = 'ENTRADA' && account_id = {:a} && bank_line_id = '') || (type = 'TRANSFERENCIA' && to_account_id = {:a} && to_bank_line_id = ''))"
+              : "((type = 'SAIDA' || type = 'TRANSFERENCIA') && account_id = {:a} && bank_line_id = '')"
           const cands = txApp.findRecordsByFilter(
             'fin_transactions',
-            "church_id = {:c} && status = 'CONFIRMADO' && bank_line_id = '' && amount_cents = {:v}" +
+            "church_id = {:c} && status = 'CONFIRMADO' && amount_cents = {:v}" +
               ' && date >= {:from} && date <= {:to} && ' +
               side,
             '',
@@ -435,7 +436,12 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
             },
           )
           if (rivals.length !== 1) continue
-          tx.set('bank_line_id', line.id)
+          tx.set(
+            amount > 0 && tx.getString('type') === 'TRANSFERENCIA'
+              ? 'to_bank_line_id'
+              : 'bank_line_id',
+            line.id,
+          )
           txApp.save(tx)
           line.set('status', 'CONCILIADO')
           line.set('transaction_id', tx.id)
