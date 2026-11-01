@@ -123,7 +123,18 @@ routerAdd(
           const seen = {}
           // Aplicação e resgate automáticos do Invest Fácil (Bradesco) só mudam o dinheiro de
           // lugar dentro do caixa: não entram no extrato (o rendimento, RENTAB., entra)
-          const investMove = (d) => /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
+          // Com conta de aplicação separada (conexão do Bradesco), entram no extrato
+          let splitInvest = false
+          try {
+            const c = txApp.findFirstRecordByFilter(
+              'fin_bank_connections',
+              "account_id = {:a} && invest_account_id != ''",
+              { a: account.id },
+            )
+            splitInvest = !!c
+          } catch (_) {}
+          const investMove = (d) =>
+            !splitInvest && /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
           for (const l of lines) {
             const fitid = String(l.fitid).trim().slice(0, 255)
             if (investMove(String(l.description || ''))) {

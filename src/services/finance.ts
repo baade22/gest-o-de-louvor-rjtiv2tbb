@@ -525,6 +525,7 @@ export type BankConnectionInput = Pick<
   | 'reconcile_from'
   | 'history_from'
   | 'history_max'
+  | 'invest_account_id'
 >
 
 export async function saveBankConnection(

@@ -12,7 +12,8 @@
 //      com histórico pedido, também history: { from: 'YYYY-MM-DD' ou '' (o máximo), before }
 //      (o conector busca de before para trás, em partes, até from)
 // POST /backend/v1/finance/bank-sync/push            (conector) entrega o resultado de uma conta:
-//      { connection_id, ok: true, balance_cents?, available_cents?, invested_cents?, balance_at?,
+//      { connection_id, ok: true, balance_cents?, available_cents?, invested_cents?,
+//        invest_cash_cents? (Invest Fácil, já somado em balance_cents), balance_at?,
 //        start_date, end_date, lines: [{ id, date: 'YYYY-MM-DD', amount_cents, description }] }
 //      { connection_id, ok: false, error }
 //      { connection_id, ok: true, history: true, start_date, end_date, history_done?, lines }
@@ -302,6 +303,17 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   const isHistory = body.history === true
   const hasBalance =
     !isHistory && body.balance_cents !== null && Number.isInteger(Number(body.balance_cents))
+  // Conta de aplicação (Invest Fácil do Bradesco) separada: o saldo dela sai da conta-corrente
+  // e as aplicações e resgates viram movimentos nas duas contas (transferência entre elas)
+  const investAccountId = provider === 'BRADESCO' ? conn.getString('invest_account_id') : ''
+  const investCash =
+    body.invest_cash_cents !== null &&
+    body.invest_cash_cents !== undefined &&
+    Number.isInteger(Number(body.invest_cash_cents))
+      ? Number(body.invest_cash_cents)
+      : null
+  const ccBalance = (v) =>
+    investAccountId && investCash !== null ? Number(v) - investCash : Number(v)
   // Só no extrato: conta para ver o extrato ou movimento antes do início da conciliação
   const viewOnly = conn.getString('purpose') === 'VISUALIZAR'
   const reconcileFrom = conn.getString('reconcile_from').slice(0, 10)
@@ -318,14 +330,59 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       let imp = null
       // Aplicação e resgate automáticos do Invest Fácil (Bradesco) só mudam o dinheiro de
       // lugar dentro do caixa: não entram no extrato (o rendimento, RENTAB., entra)
+      // Com a conta de aplicação escolhida, entram no extrato das duas contas
       const investMove = (d) => /^\s*(APLIC|RESG)\b/i.test(d) && /INVEST\s*FACIL/i.test(d)
+      let invImp = null
+      // O lado da conta de aplicação: mesmo dia, valor com o sinal trocado
+      const mirror = (l, amount) => {
+        const fitid = (prefix + String(l.id).trim() + '|inv').slice(0, 255)
+        try {
+          txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
+            a: investAccountId,
+            f: fitid,
+          })
+          return
+        } catch (_) {}
+        if (!invImp) {
+          invImp = new Record(txApp.findCollectionByNameOrId('fin_bank_imports'))
+          invImp.set('church_id', churchId)
+          invImp.set('account_id', investAccountId)
+          invImp.set(
+            'file_name',
+            'API ' + label + ' · aplicação' + (isHistory ? ' (histórico)' : ''),
+          )
+          if (isYmd(body.start_date)) invImp.set('start_date', pbDate(body.start_date))
+          if (isYmd(body.end_date)) invImp.set('end_date', pbDate(body.end_date))
+          if (hasBalance && investCash !== null) {
+            invImp.set('balance_cents', investCash)
+            invImp.set('has_balance', true)
+            if (isYmd(body.end_date)) invImp.set('balance_date', pbDate(body.end_date))
+          }
+          invImp.set('imported_by_name', 'Conector bancário')
+          txApp.save(invImp)
+        }
+        const rec = new Record(linesCol)
+        rec.set('church_id', churchId)
+        rec.set('account_id', investAccountId)
+        rec.set('import_id', invImp.id)
+        rec.set('fitid', fitid)
+        rec.set('date', pbDate(l.date))
+        rec.set('amount_cents', -amount)
+        rec.set('description', String(l.description || 'Movimento').slice(0, 500))
+        rec.set('status', statusFor(l.date))
+        txApp.save(rec)
+        invImp.set('lines_created', invImp.getInt('lines_created') + 1)
+        txApp.save(invImp)
+      }
       for (const l of lines) {
         const fitid = (prefix + String(l.id).trim()).slice(0, 255)
         const amount = Number(l.amount_cents)
-        if (amount === 0 || investMove(String(l.description || ''))) {
+        const isInvest = investMove(String(l.description || ''))
+        if (amount === 0 || (isInvest && !investAccountId)) {
           skipped++
           continue
         }
+        if (isInvest) mirror(l, amount)
         let exists = false
         try {
           txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
@@ -362,7 +419,7 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           if (isYmd(body.start_date)) imp.set('start_date', pbDate(body.start_date))
           if (isYmd(body.end_date)) imp.set('end_date', pbDate(body.end_date))
           if (hasBalance) {
-            imp.set('balance_cents', Number(body.balance_cents))
+            imp.set('balance_cents', ccBalance(body.balance_cents))
             imp.set('has_balance', true)
             if (isYmd(body.end_date)) imp.set('balance_date', pbDate(body.end_date))
           }
@@ -493,14 +550,18 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       fresh.set('last_auto_reconciled', auto)
       fresh.set('sync_requested_at', '')
       if (hasBalance) {
-        fresh.set('balance_cents', Number(body.balance_cents))
+        fresh.set('balance_cents', ccBalance(body.balance_cents))
         fresh.set('has_balance', true)
         fresh.set(
           'available_cents',
-          Number.isInteger(Number(body.available_cents)) && body.available_cents !== null
-            ? Number(body.available_cents)
-            : Number(body.balance_cents),
+          ccBalance(
+            Number.isInteger(Number(body.available_cents)) && body.available_cents !== null
+              ? Number(body.available_cents)
+              : Number(body.balance_cents),
+          ),
         )
+        // Saldo do Invest Fácil: é o saldo da conta de aplicação, quando ela existe
+        fresh.set('invest_cash_cents', investCash === null ? 0 : investCash)
         // Aplicações (Bradesco) ficam à parte do saldo da conta-corrente
         fresh.set(
           'invested_cents',
