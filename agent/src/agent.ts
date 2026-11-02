@@ -44,6 +44,8 @@ export class LouvorFlowAgent {
 
   private holyricsDetected = false
   private holyricsVersion: string | undefined
+  /** Espera antes de conferir de novo quando o Holyrics demora para tirar um item */
+  private removeRetryDelayMs = 1500
 
   constructor(config: AgentConfig) {
     this.config = config
@@ -133,7 +135,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.47',
+          version: '0.0.48',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -279,7 +281,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.47',
+          version: '0.0.48',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -880,6 +882,25 @@ export class LouvorFlowAgent {
         const read = await this.readEventMediaPlaylist(payload)
         if (!read.success) return fail(read.error, read.error_code, 'Não consegui ler a playlist.')
         current = read.playlist
+        if (current.length >= before) {
+          // O Holyrics às vezes demora para refletir a remoção (visto no primeiro envio):
+          // espera, lê de novo e, se o item ainda estiver lá, tenta tirar mais uma vez.
+          await new Promise((resolve) => setTimeout(resolve, this.removeRetryDelayMs))
+          const again = await this.readEventMediaPlaylist(payload)
+          if (!again.success)
+            return fail(again.error, again.error_code, 'Não consegui ler a playlist.')
+          current = again.playlist
+          if (current.length >= before) {
+            const rm2 = await this.holyrics.removeFromMediaPlaylistIndex(0, eventId)
+            if (!rm2.success)
+              return fail(rm2.error, rm2.error_code, 'Falha ao tirar item da playlist.')
+            await new Promise((resolve) => setTimeout(resolve, this.removeRetryDelayMs))
+            const third = await this.readEventMediaPlaylist(payload)
+            if (!third.success)
+              return fail(third.error, third.error_code, 'Não consegui ler a playlist.')
+            current = third.playlist
+          }
+        }
         removed += Math.max(0, before - current.length)
         if (current.length >= before) {
           return fail(

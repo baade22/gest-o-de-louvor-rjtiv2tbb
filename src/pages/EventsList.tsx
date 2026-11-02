@@ -17,7 +17,6 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -95,7 +94,42 @@ export default function EventsList() {
     })
   }
 
-  const now = new Date()
+  const [deletingPast, setDeletingPast] = useState(false)
+
+  const handleDeletePast = () => {
+    const ids = pastEvents.map((ev) => ev.id)
+    if (ids.length === 0) return
+    confirm({
+      title: `Excluir ${ids.length} culto(s) anterior(es)?`,
+      description:
+        'A escala, o repertório, as mídias, as tarefas e o roteiro deles também são apagados, e a playlist desses cultos no Holyrics é limpa. Não dá para desfazer.',
+      confirmLabel: 'Excluir cultos anteriores',
+      destructive: true,
+      onConfirm: async () => {
+        setDeletingPast(true)
+        let ok = 0
+        for (const id of ids) {
+          try {
+            await pb.collection('events').delete(id)
+            ok++
+          } catch (err) {
+            console.error('Erro ao excluir culto anterior:', err)
+          }
+        }
+        setDeletingPast(false)
+        toast({
+          title: ok === ids.length ? 'Cultos anteriores excluídos' : 'Alguns cultos não saíram',
+          description:
+            ok === ids.length
+              ? `${ok} culto(s) excluído(s).`
+              : `${ok} de ${ids.length} culto(s) excluído(s). Tente de novo para os que faltaram.`,
+          variant: ok === ids.length ? 'default' : 'destructive',
+        })
+        fetchEvents()
+      },
+    })
+  }
+
   const upcomingEvents: EventItem[] = []
   const pastEvents: EventItem[] = []
 
@@ -113,21 +147,6 @@ export default function EventsList() {
 
   const formatDateDisplay = (dateStr: string) => {
     return formatCalendarDateDisplay(dateStr, 'short')
-  }
-
-  const statusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'Confirmado':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-      case 'Planejado':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'Realizado':
-        return 'bg-slate-100 text-slate-700 border-slate-200'
-      case 'Cancelado':
-        return 'bg-red-100 text-red-700 border-red-200'
-      default:
-        return 'bg-slate-100 text-slate-700'
-    }
   }
 
   return (
@@ -201,11 +220,6 @@ export default function EventsList() {
                       <h3 className="text-base font-bold text-slate-900 group-hover:text-teal-800 transition-colors truncate">
                         {ev.title}
                       </h3>
-                      <Badge
-                        className={`text-[10px] font-semibold border ${statusBadgeColor(ev.status)}`}
-                      >
-                        {ev.status}
-                      </Badge>
                     </div>
 
                     <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
@@ -298,6 +312,20 @@ export default function EventsList() {
               <ChevronDown className="h-4 w-4" />
             )}
           </Button>
+          {canDelete && (
+            <div className="mt-1 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={deletingPast}
+                onClick={handleDeletePast}
+                className="h-8 gap-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deletingPast ? 'Excluindo…' : 'Excluir cultos anteriores'}
+              </Button>
+            </div>
+          )}
 
           {showPastEvents && (
             <div className="grid grid-cols-1 gap-2.5 mt-3">
@@ -312,16 +340,26 @@ export default function EventsList() {
                       <span className="text-sm font-semibold text-slate-700 truncate">
                         {ev.title}
                       </span>
-                      <Badge variant="outline" className="text-[10px] text-slate-500">
-                        {ev.status}
-                      </Badge>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {formatDateDisplay(ev.date)} {ev.start_time ? `• ${ev.start_time}` : ''}
                     </p>
                   </div>
 
-                  <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                  <div className="flex shrink-0 items-center gap-1">
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Excluir ${ev.title}`}
+                        onClick={(e) => handleDeleteEvent(ev.id, e)}
+                        className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
                 </div>
               ))}
             </div>
