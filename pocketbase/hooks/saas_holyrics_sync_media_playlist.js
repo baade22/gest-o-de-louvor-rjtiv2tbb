@@ -326,6 +326,9 @@ routerAdd(
     cmdRec.set('created_at', nowIso)
 
     const eventDateStr = eventRecord.getString('date') || ''
+    // Agent 0.0.45+: a playlist do culto fica igual ao LouvorFlow (mesmo do "Enviar ao Holyrics")
+    const agentSupportsMirror =
+      agentVersionParts[0] > 0 || agentVersionParts[1] > 0 || (agentVersionParts[2] || 0) >= 45
     const payload = {
       event_id: holyricsEventId,
       church_id: churchId,
@@ -334,6 +337,7 @@ routerAdd(
       items: items,
       sections: playlistSections,
     }
+    if (agentSupportsMirror) payload.mirror = true
 
     cmdRec.set('payload', payload)
 
