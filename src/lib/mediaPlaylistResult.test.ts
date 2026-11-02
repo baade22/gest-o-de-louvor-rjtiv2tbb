@@ -71,4 +71,18 @@ describe('describeMediaSyncResult', () => {
       '1 mídia(s) colocada(s) na playlist do culto. (culto no Holyrics: Culto Dominical, 2026-11-01 17:00)',
     )
   })
+
+  it('conta os títulos de seção criados', () => {
+    const r = describeMediaSyncResult({
+      status: 'DONE',
+      result: {
+        synced_count: 1,
+        items: [],
+        sections: { arranged: true, titles_created: ['AVISOS'] },
+      },
+    })
+    expect(r.description).toBe(
+      '1 mídia(s) colocada(s) na playlist do culto. Títulos criados: AVISOS.',
+    )
+  })
 })

@@ -994,6 +994,35 @@ export class HolyricsClient {
   }
 
   /**
+   * AddToPlaylist genérico (títulos, músicas e mídias juntos), na posição index.
+   * Usado para montar as seções do culto: { type: "title", name: "LOUVOR" }, etc.
+   */
+  public async addItemsToPlaylist(
+    items: Array<Record<string, any>>,
+    eventId: string,
+    index = -1,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const cleanEventId = String(eventId || '').trim()
+    if (!cleanEventId) {
+      return {
+        success: false,
+        error: 'event_id da ocorrência no Holyrics é obrigatório para AddToPlaylist.',
+        error_code: 'MISSING_EVENT_ID',
+      }
+    }
+    if (items.length === 0) return { success: true }
+    const res = await this.request(
+      'AddToPlaylist',
+      { items, event_id: cleanEventId, index, ignore_duplicates: true },
+      6000,
+    )
+    if (res.status === 'ok') return { success: true }
+    const errStr =
+      typeof res.error === 'string' ? res.error : res.error?.message || 'Falha no AddToPlaylist'
+    return { success: false, error: errStr, error_code: 'ADD_PLAYLIST_FAILED' }
+  }
+
+  /**
    * GetPlaylist: Obtém os itens da playlist ativa ou de mídias do Holyrics
    * POST /api/GetPlaylist?token=...
    */
