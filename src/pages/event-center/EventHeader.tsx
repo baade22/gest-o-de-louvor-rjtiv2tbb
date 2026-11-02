@@ -71,6 +71,8 @@ interface EventHeaderProps {
   event: EventItem
   readiness: EventReadiness
   songsCount: number
+  /** Mídias do culto: o envio também funciona só com mídias */
+  mediaCount?: number
   agents: HolyricsAgentInfo[] | null
   linkState: HolyricsLinkState | null
   canEdit: boolean
@@ -86,6 +88,7 @@ export function EventHeader({
   event,
   readiness,
   songsCount,
+  mediaCount = 0,
   agents,
   linkState,
   canEdit,
@@ -204,11 +207,11 @@ export function EventHeader({
               {canSync && (
                 <Button
                   onClick={onSync}
-                  disabled={isSyncing || songsCount === 0}
+                  disabled={isSyncing || songsCount + mediaCount === 0}
                   title={
-                    songsCount === 0
-                      ? 'Adicione músicas ao repertório primeiro'
-                      : 'Envia as músicas, na ordem do repertório, para a playlist do Holyrics'
+                    songsCount + mediaCount === 0
+                      ? 'Adicione músicas ou mídias ao culto primeiro'
+                      : 'Envia as músicas e as mídias do culto para a playlist do Holyrics, tudo de uma vez'
                   }
                   className="h-9 flex-1 gap-1.5 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800 sm:flex-none"
                 >
