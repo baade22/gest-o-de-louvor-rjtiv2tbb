@@ -375,6 +375,74 @@ export function toAddItemFromDesired(d: DesiredItem): { type: string; id?: strin
   return { type: d.type, name: d.name }
 }
 
+/** Um item da playlist final: a chave para conferir e como recriá-lo (null = não dá). */
+export interface FinalItem {
+  key: string
+  add: { type: string; id?: string; name?: string; background_color?: string } | null
+}
+
+/**
+ * Como recriar com AddToPlaylist um item que já está na playlist. Títulos, músicas e
+ * mídias dão; versículos, textos e outros itens só do Holyrics não (retorna null).
+ */
+export function toAddItemFromPlaylist(item: PlaylistItem): FinalItem['add'] {
+  if (isTitleItem(item)) {
+    const out: NonNullable<FinalItem['add']> = { type: 'title', name: String(item.name || '') }
+    if (item.background_color) out.background_color = String(item.background_color)
+    return out
+  }
+  const sid = itemSongId(item)
+  if (sid) return { type: 'song', id: sid }
+  const type = String(item.type || '').toLowerCase()
+  if (MEDIA_TYPES.has(type) && item.name) return { type, name: String(item.name) }
+  return null
+}
+
+export function finalFromPlaylist(item: PlaylistItem): FinalItem {
+  return { key: playlistKey(item), add: toAddItemFromPlaylist(item) }
+}
+
+export function finalFromDesired(d: DesiredItem): FinalItem {
+  return { key: desiredKey(d), add: toAddItemFromDesired(d) }
+}
+
+export interface RebuildPlan {
+  /** Quantos itens tirar do começo da playlist (o Holyrics só remove o primeiro item). */
+  removeFromTop: number
+  /** Itens a incluir depois, nesta ordem. */
+  add: FinalItem[]
+  /** Posição do AddToPlaylist: -1 (fim) ou 0 (antes do que sobrou). */
+  addAt: number
+  /** Itens que precisariam ser recriados mas não dá (não mexe em nada se houver). */
+  notRecreatable: string[]
+}
+
+/**
+ * O RemoveFromMediaPlaylist do Holyrics com event_id sempre tira o PRIMEIRO item, seja
+ * qual for o índice pedido. Então, para tirar algo do meio, a playlist é refeita de cima:
+ * tira do topo até o último item que muda e inclui de novo o que deve ficar ali. O final
+ * que já está igual (ex.: OFERTA, versículos) só fica se não der para recriá-lo.
+ */
+export function planRebuild(current: PlaylistItem[], final: FinalItem[]): RebuildPlan {
+  const curKeys = current.map(playlistKey)
+  const n = curKeys.length
+  const m = final.length
+  let suffix = 0
+  while (suffix < n && suffix < m && curKeys[n - 1 - suffix] === final[m - 1 - suffix].key) {
+    suffix++
+  }
+  // Se todo o final também dá para recriar, refaz tudo e inclui no fim (o caminho mais seguro)
+  const tailRecreatable = current.slice(n - suffix).every((it) => toAddItemFromPlaylist(it))
+  if (tailRecreatable) suffix = 0
+  const add = final.slice(0, m - suffix)
+  return {
+    removeFromTop: n - suffix,
+    add,
+    addAt: suffix > 0 ? 0 : -1,
+    notRecreatable: add.filter((f) => !f.add).map((f) => f.key),
+  }
+}
+
 export interface MirrorPlan {
   /** Itens do começo que já estão certos. */
   keep: number
@@ -384,6 +452,8 @@ export interface MirrorPlan {
   insert: DesiredItem[]
   /** Chaves da playlist esperada no fim (para conferir). */
   expectedKeys: string[]
+  /** A playlist esperada no fim, item a item. */
+  final: FinalItem[]
 }
 
 /** Chave curta de um item para comparar playlists. */
@@ -433,5 +503,10 @@ export function planMirror(
     ...insert.map(desiredKey),
     ...foreignAfter.map(playlistKey),
   ]
-  return { keep, removeIndexes, insert, expectedKeys }
+  const final = [
+    ...playlist.slice(0, keep).map(finalFromPlaylist),
+    ...insert.map(finalFromDesired),
+    ...foreignAfter.map(finalFromPlaylist),
+  ]
+  return { keep, removeIndexes, insert, expectedKeys, final }
 }
