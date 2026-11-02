@@ -109,6 +109,7 @@ describe('Agent 0.0.46: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
   beforeEach(() => {
     vi.restoreAllMocks()
     agent = new LouvorFlowAgent(config)
+    ;(agent as any).removeRetryDelayMs = 0
   })
 
   it('música nova fora do título, ordem invertida e mídia excluída: corrige tudo', async () => {
@@ -228,8 +229,26 @@ describe('Agent 0.0.46: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
     const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2')]))
     expect(res.success).toBe(false)
     expect(res.error_code).toBe('REMOVE_FAILED')
-    expect(removeAt).toHaveBeenCalledTimes(1)
+    // tenta de novo uma vez antes de desistir
+    expect(removeAt).toHaveBeenCalledTimes(2)
     expect(add).not.toHaveBeenCalled()
+  })
+
+  it('0.0.48: Holyrics que ignora a primeira remoção (primeiro envio) tenta de novo e dá certo', async () => {
+    const { playlist, removeAt } = fakeHolyrics(agent, [
+      title('t1', 'LOUVOR'),
+      song('a', '2'),
+      song('b', '1'),
+    ])
+    const real = removeAt.getMockImplementation()!
+    let calls = 0
+    removeAt.mockImplementation(async (...args: any[]) => {
+      if (++calls === 1) return { success: true }
+      return (real as any)(...args)
+    })
+    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2'), avisos('av.mp4')]))
+    expect(res.success).toBe(true)
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'song 2', '# AVISOS', 'av.mp4'])
   })
 
   it('reordenar e tirar mídia do meio refaz a playlist de cima, sem perder o LOUVOR', async () => {

@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import pb from '@/lib/pocketbase/client'
 import type { EventItem } from '@/types'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +17,10 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { getLocalTodayYMD, toCalendarYMD } from '@/lib/dateUtils'
+import { listEventTypes, type EventType } from '@/services/eventTypes'
+import { EventTypesDialog } from './EventTypesDialog'
+
+const OTHER = '__outro__'
 
 export default function EventForm() {
   const { id } = useParams<{ id: string }>()
@@ -34,8 +38,53 @@ export default function EventForm() {
     start_time: '19:00',
     end_time: '21:00',
     description: '',
-    status: 'Planejado' as 'Planejado' | 'Confirmado' | 'Realizado' | 'Cancelado',
   })
+  const [types, setTypes] = useState<EventType[]>([])
+  const [typeId, setTypeId] = useState('')
+  const [typesOpen, setTypesOpen] = useState(false)
+
+  const loadTypes = async () => {
+    if (!currentChurch) return
+    try {
+      setTypes(await listEventTypes(currentChurch.id))
+    } catch (err) {
+      console.error('Erro ao carregar tipos de culto:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadTypes()
+  }, [currentChurch?.id])
+
+  // Ao abrir: culto novo já vem com o primeiro tipo; culto existente mostra o tipo pelo nome
+  useEffect(() => {
+    if (typeId || isLoading) return
+    if (isEditing) {
+      const match = types.find(
+        (t) => t.name.trim().toLowerCase() === formData.title.trim().toLowerCase(),
+      )
+      setTypeId(match ? match.id : OTHER)
+    } else if (types.length > 0) {
+      pickType(types[0].id)
+    } else {
+      setTypeId(OTHER)
+    }
+  }, [types, isLoading])
+
+  const pickType = (value: string) => {
+    setTypeId(value)
+    const t = types.find((x) => x.id === value)
+    if (t) {
+      setFormData((prev) => ({
+        ...prev,
+        title: t.name,
+        start_time: t.start_time || prev.start_time,
+        end_time: t.end_time || prev.end_time,
+      }))
+    } else if (value === OTHER && !isEditing) {
+      setFormData((prev) => ({ ...prev, title: '' }))
+    }
+  }
 
   useEffect(() => {
     if (isEditing && id) {
@@ -50,7 +99,6 @@ export default function EventForm() {
             start_time: ev.start_time || '',
             end_time: ev.end_time || '',
             description: ev.description || '',
-            status: ev.status || 'Planejado',
           })
         } catch (err) {
           console.error(err)
@@ -75,7 +123,7 @@ export default function EventForm() {
     if (!formData.title.trim() || !formData.date) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Informe o nome do evento e a data.',
+        description: 'Escolha o tipo de culto (ou digite o nome) e a data.',
         variant: 'destructive',
       })
       return
@@ -90,8 +138,8 @@ export default function EventForm() {
         start_time: formData.start_time || null,
         end_time: formData.end_time || null,
         description: formData.description.trim() || null,
-        status: formData.status,
       }
+      if (!isEditing) payload.status = 'Planejado'
 
       let eventId = id
       if (isEditing && id) {
@@ -148,29 +196,55 @@ export default function EventForm() {
             {isEditing ? 'Editar Culto / Evento' : 'Agendar Novo Culto ou Ensaio'}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Cadastre os horários e informações para planejar repertórios e escalas.
+            Escolha o culto e a data. O horário já vem do tipo de culto.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="title" className="text-xs font-semibold text-slate-700">
-              Nome do Evento / Culto <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Ex: Culto de Celebração, Vigília de Louvor, Ensaio Geral..."
-              className="rounded-xl border-slate-200"
-              required
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="type" className="text-xs font-semibold text-slate-700">
+                Culto <span className="text-red-500">*</span>
+              </Label>
+              <button
+                type="button"
+                onClick={() => setTypesOpen(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Tipos de culto
+              </button>
+            </div>
+            <Select value={typeId} onValueChange={pickType}>
+              <SelectTrigger id="type" className="rounded-xl border-slate-200">
+                <SelectValue placeholder="Escolha o culto" />
+              </SelectTrigger>
+              <SelectContent>
+                {types.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                    {t.start_time ? ` · ${t.start_time}` : ''}
+                  </SelectItem>
+                ))}
+                <SelectItem value={OTHER}>Outro (digitar o nome)</SelectItem>
+              </SelectContent>
+            </Select>
+            {typeId === OTHER && (
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Nome do culto ou evento"
+                className="rounded-xl border-slate-200"
+                required
+              />
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5 sm:col-span-1">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
               <Label htmlFor="date" className="text-xs font-semibold text-slate-700">
-                Data do Culto <span className="text-red-500">*</span>
+                Data <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="date"
@@ -184,7 +258,7 @@ export default function EventForm() {
 
             <div className="space-y-1.5">
               <Label htmlFor="start_time" className="text-xs font-semibold text-slate-700">
-                Horário de Início
+                Início
               </Label>
               <Input
                 id="start_time"
@@ -197,7 +271,7 @@ export default function EventForm() {
 
             <div className="space-y-1.5">
               <Label htmlFor="end_time" className="text-xs font-semibold text-slate-700">
-                Horário de Término
+                Término
               </Label>
               <Input
                 id="end_time"
@@ -208,39 +282,18 @@ export default function EventForm() {
               />
             </div>
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="status" className="text-xs font-semibold text-slate-700">
-              Status do Culto
-            </Label>
-            <Select
-              value={formData.status}
-              onValueChange={(val) =>
-                setFormData({
-                  ...formData,
-                  status: val as 'Planejado' | 'Confirmado' | 'Realizado' | 'Cancelado',
-                })
-              }
-            >
-              <SelectTrigger className="rounded-xl border-slate-200">
-                <SelectValue placeholder="Selecione o status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Planejado">Planejado (Em organização)</SelectItem>
-                <SelectItem value="Confirmado">Confirmado (Escala aberta)</SelectItem>
-                <SelectItem value="Realizado">Realizado (Finalizado)</SelectItem>
-                <SelectItem value="Cancelado">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <p className="-mt-2 text-[11px] text-slate-500">
+            O horário vem do tipo de culto. Para o Holyrics achar o culto, ele precisa bater com o
+            horário do culto na agenda do Holyrics.
+          </p>
 
           <div className="space-y-1.5">
             <Label htmlFor="description" className="text-xs font-semibold text-slate-700">
-              Descrição / Observações Gerais
+              Observações (opcional)
             </Label>
             <Textarea
               id="description"
-              rows={3}
+              rows={2}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Ex: Culto de ceia do Senhor, trazer instrumentos afinados às 18:30..."
@@ -269,6 +322,16 @@ export default function EventForm() {
           </div>
         </form>
       </div>
+
+      {currentChurch && (
+        <EventTypesDialog
+          open={typesOpen}
+          onOpenChange={setTypesOpen}
+          churchId={currentChurch.id}
+          types={types}
+          onChanged={loadTypes}
+        />
+      )}
     </div>
   )
 }
