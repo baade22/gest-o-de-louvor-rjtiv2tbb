@@ -53,6 +53,8 @@ export interface ChurchMember {
   id: string
   church_id: string
   user_id: string
+  /** Nome da pessoa (cópia do nome da conta, que só o próprio usuário consegue ler) */
+  display_name?: string
   role: AppRole
   operational_roles?: OperationalRole[]
   /** Perfis de acesso (ids de access_profiles) e as chaves somadas deles */

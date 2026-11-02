@@ -29,10 +29,11 @@ export const memberArea = (m: Pick<EventMember, 'team_area'>): TeamArea =>
 
 type MemberWithUser = ChurchMember & { expand?: { user_id?: User } }
 
-export const churchMemberName = (m?: MemberWithUser | null) => m?.expand?.user_id?.name || 'Membro'
+export const churchMemberName = (m?: MemberWithUser | null) =>
+  m?.display_name || m?.expand?.user_id?.name || 'Membro'
 
 export const eventMemberName = (m: EventMember) =>
-  m.expand?.member_id?.expand?.user_id?.name || 'Membro'
+  m.expand?.member_id?.display_name || m.expand?.member_id?.expand?.user_id?.name || 'Membro'
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)

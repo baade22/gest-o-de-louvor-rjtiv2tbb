@@ -190,7 +190,9 @@ export function MediaTab({
         <ul className="divide-y divide-slate-100">
           {medias.map((media, index) => {
             const status = MEDIA_STATUS[media.status] || MEDIA_STATUS.ENVIADA
-            const operator = media.expand?.assigned_operator?.expand?.user_id?.name
+            const operator =
+              media.expand?.assigned_operator?.display_name ||
+              media.expand?.assigned_operator?.expand?.user_id?.name
             const isReady = media.status === 'BAIXADA' || media.status === 'IMPORTADA_HOLYRICS'
             return (
               <li key={media.id} className="flex flex-wrap items-center gap-3 px-5 py-3">

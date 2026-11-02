@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { NotificationsBell } from '@/components/NotificationsBell'
+import { CompleteProfileGate } from '@/components/CompleteProfileGate'
 import {
   LayoutDashboard,
   Users,
@@ -596,7 +597,9 @@ export default function Layout() {
           <NotificationsBell />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-in p-4 sm:p-6 lg:p-8">
-          <Outlet />
+          <CompleteProfileGate>
+            <Outlet />
+          </CompleteProfileGate>
         </main>
       </div>
     </div>
