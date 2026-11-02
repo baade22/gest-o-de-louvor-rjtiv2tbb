@@ -15,9 +15,14 @@ const view = (pl: PlaylistItem[]) =>
     it.type === 'title' ? `# ${it.name}` : it.song_id ? `song ${it.song_id}` : it.name,
   )
 
-// Holyrics de mentira, como o real: o RemoveFromMediaPlaylist com event_id sempre tira o
-// PRIMEIRO item, seja qual for o índice pedido; o AddToPlaylist insere na posição
-function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
+// Holyrics de mentira, como o real (2.30 com event_id): RemoveFromMediaPlaylist {index: 0}
+// esvazia a playlist (ou, com removeMode 'first', tira só o primeiro) e AddToPlaylist com
+// index -1 põe os itens no COMEÇO da playlist (na ordem enviada)
+function fakeHolyrics(
+  agent: LouvorFlowAgent,
+  initial: PlaylistItem[],
+  removeMode: 'all' | 'first' = 'all',
+) {
   const playlist = [...initial]
   let seq = 0
   const h = (agent as any).holyrics
@@ -32,22 +37,19 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
   }))
   const removeById = vi.spyOn(h, 'removeFromMediaPlaylist')
   const removeAt = vi.spyOn(h, 'removeFromMediaPlaylistIndex').mockImplementation(async () => {
-    playlist.splice(0, 1)
+    playlist.splice(0, removeMode === 'all' ? playlist.length : 1)
     return { success: true }
   })
-  const add = vi
-    .spyOn(h, 'addItemsToPlaylist')
-    .mockImplementation(async (items: any, _ev: any, index: any) => {
-      const created = (items as any[]).map((it) => ({
-        id: `n${++seq}`,
-        type: it.type,
-        name: it.name,
-        ...(it.type === 'song' ? { song_id: String(it.id) } : {}),
-      }))
-      if (index < 0 || index >= playlist.length) playlist.push(...created)
-      else playlist.splice(index, 0, ...created)
-      return { success: true }
-    })
+  const add = vi.spyOn(h, 'addItemsToPlaylist').mockImplementation(async (items: any) => {
+    const created = (items as any[]).map((it) => ({
+      id: `n${++seq}`,
+      type: it.type,
+      name: it.name,
+      ...(it.type === 'song' ? { song_id: String(it.id) } : {}),
+    }))
+    playlist.splice(0, 0, ...created)
+    return { success: true }
+  })
   return { playlist, removeById, removeAt, add }
 }
 
@@ -131,23 +133,62 @@ describe('Agent 0.0.46: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
     expect(removeById).not.toHaveBeenCalled()
   })
 
-  it('mantém intacto o que só existe no Holyrics (OFERTA e versículo)', async () => {
+  it('seção do Holyrics (OFERTA) é refeita depois do LouvorFlow', async () => {
     const { playlist } = fakeHolyrics(agent, [
       title('t0', 'OFERTA'),
       image('i', 'oferta.jpeg'),
       title('t1', 'LOUVOR'),
       song('a', '1'),
-      verse('v'),
     ])
     const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2')]))
     expect(res.success).toBe(true)
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'song 2', '# OFERTA', 'oferta.jpeg'])
+  })
+
+  it('versículo só do Holyrics: não mexe em nada e explica', async () => {
+    const { playlist, removeAt, add } = fakeHolyrics(agent, [
+      title('t1', 'LOUVOR'),
+      song('a', '1'),
+      verse('v'),
+    ])
+    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2')]))
+    expect(res.success).toBe(false)
+    expect(res.error_code).toBe('NOT_RECREATABLE')
+    expect(removeAt).not.toHaveBeenCalled()
+    expect(add).not.toHaveBeenCalled()
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'Sl 23'])
+  })
+
+  it('Holyrics que tira só o primeiro item também chega no resultado certo', async () => {
+    const { playlist } = fakeHolyrics(
+      agent,
+      [song('a', '4'), song('b', '3'), title('t', 'LOUVOR'), video('v', 'x.mp4')],
+      'first',
+    )
+    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('3', '4')]))
+    expect(res.success).toBe(true)
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 3', 'song 4'])
+  })
+
+  it('teste real 29/11: músicas invertidas e mídias faltando ficam certas', async () => {
+    const { playlist } = fakeHolyrics(agent, [
+      song('a', 'N'),
+      song('b', 'M'),
+      song('c', 'G'),
+      song('d', 'O'),
+    ])
+    const res = await agent.handleSyncMediaPlaylist(
+      mirror([louvor('O', 'G', 'M', 'N'), avisos('ibmaldeia.mp4')]),
+    )
+    expect(res.success).toBe(true)
     expect(view(playlist)).toEqual([
       '# LOUVOR',
-      'song 1',
-      'song 2',
-      '# OFERTA',
-      'oferta.jpeg',
-      'Sl 23',
+      'song O',
+      'song G',
+      'song M',
+      'song N',
+      '# AVISOS',
+      'ibmaldeia.mp4',
     ])
   })
 
@@ -177,48 +218,18 @@ describe('Agent 0.0.46: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
     )
   })
 
-  it('se o Holyrics tirar o item errado, para na hora e não inclui nada', async () => {
+  it('se o Holyrics não tirar nada, para e não inclui nada', async () => {
     const { add, removeAt } = fakeHolyrics(agent, [
       title('t1', 'LOUVOR'),
       song('a', '2'),
       song('b', '1'),
-      song('c', '3'),
     ])
-    // Holyrics com defeito: remove o segundo item
-    const pl: PlaylistItem[] = [
-      title('t1', 'LOUVOR'),
-      song('a', '2'),
-      song('b', '1'),
-      song('c', '3'),
-    ]
-    vi.spyOn((agent as any).holyrics, 'getSchedules').mockImplementation(async () => ({
-      success: true,
-      schedules: [{ media_playlist: [...pl], metadata: { event: { id: EVENT_ID } } }],
-    }))
-    removeAt.mockImplementation(async () => {
-      pl.splice(1, 1)
-      return { success: true }
-    })
-    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2', '3')]))
+    removeAt.mockImplementation(async () => ({ success: true }))
+    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2')]))
     expect(res.success).toBe(false)
-    expect(res.error_code).toBe('REMOVE_WRONG_ITEM')
+    expect(res.error_code).toBe('REMOVE_FAILED')
     expect(removeAt).toHaveBeenCalledTimes(1)
     expect(add).not.toHaveBeenCalled()
-  })
-
-  it('versículo no meio dos itens do LouvorFlow: não mexe em nada e explica', async () => {
-    const { playlist, removeAt, add } = fakeHolyrics(agent, [
-      title('t1', 'LOUVOR'),
-      song('a', '1'),
-      verse('v'),
-      song('b', '2'),
-    ])
-    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('2', '1')]))
-    expect(res.success).toBe(false)
-    expect(res.error_code).toBe('NOT_RECREATABLE')
-    expect(removeAt).not.toHaveBeenCalled()
-    expect(add).not.toHaveBeenCalled()
-    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'Sl 23', 'song 2'])
   })
 
   it('reordenar e tirar mídia do meio refaz a playlist de cima, sem perder o LOUVOR', async () => {

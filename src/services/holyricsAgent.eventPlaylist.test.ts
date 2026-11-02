@@ -42,9 +42,9 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
       }
       return { success: true }
     })
-  // Como o Holyrics real: remove sempre o primeiro item
+  // Como o Holyrics real (2.30 com event_id): remover pela posição esvaziou a playlist
   vi.spyOn(holyrics, 'removeFromMediaPlaylistIndex').mockImplementation(async () => {
-    playlist.splice(0, 1)
+    playlist.splice(0, playlist.length)
     return { success: true }
   })
   vi.spyOn(holyrics, 'addItemsToPlaylist').mockImplementation(
@@ -54,8 +54,7 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
           ? song(`z${++seq}`, String(it.id))
           : { id: `z${++seq}`, type: it.type, name: it.name },
       )
-      if (index < 0 || index >= playlist.length) playlist.push(...created)
-      else playlist.splice(index, 0, ...created)
+      playlist.splice(0, 0, ...created) // index -1 pôs no começo
       return { success: true }
     },
   )
