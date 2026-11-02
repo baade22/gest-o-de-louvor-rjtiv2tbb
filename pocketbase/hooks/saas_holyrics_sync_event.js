@@ -1373,6 +1373,20 @@ routerAdd(
           index: -1,
           ignore_duplicates: true,
           song_id: songId,
+          // Agent 0.0.43+: entra no fim da seção LOUVOR (o Agent acha a posição)
+          section_title: 'LOUVOR',
+          section_order: [
+            'LOUVOR',
+            'AVISOS',
+            'ANIVERSARIANTES',
+            'AGENDA',
+            'EVENTOS',
+            'CULTOS',
+            'VÍDEO ESPECIAL',
+            'OUTROS',
+          ],
+          month: eventMonth,
+          year: eventYear,
         }
 
         const addRes = runCommandSync('ADD_TO_PLAYLIST', addPayload, 10000)
@@ -1510,7 +1524,7 @@ routerAdd(
       return true
     }
 
-    // Seções da playlist do culto no Holyrics (Agent 0.0.42+): título + itens, nesta ordem.
+    // Seções da playlist do culto no Holyrics (Agent 0.0.43+): título + itens, nesta ordem.
     // LOUVOR = músicas do repertório; cada categoria de mídia vira o seu título.
     const buildPlaylistSections = (songIds, mediaRecs) => {
       const titles = [
@@ -1565,7 +1579,7 @@ routerAdd(
         { eventId: eventId, churchId: churchId },
       )
     } catch (_) {}
-    const supportsSections = versionAtLeast(agentRecord.getString('version'), '0.0.42')
+    const supportsSections = versionAtLeast(agentRecord.getString('version'), '0.0.43')
     const playlistSections = supportsSections
       ? buildPlaylistSections(orderedSongIds, eventMediaRecs)
       : []
@@ -1586,7 +1600,7 @@ routerAdd(
             month: eventMonth,
             year: eventYear,
             song_ids: orderedSongIds,
-            // Agent 0.0.42+: monta as seções (LOUVOR, AVISOS...) em vez de só ordenar
+            // Agent 0.0.43+: monta as seções (LOUVOR, AVISOS...) em vez de só ordenar
             sections: playlistSections,
           },
           45000,

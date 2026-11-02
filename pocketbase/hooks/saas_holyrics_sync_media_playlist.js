@@ -239,7 +239,7 @@ routerAdd(
       })
     }
 
-    // Seções da playlist do culto no Holyrics (Agent 0.0.42+): título + itens, nesta ordem.
+    // Seções da playlist do culto no Holyrics (Agent 0.0.43+): título + itens, nesta ordem.
     // LOUVOR = músicas do repertório; cada categoria de mídia vira o seu título.
     const buildPlaylistSections = (songIds, mediaRecs) => {
       const titles = [
@@ -302,7 +302,15 @@ routerAdd(
         } catch (_) {}
       }
     } catch (_) {}
-    const playlistSections = buildPlaylistSections(repertoireSongIds, mediaRecords)
+    // Só o Agent 0.0.43+ monta as seções sem remover itens (a 0.0.42 removia e apagou vídeos)
+    const agentVersionParts = String(agentRecord.getString('version') || '0')
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0)
+    const agentSupportsSections =
+      agentVersionParts[0] > 0 || agentVersionParts[1] > 0 || (agentVersionParts[2] || 0) >= 43
+    const playlistSections = agentSupportsSections
+      ? buildPlaylistSections(repertoireSongIds, mediaRecords)
+      : []
 
     // Enfileira comando SYNC_MEDIA_PLAYLIST
     const commandId = 'cmd_sync_media_' + Date.now() + '_' + $security.randomString(8)

@@ -220,8 +220,88 @@ export function toAddItem(
   current?: PlaylistItem,
 ): { type: string; id?: string; name?: string } {
   if (wanted.kind === 'song') return { type: 'song', id: String(wanted.song_id) }
+  // Usa o nome do arquivo que o LouvorFlow conhece (é o que o AddToPlaylist aceita);
+  // o name do item na playlist pode vir em outro formato.
   return {
-    type: String(current?.type || wanted.type || 'video').toLowerCase(),
-    name: String(current?.name || wanted.name),
+    type: String(wanted.type || current?.type || 'video').toLowerCase(),
+    name: String(wanted.name || current?.name || ''),
   }
+}
+
+/** Quantas vezes o item da seção aparece na playlist. */
+export function countMatches(playlist: PlaylistItem[], wanted: SectionItem): number {
+  return playlist.filter((it) => playlistItemMatches(it, wanted)).length
+}
+
+/** Resumo curto da playlist para diagnóstico. */
+export function summarizePlaylist(playlist: PlaylistItem[]): string[] {
+  return playlist
+    .slice(0, 60)
+    .map((it) =>
+      isTitleItem(it)
+        ? `# ${it.name || ''}`
+        : itemSongId(it)
+          ? `song ${itemSongId(it)}`
+          : `${it.type || '?'} ${it.name || ''}`,
+    )
+}
+
+/**
+ * Onde criar o título que falta: logo antes do primeiro item da seção que já está na
+ * playlist. Se esse item estiver acima do fim de uma seção anterior do LouvorFlow, usa a
+ * regra de ordem das seções (antes da próxima seção conhecida, senão no fim).
+ */
+export function titleIndexForSection(
+  playlist: PlaylistItem[],
+  sections: PlaylistSection[],
+  sectionIndex: number,
+): number {
+  let prevEnd = 0
+  for (let i = 0; i < sectionIndex; i++) {
+    const t = findTitleIndex(playlist, sections[i].title)
+    if (t >= 0) prevEnd = Math.max(prevEnd, t + 1)
+    for (const w of sections[i].items) {
+      playlist.forEach((it, idx) => {
+        if (playlistItemMatches(it, w)) prevEnd = Math.max(prevEnd, idx + 1)
+      })
+    }
+  }
+  const first = playlist.findIndex((it) =>
+    sections[sectionIndex].items.some((w) => playlistItemMatches(it, w)),
+  )
+  if (first >= prevEnd) return first
+  return Math.max(prevEnd, titleInsertIndex(playlist, sections, sectionIndex))
+}
+
+export function parseSections(raw: any): PlaylistSection[] {
+  return (Array.isArray(raw) ? raw : [])
+    .map((s: any) => ({
+      title: String(s?.title || '').trim(),
+      items: Array.isArray(s?.items) ? s.items : [],
+    }))
+    .filter((s: PlaylistSection) => s.title && s.items.length > 0)
+}
+
+/** Fim do bloco de um título: posição do próximo título (ou o fim da playlist). */
+export function sectionBlockEnd(playlist: PlaylistItem[], titleIndex: number): number {
+  for (let i = titleIndex + 1; i < playlist.length; i++) {
+    if (isTitleItem(playlist[i])) return i
+  }
+  return playlist.length
+}
+
+/**
+ * Onde criar o título de uma seção que ainda não tem itens: logo depois do bloco da seção
+ * anterior do LouvorFlow que existir; se nenhuma existir, antes da próxima conhecida ou no fim.
+ */
+export function missingTitleIndex(
+  playlist: PlaylistItem[],
+  sections: PlaylistSection[],
+  sectionIndex: number,
+): number {
+  for (let j = sectionIndex - 1; j >= 0; j--) {
+    const t = findTitleIndex(playlist, sections[j].title)
+    if (t >= 0) return sectionBlockEnd(playlist, t)
+  }
+  return titleInsertIndex(playlist, sections, sectionIndex)
 }

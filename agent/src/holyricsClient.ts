@@ -1001,6 +1001,7 @@ export class HolyricsClient {
     items: Array<Record<string, any>>,
     eventId: string,
     index = -1,
+    ignoreDuplicates = true,
   ): Promise<{ success: boolean; error?: string; error_code?: string }> {
     const cleanEventId = String(eventId || '').trim()
     if (!cleanEventId) {
@@ -1013,7 +1014,7 @@ export class HolyricsClient {
     if (items.length === 0) return { success: true }
     const res = await this.request(
       'AddToPlaylist',
-      { items, event_id: cleanEventId, index, ignore_duplicates: true },
+      { items, event_id: cleanEventId, index, ignore_duplicates: ignoreDuplicates },
       6000,
     )
     if (res.status === 'ok') return { success: true }
