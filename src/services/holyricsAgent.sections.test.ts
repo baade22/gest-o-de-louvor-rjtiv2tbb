@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import { LouvorFlowAgent } from '../../agent/src/agent'
 import { normalizeTitle, titleMatches, type PlaylistItem } from '../../agent/src/eventPlaylist'
 import type { AgentConfig, AgentCommand } from '../../agent/src/types'
@@ -80,96 +83,123 @@ describe('Títulos de seção: regras puras', () => {
   })
 })
 
-describe('Agent: monta a playlist do culto por seções', () => {
+const syncMedia = (sections: any[], items: any[]): AgentCommand => ({
+  id: 'm',
+  command_id: 'cm',
+  action: 'SYNC_MEDIA_PLAYLIST',
+  payload: { event_id: EVENT_ID, event_date: '2026-11-15 00:00:00.000Z', items, sections },
+  created_at: '2026-11-02 01:00:00',
+})
+
+describe('Agent: títulos de seção sem remover nada', () => {
   let agent: LouvorFlowAgent
+  let tmp: string
   beforeEach(() => {
     vi.restoreAllMocks()
-    agent = new LouvorFlowAgent(config)
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-sections-'))
+    fs.mkdirSync(path.join(tmp, 'video'), { recursive: true })
+    agent = new LouvorFlowAgent({ ...config, holyricsMediaPath: tmp })
+    const h = (agent as any).holyrics
+    vi.spyOn(h, 'testConnection').mockResolvedValue({ connected: true })
+    vi.spyOn(h, 'verifyMediaRecognition').mockResolvedValue({
+      recognized: true,
+      methodUsed: 'GetFile',
+    })
   })
 
-  const sections = [
-    {
-      title: 'LOUVOR',
-      items: [
-        { kind: 'song', song_id: '1' },
-        { kind: 'song', song_id: '2' },
-      ],
-    },
-    { title: 'AVISOS', items: [{ kind: 'media', type: 'video', name: 'aviso.mp4' }] },
-    { title: 'ANIVERSARIANTES', items: [{ kind: 'media', type: 'video', name: 'niver.mp4' }] },
-  ]
+  const songsSection = {
+    title: 'LOUVOR',
+    items: [
+      { kind: 'song', song_id: '1' },
+      { kind: 'song', song_id: '2' },
+    ],
+  }
+  const avisos = { title: 'AVISOS', items: [{ kind: 'media', type: 'video', name: 'av.mp4' }] }
+  const aniv = {
+    title: 'ANIVERSARIANTES',
+    items: [{ kind: 'media', type: 'video', name: 'aniv.mp4' }],
+  }
+  const media = (name: string) => ({ holyrics_filename: name, media_type: 'VIDEO' })
 
-  it('playlist como a do Pedro: usa os títulos que existem e cria o que falta', async () => {
-    const { playlist } = fakeHolyrics(agent, [
-      video('a', 'aviso.mp4'),
-      video('b', 'niver.mp4'),
-      title('t1', 'LOUVOR'),
-      song('s2', '2'),
-      song('s1', '1'),
-      title('t2', 'OFERTA'),
-      image('i', 'oferta.jpeg'),
-      title('t3', 'AVISOS!!'),
-      title('t4', 'KITUTS'),
-      video('k', 'KITUTS.mp4'),
-    ])
-    const res = await agent.handleReorderEventSongs(reorder(sections))
+  it('Enviar ao Holyrics: cria LOUVOR antes das músicas e não remove nada', async () => {
+    const { playlist } = fakeHolyrics(agent, [song('s1', '1'), song('s2', '2')])
+    const remove = vi.spyOn((agent as any).holyrics, 'removeFromMediaPlaylist')
+    const res = await agent.handleReorderEventSongs(reorder([songsSection, avisos]))
     expect(res.success).toBe(true)
-    expect(res.result?.titles_created).toEqual(['ANIVERSARIANTES'])
-    expect(view(playlist)).toEqual([
-      '# LOUVOR',
-      'song 1',
-      'song 2',
-      '# OFERTA',
-      'oferta.jpeg',
-      '# AVISOS!!',
-      'aviso.mp4',
-      '# KITUTS',
-      'KITUTS.mp4',
-      '# ANIVERSARIANTES',
-      'niver.mp4',
-    ])
+    expect(res.result?.titles_created).toEqual(['LOUVOR'])
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'song 2'])
+    expect(remove).not.toHaveBeenCalled()
   })
 
-  it('playlist sem títulos: cria todos na ordem do LouvorFlow', async () => {
-    const { playlist } = fakeHolyrics(agent, [
-      video('b', 'niver.mp4'),
-      song('s1', '1'),
-      video('a', 'aviso.mp4'),
-      song('s2', '2'),
-    ])
-    const res = await agent.handleReorderEventSongs(reorder(sections))
+  it('Montar playlist (culto novo): cada vídeo entra embaixo do seu título, na ordem das seções', async () => {
+    fs.writeFileSync(path.join(tmp, 'video', 'av.mp4'), 'x')
+    fs.writeFileSync(path.join(tmp, 'video', 'aniv.mp4'), 'x')
+    const { playlist } = fakeHolyrics(agent, [song('s1', '1'), song('s2', '2')])
+    const remove = vi.spyOn((agent as any).holyrics, 'removeFromMediaPlaylist')
+    const res = await agent.handleSyncMediaPlaylist(
+      syncMedia([songsSection, avisos, aniv], [media('aniv.mp4'), media('av.mp4')]),
+    )
     expect(res.success).toBe(true)
+    expect(res.result?.synced_count).toBe(2)
+    expect(res.result?.sections?.titles_created).toEqual(['LOUVOR', 'AVISOS', 'ANIVERSARIANTES'])
     expect(view(playlist)).toEqual([
       '# LOUVOR',
       'song 1',
       'song 2',
       '# AVISOS',
-      'aviso.mp4',
+      'av.mp4',
       '# ANIVERSARIANTES',
-      'niver.mp4',
+      'aniv.mp4',
+    ])
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('usa título que já existe (AVISOS!!) e põe o vídeo no fim do bloco, antes do próximo título', async () => {
+    fs.writeFileSync(path.join(tmp, 'video', 'av.mp4'), 'x')
+    const { playlist } = fakeHolyrics(agent, [
+      title('t1', 'LOUVOR'),
+      song('s1', '1'),
+      title('t2', 'OFERTA'),
+      image('i', 'oferta.jpeg'),
+      title('t3', 'AVISOS!!'),
+      video('k0', 'antigo.mp4'),
+      title('t4', 'KITUTS'),
+      video('k', 'KITUTS.mp4'),
+    ])
+    const res = await agent.handleSyncMediaPlaylist(
+      syncMedia([songsSection, avisos], [media('av.mp4')]),
+    )
+    expect(res.success).toBe(true)
+    expect(res.result?.sections?.titles_created).toEqual([])
+    expect(view(playlist)).toEqual([
+      '# LOUVOR',
+      'song 1',
+      '# OFERTA',
+      'oferta.jpeg',
+      '# AVISOS!!',
+      'antigo.mp4',
+      'av.mp4',
+      '# KITUTS',
+      'KITUTS.mp4',
     ])
   })
 
-  it('não mexe quando já está organizada e ignora itens que ainda não estão na playlist', async () => {
-    const { playlist, addSpy } = fakeHolyrics(agent, [
-      title('t1', 'Louvor'),
+  it('playlist já bagunçada (15/11): não move nada, só cria o que falta', async () => {
+    const { playlist } = fakeHolyrics(agent, [
       song('s1', '1'),
       song('s2', '2'),
-      title('t2', 'Avisos'),
-      video('a', 'aviso.mp4'),
+      title('t1', 'LOUVOR'),
     ])
-    const res = await agent.handleReorderEventSongs(reorder(sections))
+    const remove = vi.spyOn((agent as any).holyrics, 'removeFromMediaPlaylist')
+    const res = await agent.handleReorderEventSongs(reorder([songsSection]))
     expect(res.success).toBe(true)
-    expect(res.result?.reordered).toBe(false)
-    expect(addSpy).not.toHaveBeenCalled()
-    // niver.mp4 não está na playlist: não cria o título ANIVERSARIANTES
-    expect(view(playlist)).toEqual(['# Louvor', 'song 1', 'song 2', '# Avisos', 'aviso.mp4'])
+    expect(view(playlist)).toEqual(['song 1', 'song 2', '# LOUVOR'])
+    expect(remove).not.toHaveBeenCalled()
   })
 
-  it('sem "sections" continua só ordenando as músicas (compatível com o servidor antigo)', async () => {
-    const h = (agent as any).holyrics
+  it('sem "sections" continua no comportamento antigo (servidor antigo)', async () => {
     const spy = vi.spyOn(agent as any, 'arrangeEventPlaylist')
-    vi.spyOn(h, 'getSchedules').mockResolvedValue({
+    vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
       success: true,
       schedules: [{ media_playlist: [song('s1', '1')], metadata: { event: { id: EVENT_ID } } }],
     })
