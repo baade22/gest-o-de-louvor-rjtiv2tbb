@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T19:13:29.194Z",
+  "generatedAt": "2026-11-02T21:22:36.990Z",
   "collections": [
     {
       "name": "users",
@@ -317,6 +317,12 @@
         {
           "name": "cong_financeiro",
           "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "display_name",
+          "type": "text",
           "required": false,
           "system": false
         }
@@ -2362,6 +2368,12 @@
         },
         {
           "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "profile_pending",
           "type": "bool",
           "required": false,
           "system": false
