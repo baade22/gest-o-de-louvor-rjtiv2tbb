@@ -11,7 +11,6 @@ import {
   desiredFromSections,
   desiredKey,
   planMirror,
-  planRebuild,
   finalFromPlaylist,
   type FinalItem,
   playlistKey,
@@ -134,7 +133,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.46',
+          version: '0.0.47',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -280,7 +279,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.46',
+          version: '0.0.47',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -825,11 +824,13 @@ export class LouvorFlowAgent {
   }
 
   /**
-   * Deixa a playlist do culto igual a `final` quando é preciso tirar algum item.
-   * O RemoveFromMediaPlaylist do Holyrics (com event_id) sempre tira o PRIMEIRO item, seja
-   * qual for o índice pedido. Por isso a playlist é refeita de cima: tira o primeiro item,
-   * lê de novo e confere que saiu só ele (se sair outra coisa, para na hora), repete até
-   * onde precisa e depois inclui de novo, na ordem certa, o que deve ficar.
+   * Deixa a playlist do culto igual a `final` refazendo-a do zero.
+   * Testes reais (Holyrics 2.30, com event_id) mostraram que posição não é confiável:
+   * RemoveFromMediaPlaylist com index tirou o primeiro item ou esvaziou a playlist inteira, e
+   * AddToPlaylist com index -1 pôs o item no começo, não no fim. Então o Agent esvazia a
+   * playlist (lendo depois de cada remoção) e inclui tudo de novo numa chamada só, na ordem
+   * do LouvorFlow, conferindo no fim. Itens que só existem no Holyrics e não dá para
+   * recriar (versículo, texto) impedem a mudança: não mexe em nada e explica.
    */
   private async rebuildEventPlaylist(
     payload: Record<string, any>,
@@ -844,15 +845,18 @@ export class LouvorFlowAgent {
     error?: string
     error_code?: string
   }> {
-    const plan = planRebuild(playlist, final)
-    if (plan.notRecreatable.length > 0) {
+    const finalKeys = final.map((f) => f.key).join('\n')
+    if (playlist.map(playlistKey).join('\n') === finalKeys) {
+      return { success: true, removed: 0, added: 0, playlist }
+    }
+    if (final.some((f) => !f.add)) {
       return {
         success: false,
         removed: 0,
         added: 0,
         playlist,
         error:
-          'A playlist do culto tem itens que só existem no Holyrics (ex.: versículo ou texto) no meio dos itens do LouvorFlow e eles não podem ser recriados. Não mexi em nada; mova esses itens para o fim da playlist no Holyrics e envie de novo.',
+          'A playlist do culto tem itens que só existem no Holyrics (ex.: versículo ou texto) e eles não podem ser recriados. Não mexi em nada; tire esses itens da playlist no Holyrics e envie de novo.',
         error_code: 'NOT_RECREATABLE',
       }
     }
@@ -866,34 +870,62 @@ export class LouvorFlowAgent {
       error: error || fallback,
       error_code: code || 'REBUILD_FAILED',
     })
-    for (let step = 0; step < plan.removeFromTop; step++) {
-      if (current.length === 0) break
-      const expected = current.slice(1).map(playlistKey)
-      const rm = await this.holyrics.removeFromMediaPlaylistIndex(0, eventId)
-      if (!rm.success) return fail(rm.error, rm.error_code, 'Falha ao tirar item da playlist.')
-      const read = await this.readEventMediaPlaylist(payload)
-      if (!read.success) return fail(read.error, read.error_code, 'Não consegui ler a playlist.')
-      if (read.playlist.map(playlistKey).join('\n') !== expected.join('\n')) {
+
+    const clear = async () => {
+      let guard = current.length + 2
+      while (current.length > 0 && guard-- > 0) {
+        const before = current.length
+        const rm = await this.holyrics.removeFromMediaPlaylistIndex(0, eventId)
+        if (!rm.success) return fail(rm.error, rm.error_code, 'Falha ao tirar item da playlist.')
+        const read = await this.readEventMediaPlaylist(payload)
+        if (!read.success) return fail(read.error, read.error_code, 'Não consegui ler a playlist.')
         current = read.playlist
-        return fail(
-          'O Holyrics tirou da playlist um item diferente do esperado. Parei para não mexer em mais nada; confira a playlist do culto no Holyrics e envie de novo.',
-          'REMOVE_WRONG_ITEM',
-          '',
-        )
+        removed += Math.max(0, before - current.length)
+        if (current.length >= before) {
+          return fail(
+            'O Holyrics não tirou o item da playlist do culto. Confira a playlist no Holyrics e envie de novo.',
+            'REMOVE_FAILED',
+            '',
+          )
+        }
       }
-      current = read.playlist
-      removed++
+      return null
     }
-    const addItems = plan.add.map((f) => f.add as Record<string, any>)
-    if (addItems.length > 0) {
-      const at = current.length === 0 ? -1 : plan.addAt
-      const add = await this.holyrics.addItemsToPlaylist(addItems, eventId, at, false)
+
+    const addAll = async (items: FinalItem[]) => {
+      const add = await this.holyrics.addItemsToPlaylist(
+        items.map((f) => f.add as Record<string, any>),
+        eventId,
+        -1,
+        false,
+      )
       if (!add.success) return fail(add.error, add.error_code, 'Falha ao incluir na playlist.')
       const read = await this.readEventMediaPlaylist(payload)
       if (!read.success) return fail(read.error, read.error_code, 'Não consegui ler a playlist.')
       current = read.playlist
+      return null
     }
-    return { success: true, removed, added: addItems.length, playlist: current }
+
+    const c1 = await clear()
+    if (c1) return c1
+    const a1 = await addAll(final)
+    if (a1) return a1
+    const got = current.map(playlistKey).join('\n')
+    if (
+      got !== finalKeys &&
+      got ===
+        [...final]
+          .reverse()
+          .map((f) => f.key)
+          .join('\n')
+    ) {
+      // O Holyrics incluiu na ordem inversa: refaz mandando invertido
+      const c2 = await clear()
+      if (c2) return c2
+      const a2 = await addAll([...final].reverse())
+      if (a2) return a2
+    }
+    return { success: true, removed, added: final.length, playlist: current }
   }
 
   /**
@@ -996,40 +1028,16 @@ export class LouvorFlowAgent {
 
     let current = before
     let removedCount = 0
-    if (plan.removeIndexes.length > 0) {
-      // Precisa tirar algo: refaz a playlist de cima (o Holyrics só remove o primeiro item)
-      const rb = await this.rebuildEventPlaylist(p, eventId, before, plan.final)
-      if (!rb.success)
-        return fail(
-          rb.error || 'Falha ao atualizar a playlist.',
-          rb.error_code || 'REBUILD_FAILED',
-          rb.playlist,
-        )
-      current = rb.playlist
-      removedCount = rb.removed
-    } else if (plan.insert.length > 0) {
-      const at = plan.keep >= current.length ? -1 : plan.keep
-      const add = await this.holyrics.addItemsToPlaylist(
-        plan.insert.map(toAddItemFromDesired),
-        eventId,
-        at,
-        false,
+    // Qualquer diferença: refaz a playlist (posição no Holyrics não é confiável)
+    const rb = await this.rebuildEventPlaylist(p, eventId, before, plan.final)
+    if (!rb.success)
+      return fail(
+        rb.error || 'Falha ao atualizar a playlist.',
+        rb.error_code || 'REBUILD_FAILED',
+        rb.playlist,
       )
-      if (!add.success)
-        return fail(
-          add.error || 'Falha ao incluir na playlist.',
-          add.error_code || 'ADD_PLAYLIST_FAILED',
-          current,
-        )
-      const read = await this.readEventMediaPlaylist(p)
-      if (!read.success)
-        return fail(
-          read.error || 'Não consegui ler a playlist.',
-          read.error_code || 'READ_FAILED',
-          current,
-        )
-      current = read.playlist
-    }
+    current = rb.playlist
+    removedCount = rb.removed
 
     const finalKeys = current.map(playlistKey)
     const matches = finalKeys.join('\n') === plan.expectedKeys.join('\n')
@@ -1062,7 +1070,7 @@ export class LouvorFlowAgent {
       items,
       mirror: {
         removed: removedCount,
-        added: plan.insert.length,
+        added: rb.added,
         kept: plan.keep,
         songs: desired.filter((d) => d.kind === 'song').length,
         matches,

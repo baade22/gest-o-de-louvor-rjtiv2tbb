@@ -406,43 +406,6 @@ export function finalFromDesired(d: DesiredItem): FinalItem {
   return { key: desiredKey(d), add: toAddItemFromDesired(d) }
 }
 
-export interface RebuildPlan {
-  /** Quantos itens tirar do começo da playlist (o Holyrics só remove o primeiro item). */
-  removeFromTop: number
-  /** Itens a incluir depois, nesta ordem. */
-  add: FinalItem[]
-  /** Posição do AddToPlaylist: -1 (fim) ou 0 (antes do que sobrou). */
-  addAt: number
-  /** Itens que precisariam ser recriados mas não dá (não mexe em nada se houver). */
-  notRecreatable: string[]
-}
-
-/**
- * O RemoveFromMediaPlaylist do Holyrics com event_id sempre tira o PRIMEIRO item, seja
- * qual for o índice pedido. Então, para tirar algo do meio, a playlist é refeita de cima:
- * tira do topo até o último item que muda e inclui de novo o que deve ficar ali. O final
- * que já está igual (ex.: OFERTA, versículos) só fica se não der para recriá-lo.
- */
-export function planRebuild(current: PlaylistItem[], final: FinalItem[]): RebuildPlan {
-  const curKeys = current.map(playlistKey)
-  const n = curKeys.length
-  const m = final.length
-  let suffix = 0
-  while (suffix < n && suffix < m && curKeys[n - 1 - suffix] === final[m - 1 - suffix].key) {
-    suffix++
-  }
-  // Se todo o final também dá para recriar, refaz tudo e inclui no fim (o caminho mais seguro)
-  const tailRecreatable = current.slice(n - suffix).every((it) => toAddItemFromPlaylist(it))
-  if (tailRecreatable) suffix = 0
-  const add = final.slice(0, m - suffix)
-  return {
-    removeFromTop: n - suffix,
-    add,
-    addAt: suffix > 0 ? 0 : -1,
-    notRecreatable: add.filter((f) => !f.add).map((f) => f.key),
-  }
-}
-
 export interface MirrorPlan {
   /** Itens do começo que já estão certos. */
   keep: number
