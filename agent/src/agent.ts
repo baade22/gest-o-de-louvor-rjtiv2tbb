@@ -8,6 +8,7 @@ import type { AgentConfig, AgentCommand, AgentStatusInfo } from './types.js'
 import { HolyricsClient } from './holyricsClient.js'
 import { saveConfig } from './config.js'
 import {
+  playlistItemMatches,
   findEventSchedule,
   findItemIdsToRemove,
   findTitleIndex,
@@ -125,7 +126,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.43',
+          version: '0.0.44',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -271,7 +272,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.43',
+          version: '0.0.44',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -431,7 +432,20 @@ export class LouvorFlowAgent {
               : -1
           // Agent 0.0.43+: música nova entra no fim da seção LOUVOR (antes do próximo título)
           if (cmd.payload?.section_title && Array.isArray(cmd.payload?.section_order)) {
-            const placed = await this.songSectionIndex(cmd.payload).catch(() => -1)
+            const placed = await this.songSectionIndex(cmd.payload, holyricsSongId).catch(
+              () => -1 as number | 'present',
+            )
+            if (placed === 'present') {
+              status = 'DONE'
+              resultPayload = {
+                added: false,
+                already_present: true,
+                holyrics_song_id: holyricsSongId,
+                event_id: eventId,
+                title: cmd.payload?.title,
+              }
+              break
+            }
             if (placed >= 0) playlistIndex = placed
           }
           const ignoreDuplicates = cmd.payload?.ignore_duplicates ?? true
@@ -947,12 +961,20 @@ export class LouvorFlowAgent {
    * Posição para uma música nova: fim do bloco do título da seção (LOUVOR). Se o título ainda
    * não existe mas há seções posteriores (AVISOS...), entra antes delas. Senão, -1 (fim).
    */
-  private async songSectionIndex(payload: Record<string, any>): Promise<number> {
+  private async songSectionIndex(
+    payload: Record<string, any>,
+    songId: string,
+  ): Promise<number | 'present'> {
     const month = Number(payload.month)
     const year = Number(payload.year)
     if (!month || !year) return -1
     const read = await this.readEventMediaPlaylist(payload)
     if (!read.success) return -1
+    // Já está no culto: não manda de novo. AddToPlaylist com index e item repetido
+    // fez o Holyrics apagar os itens de cima da playlist (teste real 15/11).
+    if (read.playlist.some((it) => playlistItemMatches(it, { kind: 'song', song_id: songId }))) {
+      return 'present'
+    }
     const order: PlaylistSection[] = (payload.section_order as any[])
       .map((t) => ({ title: String(t || ''), items: [] }))
       .filter((sec) => sec.title)
@@ -974,11 +996,27 @@ export class LouvorFlowAgent {
   private async addMediaInSections(
     payload: Record<string, any>,
     itemsToAdd: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }>,
-  ): Promise<{ success: boolean; error?: string; error_code?: string; titles_created: string[] }> {
+  ): Promise<{
+    success: boolean
+    error?: string
+    error_code?: string
+    titles_created: string[]
+    already_present: string[]
+  }> {
     const eventId = String(payload.event_id || '').trim()
     const sections = parseSections(payload.sections)
     const titlesCreated: string[] = []
     const placed = new Set<string>()
+    // Mídia que já está no culto não é enviada de novo: AddToPlaylist com index e item
+    // repetido fez o Holyrics apagar os itens de cima da playlist (teste real 15/11).
+    const first = await this.readEventMediaPlaylist(payload)
+    if (!first.success) return { ...first, success: false, titles_created: [], already_present: [] }
+    const isPresent = (pl: any[], it: { type: string; name: string }) =>
+      pl.some((p) => playlistItemMatches(p, { kind: 'media', type: it.type, name: it.name }))
+    const alreadyPresent = itemsToAdd
+      .filter((it) => isPresent(first.playlist, it))
+      .map((it) => it.name)
+    itemsToAdd = itemsToAdd.filter((it) => !alreadyPresent.includes(it.name))
 
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i]
@@ -991,7 +1029,13 @@ export class LouvorFlowAgent {
       mine.forEach((m) => placed.add(m.name))
 
       let read = await this.readEventMediaPlaylist(payload)
-      if (!read.success) return { ...read, success: false, titles_created: titlesCreated }
+      if (!read.success)
+        return {
+          ...read,
+          success: false,
+          titles_created: titlesCreated,
+          already_present: alreadyPresent,
+        }
       let titleIdx = findTitleIndex(read.playlist, section.title)
       if (titleIdx < 0) {
         const at = missingTitleIndex(read.playlist, sections, i)
@@ -1006,11 +1050,18 @@ export class LouvorFlowAgent {
             error: `Não consegui criar o título "${section.title}": ${addTitle.error}`,
             error_code: addTitle.error_code,
             titles_created: titlesCreated,
+            already_present: alreadyPresent,
           }
         }
         titlesCreated.push(section.title)
         read = await this.readEventMediaPlaylist(payload)
-        if (!read.success) return { ...read, success: false, titles_created: titlesCreated }
+        if (!read.success)
+          return {
+            ...read,
+            success: false,
+            titles_created: titlesCreated,
+            already_present: alreadyPresent,
+          }
         titleIdx = findTitleIndex(read.playlist, section.title)
       }
       const at = titleIdx >= 0 ? sectionBlockEnd(read.playlist, titleIdx) : -1
@@ -1021,6 +1072,7 @@ export class LouvorFlowAgent {
           error: addRes.error,
           error_code: addRes.error_code,
           titles_created: titlesCreated,
+          already_present: alreadyPresent,
         }
       }
     }
@@ -1034,10 +1086,11 @@ export class LouvorFlowAgent {
           error: addRes.error,
           error_code: addRes.error_code,
           titles_created: titlesCreated,
+          already_present: alreadyPresent,
         }
       }
     }
-    return { success: true, titles_created: titlesCreated }
+    return { success: true, titles_created: titlesCreated, already_present: alreadyPresent }
   }
 
   /**
