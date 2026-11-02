@@ -107,6 +107,8 @@ export interface SyncEventRepertoireResponse {
   error_code?: string
   agent_online?: boolean
   holyrics_detected?: boolean
+  /** Agent 0.0.45+: comando que deixa a playlist do culto igual ao LouvorFlow. */
+  playlist_sync?: { status: string; command_id?: string; pending_media?: number; error?: string }
   message: string
 }
 
@@ -203,6 +205,27 @@ export async function getHolyricsCommandStatus(
       method: 'GET',
     },
   )
+}
+
+/**
+ * Espera o Agent terminar um comando (DONE/FAILED). Devolve null se não terminar no prazo.
+ */
+export async function waitHolyricsCommand(
+  commandId: string,
+  timeoutMs = 90000,
+  intervalMs = 2500,
+): Promise<HolyricsCommandStatusResponse | null> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+    try {
+      const res = await getHolyricsCommandStatus(commandId)
+      if (res.status === 'DONE' || res.status === 'FAILED') return res
+    } catch (_) {
+      // tenta de novo
+    }
+  }
+  return null
 }
 
 /**
