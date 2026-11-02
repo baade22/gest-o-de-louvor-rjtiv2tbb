@@ -15,7 +15,8 @@ const view = (pl: PlaylistItem[]) =>
     it.type === 'title' ? `# ${it.name}` : it.song_id ? `song ${it.song_id}` : it.name,
   )
 
-// Holyrics de mentira: lê, remove pela posição e insere na posição
+// Holyrics de mentira, como o real: o RemoveFromMediaPlaylist com event_id sempre tira o
+// PRIMEIRO item, seja qual for o índice pedido; o AddToPlaylist insere na posição
 function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
   const playlist = [...initial]
   let seq = 0
@@ -30,12 +31,10 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
     schedules: [{ media_playlist: [...playlist], metadata: { event: { id: EVENT_ID } } }],
   }))
   const removeById = vi.spyOn(h, 'removeFromMediaPlaylist')
-  const removeAt = vi
-    .spyOn(h, 'removeFromMediaPlaylistIndex')
-    .mockImplementation(async (index: any) => {
-      playlist.splice(index, 1)
-      return { success: true }
-    })
+  const removeAt = vi.spyOn(h, 'removeFromMediaPlaylistIndex').mockImplementation(async () => {
+    playlist.splice(0, 1)
+    return { success: true }
+  })
   const add = vi
     .spyOn(h, 'addItemsToPlaylist')
     .mockImplementation(async (items: any, _ev: any, index: any) => {
@@ -103,7 +102,7 @@ describe('planMirror', () => {
   })
 })
 
-describe('Agent 0.0.45: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow', () => {
+describe('Agent 0.0.46: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow', () => {
   let agent: LouvorFlowAgent
   beforeEach(() => {
     vi.restoreAllMocks()
@@ -185,7 +184,7 @@ describe('Agent 0.0.45: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
       song('b', '1'),
       song('c', '3'),
     ])
-    // Holyrics com defeito: sempre remove o primeiro item
+    // Holyrics com defeito: remove o segundo item
     const pl: PlaylistItem[] = [
       title('t1', 'LOUVOR'),
       song('a', '2'),
@@ -197,7 +196,7 @@ describe('Agent 0.0.45: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
       schedules: [{ media_playlist: [...pl], metadata: { event: { id: EVENT_ID } } }],
     }))
     removeAt.mockImplementation(async () => {
-      pl.splice(0, 1)
+      pl.splice(1, 1)
       return { success: true }
     })
     const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2', '3')]))
@@ -205,6 +204,48 @@ describe('Agent 0.0.45: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
     expect(res.error_code).toBe('REMOVE_WRONG_ITEM')
     expect(removeAt).toHaveBeenCalledTimes(1)
     expect(add).not.toHaveBeenCalled()
+  })
+
+  it('versículo no meio dos itens do LouvorFlow: não mexe em nada e explica', async () => {
+    const { playlist, removeAt, add } = fakeHolyrics(agent, [
+      title('t1', 'LOUVOR'),
+      song('a', '1'),
+      verse('v'),
+      song('b', '2'),
+    ])
+    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('2', '1')]))
+    expect(res.success).toBe(false)
+    expect(res.error_code).toBe('NOT_RECREATABLE')
+    expect(removeAt).not.toHaveBeenCalled()
+    expect(add).not.toHaveBeenCalled()
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'Sl 23', 'song 2'])
+  })
+
+  it('reordenar e tirar mídia do meio refaz a playlist de cima, sem perder o LOUVOR', async () => {
+    // Teste real do 22/11: Holyrics só remove o primeiro item
+    const { playlist } = fakeHolyrics(agent, [
+      title('t1', 'LOUVOR'),
+      song('a', '4'),
+      song('b', '3'),
+      song('c', '2'),
+      song('d', '1'),
+      title('t2', 'AVISOS'),
+      video('v1', 'kituts.mp4'),
+      video('v2', 'apagada.mp4'),
+    ])
+    const res = await agent.handleSyncMediaPlaylist(
+      mirror([louvor('1', '2', '3'), avisos('kituts.mp4')]),
+    )
+    expect(res.success).toBe(true)
+    expect(view(playlist)).toEqual([
+      '# LOUVOR',
+      'song 1',
+      'song 2',
+      'song 3',
+      '# AVISOS',
+      'kituts.mp4',
+    ])
+    expect(res.result.mirror.matches).toBe(true)
   })
 
   it('excluir música no LouvorFlow tira só ela, pela posição', async () => {

@@ -212,7 +212,7 @@ export async function getHolyricsCommandStatus(
  */
 export async function waitHolyricsCommand(
   commandId: string,
-  timeoutMs = 90000,
+  timeoutMs = 240000,
   intervalMs = 2500,
 ): Promise<HolyricsCommandStatusResponse | null> {
   const startedAt = Date.now()

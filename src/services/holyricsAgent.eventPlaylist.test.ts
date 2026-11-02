@@ -42,11 +42,23 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
       }
       return { success: true }
     })
-  // Agent 0.0.45+: remove pela posição
-  vi.spyOn(holyrics, 'removeFromMediaPlaylistIndex').mockImplementation(async (index: any) => {
-    playlist.splice(index, 1)
+  // Como o Holyrics real: remove sempre o primeiro item
+  vi.spyOn(holyrics, 'removeFromMediaPlaylistIndex').mockImplementation(async () => {
+    playlist.splice(0, 1)
     return { success: true }
   })
+  vi.spyOn(holyrics, 'addItemsToPlaylist').mockImplementation(
+    async (items: any, _e: any, index: any) => {
+      const created = (items as any[]).map((it) =>
+        it.type === 'song'
+          ? song(`z${++seq}`, String(it.id))
+          : { id: `z${++seq}`, type: it.type, name: it.name },
+      )
+      if (index < 0 || index >= playlist.length) playlist.push(...created)
+      else playlist.splice(index, 0, ...created)
+      return { success: true }
+    },
+  )
   const addSpy = vi
     .spyOn(holyrics, 'addToPlaylist')
     .mockImplementation(async (songId: any, opts: any) => {
@@ -173,7 +185,7 @@ describe('Agent: comandos de remoção e ordem na playlist do culto', () => {
 
     expect(res.success).toBe(true)
     expect(res.result?.removed_items).toBe(2)
-    expect(fake.playlist.map((p) => p.id)).toEqual(['z2'])
+    expect(fake.playlist.map((p) => p.song_id)).toEqual(['200'])
     expect(fs.existsSync(path.join(tmpDir, 'media', 'video', fileName))).toBe(false)
     expect(fs.existsSync(outside)).toBe(true)
   })
