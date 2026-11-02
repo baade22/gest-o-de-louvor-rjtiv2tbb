@@ -437,8 +437,16 @@ export default function MediaModule() {
                           </span>
                         )}
                         <span>Tipo: {item.media_type}</span>
-                        <span>Enviado por: {uploaderInfo?.name || 'Equipe'}</span>
-                        <span>Operador: {operatorInfo?.name || 'Não atribuído'}</span>
+                        <span>
+                          Enviado por:{' '}
+                          {item.expand?.uploaded_by?.display_name || uploaderInfo?.name || 'Equipe'}
+                        </span>
+                        <span>
+                          Operador:{' '}
+                          {item.expand?.assigned_operator?.display_name ||
+                            operatorInfo?.name ||
+                            'Não atribuído'}
+                        </span>
                       </p>
                     </div>
 
@@ -579,7 +587,7 @@ export default function MediaModule() {
                     const u = m.expand?.user_id
                     return (
                       <SelectItem key={m.id} value={m.id}>
-                        {u?.name || 'Membro'}
+                        {(m as any).display_name || u?.name || 'Membro'}
                       </SelectItem>
                     )
                   })}

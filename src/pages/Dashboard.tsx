@@ -729,7 +729,9 @@ export default function Dashboard() {
           <ul className="divide-y divide-slate-100">
             {recentActivities.map((act) => {
               const musicianName =
-                act.expand?.member_id?.expand?.user_id?.name || 'Músico da equipe'
+                act.expand?.member_id?.display_name ||
+                act.expand?.member_id?.expand?.user_id?.name ||
+                'Músico da equipe'
               const eventName = act.expand?.event_id?.title || 'Culto'
               const roleName = act.expand?.role_id?.name || 'Escala'
               const Icon =

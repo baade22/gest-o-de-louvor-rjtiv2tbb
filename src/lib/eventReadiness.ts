@@ -67,7 +67,10 @@ function listNames(names: string[], max = 3): string {
 }
 
 function memberLabel(m: ReadinessInput['members'][number]): string {
-  const name = m.expand?.member_id?.expand?.user_id?.name?.split(' ')[0] || 'Membro'
+  const name =
+    (m.expand?.member_id?.display_name || m.expand?.member_id?.expand?.user_id?.name)?.split(
+      ' ',
+    )[0] || 'Membro'
   const role = m.expand?.role_id?.name
   return role ? `${name} (${role.toLowerCase()})` : name
 }
