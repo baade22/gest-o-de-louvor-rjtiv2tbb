@@ -13,11 +13,14 @@ import {
   findTitleIndex,
   getMediaPlaylist,
   planSongReorder,
-  presentSectionItems,
-  sectionInPlace,
-  titleInsertIndex,
-  toAddItem,
+  missingTitleIndex,
+  normalizeTitle,
+  parseSections,
   type PlaylistSection,
+  presentSectionItems,
+  sectionBlockEnd,
+  summarizePlaylist,
+  titleIndexForSection,
 } from './eventPlaylist.js'
 
 export class LouvorFlowAgent {
@@ -122,7 +125,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.42',
+          version: '0.0.43',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -268,7 +271,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.42',
+          version: '0.0.43',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -422,10 +425,15 @@ export class LouvorFlowAgent {
             break
           }
 
-          const playlistIndex =
+          let playlistIndex =
             cmd.payload?.index !== undefined && cmd.payload?.index !== null
               ? Number(cmd.payload.index)
               : -1
+          // Agent 0.0.43+: música nova entra no fim da seção LOUVOR (antes do próximo título)
+          if (cmd.payload?.section_title && Array.isArray(cmd.payload?.section_order)) {
+            const placed = await this.songSectionIndex(cmd.payload).catch(() => -1)
+            if (placed >= 0) playlistIndex = placed
+          }
           const ignoreDuplicates = cmd.payload?.ignore_duplicates ?? true
           const mediaPlaylist = cmd.payload?.media_playlist ?? false
 
@@ -880,11 +888,10 @@ export class LouvorFlowAgent {
   }
 
   /**
-   * Monta as seções da playlist do culto: para cada seção (na ordem informada) garante o
-   * título (type "title") e deixa logo abaixo dele os itens da seção, na ordem. Itens que
-   * ainda não estão na playlist são ignorados (quem os adiciona é o envio de músicas/mídias).
-   * Títulos e itens que não são do LouvorFlow (ex.: OFERTA) ficam como estão.
-   * A API não move itens, então quem está fora do lugar é removido e reinserido.
+   * Seções da playlist do culto (títulos LOUVOR, AVISOS...): para cada seção que já tem item
+   * na playlist e ainda não tem título, cria o título logo antes do primeiro item dela.
+   * NUNCA remove nem move itens: no teste real (15/11) o RemoveFromMediaPlaylist do Holyrics
+   * não tirou as músicas pedidas e apagou os vídeos. Itens fora do lugar ficam como estão.
    */
   public async arrangeEventPlaylist(payload: Record<string, any>): Promise<{
     success: boolean
@@ -893,27 +900,101 @@ export class LouvorFlowAgent {
     error_code?: string
   }> {
     const eventId = String(payload.event_id || '').trim()
-    const sections: PlaylistSection[] = (Array.isArray(payload.sections) ? payload.sections : [])
-      .map((s: any) => ({
-        title: String(s?.title || '').trim(),
-        items: Array.isArray(s?.items) ? s.items : [],
-      }))
-      .filter((s: PlaylistSection) => s.title && s.items.length > 0)
-
+    const sections = parseSections(payload.sections)
     const titlesCreated: string[] = []
-    const sectionsMoved: string[] = []
 
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i]
       let read = await this.readEventMediaPlaylist(payload)
       if (!read.success) return { success: false, error: read.error, error_code: read.error_code }
-
-      // Só monta a seção se algum item dela já estiver na playlist
       if (presentSectionItems(read.playlist, section).length === 0) continue
+      if (findTitleIndex(read.playlist, section.title) >= 0) continue
 
+      const at = titleIndexForSection(read.playlist, sections, i)
+      const addTitle = await this.holyrics.addItemsToPlaylist(
+        [{ type: 'title', name: section.title }],
+        eventId,
+        at,
+      )
+      if (!addTitle.success) {
+        return {
+          success: false,
+          result: { titles_created: titlesCreated },
+          error: `Não consegui criar o título "${section.title}": ${addTitle.error}`,
+          error_code: addTitle.error_code,
+        }
+      }
+      read = await this.readEventMediaPlaylist(payload)
+      if (!read.success) return { success: false, error: read.error, error_code: read.error_code }
+      if (findTitleIndex(read.playlist, section.title) < 0) {
+        return {
+          success: false,
+          result: { titles_created: titlesCreated, playlist: summarizePlaylist(read.playlist) },
+          error: `O Holyrics aceitou o título "${section.title}", mas ele não apareceu na playlist do culto.`,
+          error_code: 'TITLE_NOT_CONFIRMED',
+        }
+      }
+      titlesCreated.push(section.title)
+    }
+
+    return {
+      success: true,
+      result: { arranged: titlesCreated.length > 0, titles_created: titlesCreated },
+    }
+  }
+
+  /**
+   * Posição para uma música nova: fim do bloco do título da seção (LOUVOR). Se o título ainda
+   * não existe mas há seções posteriores (AVISOS...), entra antes delas. Senão, -1 (fim).
+   */
+  private async songSectionIndex(payload: Record<string, any>): Promise<number> {
+    const month = Number(payload.month)
+    const year = Number(payload.year)
+    if (!month || !year) return -1
+    const read = await this.readEventMediaPlaylist(payload)
+    if (!read.success) return -1
+    const order: PlaylistSection[] = (payload.section_order as any[])
+      .map((t) => ({ title: String(t || ''), items: [] }))
+      .filter((sec) => sec.title)
+    const idx = order.findIndex(
+      (sec) => normalizeTitle(sec.title) === normalizeTitle(payload.section_title),
+    )
+    if (idx < 0) return -1
+    const t = findTitleIndex(read.playlist, order[idx].title)
+    if (t >= 0) return sectionBlockEnd(read.playlist, t)
+    const at = missingTitleIndex(read.playlist, order, idx)
+    return at >= read.playlist.length ? -1 : at
+  }
+
+  /**
+   * Inclui mídias novas já na seção certa: garante o título da seção (depois das seções
+   * anteriores do LouvorFlow) e põe as mídias no fim do bloco dela (antes do próximo título).
+   * Mídias que não pertencem a nenhuma seção vão para o fim da playlist.
+   */
+  private async addMediaInSections(
+    payload: Record<string, any>,
+    itemsToAdd: Array<{ type: 'video' | 'image' | 'audio' | 'file'; name: string }>,
+  ): Promise<{ success: boolean; error?: string; error_code?: string; titles_created: string[] }> {
+    const eventId = String(payload.event_id || '').trim()
+    const sections = parseSections(payload.sections)
+    const titlesCreated: string[] = []
+    const placed = new Set<string>()
+
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i]
+      const mine = itemsToAdd.filter((it) =>
+        section.items.some(
+          (w) => w.kind === 'media' && w.name.trim().toLowerCase() === it.name.trim().toLowerCase(),
+        ),
+      )
+      if (mine.length === 0) continue
+      mine.forEach((m) => placed.add(m.name))
+
+      let read = await this.readEventMediaPlaylist(payload)
+      if (!read.success) return { ...read, success: false, titles_created: titlesCreated }
       let titleIdx = findTitleIndex(read.playlist, section.title)
       if (titleIdx < 0) {
-        const at = titleInsertIndex(read.playlist, sections, i)
+        const at = missingTitleIndex(read.playlist, sections, i)
         const addTitle = await this.holyrics.addItemsToPlaylist(
           [{ type: 'title', name: section.title }],
           eventId,
@@ -922,61 +1003,41 @@ export class LouvorFlowAgent {
         if (!addTitle.success) {
           return {
             success: false,
-            result: { titles_created: titlesCreated, sections_moved: sectionsMoved },
             error: `Não consegui criar o título "${section.title}": ${addTitle.error}`,
             error_code: addTitle.error_code,
+            titles_created: titlesCreated,
           }
         }
         titlesCreated.push(section.title)
         read = await this.readEventMediaPlaylist(payload)
-        if (!read.success) return { success: false, error: read.error, error_code: read.error_code }
+        if (!read.success) return { ...read, success: false, titles_created: titlesCreated }
         titleIdx = findTitleIndex(read.playlist, section.title)
-        if (titleIdx < 0) {
-          return {
-            success: false,
-            result: { titles_created: titlesCreated, sections_moved: sectionsMoved },
-            error: `O Holyrics aceitou o título "${section.title}", mas ele não apareceu na playlist do culto.`,
-            error_code: 'TITLE_NOT_CONFIRMED',
-          }
-        }
       }
-
-      const present = presentSectionItems(read.playlist, section)
-      if (sectionInPlace(read.playlist, titleIdx, present)) continue
-
-      const toAdd = present.map((p) => toAddItem(p.wanted, p.item))
-      const removeIds = present.map((p) => String(p.item.id || '')).filter(Boolean)
-      const removeRes = await this.holyrics.removeFromMediaPlaylist(removeIds, eventId)
-      if (!removeRes.success) {
-        return { success: false, error: removeRes.error, error_code: removeRes.error_code }
-      }
-      read = await this.readEventMediaPlaylist(payload)
-      if (!read.success) return { success: false, error: read.error, error_code: read.error_code }
-      titleIdx = findTitleIndex(read.playlist, section.title)
-      const addRes = await this.holyrics.addItemsToPlaylist(
-        toAdd,
-        eventId,
-        titleIdx >= 0 ? titleIdx + 1 : -1,
-      )
+      const at = titleIdx >= 0 ? sectionBlockEnd(read.playlist, titleIdx) : -1
+      const addRes = await this.holyrics.addItemsToPlaylist(mine, eventId, at)
       if (!addRes.success) {
         return {
           success: false,
-          result: { titles_created: titlesCreated, sections_moved: sectionsMoved },
-          error: `Não consegui recolocar os itens de "${section.title}": ${addRes.error}`,
+          error: addRes.error,
           error_code: addRes.error_code,
+          titles_created: titlesCreated,
         }
       }
-      sectionsMoved.push(section.title)
     }
 
-    return {
-      success: true,
-      result: {
-        arranged: titlesCreated.length > 0 || sectionsMoved.length > 0,
-        titles_created: titlesCreated,
-        sections_moved: sectionsMoved,
-      },
+    const rest = itemsToAdd.filter((it) => !placed.has(it.name))
+    if (rest.length > 0) {
+      const addRes = await this.holyrics.addItemsToPlaylist(rest, eventId, -1)
+      if (!addRes.success) {
+        return {
+          success: false,
+          error: addRes.error,
+          error_code: addRes.error_code,
+          titles_created: titlesCreated,
+        }
+      }
     }
+    return { success: true, titles_created: titlesCreated }
   }
 
   /**
@@ -991,7 +1052,8 @@ export class LouvorFlowAgent {
     error_code?: string
   }> {
     const payload = cmd.payload || {}
-    // Agent 0.0.42+: com "sections", monta a playlist por seções (títulos + itens)
+    // Agent 0.0.43+: com "sections", só cria os títulos de seção. Não reordena
+    // (reordenar exige remover itens, e o RemoveFromMediaPlaylist apagou itens errados).
     if (Array.isArray(payload.sections) && payload.sections.length > 0) {
       const arranged = await this.arrangeEventPlaylist(payload)
       if (!arranged.success) return arranged
@@ -1362,6 +1424,8 @@ export class LouvorFlowAgent {
     let addedCount = 0
     let failedCount = 0
     let afterSnapshot: any = null
+    let sectionTitles: string[] = []
+    let sectionError = ''
 
     // Passo 5: Chamar AddToPlaylist com event_id obrigatório da ocorrência do culto
     if (itemsToAdd.length > 0) {
@@ -1377,12 +1441,33 @@ export class LouvorFlowAgent {
         }),
       )
 
-      const addRes = await this.holyrics.addMediaToPlaylist({
-        items: itemsToAdd,
-        eventId: eventId,
-        index: -1,
-        ignoreDuplicates: true,
-      })
+      const hasSections = Array.isArray(payload.sections) && payload.sections.length > 0
+      let addRes: { success: boolean; error?: string; error_code?: string; httpStatus?: number }
+      if (hasSections) {
+        const schedPayload = {
+          ...payload,
+          event_id: eventId,
+          month: eventDateMonth,
+          year: eventDateYear,
+        }
+        // Primeiro os títulos das seções que já existem (ex.: LOUVOR antes das músicas)
+        const titled = await this.arrangeEventPlaylist(schedPayload).catch((err: any) => ({
+          success: false,
+          error: err?.message || String(err),
+          result: undefined as any,
+        }))
+        const placedRes = await this.addMediaInSections(schedPayload, itemsToAdd)
+        sectionTitles = [...(titled.result?.titles_created || []), ...placedRes.titles_created]
+        if (!titled.success) sectionError = titled.error || ''
+        addRes = placedRes
+      } else {
+        addRes = await this.holyrics.addMediaToPlaylist({
+          items: itemsToAdd,
+          eventId: eventId,
+          index: -1,
+          ignoreDuplicates: true,
+        })
+      }
 
       if (addRes.success) {
         // Passo 6: Verificação rigorosa pós-inserção na playlist da ocorrência de destino.
@@ -1512,23 +1597,12 @@ export class LouvorFlowAgent {
       summaryErrorCode = 'PENDING_LOCAL_FILE'
     }
 
-    // Seções (títulos LOUVOR/AVISOS/...) quando o LouvorFlow mandar
-    let arrangeResult: any = null
-    if (Array.isArray(payload.sections) && payload.sections.length > 0) {
-      try {
-        const arranged = await this.arrangeEventPlaylist({
-          ...payload,
-          event_id: eventId,
-          month: eventDateMonth,
-          year: eventDateYear,
-        })
-        arrangeResult = arranged.success
-          ? arranged.result
-          : { ...(arranged.result || {}), error: arranged.error, error_code: arranged.error_code }
-      } catch (err: any) {
-        arrangeResult = { error: err?.message || String(err) }
-      }
-    }
+    const arrangeResult =
+      Array.isArray(payload.sections) && payload.sections.length > 0
+        ? sectionError
+          ? { titles_created: sectionTitles, error: sectionError }
+          : { arranged: sectionTitles.length > 0, titles_created: sectionTitles }
+        : null
 
     return {
       success:
