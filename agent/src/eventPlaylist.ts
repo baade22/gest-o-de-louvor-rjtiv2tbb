@@ -116,3 +116,112 @@ export function planSongReorder(
     inserts: target.map((songId, i) => ({ index: positions[i], songId })),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Seções da playlist do culto (títulos do Holyrics: LOUVOR, AVISOS, ...)
+// Um título é um item { type: "title", name } na media_playlist. Cada seção do
+// LouvorFlow vira um título seguido dos seus itens, na ordem informada.
+// ---------------------------------------------------------------------------
+
+export type SectionItem =
+  | { kind: 'song'; song_id: string }
+  | { kind: 'media'; type: string; name: string }
+
+export interface PlaylistSection {
+  title: string
+  items: SectionItem[]
+}
+
+/** "AVISOS!!", "Avisos" e "avisos" são o mesmo título. Ignora acento, caixa e símbolos. */
+export function normalizeTitle(name: string): string {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
+/** Casa títulos iguais ou que diferem só por um "s" no fim (Aviso/Avisos). */
+export function titleMatches(a: string, b: string): boolean {
+  const na = normalizeTitle(a)
+  const nb = normalizeTitle(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  return na + 's' === nb || nb + 's' === na
+}
+
+export function isTitleItem(item: PlaylistItem): boolean {
+  return String(item?.type || '').toLowerCase() === 'title'
+}
+
+export function findTitleIndex(playlist: PlaylistItem[], title: string): number {
+  return playlist.findIndex((it) => isTitleItem(it) && titleMatches(it.name || '', title))
+}
+
+const mediaBaseName = (name: string) =>
+  normalizeName(
+    String(name || '')
+      .split(/[\\/]/)
+      .pop() || '',
+  )
+
+/** Este item da playlist é o item da seção? Música por song_id; mídia pelo nome do arquivo. */
+export function playlistItemMatches(item: PlaylistItem, wanted: SectionItem): boolean {
+  if (wanted.kind === 'song') return itemSongId(item) === String(wanted.song_id).trim()
+  if (isTitleItem(item) || itemSongId(item)) return false
+  const name = mediaBaseName(item.name || '')
+  return !!name && name === mediaBaseName(wanted.name)
+}
+
+/** Itens da seção que já estão na playlist, na ordem da seção (cada um com o item real). */
+export function presentSectionItems(
+  playlist: PlaylistItem[],
+  section: PlaylistSection,
+): Array<{ wanted: SectionItem; item: PlaylistItem }> {
+  const out: Array<{ wanted: SectionItem; item: PlaylistItem }> = []
+  for (const wanted of section.items) {
+    const item = playlist.find((it) => playlistItemMatches(it, wanted))
+    if (item) out.push({ wanted, item })
+  }
+  return out
+}
+
+/** Os itens já estão logo abaixo do título, nesta ordem? */
+export function sectionInPlace(
+  playlist: PlaylistItem[],
+  titleIndex: number,
+  present: Array<{ wanted: SectionItem }>,
+): boolean {
+  return present.every((p, i) => {
+    const it = playlist[titleIndex + 1 + i]
+    return !!it && playlistItemMatches(it, p.wanted)
+  })
+}
+
+/**
+ * Onde criar o título que falta: antes do título da próxima seção (na ordem do
+ * LouvorFlow) que já existe na playlist; se nenhuma existir, no fim.
+ */
+export function titleInsertIndex(
+  playlist: PlaylistItem[],
+  sections: PlaylistSection[],
+  sectionIndex: number,
+): number {
+  for (let i = sectionIndex + 1; i < sections.length; i++) {
+    const idx = findTitleIndex(playlist, sections[i].title)
+    if (idx >= 0) return idx
+  }
+  return playlist.length
+}
+
+/** Item no formato do AddToPlaylist para reinserir o item que já estava na playlist. */
+export function toAddItem(
+  wanted: SectionItem,
+  current?: PlaylistItem,
+): { type: string; id?: string; name?: string } {
+  if (wanted.kind === 'song') return { type: 'song', id: String(wanted.song_id) }
+  return {
+    type: String(current?.type || wanted.type || 'video').toLowerCase(),
+    name: String(current?.name || wanted.name),
+  }
+}

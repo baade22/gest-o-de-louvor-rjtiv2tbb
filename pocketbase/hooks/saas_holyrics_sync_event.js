@@ -1509,9 +1509,69 @@ routerAdd(
       }
       return true
     }
+
+    // Seções da playlist do culto no Holyrics (Agent 0.0.42+): título + itens, nesta ordem.
+    // LOUVOR = músicas do repertório; cada categoria de mídia vira o seu título.
+    const buildPlaylistSections = (songIds, mediaRecs) => {
+      const titles = [
+        ['LOUVOR', null],
+        ['AVISOS', 'AVISOS'],
+        ['ANIVERSARIANTES', 'ANIVERSARIANTES'],
+        ['AGENDA', 'AGENDA'],
+        ['EVENTOS', 'EVENTOS'],
+        ['CULTOS', 'CULTOS'],
+        ['VÍDEO ESPECIAL', 'VIDEO_ESPECIAL'],
+        ['OUTROS', 'OUTROS'],
+      ]
+      const typeOf = (mt) =>
+        mt === 'IMAGEM' ? 'image' : mt === 'AUDIO' ? 'audio' : mt === 'DOCUMENTO' ? 'file' : 'video'
+      const sections = []
+      for (let t = 0; t < titles.length; t++) {
+        const title = titles[t][0]
+        const category = titles[t][1]
+        const items = []
+        if (!category) {
+          for (let i = 0; i < songIds.length; i++) {
+            if (songIds[i]) items.push({ kind: 'song', song_id: String(songIds[i]) })
+          }
+        } else {
+          for (let i = 0; i < mediaRecs.length; i++) {
+            const m = mediaRecs[i]
+            const st = m.getString('status')
+            if (st !== 'BAIXADA' && st !== 'IMPORTADA_HOLYRICS') continue
+            let cat = String(m.getString('category') || '').toUpperCase()
+            if (!cat || titles.every((x) => x[1] !== cat)) cat = 'OUTROS'
+            if (cat !== category) continue
+            const name = String(
+              m.getString('holyrics_filename') || m.getString('name') || '',
+            ).trim()
+            if (name)
+              items.push({ kind: 'media', type: typeOf(m.getString('media_type')), name: name })
+          }
+        }
+        if (items.length > 0) sections.push({ title: title, items: items })
+      }
+      return sections
+    }
+
+    let eventMediaRecs = []
+    try {
+      eventMediaRecs = $app.findRecordsByFilter(
+        'media_assets',
+        'event_id = {:eventId} && church_id = {:churchId}',
+        '+presentation_order,+created',
+        100,
+        0,
+        { eventId: eventId, churchId: churchId },
+      )
+    } catch (_) {}
+    const supportsSections = versionAtLeast(agentRecord.getString('version'), '0.0.42')
+    const playlistSections = supportsSections
+      ? buildPlaylistSections(orderedSongIds, eventMediaRecs)
+      : []
     let orderNote = ''
     let playlistOrder = { status: 'SKIPPED' }
-    if (orderedSongIds.length > 1) {
+    if (orderedSongIds.length > 1 || (supportsSections && orderedSongIds.length > 0)) {
       if (!versionAtLeast(agentRecord.getString('version'), '0.0.38')) {
         playlistOrder = { status: 'AGENT_OUTDATED' }
         orderNote =
@@ -1526,13 +1586,22 @@ routerAdd(
             month: eventMonth,
             year: eventYear,
             song_ids: orderedSongIds,
+            // Agent 0.0.42+: monta as seções (LOUVOR, AVISOS...) em vez de só ordenar
+            sections: playlistSections,
           },
-          20000,
+          45000,
         )
         const reorderResult = unwrapCommandResult(reorderRes.result) || {}
         if (reorderRes.status === 'DONE') {
           playlistOrder = { status: reorderResult.reordered ? 'REORDERED' : 'ALREADY_ORDERED' }
-          if (reorderResult.reordered) orderNote = ' Ordem da playlist ajustada ao repertório.'
+          if (reorderResult.reordered) {
+            const created = Array.isArray(reorderResult.titles_created)
+              ? reorderResult.titles_created
+              : []
+            orderNote = created.length
+              ? ' Playlist organizada por seções (' + created.join(', ') + ').'
+              : ' Ordem da playlist ajustada ao repertório.'
+          }
         } else {
           playlistOrder = { status: 'ERROR', error: reorderRes.error || reorderRes.status }
           orderNote =

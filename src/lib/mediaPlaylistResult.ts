@@ -22,12 +22,21 @@ function stripRetryNote(text: string): string {
     .trim()
 }
 
-/** Diz qual culto do Holyrics o Agent leu, para conferir se é o certo. */
+/** Diz qual culto do Holyrics o Agent leu e como ficaram as seções (títulos). */
 function scheduleNote(result: any): string {
+  let note = ''
+  const sec = result?.sections
+  if (sec && typeof sec === 'object') {
+    if (sec.error) note += ` Não consegui organizar os títulos: ${sec.error}`
+    else if (Array.isArray(sec.titles_created) && sec.titles_created.length > 0)
+      note += ` Títulos criados: ${sec.titles_created.join(', ')}.`
+    else if (sec.arranged) note += ' Playlist organizada por seções.'
+  }
   const snap = result?.playlist_after || result?.playlist_before
-  if (!snap || (!snap.name && !snap.datetime)) return ''
-  const label = [snap.name, snap.datetime].filter(Boolean).join(', ')
-  return ` (culto no Holyrics: ${label})`
+  if (snap && (snap.name || snap.datetime)) {
+    note += ` (culto no Holyrics: ${[snap.name, snap.datetime].filter(Boolean).join(', ')})`
+  }
+  return note
 }
 
 export function describeMediaSyncResult(cmd: MediaSyncCommandStatus): MediaSyncSummary {
