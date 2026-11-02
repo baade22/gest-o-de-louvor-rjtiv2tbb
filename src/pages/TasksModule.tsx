@@ -466,7 +466,7 @@ export default function TasksModule() {
                     const u = m.expand?.user_id
                     return (
                       <SelectItem key={m.id} value={m.id}>
-                        {u?.name || 'Membro'}
+                        {(m as any).display_name || u?.name || 'Membro'}
                       </SelectItem>
                     )
                   })}
