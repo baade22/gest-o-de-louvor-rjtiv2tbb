@@ -8,6 +8,11 @@ import type { AgentConfig, AgentCommand, AgentStatusInfo } from './types.js'
 import { HolyricsClient } from './holyricsClient.js'
 import { saveConfig } from './config.js'
 import {
+  desiredFromSections,
+  desiredKey,
+  planMirror,
+  playlistKey,
+  toAddItemFromDesired,
   playlistItemMatches,
   findEventSchedule,
   findItemIdsToRemove,
@@ -126,7 +131,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.44',
+          version: '0.0.45',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -272,7 +277,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.44',
+          version: '0.0.45',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -817,6 +822,246 @@ export class LouvorFlowAgent {
   }
 
   /**
+   * Remove itens da playlist do culto pela posição, do maior índice para o menor, um por
+   * vez. Depois de cada remoção lê a playlist de novo e confere que saiu exatamente o item
+   * pedido; se o Holyrics tirar outro, para na hora para não estragar mais nada.
+   */
+  private async removeIndexesSafely(
+    payload: Record<string, any>,
+    eventId: string,
+    playlist: import('./eventPlaylist.js').PlaylistItem[],
+    indexesDesc: number[],
+  ): Promise<{
+    success: boolean
+    removed: number
+    playlist: import('./eventPlaylist.js').PlaylistItem[]
+    error?: string
+    error_code?: string
+  }> {
+    let current = playlist
+    let removed = 0
+    for (const idx of indexesDesc) {
+      if (idx < 0 || idx >= current.length) continue
+      const expected = current.filter((_, i) => i !== idx).map(playlistKey)
+      const rm = await this.holyrics.removeFromMediaPlaylistIndex(idx, eventId)
+      if (!rm.success) {
+        return {
+          success: false,
+          removed,
+          playlist: current,
+          error: rm.error,
+          error_code: rm.error_code,
+        }
+      }
+      const read = await this.readEventMediaPlaylist(payload)
+      if (!read.success) {
+        return {
+          success: false,
+          removed,
+          playlist: current,
+          error: read.error,
+          error_code: read.error_code,
+        }
+      }
+      const actual = read.playlist.map(playlistKey)
+      if (actual.join('\n') !== expected.join('\n')) {
+        return {
+          success: false,
+          removed,
+          playlist: read.playlist,
+          error: `O Holyrics tirou da playlist um item diferente do pedido (posição ${idx + 1}). Parei para não mexer em mais nada; confira a playlist do culto no Holyrics.`,
+          error_code: 'REMOVE_WRONG_ITEM',
+        }
+      }
+      current = read.playlist
+      removed++
+    }
+    return { success: true, removed, playlist: current }
+  }
+
+  /**
+   * Espelho (Agent 0.0.45+): deixa a playlist do culto no Holyrics igual ao LouvorFlow.
+   * Títulos das seções, músicas na ordem do repertório e mídias na ordem de apresentação.
+   * O começo que já está certo fica; os itens do LouvorFlow fora do lugar (ou que saíram do
+   * culto) saem um por vez, conferidos; o resto entra na ordem certa. Seções e itens que só
+   * existem no Holyrics (ex.: OFERTA, versículos) não são tocados.
+   */
+  public async handleMirrorEventPlaylist(cmd: AgentCommand): Promise<{
+    success: boolean
+    result?: any
+    error?: string
+    error_code?: string
+  }> {
+    const payload = cmd.payload || {}
+    const eventId = String(payload.event_id || '').trim()
+    if (!eventId) {
+      return {
+        success: false,
+        error: 'event_id da ocorrência do culto no Holyrics ausente.',
+        error_code: 'MISSING_EVENT_ID',
+      }
+    }
+    let month = Number(payload.month)
+    let year = Number(payload.year)
+    if ((!month || !year) && typeof payload.event_date === 'string') {
+      const m = payload.event_date.match(/^(\d{4})-(\d{2})/)
+      if (m) {
+        year = parseInt(m[1], 10)
+        month = parseInt(m[2], 10)
+      }
+    }
+    const p = { ...payload, event_id: eventId, month, year }
+
+    const ping = await this.holyrics.testConnection()
+    if (!ping.connected) {
+      return {
+        success: false,
+        error: ping.error || 'Holyrics fechado ou inacessível.',
+        error_code: 'HOLYRICS_OFFLINE',
+      }
+    }
+
+    // Mídias que o Holyrics ainda não enxerga ficam de fora (e aparecem no resultado)
+    const sections = parseSections(payload.sections)
+    const items: Array<Record<string, any>> = []
+    const skipped = new Set<string>()
+    for (const sec of sections) {
+      for (const it of sec.items) {
+        if (it.kind !== 'media') continue
+        const type = (
+          ['video', 'image', 'audio', 'file'].includes(String(it.type)) ? it.type : 'video'
+        ) as 'video' | 'image' | 'audio' | 'file'
+        const check = await this.holyrics
+          .verifyMediaRecognition(type, String(it.name))
+          .catch((err: any) => ({ recognized: false, error: err?.message || String(err) }))
+        if (!check.recognized) {
+          skipped.add(desiredKey({ kind: 'media', type, name: String(it.name) }))
+          items.push({
+            name: it.name,
+            status: 'MEDIA_NOT_RECOGNIZED',
+            media_type: type,
+            error: `"${it.name}" não está no computador do Holyrics (use "Enviar ao computador" na mídia).`,
+          })
+        }
+      }
+    }
+    const usable = sections
+      .map((sec) => ({
+        ...sec,
+        items: sec.items.filter(
+          (it) =>
+            it.kind !== 'media' ||
+            !skipped.has(desiredKey({ kind: 'media', type: it.type, name: it.name })),
+        ),
+      }))
+      .filter((sec) => sec.items.length > 0)
+    const desired = desiredFromSections(usable)
+
+    const first = await this.readEventMediaPlaylist(p)
+    if (!first.success) {
+      return { success: false, error: first.error, error_code: first.error_code, result: { items } }
+    }
+    const before = first.playlist
+    const plan = planMirror(before, desired)
+    const beforeKeys = new Set(before.map(playlistKey))
+
+    const fail = (error: string, error_code: string, after: any[]) => ({
+      success: false,
+      error,
+      error_code,
+      result: {
+        items,
+        mirror: { removed: 0, added: 0, kept: plan.keep, matches: false },
+        playlist_before: { items: summarizePlaylist(before) },
+        playlist_after: { items: summarizePlaylist(after) },
+      },
+    })
+
+    const rm = await this.removeIndexesSafely(p, eventId, before, plan.removeIndexes)
+    if (!rm.success)
+      return fail(
+        rm.error || 'Falha ao tirar itens da playlist.',
+        rm.error_code || 'REMOVE_FAILED',
+        rm.playlist,
+      )
+    let current = rm.playlist
+
+    if (plan.insert.length > 0) {
+      const at = plan.keep >= current.length ? -1 : plan.keep
+      const add = await this.holyrics.addItemsToPlaylist(
+        plan.insert.map(toAddItemFromDesired),
+        eventId,
+        at,
+        false,
+      )
+      if (!add.success)
+        return fail(
+          add.error || 'Falha ao incluir na playlist.',
+          add.error_code || 'ADD_PLAYLIST_FAILED',
+          current,
+        )
+      const read = await this.readEventMediaPlaylist(p)
+      if (!read.success)
+        return fail(
+          read.error || 'Não consegui ler a playlist.',
+          read.error_code || 'READ_FAILED',
+          current,
+        )
+      current = read.playlist
+    }
+
+    const finalKeys = current.map(playlistKey)
+    const matches = finalKeys.join('\n') === plan.expectedKeys.join('\n')
+    const finalSet = new Set(finalKeys)
+    let synced = 0
+    let already = 0
+    for (const d of desired) {
+      if (d.kind !== 'media') continue
+      const key = desiredKey(d)
+      if (!finalSet.has(key)) {
+        items.push({
+          name: d.name,
+          status: 'FAILED',
+          media_type: d.type,
+          error: `"${d.name}" não apareceu na playlist do culto.`,
+        })
+      } else if (beforeKeys.has(key)) {
+        already++
+        items.push({ name: d.name, status: 'ALREADY_PRESENT', media_type: d.type })
+      } else {
+        synced++
+        items.push({ name: d.name, status: 'ADDED', media_type: d.type })
+      }
+    }
+    const result = {
+      synced_count: synced,
+      already_present_count: already,
+      failed_count: items.filter((i) => i.status !== 'ADDED' && i.status !== 'ALREADY_PRESENT')
+        .length,
+      items,
+      mirror: {
+        removed: rm.removed,
+        added: plan.insert.length,
+        kept: plan.keep,
+        songs: desired.filter((d) => d.kind === 'song').length,
+        matches,
+      },
+      playlist_before: { items: summarizePlaylist(before) },
+      playlist_after: { items: summarizePlaylist(current) },
+    }
+    if (!matches) {
+      return {
+        success: false,
+        error:
+          'A playlist do culto no Holyrics não ficou igual ao LouvorFlow. Confira no Holyrics e envie de novo.',
+        error_code: 'MIRROR_MISMATCH',
+        result,
+      }
+    }
+    return { success: true, result }
+  }
+
+  /**
    * REMOVE_FROM_EVENT_PLAYLIST: tira da playlist do culto as músicas (song_ids) e as
    * mídias (media: [{ media_type, file_name }]) que saíram do LouvorFlow. Com
    * delete_files: true, apaga também os arquivos que o Agent gravou na biblioteca.
@@ -846,15 +1091,27 @@ export class LouvorFlowAgent {
         playlistError = read.error || ''
         playlistErrorCode = read.error_code || ''
       } else {
+        // Remove pela posição, um por vez, conferindo (remover pelo id apagou itens errados)
         removedIds = findItemIdsToRemove(read.playlist, songIds, mediaNames)
-        const removeRes = await this.holyrics.removeFromMediaPlaylist(
-          removedIds,
+        const songSet = new Set(songIds)
+        const nameSet = new Set(mediaNames.map((n) => playlistKey({ type: 'video', name: n })))
+        const indexes: number[] = []
+        read.playlist.forEach((it, i) => {
+          const key = playlistKey(it)
+          const sid = key.startsWith('song:') ? key.slice(5) : ''
+          if ((sid && songSet.has(sid)) || nameSet.has(key)) indexes.push(i)
+        })
+        indexes.sort((a, b) => b - a)
+        const removeRes = await this.removeIndexesSafely(
+          payload,
           String(payload.event_id),
+          read.playlist,
+          indexes,
         )
+        removedIds = removedIds.slice(0, removeRes.removed)
         if (!removeRes.success) {
           playlistError = removeRes.error || ''
           playlistErrorCode = removeRes.error_code || 'REMOVE_FROM_PLAYLIST_FAILED'
-          removedIds = []
         }
       }
     }
@@ -1173,6 +1430,8 @@ export class LouvorFlowAgent {
     error_code?: string
   }> {
     const payload = cmd.payload || {}
+    // Agent 0.0.45+: "Enviar ao Holyrics" manda o culto inteiro e a playlist fica igual ao LouvorFlow
+    if (payload.mirror === true) return this.handleMirrorEventPlaylist(cmd)
     const eventId = String(payload.event_id || '').trim()
     const itemsRaw = Array.isArray(payload.items) ? payload.items : []
 

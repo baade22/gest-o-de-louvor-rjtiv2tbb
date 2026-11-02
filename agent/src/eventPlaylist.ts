@@ -305,3 +305,133 @@ export function missingTitleIndex(
   }
   return titleInsertIndex(playlist, sections, sectionIndex)
 }
+
+// ---------------------------------------------------------------------------------------
+// Espelho (Agent 0.0.45+): deixa a playlist do culto igual ao LouvorFlow.
+//
+// O LouvorFlow cuida dos títulos das suas seções (LOUVOR, AVISOS...) e das músicas e
+// mídias que ficam nessas seções (ou antes de qualquer título). Tudo o resto é do
+// Holyrics e fica intacto: seções com outro título (ex.: OFERTA) com tudo o que estiver
+// embaixo delas, e itens de outro tipo (versículo, texto, anúncio...).
+// ---------------------------------------------------------------------------------------
+
+export const LOUVORFLOW_SECTION_TITLES = [
+  'LOUVOR',
+  'AVISOS',
+  'ANIVERSARIANTES',
+  'AGENDA',
+  'EVENTOS',
+  'CULTOS',
+  'VÍDEO ESPECIAL',
+  'OUTROS',
+]
+
+const MEDIA_TYPES = new Set(['video', 'image', 'audio', 'file', 'automatic_presentation'])
+
+export type DesiredItem =
+  | { kind: 'title'; name: string }
+  | { kind: 'song'; song_id: string }
+  | { kind: 'media'; type: string; name: string }
+
+/** Lista final do LouvorFlow: título de cada seção seguido dos seus itens. */
+export function desiredFromSections(sections: PlaylistSection[]): DesiredItem[] {
+  const out: DesiredItem[] = []
+  for (const s of sections) {
+    out.push({ kind: 'title', name: s.title })
+    for (const it of s.items) {
+      if (it.kind === 'song') out.push({ kind: 'song', song_id: String(it.song_id) })
+      else out.push({ kind: 'media', type: String(it.type || 'video'), name: String(it.name) })
+    }
+  }
+  return out
+}
+
+/** O item da playlist é este item desejado? */
+export function desiredMatches(item: PlaylistItem, wanted: DesiredItem): boolean {
+  if (wanted.kind === 'title') {
+    return isTitleItem(item) && normalizeTitle(item.name || '') === normalizeTitle(wanted.name)
+  }
+  return playlistItemMatches(item, wanted)
+}
+
+/** Quais itens da playlist atual pertencem ao LouvorFlow (os outros nunca são mexidos). */
+export function managedFlags(playlist: PlaylistItem[], knownTitles: string[]): boolean[] {
+  const isKnownTitle = (name: string) => knownTitles.some((t) => titleMatches(name, t))
+  let blockKnown = true
+  return playlist.map((it) => {
+    if (isTitleItem(it)) {
+      blockKnown = isKnownTitle(it.name || '')
+      return blockKnown
+    }
+    const type = String(it.type || '').toLowerCase()
+    const songOrMedia = type === 'song' || MEDIA_TYPES.has(type)
+    return blockKnown && songOrMedia
+  })
+}
+
+export function toAddItemFromDesired(d: DesiredItem): { type: string; id?: string; name?: string } {
+  if (d.kind === 'title') return { type: 'title', name: d.name }
+  if (d.kind === 'song') return { type: 'song', id: d.song_id }
+  return { type: d.type, name: d.name }
+}
+
+export interface MirrorPlan {
+  /** Itens do começo que já estão certos. */
+  keep: number
+  /** Posições (na playlist atual) a remover, da maior para a menor. */
+  removeIndexes: number[]
+  /** Itens a inserir na posição `keep`, nesta ordem. */
+  insert: DesiredItem[]
+  /** Chaves da playlist esperada no fim (para conferir). */
+  expectedKeys: string[]
+}
+
+/** Chave curta de um item para comparar playlists. */
+export function playlistKey(item: PlaylistItem): string {
+  if (isTitleItem(item)) return `#${normalizeTitle(item.name || '')}`
+  const sid = itemSongId(item)
+  if (sid) return `song:${sid}`
+  const type = String(item.type || '').toLowerCase()
+  if (MEDIA_TYPES.has(type)) return `media:${mediaBaseName(item.name || '')}`
+  return `${type}:${String(item.id || item.name || '')}`
+}
+
+export function desiredKey(d: DesiredItem): string {
+  if (d.kind === 'title') return `#${normalizeTitle(d.name)}`
+  if (d.kind === 'song') return `song:${String(d.song_id).trim()}`
+  return `media:${mediaBaseName(d.name)}`
+}
+
+/**
+ * Plano para a playlist ficar igual ao LouvorFlow: mantém o começo que já está certo,
+ * tira os itens do LouvorFlow que estão fora do lugar (ou que saíram do culto) e insere o
+ * resto na ordem certa. Itens do Holyrics que não são do LouvorFlow ficam depois.
+ */
+export function planMirror(
+  playlist: PlaylistItem[],
+  desired: DesiredItem[],
+  knownTitles: string[] = LOUVORFLOW_SECTION_TITLES,
+): MirrorPlan {
+  const managed = managedFlags(playlist, knownTitles)
+  let keep = 0
+  while (
+    keep < playlist.length &&
+    keep < desired.length &&
+    managed[keep] &&
+    desiredMatches(playlist[keep], desired[keep])
+  ) {
+    keep++
+  }
+  const removeIndexes: number[] = []
+  for (let i = playlist.length - 1; i >= keep; i--) {
+    if (managed[i]) removeIndexes.push(i)
+  }
+  const insert = desired.slice(keep)
+  const foreignAfter = playlist.filter((_, i) => i >= keep && !managed[i])
+  const expectedKeys = [
+    ...playlist.slice(0, keep).map(playlistKey),
+    ...insert.map(desiredKey),
+    ...foreignAfter.map(playlistKey),
+  ]
+  return { keep, removeIndexes, insert, expectedKeys }
+}

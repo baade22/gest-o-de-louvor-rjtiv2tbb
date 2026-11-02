@@ -39,8 +39,36 @@ function scheduleNote(result: any): string {
   return note
 }
 
+/** Agent 0.0.45+: a playlist do culto inteira foi deixada igual ao LouvorFlow. */
+function describeMirror(cmd: MediaSyncCommandStatus, result: any): MediaSyncSummary {
+  const m = result.mirror || {}
+  const items: any[] = Array.isArray(result.items) ? result.items : []
+  const problems = items.filter((it) => ITEM_PROBLEMS.has(String(it?.status || '')))
+  if (cmd.status === 'FAILED') {
+    return {
+      ok: false,
+      title: 'A playlist do Holyrics não ficou igual ao LouvorFlow',
+      description: stripRetryNote(cmd.error || '') || 'Falha sem detalhes do Agent.',
+    }
+  }
+  const changed = Number(m.removed) > 0 || Number(m.added) > 0
+  const base = changed
+    ? 'Playlist do culto no Holyrics igual ao LouvorFlow (músicas, mídias e títulos).'
+    : 'A playlist do culto no Holyrics já estava igual ao LouvorFlow.'
+  if (problems.length > 0) {
+    const first = problems[0]
+    return {
+      ok: false,
+      title: 'Playlist montada, faltou mídia',
+      description: `${base} ${problems.length} mídia(s) ficaram de fora: ${stripRetryNote(first.error || '') || first.name}`,
+    }
+  }
+  return { ok: true, title: 'Culto sincronizado com o Holyrics', description: base }
+}
+
 export function describeMediaSyncResult(cmd: MediaSyncCommandStatus): MediaSyncSummary {
   const result = cmd.result && typeof cmd.result === 'object' ? cmd.result : {}
+  if (result.mirror) return describeMirror(cmd, result)
   const items: any[] = Array.isArray(result.items) ? result.items : []
   const added = Number(result.synced_count) || 0
   const already = Number(result.already_present_count) || 0

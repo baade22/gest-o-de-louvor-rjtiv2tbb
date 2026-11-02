@@ -42,6 +42,11 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
       }
       return { success: true }
     })
+  // Agent 0.0.45+: remove pela posição
+  vi.spyOn(holyrics, 'removeFromMediaPlaylistIndex').mockImplementation(async (index: any) => {
+    playlist.splice(index, 1)
+    return { success: true }
+  })
   const addSpy = vi
     .spyOn(holyrics, 'addToPlaylist')
     .mockImplementation(async (songId: any, opts: any) => {

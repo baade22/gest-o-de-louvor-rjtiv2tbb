@@ -215,6 +215,97 @@ routerAdd(
       })
     }
 
+    // Agent 0.0.45+: "Enviar ao Holyrics" deixa a playlist do culto igual ao LouvorFlow
+    // (títulos, músicas na ordem do repertório e mídias), num comando só que o Agent executa
+    // em seguida. O site acompanha o comando e mostra o resultado.
+    const mirrorVersionParts = String(agentRecord.getString('version') || '0')
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0)
+    const supportsMirror =
+      mirrorVersionParts[0] > 0 || mirrorVersionParts[1] > 0 || (mirrorVersionParts[2] || 0) >= 45
+
+    const enqueuePlaylistMirror = (songIdsInOrder) => {
+      const dm = String(eventRecord.getString('date') || '').match(/^(\d{4})-(\d{2})/)
+      if (!dm) return { status: 'INVALID_EVENT_DATE' }
+      const sectionTitles = [
+        ['LOUVOR', null],
+        ['AVISOS', 'AVISOS'],
+        ['ANIVERSARIANTES', 'ANIVERSARIANTES'],
+        ['AGENDA', 'AGENDA'],
+        ['EVENTOS', 'EVENTOS'],
+        ['CULTOS', 'CULTOS'],
+        ['VÍDEO ESPECIAL', 'VIDEO_ESPECIAL'],
+        ['OUTROS', 'OUTROS'],
+      ]
+      const typeOf = (mt) =>
+        mt === 'IMAGEM' ? 'image' : mt === 'AUDIO' ? 'audio' : mt === 'DOCUMENTO' ? 'file' : 'video'
+      let medias = []
+      try {
+        medias = $app.findRecordsByFilter(
+          'media_assets',
+          'event_id = {:eventId} && church_id = {:churchId}',
+          '+presentation_order,+created',
+          100,
+          0,
+          { eventId: eventId, churchId: churchId },
+        )
+      } catch (_) {}
+      const sections = []
+      let pendingMedia = 0
+      for (let t = 0; t < sectionTitles.length; t++) {
+        const category = sectionTitles[t][1]
+        const items = []
+        if (!category) {
+          for (let i = 0; i < songIdsInOrder.length; i++) {
+            if (songIdsInOrder[i]) items.push({ kind: 'song', song_id: String(songIdsInOrder[i]) })
+          }
+        } else {
+          for (let i = 0; i < medias.length; i++) {
+            const m = medias[i]
+            let cat = String(m.getString('category') || '').toUpperCase()
+            if (!cat || sectionTitles.every((x) => x[1] !== cat)) cat = 'OUTROS'
+            if (cat !== category) continue
+            const st = m.getString('status')
+            if (st !== 'BAIXADA' && st !== 'IMPORTADA_HOLYRICS') {
+              pendingMedia++
+              continue
+            }
+            const name = String(m.getString('holyrics_filename') || m.getString('name') || '')
+              .trim()
+              .replace(/(\.[a-zA-Z0-9]+)\1+$/, '$1')
+            if (name)
+              items.push({ kind: 'media', type: typeOf(m.getString('media_type')), name: name })
+          }
+        }
+        if (items.length > 0) sections.push({ title: sectionTitles[t][0], items: items })
+      }
+      const commandId = 'cmd_sync_media_' + Date.now() + '_' + $security.randomString(8)
+      const rec = new Record($app.findCollectionByNameOrId('holyrics_commands'))
+      rec.set('command_id', commandId)
+      rec.set('church_id', churchId)
+      rec.set('agent_id', agentRecord.id)
+      rec.set('action', 'SYNC_MEDIA_PLAYLIST')
+      rec.set('status', 'PENDING')
+      rec.set('created_at', new Date().toISOString().replace('T', ' ').substring(0, 19))
+      rec.set('payload', {
+        event_id: holyricsEventId,
+        church_id: churchId,
+        event_title: eventRecord.getString('title'),
+        event_date: eventRecord.getString('date') || '',
+        month: Number(dm[2]),
+        year: Number(dm[1]),
+        mirror: true,
+        items: [],
+        sections: sections,
+      })
+      try {
+        $app.save(rec)
+      } catch (err) {
+        return { status: 'ERROR', error: String(err && err.message ? err.message : err) }
+      }
+      return { status: 'QUEUED', command_id: commandId, pending_media: pendingMedia }
+    }
+
     // 4. Busca músicas do evento na ordem exata (order ASC)
     let eventSongRecords = []
     try {
@@ -230,6 +321,28 @@ routerAdd(
       return e.json(500, {
         success: false,
         message: 'Erro ao carregar repertório do evento: ' + err.message,
+      })
+    }
+
+    if (eventSongRecords.length === 0 && supportsMirror) {
+      // Sem músicas: ainda assim a playlist fica igual ao LouvorFlow (mídias e títulos)
+      const playlistSync = enqueuePlaylistMirror([])
+      return e.json(200, {
+        success: playlistSync.status === 'QUEUED',
+        items: [],
+        summary: {
+          total: 0,
+          created: 0,
+          already_existed: 0,
+          added: 0,
+          already_in_playlist: 0,
+          errors: 0,
+        },
+        playlist_sync: playlistSync,
+        message:
+          playlistSync.status === 'QUEUED'
+            ? 'Repertório vazio. Montando a playlist do culto com as mídias.'
+            : 'Não foi possível montar a playlist do culto.',
       })
     }
 
@@ -1585,7 +1698,12 @@ routerAdd(
       : []
     let orderNote = ''
     let playlistOrder = { status: 'SKIPPED' }
-    if (orderedSongIds.length > 1 || (supportsSections && orderedSongIds.length > 0)) {
+    let playlistSync = null
+    if (supportsMirror) {
+      // Agent 0.0.45+: a playlist inteira fica igual ao LouvorFlow (substitui o REORDER)
+      playlistSync = enqueuePlaylistMirror(orderedSongIds)
+      playlistOrder = { status: playlistSync.status === 'QUEUED' ? 'MIRROR_QUEUED' : 'ERROR' }
+    } else if (orderedSongIds.length > 1 || (supportsSections && orderedSongIds.length > 0)) {
       if (!versionAtLeast(agentRecord.getString('version'), '0.0.38')) {
         playlistOrder = { status: 'AGENT_OUTDATED' }
         orderNote =
@@ -1662,6 +1780,7 @@ routerAdd(
         errors: countErrors,
       },
       playlist_order: playlistOrder,
+      playlist_sync: playlistSync || undefined,
       message: summaryMessage + orderNote,
     })
   },

@@ -6,9 +6,11 @@ import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { computeEventReadiness } from '@/lib/eventReadiness'
+import { describeMediaSyncResult } from '@/lib/mediaPlaylistResult'
 import {
   resolveHolyricsEvent,
   syncEventRepertoireWithHolyrics,
+  waitHolyricsCommand,
   type ResolveHolyricsEventResponse,
 } from '@/services/holyricsAgent'
 import type { TeamArea } from '@/types'
@@ -161,6 +163,32 @@ export default function EventScaleDetail() {
         })
       }
       await center.reload()
+
+      // Agent 0.0.45+: em seguida a playlist do culto fica igual ao LouvorFlow
+      const commandId = res.playlist_sync?.command_id
+      if (commandId) {
+        const pending = res.playlist_sync?.pending_media || 0
+        const pendingNote = pending
+          ? ` ${pending} mídia(s) ainda não estão no computador do Holyrics e ficaram de fora.`
+          : ''
+        const done = await waitHolyricsCommand(commandId)
+        if (!done) {
+          toast({
+            title: 'O Holyrics ainda não respondeu',
+            description:
+              'A playlist do culto será montada assim que o LouvorFlow Agent e o Holyrics responderem.',
+            variant: 'destructive',
+          })
+        } else {
+          const summary = describeMediaSyncResult(done)
+          toast({
+            title: summary.title,
+            description: summary.description + pendingNote,
+            variant: summary.ok ? 'default' : 'destructive',
+          })
+        }
+        await center.reload()
+      }
     } catch (err: any) {
       toast({
         title: 'Erro ao enviar ao Holyrics',
