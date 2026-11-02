@@ -197,6 +197,66 @@ describe('Agent: títulos de seção sem remover nada', () => {
     expect(remove).not.toHaveBeenCalled()
   })
 
+  it('Montar playlist de novo: não reenvia o que já está e só põe a mídia nova', async () => {
+    fs.writeFileSync(path.join(tmp, 'video', 'av.mp4'), 'x')
+    fs.writeFileSync(path.join(tmp, 'video', 'av2.mp4'), 'x')
+    fs.writeFileSync(path.join(tmp, 'video', 'aniv.mp4'), 'x')
+    const { playlist, addSpy } = fakeHolyrics(agent, [
+      title('t1', 'LOUVOR'),
+      song('s1', '1'),
+      song('s2', '2'),
+      title('t2', 'AVISOS'),
+      video('v1', 'av.mp4'),
+      title('t3', 'ANIVERSARIANTES'),
+      video('v2', 'aniv.mp4'),
+    ])
+    const avisos2 = {
+      title: 'AVISOS',
+      items: [...avisos.items, { kind: 'media', type: 'video', name: 'av2.mp4' }],
+    }
+    const res = await agent.handleSyncMediaPlaylist(
+      syncMedia(
+        [songsSection, avisos2, aniv],
+        [media('av.mp4'), media('av2.mp4'), media('aniv.mp4')],
+      ),
+    )
+    expect(res.success).toBe(true)
+    const sent = addSpy.mock.calls.flatMap((c: any[]) => (c[0] as any[]).map((it) => it.name))
+    expect(sent).toEqual(['av2.mp4'])
+    expect(view(playlist)).toEqual([
+      '# LOUVOR',
+      'song 1',
+      'song 2',
+      '# AVISOS',
+      'av.mp4',
+      'av2.mp4',
+      '# ANIVERSARIANTES',
+      'aniv.mp4',
+    ])
+  })
+
+  it('Enviar ao Holyrics de novo: música que já está no culto não é reenviada', async () => {
+    fakeHolyrics(agent, [title('t1', 'LOUVOR'), song('s1', '1')])
+    const h = (agent as any).holyrics
+    const addSong = vi.spyOn(h, 'addToPlaylist').mockResolvedValue({ success: true })
+    vi.spyOn(agent as any, 'reportCommandResult').mockResolvedValue(undefined)
+    await (agent as any).executeCommand({
+      id: 'a',
+      command_id: 'ca',
+      action: 'ADD_TO_PLAYLIST',
+      payload: {
+        holyrics_song_id: '1',
+        event_id: EVENT_ID,
+        month: 11,
+        year: 2026,
+        section_title: 'LOUVOR',
+        section_order: ['LOUVOR', 'AVISOS'],
+      },
+      created_at: '2026-11-02 01:00:00',
+    })
+    expect(addSong).not.toHaveBeenCalled()
+  })
+
   it('sem "sections" continua no comportamento antigo (servidor antigo)', async () => {
     const spy = vi.spyOn(agent as any, 'arrangeEventPlaylist')
     vi.spyOn((agent as any).holyrics, 'getSchedules').mockResolvedValue({
