@@ -346,7 +346,7 @@ export default function FinanceClosing() {
       </div>
 
       {month && isClosedMonth && (
-        <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className={cardClass}>
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-4">
               <h3 className="font-semibold text-slate-900">{monthLabel(month)}</h3>
@@ -379,7 +379,7 @@ export default function FinanceClosing() {
       )}
 
       {month && !isClosedMonth && (
-        <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className={cardClass}>
             <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4">
               <h3 className="font-semibold text-slate-900">Conferência de {monthName(month)}</h3>

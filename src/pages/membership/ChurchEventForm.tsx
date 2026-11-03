@@ -553,7 +553,7 @@ export default function ChurchEventForm() {
             maxLength={160}
           />
         </Field>
-        <div className="grid sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <Field id="ev-start" label="Data" required>
             <Input
               id="ev-start"
@@ -591,7 +591,7 @@ export default function ChurchEventForm() {
             />
           </Field>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field id="ev-cong" label="Congregação">
             <Select value={form.congregation} onValueChange={(v) => set('congregation', v)}>
               <SelectTrigger id="ev-cong" className={inputClass}>
@@ -678,7 +678,7 @@ export default function ChurchEventForm() {
             Buscar
           </Button>
         </div>
-        <div className="grid sm:grid-cols-[1fr_7rem] gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_7rem] gap-4">
           <Field id="ev-street" label="Endereço">
             <Input
               id="ev-street"
@@ -698,7 +698,7 @@ export default function ChurchEventForm() {
             />
           </Field>
         </div>
-        <div className="grid sm:grid-cols-[1fr_1fr_1fr_5rem] gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_5rem] gap-4">
           <Field id="ev-compl" label="Complemento">
             <Input
               id="ev-compl"
@@ -755,7 +755,7 @@ export default function ChurchEventForm() {
             minHeight="min-h-48"
           />
         </Field>
-        <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
           <CoverPicker
             field="cover"
             title="Capa para celular"
@@ -835,7 +835,7 @@ export default function ChurchEventForm() {
       </Section>
 
       <Section icon={Wallet} title="Inscrição e pagamento">
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field
             id="ev-price"
             label={form.couple_only ? 'Valor por casal (R$)' : 'Valor por pessoa (R$)'}
@@ -1022,7 +1022,7 @@ export default function ChurchEventForm() {
         )}
         {form.questions.map((q, i) => (
           <div key={q.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
-            <div className="grid sm:grid-cols-[1fr_12rem_auto] gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_12rem_auto] gap-2">
               <Input
                 aria-label="Pergunta"
                 value={q.label}

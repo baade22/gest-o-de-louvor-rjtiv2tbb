@@ -122,7 +122,7 @@ export default function Groups() {
       )}
 
       {isLoading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-36 rounded-2xl" />
           ))}
@@ -149,7 +149,7 @@ export default function Groups() {
         </div>
       ) : (
         <>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {shown.map((g) => {
               const leader = g.leader_id ? peopleById.get(g.leader_id) : undefined
               const memberIds = new Set(

@@ -362,7 +362,7 @@ function RegistryTab({
   return (
     <div className={cardClass}>
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
-        <p className="min-w-0 flex-1 text-sm text-slate-500">{config.empty}</p>
+        <p className="min-w-[12rem] flex-1 text-sm text-slate-500">{config.empty}</p>
         {archivedCount > 0 && (
           <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
             <Switch checked={showArchived} onCheckedChange={setShowArchived} />
@@ -631,7 +631,7 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
       <p className="text-sm text-slate-600">
         Saem no informe anual de contribuições e nos recibos que cada membro recebe.
       </p>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {SETTINGS_FIELDS.map((f) => (
           <div key={f.key} className={cn('space-y-1.5', f.key === 'legal_name' && 'sm:col-span-2')}>
             <Label htmlFor={`fs-${f.key}`} className="text-xs font-semibold text-slate-600">
@@ -671,7 +671,7 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
             direto na conta da chave; a tesouraria confere pelo extrato.
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[180px_1fr]">
           <div className="space-y-1.5">
             <Label htmlFor="fs-pix-type" className="text-xs font-semibold text-slate-600">
               Tipo de chave
@@ -741,7 +741,7 @@ function ChurchDataTab({ churchId, canEdit }: { churchId: string; canEdit: boole
         {savedPix && (
           <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 p-3">
             <PixQr payload={savedPix} className="h-24 w-24 rounded" />
-            <div className="min-w-0 flex-1 text-sm text-slate-600">
+            <div className="min-w-[12rem] flex-1 text-sm text-slate-600">
               <p className="font-medium text-slate-900">QR da chave salva</p>
               <p>Teste no aplicativo do banco antes de imprimir: deve aparecer o nome da igreja.</p>
             </div>

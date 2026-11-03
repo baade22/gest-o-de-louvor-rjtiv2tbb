@@ -249,7 +249,7 @@ export default function FinanceAudit() {
 
       {loading || !month ? (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-28 rounded-xl" />
             ))}
@@ -258,7 +258,7 @@ export default function FinanceAudit() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className={cn(cardClass, 'p-4')}>
               <p className="text-sm text-slate-500">Lançamentos do mês</p>
               <p className="mt-1 text-3xl font-bold text-slate-900">{total}</p>
@@ -299,7 +299,7 @@ export default function FinanceAudit() {
             </div>
           </div>
 
-          <div className="grid items-start gap-5 lg:grid-cols-[1fr_360px]">
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_360px]">
             <section className={cn(cardClass, 'min-w-0 overflow-hidden')}>
               <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="font-semibold text-slate-900">Lançamentos</h2>
@@ -338,10 +338,10 @@ export default function FinanceAudit() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
+                  <table className="w-full text-sm sm:min-w-[640px]">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                        <th className="w-10 px-4 py-2.5">
+                        <th className="w-10 py-2.5 pl-3 pr-1 sm:px-4">
                           {canAudit && (
                             <Checkbox
                               aria-label="Selecionar todos"
@@ -353,10 +353,10 @@ export default function FinanceAudit() {
                             />
                           )}
                         </th>
-                        <th className="px-2 py-2.5 font-medium">Data</th>
+                        <th className="hidden px-2 py-2.5 font-medium sm:table-cell">Data</th>
                         <th className="px-2 py-2.5 font-medium">Descrição</th>
                         <th className="px-2 py-2.5 text-right font-medium">Valor</th>
-                        <th className="px-4 py-2.5 font-medium">Situação</th>
+                        <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Situação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -366,6 +366,18 @@ export default function FinanceAudit() {
                         const canPick = canAudit && s !== 'APROVADO' && !own
                         const voided = tx.status === 'ESTORNADO'
                         const audit = auditByTx.get(tx.id)
+                        const badge = (
+                          <span
+                            className={cn(
+                              'whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium',
+                              SITUATION[s].className,
+                            )}
+                          >
+                            {s === 'APROVADO' && audit?.approved_by_name
+                              ? `Aprovado por ${audit.approved_by_name.split(' ')[0]}`
+                              : SITUATION[s].label}
+                          </span>
+                        )
                         return (
                           <tr
                             key={tx.id}
@@ -382,7 +394,10 @@ export default function FinanceAudit() {
                                   : 'hover:bg-slate-50',
                             )}
                           >
-                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <td
+                              className="py-3 pl-3 pr-1 align-top sm:px-4 sm:align-middle"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {canAudit && (
                                 <Checkbox
                                   aria-label={`Selecionar ${txTitle(tx)}`}
@@ -397,7 +412,7 @@ export default function FinanceAudit() {
                                 />
                               )}
                             </td>
-                            <td className="whitespace-nowrap px-2 py-3 tabular-nums text-slate-600">
+                            <td className="hidden whitespace-nowrap px-2 py-3 tabular-nums text-slate-600 sm:table-cell">
                               {shortDate(tx.date)}
                             </td>
                             <td className="px-2 py-3">
@@ -425,10 +440,15 @@ export default function FinanceAudit() {
                                   <Paperclip className="ml-1 inline h-3 w-3 text-slate-400" />
                                 )}
                               </p>
+                              {/* No celular: data e situação embaixo da descrição */}
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs tabular-nums text-slate-500 sm:hidden">
+                                {shortDate(tx.date)}
+                                {badge}
+                              </div>
                             </td>
                             <td
                               className={cn(
-                                'whitespace-nowrap px-2 py-3 text-right font-semibold tabular-nums',
+                                'whitespace-nowrap py-3 pl-2 pr-3 text-right align-top font-semibold tabular-nums sm:px-2 sm:align-middle',
                                 tx.type === 'ENTRADA'
                                   ? 'text-emerald-700'
                                   : tx.type === 'SAIDA'
@@ -438,18 +458,7 @@ export default function FinanceAudit() {
                             >
                               {formatCents(tx.amount_cents)}
                             </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={cn(
-                                  'whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium',
-                                  SITUATION[s].className,
-                                )}
-                              >
-                                {s === 'APROVADO' && audit?.approved_by_name
-                                  ? `Aprovado por ${audit.approved_by_name.split(' ')[0]}`
-                                  : SITUATION[s].label}
-                              </span>
-                            </td>
+                            <td className="hidden px-4 py-3 sm:table-cell">{badge}</td>
                           </tr>
                         )
                       })}

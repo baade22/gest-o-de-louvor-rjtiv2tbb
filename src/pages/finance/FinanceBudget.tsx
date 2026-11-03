@@ -104,20 +104,28 @@ function BudgetTable({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className={cn('w-full text-sm', !planningOnly && 'min-w-[680px]')}>
+          <table className={cn('w-full text-[13px] sm:text-sm', !planningOnly && 'sm:min-w-[680px]')}>
             <thead>
               <tr className="border-y border-slate-100 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-2 font-semibold">Categoria</th>
-                <th className={cn('px-4 py-2 text-right font-semibold', planningOnly && 'w-48')}>
-                  Previsto no ano
+                <th className="px-3 py-2 font-semibold sm:px-4">Categoria</th>
+                <th
+                  className={cn(
+                    'px-2 py-2 text-right font-semibold sm:px-4',
+                    planningOnly && 'sm:w-48',
+                  )}
+                >
+                  Previsto<span className="hidden sm:inline"> no ano</span>
                 </th>
                 {planningOnly ? (
-                  <th className="w-36 px-4 py-2 text-right font-semibold">Parte do total</th>
+                  <th className="px-3 py-2 text-right font-semibold sm:w-36 sm:px-4">
+                    <span className="sm:hidden">%</span>
+                    <span className="hidden sm:inline">Parte do total</span>
+                  </th>
                 ) : (
                   <>
-                    <th className="px-4 py-2 text-right font-semibold">Realizado</th>
-                    <th className="px-4 py-2 font-semibold">Consumo</th>
-                    <th className="px-4 py-2" />
+                    <th className="px-2 py-2 text-right font-semibold sm:px-4">Realizado</th>
+                    <th className="hidden px-4 py-2 font-semibold sm:table-cell">Consumo</th>
+                    <th className="hidden px-4 py-2 sm:table-cell" />
                   </>
                 )}
               </tr>
@@ -125,6 +133,23 @@ function BudgetTable({
             <tbody>
               {rows.map((r) => {
                 const used = r.planned ? Math.min(1, r.realized / r.planned) : r.realized ? 1 : 0
+                const bar = (
+                  <div className="relative h-2 w-full rounded-full bg-slate-100 sm:w-40">
+                    <div
+                      className={cn(
+                        'h-full rounded-full',
+                        bad(r) || r.status === 'SEM_PREVISAO' ? 'bg-red-500' : 'bg-teal-600',
+                      )}
+                      style={{ width: `${used * 100}%` }}
+                    />
+                    {fraction > 0 && fraction < 1 && (
+                      <span
+                        className="absolute -top-1 h-4 w-0.5 bg-slate-900"
+                        style={{ left: `${fraction * 100}%` }}
+                      />
+                    )}
+                  </div>
+                )
                 if (planningOnly)
                   return (
                     <tr key={r.categoryId} className="border-b border-slate-100">
@@ -142,31 +167,22 @@ function BudgetTable({
                     key={r.categoryId}
                     className={cn('border-b border-slate-100', bad(r) && 'bg-red-50/40')}
                   >
-                    <td className="px-4 py-2.5 font-medium text-slate-900">{r.name}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      {r.planned ? formatCents(r.planned) : '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      {formatCents(r.realized)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="relative h-2 w-40 rounded-full bg-slate-100">
-                        <div
-                          className={cn(
-                            'h-full rounded-full',
-                            bad(r) || r.status === 'SEM_PREVISAO' ? 'bg-red-500' : 'bg-teal-600',
-                          )}
-                          style={{ width: `${used * 100}%` }}
-                        />
-                        {fraction > 0 && fraction < 1 && (
-                          <span
-                            className="absolute -top-1 h-4 w-0.5 bg-slate-900"
-                            style={{ left: `${fraction * 100}%` }}
-                          />
-                        )}
+                    <td className="px-3 py-2.5 font-medium text-slate-900 [overflow-wrap:anywhere] sm:px-4">
+                      {r.name}
+                      {/* No celular: barra de consumo e situação embaixo do nome */}
+                      <div className="mt-1.5 space-y-1.5 sm:hidden">
+                        {bar}
+                        <StatusBadge row={r} direction={direction} />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right align-top tabular-nums sm:px-4 sm:align-middle">
+                      {r.planned ? formatCents(r.planned) : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right align-top tabular-nums sm:px-4 sm:align-middle">
+                      {formatCents(r.realized)}
+                    </td>
+                    <td className="hidden px-4 py-2.5 sm:table-cell">{bar}</td>
+                    <td className="hidden px-4 py-2.5 text-right sm:table-cell">
                       <StatusBadge row={r} direction={direction} />
                     </td>
                   </tr>
@@ -540,7 +556,7 @@ export default function FinanceBudget() {
 
       {loading ? (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-28" />
             ))}
@@ -568,7 +584,7 @@ export default function FinanceBudget() {
       ) : (
         <>
           {future ? (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className={cn(cardClass, 'p-4')}>
                 <p className="text-sm text-slate-500">Entradas planejadas no ano</p>
                 <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
@@ -601,7 +617,7 @@ export default function FinanceBudget() {
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div className={cn(cardClass, 'p-4')}>
                 <p className="text-sm text-slate-500">Entradas planejadas {until}</p>
                 <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">

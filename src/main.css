@@ -116,6 +116,8 @@
   }
   body {
     -webkit-tap-highlight-color: transparent;
+    /* e-mails, links e nomes enormes quebram em vez de empurrar a tela para o lado */
+    overflow-wrap: break-word;
   }
 
   /* Campos de data, hora e mês: no iPhone o Safari desenha o campo nativo, que ignora a

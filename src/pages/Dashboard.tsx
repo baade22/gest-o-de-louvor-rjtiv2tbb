@@ -411,7 +411,7 @@ export default function Dashboard() {
       {isLoading ? (
         <Skeleton className="h-48 w-full rounded-xl" />
       ) : next ? (
-        <div className="grid overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs md:grid-cols-[1fr_280px]">
+        <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs md:grid-cols-[1fr_280px]">
           <div className="p-5 sm:p-6">
             <div className="text-xs font-bold uppercase tracking-wider text-teal-700">
               Próximo culto
@@ -556,7 +556,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[1.3fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.3fr_1fr]">
         {/* Próximos cultos */}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
@@ -668,7 +668,7 @@ export default function Dashboard() {
                 return (
                   <li key={scale.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                     {ev && <MiniDate date={ev.date} />}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-[10rem] flex-1">
                       <div className="truncate font-semibold text-slate-900">
                         {ev?.title || 'Culto'}
                       </div>

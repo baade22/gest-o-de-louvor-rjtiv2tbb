@@ -158,7 +158,7 @@ export default function AccessProfiles() {
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {[
           {
             icon: ShieldCheck,
@@ -241,7 +241,7 @@ export default function AccessProfiles() {
               return (
                 <li
                   key={p.id}
-                  className="grid gap-3 p-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto] md:items-center"
+                  className="grid grid-cols-1 gap-3 p-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto] md:items-center"
                 >
                   <Link to={`/perfis-acesso/${p.id}`} className="min-w-0">
                     <p className="truncate text-sm font-bold text-slate-900 hover:text-teal-800">

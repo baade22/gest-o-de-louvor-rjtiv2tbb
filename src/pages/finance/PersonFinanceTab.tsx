@@ -141,7 +141,7 @@ export default function PersonFinanceTab({
     return (
       <div className="space-y-4">
         <Skeleton className="h-12 w-full" />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
@@ -173,9 +173,9 @@ export default function PersonFinanceTab({
         <p>Só quem cuida do financeiro vê esta aba. Contribuições anônimas nunca aparecem aqui.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Stat
               label={`Contribuído em ${currentYear}`}
               value={formatCents(summary.total)}
@@ -249,13 +249,13 @@ export default function PersonFinanceTab({
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] text-sm">
+                <table className="w-full text-sm sm:min-w-[560px]">
                   <thead>
                     <tr className="border-y border-slate-100 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-                      <th className="px-4 py-2 font-semibold">Data</th>
-                      <th className="px-4 py-2 font-semibold">Tipo</th>
-                      <th className="px-4 py-2 font-semibold">Forma</th>
-                      <th className="px-4 py-2 font-semibold">Origem</th>
+                      <th className="hidden px-4 py-2 font-semibold sm:table-cell">Data</th>
+                      <th className="px-3 py-2 font-semibold sm:px-4">Tipo</th>
+                      <th className="hidden px-4 py-2 font-semibold sm:table-cell">Forma</th>
+                      <th className="hidden px-4 py-2 font-semibold sm:table-cell">Origem</th>
                       <th className="px-4 py-2 text-right font-semibold">Valor</th>
                       <th className="w-10 px-2 py-2" />
                     </tr>
@@ -269,8 +269,10 @@ export default function PersonFinanceTab({
                           key={tx.id}
                           className={cn('border-b border-slate-100', voided && 'text-slate-400')}
                         >
-                          <td className="px-4 py-2.5 tabular-nums">{shortDate(tx.date, true)}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="hidden px-4 py-2.5 tabular-nums sm:table-cell">
+                            {shortDate(tx.date, true)}
+                          </td>
+                          <td className="px-3 py-2.5 sm:px-4">
                             {categoryName.get(tx.category_id || '') || tx.description || 'Entrada'}
                             {voided && (
                               <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold">
@@ -285,14 +287,23 @@ export default function PersonFinanceTab({
                                 Fora do informe
                               </span>
                             )}
+                            <div className="mt-0.5 text-xs tabular-nums text-slate-500 sm:hidden">
+                              {[
+                                shortDate(tx.date, true),
+                                tx.payment_method ? PAYMENT_METHOD_LABELS[tx.payment_method] : '',
+                                origin(tx),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </div>
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="hidden px-4 py-2.5 sm:table-cell">
                             {tx.payment_method ? PAYMENT_METHOD_LABELS[tx.payment_method] : '—'}
                           </td>
-                          <td className="px-4 py-2.5">{origin(tx)}</td>
+                          <td className="hidden px-4 py-2.5 sm:table-cell">{origin(tx)}</td>
                           <td
                             className={cn(
-                              'px-4 py-2.5 text-right tabular-nums font-semibold',
+                              'whitespace-nowrap px-3 py-2.5 text-right tabular-nums font-semibold sm:px-4',
                               voided ? 'line-through' : 'text-emerald-700',
                             )}
                           >

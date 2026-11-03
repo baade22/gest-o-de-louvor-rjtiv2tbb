@@ -434,17 +434,17 @@ export default function EventScaleDetail() {
 
       <Tabs value={currentTab} onValueChange={openTab}>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList className="h-auto w-full min-w-max justify-start gap-1 rounded-none border-b border-slate-200 bg-transparent p-0">
+          <TabsList className="h-auto w-full justify-start sm:min-w-max gap-1 rounded-none border-b border-slate-200 bg-transparent p-0">
             {tabs.map(({ value, label, icon: Icon, count }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="group -mb-px gap-2 rounded-none border-b-2 border-transparent px-3.5 py-2.5 text-sm font-semibold text-slate-500 shadow-none hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:bg-transparent data-[state=active]:text-teal-700 data-[state=active]:shadow-none"
+                className="relative min-w-0 flex-1 flex-col gap-1 whitespace-normal px-1 text-center text-[11px] leading-tight sm:flex-none sm:flex-row sm:whitespace-nowrap sm:text-sm sm:leading-normal group -mb-px sm:gap-2 rounded-none border-b-2 border-transparent sm:px-3.5 py-2.5 font-semibold text-slate-500 shadow-none hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:bg-transparent data-[state=active]:text-teal-700 data-[state=active]:shadow-none"
               >
                 <Icon className="h-4 w-4" />
                 {label}
                 {count !== undefined && (
-                  <span className="rounded-full bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600 group-data-[state=active]:bg-teal-50 group-data-[state=active]:text-teal-700">
+                  <span className="absolute left-1/2 top-1 ml-2 sm:static sm:ml-0 rounded-full bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600 group-data-[state=active]:bg-teal-50 group-data-[state=active]:text-teal-700">
                     {count}
                   </span>
                 )}
