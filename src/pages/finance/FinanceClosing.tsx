@@ -244,10 +244,23 @@ export default function FinanceClosing() {
       const rows = await loadClosings()
       if (rows) setMonth(month)
     } catch (err) {
-      toast({
-        title: serverMessage(err, 'Não foi possível fechar o mês.'),
-        variant: 'destructive',
-      })
+      // A resposta pode se perder no caminho (rede do celular, proxy) depois que o servidor
+      // já fechou o mês: confere de novo antes de mostrar erro.
+      const rows = await loadClosings()
+      if (rows?.some((c) => c.status === 'FECHADO' && c.month === month)) {
+        toast({
+          title: `${monthLabel(month)} fechado. Os lançamentos até ${monthName(month)} estão travados.`,
+        })
+        setNotes('')
+        setMonth(month)
+      } else {
+        const status = (err as { status?: number })?.status
+        toast({
+          title: serverMessage(err, 'Não foi possível fechar o mês.'),
+          description: status ? `Código ${status}. Tente de novo.` : 'Tente de novo.',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setClosing(false)
     }
