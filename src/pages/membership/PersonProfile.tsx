@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
@@ -402,7 +403,7 @@ export default function PersonProfile() {
             <p className="text-xs text-amber-700 mt-2">Falta na ficha: {missing.join(', ')}.</p>
           )}
         </div>
-        <div className="flex flex-col gap-3 md:w-48 shrink-0">
+        <div className="flex flex-col gap-3 md:w-80 shrink-0">
           <div>
             <div className="flex justify-between text-xs text-slate-500 mb-1">
               <span>Ficha preenchida</span>
@@ -410,7 +411,7 @@ export default function PersonProfile() {
             </div>
             <Progress value={filled} className="h-1.5" />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {wa && (
               <a href={wa} target="_blank" rel="noopener noreferrer" className="flex-1">
                 <Button variant="outline" size="sm" className="w-full rounded-xl gap-1.5">
@@ -440,7 +441,7 @@ export default function PersonProfile() {
 
       <Tabs defaultValue="linha">
         <div className="overflow-x-auto">
-          <TabsList className="h-auto w-full min-w-max justify-start gap-1 rounded-none border-b border-slate-200 bg-transparent p-0">
+          <TabsList className="h-auto w-full justify-start sm:min-w-max gap-1 rounded-none border-b border-slate-200 bg-transparent p-0">
             {[
               ['linha', 'Linha do tempo', History, timeline.length],
               ['familia', 'Família', Users, family.length],
@@ -453,12 +454,12 @@ export default function PersonProfile() {
                 <TabsTrigger
                   key={value as string}
                   value={value as string}
-                  className="gap-1.5 rounded-none border-b-2 border-transparent px-3 py-2.5 text-sm font-semibold text-slate-500 data-[state=active]:border-teal-600 data-[state=active]:text-teal-800 data-[state=active]:shadow-none"
+                  className="relative min-w-0 flex-1 flex-col gap-1 whitespace-normal px-1 text-center text-[11px] leading-tight sm:flex-none sm:flex-row sm:whitespace-nowrap sm:text-sm sm:leading-normal sm:gap-1.5 rounded-none border-b-2 border-transparent sm:px-3 py-2.5 font-semibold text-slate-500 data-[state=active]:border-teal-600 data-[state=active]:text-teal-800 data-[state=active]:shadow-none"
                 >
                   <I className="h-4 w-4" />
                   {label as string}
                   {(count as number) > 0 && (
-                    <span className="text-[11px] bg-slate-100 text-slate-600 rounded-full px-1.5">
+                    <span className="absolute left-1/2 top-1 ml-2 sm:static sm:ml-0 text-[11px] bg-slate-100 text-slate-600 rounded-full px-1.5">
                       {count as number}
                     </span>
                   )}
@@ -703,7 +704,14 @@ export default function PersonProfile() {
               {fichaRows.map(([label, value]) => (
                 <div key={label} className="flex gap-3 border-b border-slate-50 pb-2">
                   <dt className="w-28 shrink-0 text-slate-500">{label}</dt>
-                  <dd className={value ? 'text-slate-900' : 'text-slate-300'}>{value || '—'}</dd>
+                  <dd
+                    className={cn(
+                      'min-w-0 [overflow-wrap:anywhere]',
+                      value ? 'text-slate-900' : 'text-slate-300',
+                    )}
+                  >
+                    {value || '—'}
+                  </dd>
                 </div>
               ))}
             </dl>

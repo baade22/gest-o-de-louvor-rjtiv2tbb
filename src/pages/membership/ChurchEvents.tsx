@@ -218,7 +218,7 @@ export default function ChurchEvents() {
       </div>
 
       {isLoading ? (
-        <div className="grid lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {[1, 2].map((i) => (
             <Skeleton key={i} className="h-28 rounded-2xl" />
           ))}
@@ -333,7 +333,7 @@ export default function ChurchEvents() {
                 {upcoming.length === 0 && (
                   <p className="text-sm text-slate-500">Nenhum evento marcado.</p>
                 )}
-                <div className="grid lg:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {upcoming.map((e) => (
                     <EventCard
                       key={e.id}
@@ -349,7 +349,7 @@ export default function ChurchEvents() {
                   <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
                     Já aconteceram
                   </h2>
-                  <div className="grid lg:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {past.map((e) => (
                       <EventCard key={e.id} event={e} regs={regsByEvent.get(e.id) || []} past />
                     ))}

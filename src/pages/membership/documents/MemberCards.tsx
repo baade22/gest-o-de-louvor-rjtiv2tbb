@@ -109,7 +109,7 @@ export default function MemberCards() {
               className="rounded-xl h-9 w-48 ml-auto"
             />
           </div>
-          <div className="max-h-48 overflow-y-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+          <div className="max-h-48 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
             {candidates.map((p) => (
               <label key={p.id} className="flex items-center gap-2 text-sm text-slate-700 py-0.5">
                 <Checkbox checked={!unselected.has(p.id)} onCheckedChange={() => toggle(p.id)} />

@@ -489,7 +489,7 @@ export default function PublicEventSignup() {
               />
             </div>
             {info.couple_only && (
-              <div className="grid sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="ev-partner" className="text-sm font-semibold">
                     Nome do cônjuge <span className="text-red-500">*</span>

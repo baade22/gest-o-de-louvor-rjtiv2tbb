@@ -377,7 +377,7 @@ export default function FinanceCashFlow() {
 
       {loading ? (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-28 rounded-xl" />
             ))}
@@ -405,7 +405,7 @@ export default function FinanceCashFlow() {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Stat
               label="Saldo hoje"
               value={flow.balanceToday}
@@ -489,14 +489,21 @@ export default function FinanceCashFlow() {
               </h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px] text-sm">
+              <table className="w-full text-sm sm:min-w-[620px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-2.5 font-medium">Semana</th>
-                    <th className="px-4 py-2.5 font-medium">Origem</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Entradas</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Saídas</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Saldo ao fim</th>
+                    <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Origem</th>
+                    <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">
+                      Entradas
+                    </th>
+                    <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">
+                      Saídas
+                    </th>
+                    <th className="px-4 py-2.5 text-right font-medium">
+                      <span className="sm:hidden">Saldo</span>
+                      <span className="hidden sm:inline">Saldo ao fim</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -535,6 +542,24 @@ function WeekRows({
   onToggle: () => void
 }) {
   const below = w.below.length > 0
+  const badge = below ? (
+    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+      Abaixo do mínimo{w.below.length === 1 ? ` (${w.below[0]})` : ''}
+    </span>
+  ) : (
+    <span
+      className={cn(
+        'rounded-full px-2 py-0.5 text-xs font-medium',
+        w.kind === 'REALIZADO'
+          ? 'bg-emerald-50 text-emerald-700'
+          : w.kind === 'ATUAL'
+            ? 'bg-sky-50 text-sky-700'
+            : 'border border-slate-200 text-slate-600',
+      )}
+    >
+      {w.kind === 'REALIZADO' ? 'Realizado' : w.kind === 'ATUAL' ? 'Esta semana' : 'Projetado'}
+    </span>
+  )
   return (
     <>
       <tr
@@ -544,7 +569,7 @@ function WeekRows({
           below ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-slate-50',
         )}
       >
-        <td className="px-4 py-3">
+        <td className="px-3 py-3 sm:px-4">
           <button
             type="button"
             aria-expanded={expanded}
@@ -553,59 +578,46 @@ function WeekRows({
             {icon}
             {shortDate(w.start)} a {shortDate(w.end)}
           </button>
+          {/* No celular: origem, entradas e saídas embaixo da semana */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-xs tabular-nums sm:hidden">
+            {badge}
+            <span className="text-emerald-700">+{formatCents(w.income)}</span>
+            <span className="text-red-600">−{formatCents(w.expense)}</span>
+          </div>
         </td>
-        <td className="px-4 py-3">
-          {below ? (
-            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-              Abaixo do mínimo{w.below.length === 1 ? ` (${w.below[0]})` : ''}
-            </span>
-          ) : (
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-xs font-medium',
-                w.kind === 'REALIZADO'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : w.kind === 'ATUAL'
-                    ? 'bg-sky-50 text-sky-700'
-                    : 'border border-slate-200 text-slate-600',
-              )}
-            >
-              {w.kind === 'REALIZADO'
-                ? 'Realizado'
-                : w.kind === 'ATUAL'
-                  ? 'Esta semana'
-                  : 'Projetado'}
-            </span>
-          )}
-        </td>
-        <td className="px-4 py-3 text-right tabular-nums text-emerald-700">
+        <td className="hidden px-4 py-3 sm:table-cell">{badge}</td>
+        <td className="hidden px-4 py-3 text-right tabular-nums text-emerald-700 sm:table-cell">
           {formatCents(w.income)}
         </td>
-        <td className="px-4 py-3 text-right tabular-nums text-red-600">{formatCents(w.expense)}</td>
-        <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
+        <td className="hidden px-4 py-3 text-right tabular-nums text-red-600 sm:table-cell">
+          {formatCents(w.expense)}
+        </td>
+        <td className="whitespace-nowrap px-3 py-3 text-right align-top font-semibold tabular-nums text-slate-900 sm:px-4 sm:align-middle">
           {formatCents(w.closing)}
         </td>
       </tr>
       {expanded && (
         <tr className="border-b border-slate-100 bg-slate-50/60">
-          <td colSpan={5} className="px-4 py-2">
+          <td colSpan={5} className="px-3 py-2 sm:px-4">
             {w.items.length === 0 ? (
               <p className="py-2 text-sm text-slate-400">Nada nesta semana.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
                 {w.items.map((i, k) => (
                   <li key={k} className="flex items-center gap-3 py-2 text-sm">
-                    <span className="w-12 shrink-0 tabular-nums text-slate-500">
+                    <span className="w-11 shrink-0 tabular-nums text-slate-500 sm:w-12">
                       {shortDate(i.date)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-slate-800">{i.label}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 break-words text-slate-800 sm:line-clamp-1">
+                      {i.label}
+                    </span>
                     <span className="hidden shrink-0 text-xs text-slate-500 sm:inline">
                       {SOURCE_LABELS[i.source]}
                       {i.group ? ` · ${i.group}` : ''}
                     </span>
                     <span
                       className={cn(
-                        'w-28 shrink-0 text-right tabular-nums',
+                        'shrink-0 text-right tabular-nums sm:w-28',
                         i.cents < 0 ? 'text-red-600' : 'text-emerald-700',
                       )}
                     >

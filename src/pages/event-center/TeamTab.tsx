@@ -111,7 +111,7 @@ export function TeamTab({
         </div>
       )}
 
-      <div className="grid items-start gap-5 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
         {TEAM_AREAS.map(({ value, label, icon: Icon }) => {
           const areaMembers = members.filter((m) => memberArea(m) === value)
           if (members.length === 0 || (areaMembers.length === 0 && !canEdit)) return null
@@ -155,7 +155,7 @@ export function TeamTab({
                     <li key={scale.id} className="px-5 py-3">
                       <div className="flex flex-wrap items-center gap-3">
                         <Avatar name={name} />
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-[10rem] flex-1">
                           <div className="truncate text-sm font-semibold text-slate-900">
                             {name}
                             {isMe && (

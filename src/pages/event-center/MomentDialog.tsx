@@ -139,7 +139,7 @@ export function MomentDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
-          <div className="grid gap-3 sm:grid-cols-[1fr_170px]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_170px]">
             <div className="space-y-1.5">
               <Label htmlFor="moment-title">Nome</Label>
               <Input

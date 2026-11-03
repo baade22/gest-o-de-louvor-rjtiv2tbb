@@ -104,7 +104,7 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
             required
           />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="cp-birth">Data de nascimento *</Label>
             <Input
@@ -158,7 +158,7 @@ export function CompleteProfileGate({ children }: { children: React.ReactNode })
           </div>
         </div>
 
-        <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-6">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="cp-zip">CEP</Label>
             <Input

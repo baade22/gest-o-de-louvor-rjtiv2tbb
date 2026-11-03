@@ -62,7 +62,7 @@ export function OverviewTab({
   const confirmed = members.filter((m) => m.status === 'CONFIRMADO').length
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
       <RunSheet
         event={event}
         moments={moments}

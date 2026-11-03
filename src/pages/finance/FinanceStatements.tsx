@@ -255,7 +255,7 @@ export default function FinanceStatements() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           ['Contribuintes com nome', busy ? '…' : String(rows.length)],
           [`Total doado em ${year}`, busy ? '…' : formatCents(total)],
@@ -281,10 +281,10 @@ export default function FinanceStatements() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full text-sm sm:min-w-[560px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-                  <th className="w-10 px-4 py-2">
+                  <th className="w-10 py-2 pl-3 pr-1 sm:px-4">
                     <Checkbox
                       aria-label="Escolher todos"
                       checked={allShownChosen}
@@ -292,8 +292,8 @@ export default function FinanceStatements() {
                     />
                   </th>
                   <th className="px-2 py-2 font-semibold">Pessoa</th>
-                  <th className="px-2 py-2 font-semibold">CPF</th>
-                  <th className="px-2 py-2 text-right font-semibold">Lanç.</th>
+                  <th className="hidden px-2 py-2 font-semibold sm:table-cell">CPF</th>
+                  <th className="hidden px-2 py-2 text-right font-semibold sm:table-cell">Lanç.</th>
                   <th className="px-2 py-2 text-right font-semibold">Total</th>
                   <th className="px-4 py-2" />
                 </tr>
@@ -301,7 +301,7 @@ export default function FinanceStatements() {
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.personId} className="border-b border-slate-100">
-                    <td className="px-4 py-2">
+                    <td className="py-2 pl-3 pr-1 sm:px-4">
                       <Checkbox
                         aria-label={`Escolher ${r.person.name}`}
                         checked={chosen.has(r.personId)}
@@ -316,8 +316,18 @@ export default function FinanceStatements() {
                       ) : (
                         r.person.name
                       )}
+                      <div className="mt-0.5 text-xs font-normal tabular-nums text-slate-500 sm:hidden">
+                        {r.person.document ? (
+                          formatCpf(r.person.document)
+                        ) : (
+                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                            Falta CPF
+                          </span>
+                        )}{' '}
+                        · {r.count} lanç.
+                      </div>
                     </td>
-                    <td className="px-2 py-2 tabular-nums">
+                    <td className="hidden px-2 py-2 tabular-nums sm:table-cell">
                       {r.person.document ? (
                         formatCpf(r.person.document)
                       ) : (
@@ -326,11 +336,13 @@ export default function FinanceStatements() {
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-2 text-right tabular-nums">{r.count}</td>
+                    <td className="hidden px-2 py-2 text-right tabular-nums sm:table-cell">
+                      {r.count}
+                    </td>
                     <td className="px-2 py-2 text-right font-semibold tabular-nums">
                       {formatCents(r.total)}
                     </td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="py-2 pl-1 pr-2 text-right sm:px-4">
                       <Button
                         variant="ghost"
                         size="sm"

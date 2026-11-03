@@ -325,13 +325,13 @@ export default function FinancePanel() {
       )}
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={Wallet}
             tone="bg-teal-50 text-teal-700"
@@ -444,7 +444,7 @@ export default function FinancePanel() {
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
         <div className={cn(cardClass, 'min-w-0')}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 px-5 py-4">
             <h3 className="font-semibold text-slate-900">Entradas e saídas</h3>

@@ -487,7 +487,7 @@ export function RepertoireTab({
   if (!canEdit) return table
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
       {table}
       <AddSongPanel churchId={event.church_id} library={library} songs={songs} onAdd={addSong} />
     </div>

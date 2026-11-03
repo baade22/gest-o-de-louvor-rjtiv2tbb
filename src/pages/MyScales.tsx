@@ -150,17 +150,26 @@ export default function MyScales() {
           setActiveFilter(v as 'TODAS' | 'PENDENTES' | 'CONFIRMADAS' | 'RECUSADAS')
         }
       >
-        <TabsList className="flex h-11 w-full justify-start overflow-x-auto rounded-xl bg-slate-100 p-1 sm:grid sm:grid-cols-4">
-          <TabsTrigger value="TODAS" className="shrink-0 rounded-lg px-3 text-xs font-bold">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 sm:h-11 sm:grid-cols-4">
+          <TabsTrigger value="TODAS" className="rounded-lg px-2 py-2 text-xs font-bold sm:py-1.5">
             Todas ({scales.length})
           </TabsTrigger>
-          <TabsTrigger value="PENDENTES" className="shrink-0 rounded-lg px-3 text-xs font-bold">
+          <TabsTrigger
+            value="PENDENTES"
+            className="rounded-lg px-2 py-2 text-xs font-bold sm:py-1.5"
+          >
             Pendentes ({scales.filter((s) => s.status === 'PENDENTE').length})
           </TabsTrigger>
-          <TabsTrigger value="CONFIRMADAS" className="shrink-0 rounded-lg px-3 text-xs font-bold">
+          <TabsTrigger
+            value="CONFIRMADAS"
+            className="rounded-lg px-2 py-2 text-xs font-bold sm:py-1.5"
+          >
             Confirmadas ({scales.filter((s) => s.status === 'CONFIRMADO').length})
           </TabsTrigger>
-          <TabsTrigger value="RECUSADAS" className="shrink-0 rounded-lg px-3 text-xs font-bold">
+          <TabsTrigger
+            value="RECUSADAS"
+            className="rounded-lg px-2 py-2 text-xs font-bold sm:py-1.5"
+          >
             Recusadas ({scales.filter((s) => s.status === 'RECUSADO').length})
           </TabsTrigger>
         </TabsList>

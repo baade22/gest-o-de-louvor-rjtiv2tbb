@@ -254,14 +254,14 @@ export default function AvisoEnvio() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[620px]">
+          <table className="w-full text-sm sm:min-w-[620px]">
             <thead>
               <tr className="bg-slate-50 text-left text-slate-600">
-                <th className="px-5 py-3 font-semibold">Pessoa</th>
-                <th className="px-5 py-3 font-semibold">Celular ou grupo</th>
-                <th className="px-5 py-3 font-semibold">Situação</th>
-                <th className="px-5 py-3 font-semibold">Horário</th>
-                <th className="px-5 py-3">
+                <th className="px-3 py-3 font-semibold sm:px-5">Pessoa</th>
+                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Celular ou grupo</th>
+                <th className="px-3 py-3 font-semibold sm:px-5">Situação</th>
+                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Horário</th>
+                <th className="px-3 py-3 sm:px-5">
                   <span className="sr-only">Ações</span>
                 </th>
               </tr>
@@ -269,27 +269,41 @@ export default function AvisoEnvio() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-slate-100">
-                  <td className="px-5 py-3 text-slate-900">{r.name || '—'}</td>
-                  <td className="px-5 py-3 text-slate-700">
+                  <td className="px-3 py-3 text-slate-900 sm:px-5">
+                    {r.name || '—'}
+                    <div className="mt-0.5 text-xs text-slate-500 sm:hidden">
+                      {[
+                        r.group ? 'Grupo do WhatsApp' : `•••• ${r.phone_end}`,
+                        r.sent_at
+                          ? whenLabel(serverMs(r.sent_at))
+                          : r.status === 'FILA'
+                            ? `~${whenLabel(serverMs(r.send_after))}`
+                            : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  </td>
+                  <td className="hidden px-5 py-3 text-slate-700 sm:table-cell">
                     {r.group ? 'Grupo do WhatsApp' : `•••• ${r.phone_end}`}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3 sm:px-5">
                     <span
-                      className={`text-xs font-semibold rounded-full px-2 py-0.5 ${R_STATUS[r.status].className}`}
+                      className={`whitespace-nowrap text-xs font-semibold rounded-full px-2 py-0.5 ${R_STATUS[r.status].className}`}
                     >
                       {r.status === 'ERRO' && /WhatsApp/i.test(r.error)
                         ? 'Sem WhatsApp'
                         : R_STATUS[r.status].label}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-slate-700">
+                  <td className="hidden px-5 py-3 text-slate-700 sm:table-cell">
                     {r.sent_at
                       ? whenLabel(serverMs(r.sent_at))
                       : r.status === 'FILA'
                         ? `~${whenLabel(serverMs(r.send_after))}`
                         : ''}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-3 py-3 text-right sm:px-5">
                     {(r.status === 'FILA' || r.status === 'PAUSADO') && canSend && (
                       <button
                         type="button"

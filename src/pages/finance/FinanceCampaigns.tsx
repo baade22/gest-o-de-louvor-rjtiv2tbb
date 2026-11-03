@@ -329,7 +329,7 @@ function CampaignDialog({
               className="h-10 rounded-lg"
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="cp-goal" className={label}>
                 Meta (R$, opcional)
@@ -698,7 +698,7 @@ export default function FinanceCampaigns() {
       {!canEdit && <ReadOnlyNotice />}
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Skeleton className="h-56" />
           <Skeleton className="h-56" />
           <Skeleton className="h-56" />
@@ -717,7 +717,7 @@ export default function FinanceCampaigns() {
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((c) => (
             <CampaignCard
               key={c.id}
@@ -808,13 +808,13 @@ export default function FinanceCampaigns() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+              <table className="w-full text-sm sm:min-w-[640px]">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-2 font-semibold">Data</th>
-                    <th className="px-4 py-2 font-semibold">Contribuinte</th>
-                    <th className="px-4 py-2 font-semibold">Forma</th>
-                    <th className="px-4 py-2 font-semibold">Origem</th>
+                    <th className="hidden px-4 py-2 font-semibold sm:table-cell">Data</th>
+                    <th className="px-3 py-2 font-semibold sm:px-4">Contribuinte</th>
+                    <th className="hidden px-4 py-2 font-semibold sm:table-cell">Forma</th>
+                    <th className="hidden px-4 py-2 font-semibold sm:table-cell">Origem</th>
                     <th className="px-4 py-2 text-right font-semibold">Valor</th>
                   </tr>
                 </thead>
@@ -827,22 +827,33 @@ export default function FinanceCampaigns() {
                         key={t.id}
                         className={cn('border-b border-slate-100', voided && 'text-slate-400')}
                       >
-                        <td className="px-4 py-2.5 tabular-nums">{shortDate(t.date)}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="hidden px-4 py-2.5 tabular-nums sm:table-cell">
+                          {shortDate(t.date)}
+                        </td>
+                        <td className="px-3 py-2.5 sm:px-4">
                           {who(t)}
                           {voided && (
                             <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold">
                               Estornado
                             </span>
                           )}
+                          <div className="mt-0.5 text-xs tabular-nums text-slate-500 sm:hidden">
+                            {[
+                              shortDate(t.date),
+                              t.payment_method ? PAYMENT_METHOD_LABELS[t.payment_method] : '',
+                              origin(t),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </div>
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="hidden px-4 py-2.5 sm:table-cell">
                           {t.payment_method ? PAYMENT_METHOD_LABELS[t.payment_method] : '—'}
                         </td>
-                        <td className="px-4 py-2.5">{origin(t)}</td>
+                        <td className="hidden px-4 py-2.5 sm:table-cell">{origin(t)}</td>
                         <td
                           className={cn(
-                            'px-4 py-2.5 text-right font-semibold tabular-nums',
+                            'whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums sm:px-4',
                             voided ? 'line-through' : out ? 'text-rose-700' : 'text-emerald-700',
                           )}
                         >
