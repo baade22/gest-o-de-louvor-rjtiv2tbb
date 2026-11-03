@@ -3,7 +3,15 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- App web: ao "Adicionar à Tela de Início" no iPhone/Android abre como aplicativo -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="LouvorFlow" />
     <title>LouvorFlow</title>
     <meta name="description" content="Gestão do ministério de louvor: cultos, escalas, repertório, mídias e integração com o Holyrics." />
     <meta property="og:image" content="/og-image.png" />

@@ -531,32 +531,34 @@ export default function Layout() {
       </aside>
 
       {/* BARRA SUPERIOR NO CELULAR (< 1024px) */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-3 lg:hidden print:hidden">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMobileDrawerOpen(true)}
-            aria-label="Abrir menu de navegação"
-            className="h-10 w-10 rounded-lg text-slate-700"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <div className="min-w-0">
-            <p className="text-[15px] font-bold leading-tight text-slate-900">LouvorFlow</p>
-            <p className="max-w-[180px] truncate text-[11px] text-slate-500">
-              {currentChurch?.name}
-            </p>
+      <header className="pt-safe fixed inset-x-0 top-0 z-30 border-b border-slate-200 bg-white lg:hidden print:hidden">
+        <div className="flex h-14 items-center justify-between pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-label="Abrir menu de navegação"
+              className="h-10 w-10 rounded-lg text-slate-700"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="min-w-0">
+              <p className="text-[15px] font-bold leading-tight text-slate-900">LouvorFlow</p>
+              <p className="max-w-[180px] truncate text-[11px] text-slate-500">
+                {currentChurch?.name}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <NotificationsBell />
-          <NavLink
-            to="/perfil"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800"
-          >
-            {userInitials}
-          </NavLink>
+          <div className="flex items-center gap-1.5">
+            <NotificationsBell />
+            <NavLink
+              to="/perfil"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800"
+            >
+              {userInitials}
+            </NavLink>
+          </div>
         </div>
       </header>
 
@@ -567,7 +569,7 @@ export default function Layout() {
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-[2px]"
             onClick={() => setMobileDrawerOpen(false)}
           />
-          <div className="relative z-10 flex h-full w-4/5 max-w-xs animate-slide-right flex-col gap-4 bg-slate-950 py-4 shadow-2xl">
+          <div className="relative z-10 flex h-full w-4/5 max-w-xs animate-slide-right flex-col gap-4 bg-slate-950 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl">
             <div className="flex items-center justify-between px-4">
               {brand(false)}
               <Button
@@ -589,14 +591,14 @@ export default function Layout() {
 
       {/* ÁREA PRINCIPAL */}
       <div
-        className={`flex min-h-screen min-w-0 flex-1 flex-col pt-14 transition-[margin] duration-200 lg:pt-0 print:!ml-0 print:!pt-0 ${
+        className={`flex min-h-screen min-w-0 flex-1 flex-col pt-[calc(3.5rem+env(safe-area-inset-top))] transition-[margin] duration-200 lg:pt-0 print:!ml-0 print:!pt-0 ${
           collapsed ? 'lg:ml-[76px]' : 'lg:ml-64'
         }`}
       >
         <header className="sticky top-0 z-20 hidden h-14 items-center justify-end gap-2 border-b border-slate-200 bg-white/80 px-8 backdrop-blur lg:flex print:!hidden">
           <NotificationsBell />
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-in p-4 sm:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-in p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:p-6 lg:p-8">
           <CompleteProfileGate>
             <Outlet />
           </CompleteProfileGate>

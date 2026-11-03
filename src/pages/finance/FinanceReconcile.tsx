@@ -812,14 +812,18 @@ export default function FinanceReconcile() {
                         <ArrowUpRight className="h-4 w-4" />
                       )}
                     </div>
-                    <div className="w-12 shrink-0 text-sm tabular-nums text-slate-500">
+                    <div className="hidden w-12 shrink-0 text-sm tabular-nums text-slate-500 sm:block">
                       {shortDate(line.date)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-slate-900">
+                      <div
+                        className="line-clamp-2 break-words text-sm font-semibold leading-snug text-slate-900 sm:line-clamp-1 sm:text-base"
+                        title={line.description || undefined}
+                      >
                         {line.description || 'Movimento'}
                       </div>
-                      <div className="truncate text-xs text-slate-500">
+                      <div className="line-clamp-2 text-xs text-slate-500 sm:line-clamp-1">
+                        <span className="tabular-nums sm:hidden">{shortDate(line.date)} · </span>
                         {line.status === 'CONCILIADO' ? (
                           <span className="text-emerald-700">
                             <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
