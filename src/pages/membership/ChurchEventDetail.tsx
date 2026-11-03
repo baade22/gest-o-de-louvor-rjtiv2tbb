@@ -446,17 +446,17 @@ export default function ChurchEventDetail() {
 
       <Tabs defaultValue="inscritos">
         <div className="overflow-x-auto">
-          <TabsList className="h-auto w-full min-w-max justify-start gap-1 rounded-none border-b border-slate-200 bg-transparent p-0">
+          <TabsList className="h-auto w-full justify-start sm:min-w-max gap-1 rounded-none border-b border-slate-200 bg-transparent p-0">
             {tabs.map(([value, label, Icon, count]) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="gap-1.5 rounded-none border-b-2 border-transparent px-3 py-2.5 text-sm font-semibold text-slate-500 data-[state=active]:border-teal-600 data-[state=active]:text-teal-800 data-[state=active]:shadow-none"
+                className="relative min-w-0 flex-1 flex-col gap-1 whitespace-normal px-1 text-center text-[11px] leading-tight sm:flex-none sm:flex-row sm:whitespace-nowrap sm:text-sm sm:leading-normal sm:gap-1.5 rounded-none border-b-2 border-transparent sm:px-3 py-2.5 font-semibold text-slate-500 data-[state=active]:border-teal-600 data-[state=active]:text-teal-800 data-[state=active]:shadow-none"
               >
                 <Icon className="h-4 w-4" />
                 {label}
                 {count > 0 && (
-                  <span className="text-[11px] bg-slate-100 text-slate-600 rounded-full px-1.5">
+                  <span className="absolute left-1/2 top-1 ml-2 sm:static sm:ml-0 text-[11px] bg-slate-100 text-slate-600 rounded-full px-1.5">
                     {count}
                   </span>
                 )}
@@ -516,7 +516,7 @@ export default function ChurchEventDetail() {
             )}
             {shown.map((r) => (
               <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[10rem] flex-1">
                   <div className="flex items-center gap-2">
                     {r.person_id ? (
                       <Link
@@ -661,7 +661,7 @@ export default function ChurchEventDetail() {
               presentes
             </p>
           </div>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
             {checkinList.map((r) => (
               <button
                 key={r.id}

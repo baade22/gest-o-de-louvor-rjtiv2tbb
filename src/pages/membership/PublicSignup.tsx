@@ -200,7 +200,7 @@ export default function PublicSignup() {
               maxLength={200}
             />
           </Field>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
               id="su-phone"
               label="Telefone / WhatsApp"
@@ -242,7 +242,7 @@ export default function PublicSignup() {
 
         <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
           <h2 className="text-base font-bold text-slate-900">Sobre você</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="su-birth" label="Data de nascimento">
               <Input
                 id="su-birth"

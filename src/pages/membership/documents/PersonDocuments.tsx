@@ -138,7 +138,7 @@ export default function PersonDocuments() {
           ))}
         </div>
         {letter && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 grid sm:grid-cols-2 gap-3">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="doc-dest" className="text-xs font-semibold">
                 {kind === 'transferencia' ? 'Igreja de destino' : 'Recomendado à (opcional)'}

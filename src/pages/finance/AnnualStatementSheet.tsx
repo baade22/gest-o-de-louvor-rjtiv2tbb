@@ -100,7 +100,7 @@ export function AnnualStatementSheet({
         registros da tesouraria.
       </p>
 
-      <div className="mt-6 grid gap-6 sm:grid-cols-2 print:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 print:grid-cols-2">
         <table className="w-full self-start border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-slate-300 text-[11px] uppercase tracking-wide text-slate-500">

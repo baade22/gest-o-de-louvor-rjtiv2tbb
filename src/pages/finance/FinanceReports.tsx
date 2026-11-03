@@ -836,7 +836,7 @@ export default function FinanceReports() {
         </Button>
       </PageHeader>
 
-      <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px_1fr]">
         <nav className={cn(cardClass, 'h-fit overflow-hidden')} aria-label="Relatórios">
           {REPORTS.map((r) => {
             const Icon = r.icon

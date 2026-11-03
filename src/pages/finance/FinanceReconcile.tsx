@@ -1046,8 +1046,8 @@ export default function FinanceReconcile() {
       </div>
 
       {canEdit && draftCount > 0 && selectedLines.length === 0 && (
-        <div className="sticky bottom-3 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-lg">
-          <div className="min-w-0 flex-1 text-sm">
+        <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-lg">
+          <div className="min-w-0 flex-1 basis-full text-sm sm:basis-0">
             <div className="font-semibold text-slate-900">
               {draftCount} {draftCount === 1 ? 'movimento pronto' : 'movimentos prontos'} para
               salvar
@@ -1060,11 +1060,15 @@ export default function FinanceReconcile() {
             variant="outline"
             disabled={saving}
             onClick={() => unstage(Object.keys(drafts))}
-            className="rounded-lg font-semibold"
+            className="flex-1 rounded-lg font-semibold sm:flex-none"
           >
             Descartar
           </Button>
-          <Button onClick={saveDraft} disabled={saving} className={primaryButtonClass}>
+          <Button
+            onClick={saveDraft}
+            disabled={saving}
+            className={cn(primaryButtonClass, 'flex-1 sm:flex-none')}
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvar conciliação
           </Button>
@@ -1072,7 +1076,7 @@ export default function FinanceReconcile() {
       )}
 
       {selectable && selectedLines.length > 0 && (
-        <div className="sticky bottom-3 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-lg">
+        <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-lg">
           <div className="min-w-0 flex-1 text-sm">
             <div className="font-semibold text-slate-900">
               {selectedLines.length}{' '}
@@ -1862,10 +1866,10 @@ function RulesDialog({
           {rules.map((r) => (
             <li key={r.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-slate-900">
+                <div className="line-clamp-2 break-words text-sm font-semibold text-slate-900 sm:line-clamp-1">
                   {r.direction === 'ENTRADA' ? 'Entrada' : 'Saída'}: {r.example || r.match_code}
                 </div>
-                <div className="truncate text-xs text-slate-500">
+                <div className="line-clamp-2 text-xs text-slate-500 sm:line-clamp-1">
                   → {describe(r)} · {r.hits} {r.hits === 1 ? 'vez' : 'vezes'} na mão
                   {r.auto_count ? ` · ${r.auto_count} sozinho` : ''}
                   {r.auto && r.auto_by_name ? ` · ligado por ${r.auto_by_name}` : ''}

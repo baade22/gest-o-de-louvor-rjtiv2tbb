@@ -274,9 +274,9 @@ export default function AccessProfileForm() {
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="ap-name">Descrição *</Label>
               <Input
@@ -422,7 +422,7 @@ export default function AccessProfileForm() {
                     return (
                       <div
                         key={s.key}
-                        className="grid gap-2 border-t border-slate-100 px-4 py-2.5 md:grid-cols-[minmax(0,1fr)_repeat(4,64px)_minmax(150px,190px)] md:items-center"
+                        className="grid grid-cols-1 gap-2 border-t border-slate-100 px-4 py-2.5 md:grid-cols-[minmax(0,1fr)_repeat(4,64px)_minmax(150px,190px)] md:items-center"
                       >
                         <span className="pl-6 text-sm text-slate-800 md:pl-12">{s.label}</span>
                         {/* No celular: as ações aparecem com o nome ao lado */}
@@ -479,7 +479,7 @@ export default function AccessProfileForm() {
             )
           })}
 
-          <div className="grid items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-slate-400 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid grid-cols-1 items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-slate-400 md:grid-cols-[minmax(0,1fr)_auto]">
             <span className="pl-6 text-sm md:pl-12">Perfis de acesso</span>
             <span className="flex items-center gap-1 pl-6 text-xs">
               <Lock className="h-3.5 w-3.5" />

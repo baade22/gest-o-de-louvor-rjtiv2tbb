@@ -79,7 +79,7 @@ export function ChurchDocSettingsPanel({
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {FIELDS.map(([key, label, placeholder]) => (
               <div key={key} className="space-y-1">
                 <Label htmlFor={`doc-${key}`} className="text-xs font-semibold text-slate-700">
