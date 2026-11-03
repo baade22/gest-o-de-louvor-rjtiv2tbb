@@ -104,7 +104,9 @@ function BudgetTable({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className={cn('w-full text-[13px] sm:text-sm', !planningOnly && 'sm:min-w-[680px]')}>
+          <table
+            className={cn('w-full text-[13px] sm:text-sm', !planningOnly && 'sm:min-w-[680px]')}
+          >
             <thead>
               <tr className="border-y border-slate-100 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
                 <th className="px-3 py-2 font-semibold sm:px-4">Categoria</th>
