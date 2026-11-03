@@ -109,6 +109,41 @@
     --chart-5: 10 100% 50%;
   }
 
+  /* Celular / app web no iPhone */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Campos de data, hora e mês: no iPhone o Safari desenha o campo nativo, que ignora a
+     largura (sai do card), fica mais alto que os outros e centraliza o texto. Aqui ele passa
+     a se comportar como um campo de texto comum; tocar continua abrindo o seletor do iOS. */
+  input:where(
+    [type='date'],
+    [type='time'],
+    [type='month'],
+    [type='week'],
+    [type='datetime-local']
+  ) {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    text-align: left;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-height: 1.5em;
+  }
+  input::-webkit-datetime-edit {
+    padding: 0;
+  }
+
   /* NEVER REMOVE THIS */
   section[aria-label='Notifications alt+T'] {
     padding: 0 !important;
@@ -117,6 +152,14 @@
 }
 
 @layer utilities {
+  /* Espaço das áreas do iPhone (relógio, barra de gestos) quando aberto pela tela inicial */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   /* KEEP ALL THE ANIMATIONS CLASSES THAT ARE USED BELOW */
   @keyframes accordion-down {
     from {

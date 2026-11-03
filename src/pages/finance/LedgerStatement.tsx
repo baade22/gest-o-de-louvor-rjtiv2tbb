@@ -120,7 +120,7 @@ export function LedgerStatement({
             type="month"
             value={month}
             onChange={(e) => e.target.value && setMonth(e.target.value)}
-            className="h-9 w-[160px]"
+            className="h-9 w-full sm:w-[170px]"
             aria-label="Mês"
           />
         </div>
@@ -142,9 +142,14 @@ export function LedgerStatement({
         <div className="p-3">
           <div className="text-xs text-slate-500">A conciliar</div>
           <div className="text-sm font-bold tabular-nums text-amber-700 sm:text-base">
-            {data.pendingIn || data.pendingOut
-              ? `+${formatCents(data.pendingIn)} −${formatCents(data.pendingOut)}`
-              : '—'}
+            {data.pendingIn || data.pendingOut ? (
+              <>
+                <span className="whitespace-nowrap">+{formatCents(data.pendingIn)}</span>{' '}
+                <span className="whitespace-nowrap">−{formatCents(data.pendingOut)}</span>
+              </>
+            ) : (
+              '—'
+            )}
           </div>
         </div>
         <div className="p-3">
@@ -175,12 +180,20 @@ export function LedgerStatement({
                   <ArrowUpRight className="h-4 w-4" />
                 )}
               </div>
-              <span className="w-12 shrink-0 text-xs tabular-nums text-slate-500">
+              <span className="hidden w-12 shrink-0 text-xs tabular-nums text-slate-500 sm:block">
                 {shortDate(tx.date)}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-slate-900">{describe(tx)}</div>
+                <div
+                  className="line-clamp-2 break-words text-sm font-semibold leading-snug text-slate-900 sm:line-clamp-1"
+                  title={describe(tx)}
+                >
+                  {describe(tx)}
+                </div>
                 <div className="truncate text-xs">
+                  <span className="tabular-nums text-slate-500 sm:hidden">
+                    {shortDate(tx.date)} ·{' '}
+                  </span>
                   {reconciled ? (
                     <span className="text-emerald-700">
                       <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
@@ -191,7 +204,8 @@ export function LedgerStatement({
                       to={`/financeiro/conciliacao?conta=${id}`}
                       className="font-semibold text-amber-700 hover:underline"
                     >
-                      <Clock3 className="mr-1 inline h-3.5 w-3.5" />A conciliar (fora do saldo)
+                      <Clock3 className="mr-1 inline h-3.5 w-3.5" />A conciliar
+                      <span className="hidden sm:inline"> (fora do saldo)</span>
                     </Link>
                   ) : (
                     <span className="text-slate-500">
