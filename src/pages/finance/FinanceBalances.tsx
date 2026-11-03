@@ -718,12 +718,12 @@ export default function FinanceBalances() {
                 </SelectContent>
               </Select>
               {period === 'outro' && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex w-full items-center gap-1.5 sm:w-auto">
                   <Input
                     type="date"
                     value={from || rangeFrom}
                     onChange={(e) => setFrom(e.target.value)}
-                    className="h-9 w-[150px]"
+                    className="h-9 min-w-0 flex-1 sm:w-[150px] sm:flex-none"
                     aria-label="De"
                   />
                   <span className="text-sm text-slate-400">a</span>
@@ -731,7 +731,7 @@ export default function FinanceBalances() {
                     type="date"
                     value={to || rangeTo}
                     onChange={(e) => setTo(e.target.value)}
-                    className="h-9 w-[150px]"
+                    className="h-9 min-w-0 flex-1 sm:w-[150px] sm:flex-none"
                     aria-label="Até"
                   />
                 </div>
@@ -823,7 +823,10 @@ export default function FinanceBalances() {
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold text-slate-900">
+                            <div
+                              className="line-clamp-2 break-words text-sm font-semibold leading-snug text-slate-900 sm:line-clamp-1"
+                              title={l.description || undefined}
+                            >
                               {l.description || 'Movimento'}
                             </div>
                             <div className="truncate text-xs">
@@ -1224,7 +1227,7 @@ function ConnectionDialog({
                 type="date"
                 value={dayOf(form.reconcile_from)}
                 onChange={(e) => set({ reconcile_from: pbDay(e.target.value) })}
-                className="w-[170px]"
+                className="w-full sm:w-[170px]"
               />
               <p className="text-xs text-slate-500">
                 Movimentos de antes dessa data ficam só no extrato, sem pendência.

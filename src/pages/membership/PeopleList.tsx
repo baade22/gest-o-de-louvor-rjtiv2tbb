@@ -145,7 +145,7 @@ export default function PeopleList() {
             Fichas de membros, congregados e visitantes da {currentChurch?.name}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link to="/membros/aniversarios">
             <Button
               variant="outline"
