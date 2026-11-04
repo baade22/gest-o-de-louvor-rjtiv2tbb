@@ -713,7 +713,7 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
 })
 
 // Resposta crua do banco guardada a cada busca (fin_bank_raw). Só o MASTER vê.
-// GET ?church_id=&account_id= → lista das buscas; &id= → uma busca com pedido e resposta
+// GET ?church_id=&account_id= → lista das buscas; &busca= → uma busca com pedido e resposta
 routerAdd(
   'GET',
   '/backend/v1/finance/bank-sync/raw',
@@ -721,7 +721,7 @@ routerAdd(
     const q = e.request.url.query()
     const churchId = String(q.get('church_id') || '')
     const accountId = String(q.get('account_id') || '')
-    const id = String(q.get('id') || '')
+    const id = String(q.get('busca') || q.get('id') || '')
     let member = null
     try {
       member = $app.findFirstRecordByFilter(
@@ -750,14 +750,24 @@ routerAdd(
       if (!r || r.getString('church_id') !== churchId) {
         return e.json(404, { message: 'Busca não encontrada.' })
       }
+      // O campo JSON volta como texto; se não der para ler, devolve o texto como está
       const parse = (f) => {
+        let text = ''
         try {
-          return JSON.parse(r.getString(f) || 'null')
+          text = r.getString(f) || ''
+          return text ? JSON.parse(text) : null
         } catch (_) {
-          return null
+          return text || null
         }
       }
-      return e.json(200, { ...meta(r), request: parse('request'), response: parse('response') })
+      try {
+        const out = meta(r)
+        out.request = parse('request')
+        out.response = parse('response')
+        return e.json(200, out)
+      } catch (err) {
+        return e.json(500, { message: 'Não deu para montar a resposta guardada: ' + err })
+      }
     }
     const rows = $app.findRecordsByFilter(
       'fin_bank_raw',

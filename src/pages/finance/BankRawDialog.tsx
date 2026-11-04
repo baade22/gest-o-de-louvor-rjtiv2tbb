@@ -46,11 +46,16 @@ export function BankRawDialog({
   }, [churchId, account.id])
 
   const show = async (it: BankRawFetch) => {
+    setError('')
     setLoadingOne(it.id)
     try {
       setOpen(await getBankRaw(churchId, it.id))
-    } catch {
-      setError('Não foi possível abrir esta busca.')
+    } catch (err) {
+      const e = err as { status?: number; response?: { message?: string } }
+      setError(
+        `Não foi possível abrir esta busca${e?.status ? ` (código ${e.status})` : ''}.` +
+          (e?.response?.message ? ` ${e.response.message}` : ''),
+      )
     } finally {
       setLoadingOne('')
     }
