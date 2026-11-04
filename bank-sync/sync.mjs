@@ -190,6 +190,10 @@ async function openCora(conn, cred) {
           if (list.length < 200) break
         }
       }
+      this.lastRaw = {
+        request: { method: 'GET', path: '/bank-statement/statement', start: from, end: to },
+        response: { entries },
+      }
       return coraLines(entries)
     },
   }
@@ -227,16 +231,20 @@ async function openBradesco(conn, cred) {
     },
     // O Bradesco consulta no máximo 1 ano por vez
     async statement(from, to) {
-      const st = await request(
-        `${base}/v1/fornecimento-extratos-contas/extratos?${new URLSearchParams({
-          ...account,
-          dataInicio: ddmmyyyy(from),
-          dataFim: ddmmyyyy(to),
-          tipo: (conn.account_type || 'CC').toLowerCase(),
-          tipoOperacao: '1',
-        })}`,
-        { headers: auth, ...tls },
-      )
+      const query = {
+        ...account,
+        dataInicio: ddmmyyyy(from),
+        dataFim: ddmmyyyy(to),
+        tipo: (conn.account_type || 'CC').toLowerCase(),
+        tipoOperacao: '1',
+      }
+      const path = '/v1/fornecimento-extratos-contas/extratos'
+      const st = await request(`${base}${path}?${new URLSearchParams(query)}`, {
+        headers: auth,
+        ...tls,
+      })
+      // Resposta crua, guardada só no LouvorFlow (sem o token do pedido)
+      this.lastRaw = { request: { method: 'GET', path, query }, response: st.json ?? st.text }
       if (st.status !== 200) throw new BankError(`Extrato do Bradesco: ${short(st)}`, st.status)
       const stErr = bradescoError(st.json)
       if (stErr) throw new BankError(`Extrato do Bradesco: ${stErr}`, 400)
@@ -299,9 +307,14 @@ async function main() {
         start_date: conn.from,
         end_date: conn.to,
         lines,
+        raw: bank.lastRaw || null,
       })
       console.log(
-        `${name}: ${lines.length} movimento(s), ${res.created} novo(s), ${res.auto_reconciled} conciliado(s) sozinho(s).`,
+        `${name}: ${lines.length} movimento(s), ${res.created} novo(s), ${res.auto_reconciled} conciliado(s) sozinho(s)` +
+          (res.moved ? `, ${res.moved} com data mudada pelo banco` : '') +
+          (res.merged ? `, ${res.merged} duplicado(s) juntado(s)` : '') +
+          (res.conflicts ? `, ${res.conflicts} duplicado(s) conciliado(s) dos dois lados` : '') +
+          '.',
       )
       if (conn.history) {
         await backfill(
