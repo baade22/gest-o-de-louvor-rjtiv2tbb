@@ -4,6 +4,7 @@
 import pb from '@/lib/pocketbase/client'
 import { DEFAULT_CATEGORIES, addMonthsToDate, monthRange } from '@/lib/financeSummary'
 import type { OfxStatement } from '@/lib/ofx'
+import { fundKey } from '@/lib/realizedBalance'
 import type {
   FinAccount,
   FinBankConnection,
@@ -626,7 +627,19 @@ export async function listReconcileStarts(churchId: string, accountIds: string[]
         fields: 'date',
         requestKey: null,
       })
-      if (res.items[0]) out[accountId] = res.items[0].date.slice(0, 10)
+      if (!res.items[0]) return
+      out[accountId] = res.items[0].date.slice(0, 10)
+      // Conta de fundo: o extrato só tem as aplicações e os resgates espelhados (fitid "…|inv")
+      const own = await pb.collection('fin_bank_lines').getList<FinBankLine>(1, 1, {
+        filter: pb.filter(
+          "church_id = {:churchId} && account_id = {:accountId} && fitid !~ '%|inv'",
+          { churchId, accountId },
+        ),
+        fields: 'id',
+        skipTotal: true,
+        requestKey: null,
+      })
+      if (!own.items.length) out[fundKey(accountId)] = '1'
     }),
   )
   return out
