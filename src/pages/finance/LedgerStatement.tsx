@@ -5,7 +5,12 @@ import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { accountBalances } from '@/lib/financeSummary'
 import { txEffect } from '@/lib/balanceDiff'
-import { isRealized, isReconciledSide, type ReconcileStarts } from '@/lib/realizedBalance'
+import {
+  isFundAccount,
+  isRealized,
+  isReconciledSide,
+  type ReconcileStarts,
+} from '@/lib/realizedBalance'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
 import type { FinAccount, FinTransaction } from '@/types/finance'
 import { Input } from '@/components/ui/input'
@@ -98,9 +103,11 @@ export function LedgerStatement({
           <p className="text-xs text-slate-500">
             {isCash
               ? 'Dinheiro em espécie: vale tudo o que foi lançado.'
-              : hasStart
-                ? `Só o que foi conciliado com o extrato entra no saldo (conciliação desde ${shortDate(starts[id], true)}).`
-                : 'Sem extrato carregado: vale tudo o que foi lançado.'}
+              : hasStart && isFundAccount(starts, id)
+                ? 'Fundo: rendimentos e outros lançamentos valem na hora; aplicações e resgates, depois de conciliados.'
+                : hasStart
+                  ? `Só o que foi conciliado com o extrato entra no saldo (conciliação desde ${shortDate(starts[id], true)}).`
+                  : 'Sem extrato carregado: vale tudo o que foi lançado.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:ml-auto">

@@ -6,11 +6,24 @@
 // Antes do início da conciliação da conta (o primeiro movimento do extrato que entra na
 // conciliação) vale tudo o que foi lançado, como antes. Conta de caixa (dinheiro em espécie)
 // e conta sem extrato não têm o que conciliar: vale tudo.
+//
+// Conta de fundo de investimento (ex.: Fundo Max DI): o extrato dela só traz as aplicações e
+// os resgates espelhados da conta-corrente. Rendimento, IR e outros lançamentos do fundo nunca
+// aparecem num extrato, então valem sempre; só as transferências esperam a conciliação.
 
 import type { FinTransaction } from '@/types/finance'
 
-/** Conta → dia (AAAA-MM-DD) em que a conciliação começa. Conta fora do mapa: vale tudo. */
+/**
+ * Conta → dia (AAAA-MM-DD) em que a conciliação começa. Conta fora do mapa: vale tudo.
+ * A chave `fundo:<conta>` marca a conta de fundo (extrato só com aplicações e resgates).
+ */
 export type ReconcileStarts = Record<string, string>
+
+export const fundKey = (accountId: string) => `fundo:${accountId}`
+
+/** A conta é de fundo (o extrato só traz aplicações e resgates)? */
+export const isFundAccount = (starts: ReconcileStarts, accountId: string) =>
+  !!starts[fundKey(accountId)]
 
 type Tx = Pick<FinTransaction, 'type' | 'account_id' | 'date'> &
   Partial<Pick<FinTransaction, 'to_account_id' | 'bank_line_id' | 'to_bank_line_id'>>
@@ -27,6 +40,7 @@ export function isRealized(tx: Tx, accountId: string, starts: ReconcileStarts) {
   const start = starts[accountId]
   if (!start) return true
   if ((tx.date || '').slice(0, 10) < start) return true
+  if (tx.type !== 'TRANSFERENCIA' && isFundAccount(starts, accountId)) return true
   return isReconciledSide(tx, accountId)
 }
 
