@@ -314,6 +314,10 @@ async function main() {
           (res.moved ? `, ${res.moved} com data mudada pelo banco` : '') +
           (res.merged ? `, ${res.merged} duplicado(s) juntado(s)` : '') +
           (res.conflicts ? `, ${res.conflicts} duplicado(s) conciliado(s) dos dois lados` : '') +
+          (res.removed ? `, ${res.removed} que o banco não devolve mais tirado(s)` : '') +
+          (res.stale_kept
+            ? `, ${res.stale_kept} que o banco não devolve mais e está conciliado`
+            : '') +
           '.',
       )
       if (conn.history) {
