@@ -593,7 +593,7 @@ export async function listBankRaw(churchId: string, accountId: string) {
 }
 
 export async function getBankRaw(churchId: string, id: string) {
-  const qs = new URLSearchParams({ church_id: churchId, id })
+  const qs = new URLSearchParams({ church_id: churchId, busca: id })
   return pb.send<BankRawFetch>(`/backend/v1/finance/bank-sync/raw?${qs}`, {})
 }
 
