@@ -27,6 +27,19 @@ describe('saldo realizado', () => {
       ),
     ).toBe(true)
   })
+  it('conta de fundo: rendimento vale sem extrato, transferência espera a conciliação', () => {
+    const fund = { F: '2026-10-01', 'fundo:F': '1' }
+    expect(
+      isRealized(tx({ type: 'ENTRADA', account_id: 'F', date: '2026-11-04' }), 'F', fund),
+    ).toBe(true)
+    expect(
+      isRealized(
+        tx({ type: 'TRANSFERENCIA', account_id: 'X', to_account_id: 'F', date: '2026-11-04' }),
+        'F',
+        fund,
+      ),
+    ).toBe(false)
+  })
   it('transferência: cada lado conta pelo seu próprio extrato', () => {
     const t = tx({
       type: 'TRANSFERENCIA',
