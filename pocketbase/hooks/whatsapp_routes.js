@@ -165,9 +165,46 @@ routerAdd(
 
     const rec = loadSettings()
 
+    // Limite do dia (mesma conta da fila em whatsapp_queue.js)
+    const dailyInfo = () => {
+      const DAILY = [20, 30, 45, 60, 80, 100, 120, 150, 150, 150, 150, 150, 150, 150]
+      const BRT = 3 * 3600 * 1000
+      const dayStart = (t) => {
+        const b = new Date(t - BRT)
+        return Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()) + BRT
+      }
+      const firstAt = rec.getString('first_connected_at')
+      const first = firstAt ? new Date(firstAt.replace(' ', 'T')).getTime() || 0 : 0
+      if (!first) return { day: 0, limit: DAILY[0], sent: 0, started: false }
+      const day = Math.max(0, Math.floor((dayStart(Date.now()) - dayStart(first)) / 864e5))
+      let sent = 0
+      try {
+        sent = $app.countRecords(
+          'whatsapp_messages',
+          $dbx.exp(
+            "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR')",
+            { c: churchId, d: new Date(dayStart(Date.now())).toISOString().replace('T', ' ') },
+          ),
+        )
+      } catch (_) {}
+      return {
+        day: day + 1,
+        limit: day < DAILY.length ? DAILY[day] : 250,
+        sent: sent,
+        started: true,
+      }
+    }
+    const pauseInfo = () => {
+      const until = rec.getString('paused_until')
+      const t = until ? new Date(until.replace(' ', 'T')).getTime() || 0 : 0
+      return t > Date.now() ? { until: until, note: rec.getString('pause_note') } : null
+    }
+
     if (action === 'status') {
       const state = refreshState(rec)
       return e.json(200, {
+        daily: dailyInfo(),
+        paused: pauseInfo(),
         configured: configured,
         state: state,
         phone: rec.getString('phone'),
@@ -339,6 +376,14 @@ routerAdd(
           message: 'Servidor do WhatsApp não respondeu: ' + String(err).slice(0, 200),
         })
       }
+    }
+
+    if (action === 'resume_queue') {
+      rec.set('paused_until', '')
+      rec.set('pause_note', '')
+      rec.set('fail_streak', 0)
+      $app.save(rec)
+      return e.json(200, { paused: null })
     }
 
     if (action === 'disconnect') {

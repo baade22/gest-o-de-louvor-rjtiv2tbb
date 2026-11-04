@@ -12,6 +12,10 @@ export interface WhatsAppStatus {
   last_error: string
   auto: Record<WhatsAppAutoKind, boolean>
   queue: { fila: number; erro: number }
+  /** Limite do dia pela idade do número (day começa em 1; started = já conectou alguma vez) */
+  daily?: { day: number; limit: number; sent: number; started: boolean }
+  /** Fila pausada sozinha depois de várias falhas seguidas */
+  paused?: { until: string; note: string } | null
 }
 
 export interface WhatsAppMessage {
@@ -41,6 +45,8 @@ export const getWhatsAppStatus = (churchId: string) => call<WhatsAppStatus>(chur
 export const connectWhatsApp = (churchId: string) =>
   call<{ state: WhatsAppState; qr?: string; phone?: string }>(churchId, 'connect')
 
+export const resumeWhatsAppQueue = (churchId: string) =>
+  call<{ paused: null }>(churchId, 'resume_queue')
 export const disconnectWhatsApp = (churchId: string) =>
   call<{ state: WhatsAppState }>(churchId, 'disconnect')
 
