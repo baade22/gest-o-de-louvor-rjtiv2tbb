@@ -314,6 +314,9 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   let created = 0
   let skipped = 0
   let auto = 0
+  let moved = 0
+  let merged = 0
+  let conflicts = 0
   try {
     $app.runInTransaction((txApp) => {
       const linesCol = txApp.findCollectionByNameOrId('fin_bank_lines')
@@ -372,6 +375,83 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         invImp.set('lines_created', invImp.getInt('lines_created') + 1)
         txApp.save(invImp)
       }
+      // O Bradesco identifica o movimento pela data + documento + código + valor. Quando o
+      // banco muda a data de um movimento (ex.: entrada no feriado que vem primeiro com a data
+      // do próximo dia útil), o mesmo movimento chega com outra identificação. "Órfão" é o
+      // movimento já gravado, dentro do período buscado, que o banco não devolveu mais: se
+      // chega um igual (documento, código e valor) em até 5 dias, é o mesmo movimento.
+      const DAY = 24 * 60 * 60 * 1000
+      const daysApart = (a, b) =>
+        Math.abs(new Date(a + 'T12:00:00Z').getTime() - new Date(b + 'T12:00:00Z').getTime()) / DAY
+      const twinKey = (fitid) => {
+        if (provider !== 'BRADESCO' || fitid.indexOf(prefix) !== 0) return ''
+        const p = fitid.slice(prefix.length).split('|')
+        return p.length >= 5 ? p[1] + '|' + p[2] + '|' + p[3] : ''
+      }
+      const batch = {}
+      for (const l of lines) batch[(prefix + String(l.id).trim()).slice(0, 255)] = true
+      let orphans = []
+      if (
+        provider === 'BRADESCO' &&
+        !isHistory &&
+        lines.length &&
+        isYmd(body.start_date) &&
+        isYmd(body.end_date)
+      ) {
+        orphans = txApp
+          .findRecordsByFilter(
+            'fin_bank_lines',
+            'account_id = {:a} && fitid ~ {:p} && date >= {:s} && date <= {:e}',
+            '',
+            0,
+            0,
+            {
+              a: accountId,
+              p: prefix + '%',
+              s: body.start_date + ' 00:00:00.000Z',
+              e: body.end_date + ' 23:59:59.999Z',
+            },
+          )
+          .filter((r) => !batch[r.getString('fitid')] && twinKey(r.getString('fitid')))
+      }
+      const takeTwin = (fitid, ymd) => {
+        const key = twinKey(fitid)
+        if (!key) return null
+        let best = null
+        let bestDiff = 99
+        for (const o of orphans) {
+          if (twinKey(o.getString('fitid')) !== key) continue
+          const diff = daysApart(o.getString('date').slice(0, 10), ymd)
+          if (diff <= 5 && diff < bestDiff) {
+            best = o
+            bestDiff = diff
+          }
+        }
+        if (best) orphans = orphans.filter((o) => o !== best)
+        return best
+      }
+      // Movimento sem conciliação: dá para apagar ou trocar sem perder nada
+      const isFree = (r) => {
+        if (r.getString('status') === 'CONCILIADO' || r.getString('transaction_id')) return false
+        const refs = txApp.findRecordsByFilter(
+          'fin_transactions',
+          'bank_line_id = {:l} || to_bank_line_id = {:l}',
+          '',
+          1,
+          0,
+          { l: r.id },
+        )
+        return refs.length === 0
+      }
+      // O órfão passa a ter a identificação e a data que o banco devolve agora
+      const moveTo = (rec, fitid, l) => {
+        rec.set('fitid', fitid)
+        rec.set('date', pbDate(l.date))
+        rec.set('description', String(l.description || 'Movimento').slice(0, 500))
+        const st = rec.getString('status')
+        if (st === 'PENDENTE' || st === 'EXTRATO') rec.set('status', statusFor(l.date))
+        txApp.save(rec)
+      }
       for (const l of lines) {
         const fitid = (prefix + String(l.id).trim()).slice(0, 255)
         const amount = Number(l.amount_cents)
@@ -381,15 +461,34 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           continue
         }
         if (investAccountId && fundMove(desc)) mirror(l, amount)
-        let exists = false
+        let current = null
         try {
-          txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
-            a: accountId,
-            f: fitid,
-          })
-          exists = true
+          current = txApp.findFirstRecordByFilter(
+            'fin_bank_lines',
+            'account_id = {:a} && fitid = {:f}',
+            { a: accountId, f: fitid },
+          )
         } catch (_) {}
-        if (exists) {
+        if (current) {
+          // Já entrou em dobro antes desta correção: junta os dois
+          const twin = takeTwin(fitid, l.date)
+          if (twin) {
+            if (isFree(twin)) {
+              txApp.delete(twin)
+              merged++
+            } else if (isFree(current)) {
+              txApp.delete(current)
+              moveTo(twin, fitid, l)
+              merged++
+            } else conflicts++
+          }
+          skipped++
+          continue
+        }
+        const twin = takeTwin(fitid, l.date)
+        if (twin) {
+          moveTo(twin, fitid, l)
+          moved++
           skipped++
           continue
         }
@@ -570,8 +669,108 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   } catch (err) {
     return e.json(400, { message: 'Não foi possível gravar o extrato: ' + err.message })
   }
-  return e.json(200, { created: created, skipped: skipped, auto_reconciled: auto })
+
+  // Resposta crua do banco: guardada à parte, sem atrapalhar a busca se falhar
+  if (!isHistory && body.raw && typeof body.raw === 'object') {
+    try {
+      const raw = new Record($app.findCollectionByNameOrId('fin_bank_raw'))
+      raw.set('church_id', churchId)
+      raw.set('connection_id', conn.id)
+      raw.set('account_id', accountId)
+      raw.set('provider', provider)
+      if (isYmd(body.start_date)) raw.set('start_date', body.start_date)
+      if (isYmd(body.end_date)) raw.set('end_date', body.end_date)
+      raw.set('lines_count', lines.length)
+      raw.set('request', body.raw.request || null)
+      const resp = body.raw.response === undefined ? null : body.raw.response
+      raw.set(
+        'response',
+        JSON.stringify(resp).length > 4900000 ? { aviso: 'Resposta grande demais' } : resp,
+      )
+      $app.save(raw)
+      const old = $app.findRecordsByFilter(
+        'fin_bank_raw',
+        'connection_id = {:c}',
+        '-created',
+        200,
+        40,
+        { c: conn.id },
+      )
+      for (const r of old) $app.delete(r)
+    } catch (err) {
+      console.log('bank-sync: não foi possível guardar a resposta do banco: ' + err)
+    }
+  }
+
+  return e.json(200, {
+    created: created,
+    skipped: skipped,
+    auto_reconciled: auto,
+    moved: moved,
+    merged: merged,
+    conflicts: conflicts,
+  })
 })
+
+// Resposta crua do banco guardada a cada busca (fin_bank_raw). Só o MASTER vê.
+// GET ?church_id=&account_id= → lista das buscas; &id= → uma busca com pedido e resposta
+routerAdd(
+  'GET',
+  '/backend/v1/finance/bank-sync/raw',
+  (e) => {
+    const q = e.request.url.query()
+    const churchId = String(q.get('church_id') || '')
+    const accountId = String(q.get('account_id') || '')
+    const id = String(q.get('id') || '')
+    let member = null
+    try {
+      member = $app.findFirstRecordByFilter(
+        'church_members',
+        'church_id = {:c} && user_id = {:u} && is_active = true',
+        { c: churchId, u: e.auth.id },
+      )
+    } catch (_) {}
+    if (!member || member.getString('role') !== 'MASTER') {
+      return e.json(403, { message: 'Só o MASTER vê a resposta do banco.' })
+    }
+    const meta = (r) => ({
+      id: r.id,
+      created: r.getString('created'),
+      provider: r.getString('provider'),
+      account_id: r.getString('account_id'),
+      start_date: r.getString('start_date'),
+      end_date: r.getString('end_date'),
+      lines_count: r.getInt('lines_count'),
+    })
+    if (id) {
+      let r = null
+      try {
+        r = $app.findRecordById('fin_bank_raw', id)
+      } catch (_) {}
+      if (!r || r.getString('church_id') !== churchId) {
+        return e.json(404, { message: 'Busca não encontrada.' })
+      }
+      const parse = (f) => {
+        try {
+          return JSON.parse(r.getString(f) || 'null')
+        } catch (_) {
+          return null
+        }
+      }
+      return e.json(200, { ...meta(r), request: parse('request'), response: parse('response') })
+    }
+    const rows = $app.findRecordsByFilter(
+      'fin_bank_raw',
+      accountId ? 'church_id = {:c} && account_id = {:a}' : 'church_id = {:c}',
+      '-created',
+      40,
+      0,
+      { c: churchId, a: accountId },
+    )
+    return e.json(200, { items: rows.map(meta) })
+  },
+  $apis.requireAuth(),
+)
 
 routerAdd(
   'POST',
