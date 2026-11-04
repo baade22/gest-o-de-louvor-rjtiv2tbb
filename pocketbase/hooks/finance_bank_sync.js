@@ -317,6 +317,8 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
   let moved = 0
   let merged = 0
   let conflicts = 0
+  let removed = 0
+  let staleKept = 0
   try {
     $app.runInTransaction((txApp) => {
       const linesCol = txApp.findCollectionByNameOrId('fin_bank_lines')
@@ -536,6 +538,16 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         if (rec.getString('status') === 'PENDENTE') newLines.push(rec)
         created++
       }
+      // O que sobrou dos órfãos o banco não devolve mais neste período (ex.: lançamento
+      // provisório do feriado que o banco trocou por outro, com outro nome). Sem conciliação,
+      // sai do extrato; se o movimento voltar numa busca futura, entra de novo. Conciliado
+      // fica, para a pessoa desfazer a conciliação primeiro.
+      for (const o of orphans) {
+        if (isFree(o)) {
+          txApp.delete(o)
+          removed++
+        } else staleKept++
+      }
       if (imp) {
         imp.set('lines_created', created)
         imp.set('lines_skipped', skipped)
@@ -709,6 +721,8 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
     moved: moved,
     merged: merged,
     conflicts: conflicts,
+    removed: removed,
+    stale_kept: staleKept,
   })
 })
 
