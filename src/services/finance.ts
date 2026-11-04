@@ -570,6 +570,33 @@ export async function requestBankSync(churchId: string): Promise<BankSyncRequest
   })
 }
 
+export interface BankRawFetch {
+  id: string
+  created: string
+  provider: string
+  account_id: string
+  start_date: string
+  end_date: string
+  lines_count: number
+  request?: unknown
+  response?: unknown
+}
+
+/** Buscas do conector com a resposta crua do banco (só o MASTER vê). */
+export async function listBankRaw(churchId: string, accountId: string) {
+  const qs = new URLSearchParams({ church_id: churchId, account_id: accountId })
+  const res = await pb.send<{ items: BankRawFetch[] }>(
+    `/backend/v1/finance/bank-sync/raw?${qs}`,
+    {},
+  )
+  return res.items
+}
+
+export async function getBankRaw(churchId: string, id: string) {
+  const qs = new URLSearchParams({ church_id: churchId, id })
+  return pb.send<BankRawFetch>(`/backend/v1/finance/bank-sync/raw?${qs}`, {})
+}
+
 /** Movimentos do extrato de uma conta num período (YYYY-MM-DD a YYYY-MM-DD). */
 export async function listStatement(churchId: string, accountId: string, from: string, to: string) {
   return pb.collection('fin_bank_lines').getFullList<FinBankLine>({

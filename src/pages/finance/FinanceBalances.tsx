@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/select'
 import { useFinanceLookups } from './useFinanceLookups'
 import { BalanceDiffDialog } from './BalanceDiffDialog'
+import { BankRawDialog } from './BankRawDialog'
 import { LedgerStatement } from './LedgerStatement'
 import { useReconcileStarts } from './useReconcileStarts'
 import { realizedFilter } from '@/lib/realizedBalance'
@@ -189,7 +190,7 @@ function bankBalance(conn?: FinBankConnection, imp?: FinBankImport, asInvest = f
 }
 
 export default function FinanceBalances() {
-  const { currentChurch } = useAuth()
+  const { currentChurch, isMaster } = useAuth()
   const { canEdit } = useFinanceAccess('conciliacao')
   const { toast } = useToast()
   const churchId = currentChurch?.id
@@ -213,6 +214,7 @@ export default function FinanceBalances() {
   } | null>(null)
   // Relógio para "há 5 min" e para buscar de novo de tempos em tempos
   const [now, setNow] = useState(Date.now())
+  const [rawFor, setRawFor] = useState<FinAccount | null>(null)
 
   const accounts = useMemo(
     () =>
@@ -630,6 +632,16 @@ export default function FinanceBalances() {
                       >
                         Ver extrato
                       </Button>
+                      {isMaster && conn && !parent && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 rounded-lg"
+                          onClick={() => setRawFor(a)}
+                        >
+                          Resposta do banco
+                        </Button>
+                      )}
                       {canEdit && !parent && (
                         <Button
                           size="sm"
@@ -876,6 +888,10 @@ export default function FinanceBalances() {
           starts={starts}
           lookups={lookups}
         />
+      )}
+
+      {rawFor && churchId && (
+        <BankRawDialog churchId={churchId} account={rawFor} onClose={() => setRawFor(null)} />
       )}
 
       {diffFor && churchId && (
