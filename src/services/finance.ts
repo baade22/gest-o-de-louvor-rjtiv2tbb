@@ -512,6 +512,14 @@ export async function setLineIgnored(lineId: string, ignored: boolean) {
     .update<FinBankLine>(lineId, { status: ignored ? 'IGNORADO' : 'PENDENTE' })
 }
 
+/** Exclui um movimento ignorado; o banco e o OFX não o trazem de novo. */
+export async function removeIgnoredLine(lineId: string) {
+  return pb.send('/backend/v1/finance/bank/remove', {
+    method: 'POST',
+    body: { line_id: lineId },
+  })
+}
+
 // ---- Saldos e extratos (API do banco) ----
 
 export async function listBankConnections(churchId: string) {
