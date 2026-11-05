@@ -44,6 +44,7 @@ import {
   listOpenBills,
   listUnreconciled,
   reconcileLine,
+  removeIgnoredLine,
   saveRegistry,
   setLineIgnored,
   unreconcileLine,
@@ -89,6 +90,7 @@ import {
 import type { FinanceLookups } from './TransactionSheet'
 import { useFinanceLookups } from './useFinanceLookups'
 import { BalanceDiffDialog } from './BalanceDiffDialog'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { useReconcileStarts } from './useReconcileStarts'
 import { realizedFilter } from '@/lib/realizedBalance'
 import {
@@ -122,6 +124,7 @@ export default function FinanceReconcile() {
   const { currentChurch } = useAuth()
   const { canEdit } = useFinanceAccess('conciliacao')
   const { toast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const churchId = currentChurch?.id
   const { lookups, reload: reloadLookups } = useFinanceLookups(churchId)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -238,7 +241,11 @@ export default function FinanceReconcile() {
           : { accountId, items }
       })
       setImports(imps)
-      setConnection(conns.find((c) => c.account_id === accountId))
+      // Conta do fundo (aplicações do Bradesco): o saldo vem da conexão da conta-corrente
+      setConnection(
+        conns.find((c) => c.account_id === accountId) ||
+          conns.find((c) => c.provider === 'BRADESCO' && c.invest_account_id === accountId),
+      )
       setBills(open)
       setLedger(led)
       setCandidates(txs)
@@ -280,9 +287,14 @@ export default function FinanceReconcile() {
   const lastFile = imports.find((i) => i.has_balance)
   const fileDate = (lastFile?.balance_date || lastFile?.end_date || '').slice(0, 10)
   const apiDate = connection?.has_balance ? brtDay(connection.balance_at || '') : ''
+  const asInvest = !!connection && connection.account_id !== accountId
   const lastBalance =
     apiDate && (!lastFile || apiDate >= fileDate)
-      ? { balance_cents: connection?.balance_cents || 0 }
+      ? {
+          balance_cents: asInvest
+            ? connection?.invested_cents || 0
+            : connection?.balance_cents || 0,
+        }
       : lastFile
   const balanceDate = apiDate && lastBalance !== lastFile ? apiDate : fileDate
   const systemBalance = useMemo(() => {
@@ -1033,6 +1045,27 @@ export default function FinanceReconcile() {
                                 <Undo2 className="mr-2 h-4 w-4" /> Voltar para a conciliação
                               </DropdownMenuItem>
                             )}
+                            {line.status === 'IGNORADO' && (
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-700"
+                                onClick={() =>
+                                  confirm({
+                                    title: 'Excluir este movimento?',
+                                    description: `${line.description || 'Movimento'} de ${formatCents(Math.abs(line.amount_cents))} sai da conciliação e não volta nas próximas buscas do banco.`,
+                                    confirmLabel: 'Excluir',
+                                    destructive: true,
+                                    onConfirm: () =>
+                                      run(
+                                        line,
+                                        () => removeIgnoredLine(line.id),
+                                        'Movimento excluído',
+                                      ),
+                                  })
+                                }
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -1166,6 +1199,7 @@ export default function FinanceReconcile() {
           onClose={() => setDiffOpen(false)}
         />
       )}
+      {confirmDialog}
     </div>
   )
 }

@@ -332,9 +332,22 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
       const fundMove = (d) =>
         /^\s*(APLIC|RESG)/i.test(d) && /FUNDO|MAXI?\s*DI/i.test(d) && !/INVEST\s*FACIL/i.test(d)
       let invImp = null
+      // Movimentos que a pessoa excluiu da conciliação (ignorados e excluídos): não voltam
+      let removedRows = []
+      try {
+        removedRows = txApp.findRecordsByFilter(
+          'fin_bank_removed',
+          'account_id = {:a} || account_id = {:b}',
+          '',
+          0,
+          0,
+          { a: accountId, b: investAccountId || accountId },
+        )
+      } catch (_) {}
       // O lado da conta de aplicação: mesmo dia, valor com o sinal trocado
       const mirror = (l, amount) => {
         const fitid = (prefix + String(l.id).trim() + '|inv').slice(0, 255)
+        if (wasRemoved(investAccountId, fitid, l.date)) return
         try {
           txApp.findFirstRecordByFilter('fin_bank_lines', 'account_id = {:a} && fitid = {:f}', {
             a: investAccountId,
@@ -389,6 +402,23 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         if (provider !== 'BRADESCO' || fitid.indexOf(prefix) !== 0) return ''
         const p = fitid.slice(prefix.length).split('|')
         return p.length >= 5 ? p[1] + '|' + p[2] + '|' + p[3] : ''
+      }
+      // Excluído antes: mesma identificação, ou o mesmo movimento com a data mudada pelo banco
+      const wasRemoved = (accId, fitid, ymd) => {
+        const key = twinKey(fitid.replace(/\|inv$/, ''))
+        for (const r of removedRows) {
+          if (r.getString('account_id') !== accId) continue
+          const f = r.getString('fitid')
+          if (f === fitid) return true
+          if (
+            key &&
+            /\|inv$/.test(f) === /\|inv$/.test(fitid) &&
+            twinKey(f.replace(/\|inv$/, '')) === key &&
+            daysApart(r.getString('date'), ymd) <= 5
+          )
+            return true
+        }
+        return false
       }
       const batch = {}
       for (const l of lines) batch[(prefix + String(l.id).trim()).slice(0, 255)] = true
@@ -488,6 +518,10 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           continue
         }
         const twin = takeTwin(fitid, l.date)
+        if (!twin && wasRemoved(accountId, fitid, l.date)) {
+          skipped++
+          continue
+        }
         if (twin) {
           moveTo(twin, fitid, l)
           moved++

@@ -15,6 +15,8 @@
 //             conciliado junto quando há um só movimento pendente de mesmo valor na outra conta
 //             (até 3 dias de diferença).
 // unreconcile { line_id }   desfaz a ligação; o lançamento continua como está
+// remove      { line_id }   exclui um movimento ignorado (sem lançamento ligado). A
+//             identificação fica em fin_bank_removed para o banco e o OFX não o trazerem de novo
 //
 // Só MASTER ou quem tem financeiro.conciliacao.alterar (na congregação da conta). Tudo numa transação só.
 // Se o lançamento conciliado for estornado, a linha volta a ficar pendente.
@@ -147,6 +149,23 @@ routerAdd(
               skipped++
               continue
             }
+            // Movimento que a pessoa excluiu da conciliação não volta
+            let removedBefore = false
+            try {
+              txApp.findFirstRecordByFilter(
+                'fin_bank_removed',
+                'account_id = {:a} && fitid = {:f}',
+                {
+                  a: account.id,
+                  f: fitid,
+                },
+              )
+              removedBefore = true
+            } catch (_) {}
+            if (removedBefore) {
+              skipped++
+              continue
+            }
             // Movimento que já veio pela API do banco (com outro FITID): cada linha da API no
             // mesmo dia e valor "cobre" uma linha do arquivo
             const same = txApp.findRecordsByFilter(
@@ -196,6 +215,49 @@ routerAdd(
     const isCredit = lineAmount > 0
     const abs = Math.abs(lineAmount)
     const accountId = line.getString('account_id')
+
+    if (action === 'remove') {
+      if (line.getString('status') !== 'IGNORADO') {
+        return e.json(400, { message: 'Só dá para excluir um movimento ignorado.' })
+      }
+      try {
+        $app.findCollectionByNameOrId('fin_bank_removed')
+      } catch (_) {
+        return e.json(400, {
+          message: 'Falta aplicar a migração 0093 no servidor para excluir movimentos.',
+        })
+      }
+      try {
+        $app.runInTransaction((txApp) => {
+          const fresh = txApp.findRecordById('fin_bank_lines', line.id)
+          if (fresh.getString('status') !== 'IGNORADO' || fresh.getString('transaction_id')) {
+            throw new Error('o movimento não está mais ignorado')
+          }
+          const refs = txApp.findRecordsByFilter(
+            'fin_transactions',
+            'bank_line_id = {:l} || to_bank_line_id = {:l}',
+            '',
+            1,
+            0,
+            { l: fresh.id },
+          )
+          if (refs.length) throw new Error('o movimento está ligado a um lançamento')
+          const rm = new Record(txApp.findCollectionByNameOrId('fin_bank_removed'))
+          rm.set('church_id', churchId)
+          rm.set('account_id', accountId)
+          rm.set('fitid', fresh.getString('fitid'))
+          rm.set('date', fresh.getString('date').slice(0, 10))
+          rm.set('amount_cents', fresh.getInt('amount_cents'))
+          rm.set('description', fresh.getString('description').slice(0, 500))
+          rm.set('removed_by_name', String(userName || '').slice(0, 200))
+          txApp.save(rm)
+          txApp.delete(fresh)
+        })
+      } catch (err) {
+        return e.json(400, { message: 'Não foi possível excluir: ' + err.message })
+      }
+      return e.json(200, { ok: true })
+    }
 
     if (action === 'unreconcile') {
       if (line.getString('status') !== 'CONCILIADO') {
