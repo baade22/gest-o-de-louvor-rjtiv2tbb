@@ -2,10 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
-  ArrowDownLeft,
-  ArrowUpRight,
-  CheckCircle2,
-  Download,
   Landmark,
   Loader2,
   PlugZap,
@@ -18,14 +14,13 @@ import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { accountBalances } from '@/lib/financeSummary'
-import { brtDateTime, brtDay, statementCsv, statementSummary, timeAgo } from '@/lib/bankStatement'
+import { brtDateTime, brtDay, timeAgo } from '@/lib/bankStatement'
 import {
   deleteBankConnection,
   listBankConnections,
   listLatestBankBalances,
   listLedger,
   listPendingLines,
-  listStatement,
   requestBankSync,
   saveBankConnection,
   type BankConnectionInput,
@@ -75,12 +70,6 @@ import {
 } from './shared'
 
 const PROVIDER_LABELS = { CORA: 'Cora', BRADESCO: 'Bradesco' } as const
-const STATUS_LABELS: Record<string, string> = {
-  PENDENTE: 'A conciliar',
-  CONCILIADO: 'Conciliado',
-  IGNORADO: 'Ignorado',
-  EXTRATO: 'Só extrato',
-}
 const README_URL =
   'https://github.com/baade22/gest-o-de-louvor-rjtiv2tbb/blob/main/bank-sync/README.md'
 
@@ -136,26 +125,6 @@ function historyState(conn?: FinBankConnection) {
     conn.history_done_for === target || (target !== 'MAX' && !!loaded && loaded <= target)
   return { done, loaded }
 }
-const shiftDays = (ymd: string, n: number) => {
-  const d = new Date(`${ymd}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
-type Period = 'mes' | 'mes-passado' | '7' | '30' | 'outro'
-function periodRange(p: Period, from: string, to: string): [string, string] {
-  const t = today()
-  if (p === '7') return [shiftDays(t, -6), t]
-  if (p === '30') return [shiftDays(t, -29), t]
-  if (p === 'mes') return [`${t.slice(0, 7)}-01`, t]
-  if (p === 'mes-passado') {
-    const first = `${t.slice(0, 7)}-01`
-    const end = shiftDays(first, -1)
-    return [`${end.slice(0, 7)}-01`, end]
-  }
-  return [from || t, to || t]
-}
-
 /**
  * Saldo informado pelo banco: o mais recente entre a API e o último arquivo OFX com saldo.
  * asInvest: a conta é a do fundo (aplicações) da conexão de outra conta.
@@ -308,6 +277,13 @@ export default function FinanceBalances() {
       realized,
     )[account.id] || 0
 
+  // Tudo o que a igreja tem e sabemos: bancos (conciliado) + caixa em espécie
+  const cashTotal = accounts
+    .filter((a) => a.kind === 'CAIXA')
+    .reduce((s, a) => s + (systemBalances[a.id] || 0), 0)
+  const bankTotal = accounts
+    .filter((a) => a.kind !== 'CAIXA')
+    .reduce((s, a) => s + (systemBalances[a.id] || 0), 0)
   const withBank = accounts.map((a) => ({ a, b: balanceOf(a.id) })).filter((x) => x.b)
   const totalBank = withBank.reduce((s, x) => s + (x.b?.cents || 0), 0)
   const totalSystem = withBank.reduce((s, x) => s + systemBalanceOn(x.a, x.b!.day), 0)
@@ -343,51 +319,8 @@ export default function FinanceBalances() {
     }
   }
 
-  // ---- Extrato ----
+  // ---- Extrato (só o que está conciliado) ----
   const [stAccount, setStAccount] = useState(params.get('conta') || '')
-  const [period, setPeriod] = useState<Period>('mes')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [lines, setLines] = useState<FinBankLine[]>([])
-  const [stLoading, setStLoading] = useState(false)
-  const [rangeFrom, rangeTo] = periodRange(period, from, to)
-  const bankAccounts = useMemo(() => accounts.filter((a) => a.kind !== 'CAIXA'), [accounts])
-  useEffect(() => {
-    if (!stAccount && bankAccounts.length) setStAccount(bankAccounts[0].id)
-  }, [stAccount, bankAccounts])
-
-  const lastLineSync = connOf(stAccount)?.last_sync_at
-  useEffect(() => {
-    if (!churchId || !stAccount) return
-    let alive = true
-    setStLoading(true)
-    listStatement(churchId, stAccount, rangeFrom, rangeTo)
-      .then((ls) => alive && setLines(ls))
-      .catch((err) => {
-        console.error(err)
-        if (alive) setLines([])
-      })
-      .finally(() => alive && setStLoading(false))
-    return () => {
-      alive = false
-    }
-    // lastLineSync: recarrega quando chega uma busca nova do banco
-  }, [churchId, stAccount, rangeFrom, rangeTo, lastLineSync])
-
-  const summary = useMemo(() => statementSummary(lines), [lines])
-  const stAccountName = lookups.accounts.find((a) => a.id === stAccount)?.name || 'conta'
-
-  const exportCsv = () => {
-    const blob = new Blob([statementCsv(lines, (s) => STATUS_LABELS[s || ''] || '')], {
-      type: 'text/csv;charset=utf-8',
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `extrato-${stAccountName.toLowerCase().replace(/\s+/g, '-')}-${rangeFrom}-a-${rangeTo}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <div className="space-y-5">
@@ -435,13 +368,25 @@ export default function FinanceBalances() {
       {!canEdit && <ReadOnlyNotice />}
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={cn(cardClass, 'border-teal-200 bg-teal-50/40 p-4')}>
+            <div className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
+              <Wallet className="h-4 w-4 text-teal-600" />
+              Total em contas e caixa
+            </div>
+            <div className="mt-2 text-[22px] font-bold tabular-nums text-slate-900">
+              {formatCents(bankTotal + cashTotal)}
+            </div>
+            <div className="text-xs text-slate-500">
+              Bancos {formatCents(bankTotal)} + caixa {formatCents(cashTotal)}
+            </div>
+          </div>
           <div className={cn(cardClass, 'p-4')}>
             <div className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
               <Landmark className="h-4 w-4 text-slate-400" />
@@ -669,220 +614,13 @@ export default function FinanceBalances() {
         </div>
       )}
 
-      {bankAccounts.length > 0 && (
-        <div id="extrato" className={cn(cardClass, 'scroll-mt-4')}>
-          <div className="flex flex-col gap-3 border-b border-slate-200 p-3 lg:flex-row lg:items-center">
-            <div className="px-1">
-              <h2 className="font-semibold text-slate-900">Extrato</h2>
-              {connOf(stAccount) && (
-                <p className="text-xs text-slate-500">
-                  {lastLineSync
-                    ? `Do banco, atualizado ${timeAgo(lastLineSync, now)}`
-                    : 'Aguardando a primeira busca no banco'}
-                  {canEdit && connOf(stAccount)?.enabled && (
-                    <>
-                      {' · '}
-                      <button
-                        type="button"
-                        onClick={syncNow}
-                        disabled={syncing || waiting}
-                        className="font-semibold text-teal-700 hover:underline disabled:text-slate-400 disabled:no-underline"
-                      >
-                        {waiting ? 'buscando no banco…' : 'buscar agora'}
-                      </button>
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-              <Select
-                value={stAccount}
-                onValueChange={(v) => {
-                  setStAccount(v)
-                  setParams({ conta: v }, { replace: true })
-                }}
-              >
-                <SelectTrigger
-                  className="h-9 w-full rounded-lg sm:w-52"
-                  aria-label="Conta do extrato"
-                >
-                  <SelectValue placeholder="Conta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-                <SelectTrigger className="h-9 w-full rounded-lg sm:w-44" aria-label="Período">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mes">Este mês</SelectItem>
-                  <SelectItem value="mes-passado">Mês passado</SelectItem>
-                  <SelectItem value="7">Últimos 7 dias</SelectItem>
-                  <SelectItem value="30">Últimos 30 dias</SelectItem>
-                  <SelectItem value="outro">Outro período</SelectItem>
-                </SelectContent>
-              </Select>
-              {period === 'outro' && (
-                <div className="flex w-full items-center gap-1.5 sm:w-auto">
-                  <Input
-                    type="date"
-                    value={from || rangeFrom}
-                    onChange={(e) => setFrom(e.target.value)}
-                    className="h-9 min-w-0 flex-1 sm:w-[150px] sm:flex-none"
-                    aria-label="De"
-                  />
-                  <span className="text-sm text-slate-400">a</span>
-                  <Input
-                    type="date"
-                    value={to || rangeTo}
-                    onChange={(e) => setTo(e.target.value)}
-                    className="h-9 min-w-0 flex-1 sm:w-[150px] sm:flex-none"
-                    aria-label="Até"
-                  />
-                </div>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 rounded-lg"
-                disabled={lines.length === 0}
-                onClick={exportCsv}
-              >
-                <Download className="h-4 w-4" />
-                Planilha
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-200 text-center">
-            <div className="p-3">
-              <div className="text-xs text-slate-500">Entradas</div>
-              <div className="text-sm font-bold tabular-nums sm:text-base text-emerald-700">
-                {formatCents(summary.credits)}
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-xs text-slate-500">Saídas</div>
-              <div className="text-sm font-bold tabular-nums sm:text-base text-rose-700">
-                {formatCents(summary.debits)}
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-xs text-slate-500">Resultado</div>
-              <div
-                className={cn(
-                  'text-sm font-bold tabular-nums sm:text-base',
-                  summary.net < 0 ? 'text-rose-700' : 'text-slate-900',
-                )}
-              >
-                {summary.net < 0 ? '− ' : ''}
-                {formatCents(Math.abs(summary.net))}
-              </div>
-            </div>
-          </div>
-
-          {stLoading ? (
-            <div className="space-y-2 p-4">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : lines.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="font-semibold text-slate-800">Nenhum movimento neste período</p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-                {connOf(stAccount)
-                  ? 'Os movimentos chegam a cada busca no banco.'
-                  : 'Conecte a conta ao banco ou importe o extrato OFX na Conciliação.'}
-              </p>
-            </div>
-          ) : (
-            <div>
-              {[...summary.days].reverse().map((day) => (
-                <div key={day.date}>
-                  <div className="flex items-center justify-between bg-slate-50 px-4 py-1.5 text-xs font-semibold text-slate-600">
-                    <span>{shortDate(day.date, true)}</span>
-                    <span className="tabular-nums">
-                      {day.net < 0 ? '− ' : ''}
-                      {formatCents(Math.abs(day.net))}
-                    </span>
-                  </div>
-                  <ul className="divide-y divide-slate-100">
-                    {day.lines.map((l) => {
-                      const credit = l.amount_cents > 0
-                      const tx = l.expand?.transaction_id
-                      return (
-                        <li key={l.id} className="flex items-center gap-3 px-4 py-2.5">
-                          <div
-                            className={cn(
-                              'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
-                              credit
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-rose-50 text-rose-700',
-                            )}
-                          >
-                            {credit ? (
-                              <ArrowDownLeft className="h-4 w-4" />
-                            ) : (
-                              <ArrowUpRight className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div
-                              className="line-clamp-2 break-words text-sm font-semibold leading-snug text-slate-900 sm:line-clamp-1"
-                              title={l.description || undefined}
-                            >
-                              {l.description || 'Movimento'}
-                            </div>
-                            <div className="truncate text-xs">
-                              {l.status === 'CONCILIADO' ? (
-                                <span className="text-emerald-700">
-                                  <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
-                                  {tx?.expand?.category_id?.name || 'Conciliado'}
-                                </span>
-                              ) : l.status === 'IGNORADO' ? (
-                                <span className="text-slate-500">Ignorado</span>
-                              ) : l.status === 'EXTRATO' ? (
-                                <span className="text-slate-500">Só extrato</span>
-                              ) : (
-                                <Link
-                                  to={`/financeiro/conciliacao?conta=${l.account_id}`}
-                                  className="font-semibold text-amber-700 hover:underline"
-                                >
-                                  A conciliar
-                                </Link>
-                              )}
-                            </div>
-                          </div>
-                          <div
-                            className={cn(
-                              'shrink-0 text-right text-sm font-semibold tabular-nums',
-                              credit ? 'text-emerald-700' : 'text-rose-700',
-                            )}
-                          >
-                            {credit ? '' : '− '}
-                            {formatCents(Math.abs(l.amount_cents))}
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {churchId && (
         <LedgerStatement
+          accountId={stAccount}
+          onAccountChange={(id) => {
+            setStAccount(id)
+            setParams({ conta: id }, { replace: true })
+          }}
           churchAccounts={accounts}
           ledger={ledger}
           starts={starts}
