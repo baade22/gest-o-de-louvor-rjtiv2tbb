@@ -984,3 +984,35 @@ export async function receiptFileUrl(id: string) {
   if (!res.ok) throw new Error('Não foi possível abrir o comprovante.')
   return URL.createObjectURL(await res.blob())
 }
+
+// ---- Desfazer os estornos da lista "O que falta conciliar" (retirada) ----
+
+export const LIST_VOID_REASON = 'Sem movimento no banco (duplicado)'
+
+/** Lançamentos estornados pela lista que saiu do Painel. */
+export async function listListVoided(churchId: string) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter("church_id = {:churchId} && status = 'ESTORNADO' && void_reason = {:r}", {
+      churchId,
+      r: LIST_VOID_REASON,
+    }),
+    fields: 'id,date,description,amount_cents,type',
+    sort: 'date',
+  })
+}
+
+export interface UnvoidResult {
+  total: number
+  restored: number
+  linked: number
+  bills: number
+  not_linked: string[]
+  failed: string[]
+}
+
+export async function unvoidList(churchId: string) {
+  return pb.send<UnvoidResult>('/backend/v1/finance/unvoid-list', {
+    method: 'POST',
+    body: { church_id: churchId },
+  })
+}
