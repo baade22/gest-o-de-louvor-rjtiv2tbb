@@ -59,6 +59,7 @@ import {
 } from '@/components/ui/select'
 import { realizedFilter } from '@/lib/realizedBalance'
 import { useReconcileStarts } from './useReconcileStarts'
+import { UnreconciledDialog } from './UnreconciledDialog'
 import {
   MonthSwitcher,
   PageHeader,
@@ -84,12 +85,14 @@ function Stat({
   label,
   value,
   hint,
+  onHintClick,
 }: {
   icon: LucideIcon
   tone: string
   label: string
   value: string
   hint?: string
+  onHintClick?: () => void
 }) {
   return (
     <div className={cn(cardClass, 'p-4 sm:p-5')}>
@@ -102,7 +105,18 @@ function Stat({
       <div className="mt-3 text-[22px] font-bold tabular-nums tracking-tight text-slate-900 sm:text-[25px]">
         {value}
       </div>
-      {hint && <div className="mt-0.5 text-xs text-slate-500">{hint}</div>}
+      {hint &&
+        (onHintClick ? (
+          <button
+            type="button"
+            onClick={onHintClick}
+            className="mt-0.5 text-left text-xs font-semibold text-teal-700 hover:underline"
+          >
+            {hint}
+          </button>
+        ) : (
+          <div className="mt-0.5 text-xs text-slate-500">{hint}</div>
+        ))}
     </div>
   )
 }
@@ -110,6 +124,7 @@ function Stat({
 export default function FinancePanel() {
   const { currentChurch } = useAuth()
   const { canEdit } = useFinanceAccess('painel')
+  const { canEdit: canVoid } = useFinanceAccess('lancamentos')
   const churchId = currentChurch?.id
   const [month, setMonth] = useState(() => getLocalTodayYMD().slice(0, 7))
   const [accounts, setAccounts] = useState<FinAccount[]>([])
@@ -119,6 +134,7 @@ export default function FinancePanel() {
   // Movimentos do extrato a conciliar, por conta
   const [pendingByAccount, setPendingByAccount] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+  const [showPending, setShowPending] = useState(false)
   // '' = todas as congregações
   const [congregation, setCongregation] = useState('')
   // Último mês fechado ('' = nenhum; null = não carregou)
@@ -339,9 +355,10 @@ export default function FinancePanel() {
             value={formatCents(total)}
             hint={
               forecastTotal !== total
-                ? `Previsto ${formatCents(forecastTotal)}, com o que falta conciliar`
+                ? `Previsto ${formatCents(forecastTotal)}: ver o que falta conciliar`
                 : `${visibleAccounts.length} ${visibleAccounts.length === 1 ? 'conta' : 'contas'}`
             }
+            onHintClick={forecastTotal !== total ? () => setShowPending(true) : undefined}
           />
           <Stat
             icon={ArrowDownLeft}
@@ -551,6 +568,19 @@ export default function FinancePanel() {
           )}
         </div>
       </div>
+      {showPending && (
+        <UnreconciledDialog
+          accounts={scopedAccounts}
+          ledger={ledger}
+          starts={starts}
+          categories={categories}
+          canEdit={canVoid}
+          onVoided={(id) =>
+            setLedger((l) => l.map((tx) => (tx.id === id ? { ...tx, status: 'ESTORNADO' } : tx)))
+          }
+          onClose={() => setShowPending(false)}
+        />
+      )}
     </div>
   )
 }
