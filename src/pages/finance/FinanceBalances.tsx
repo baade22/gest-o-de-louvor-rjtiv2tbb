@@ -266,10 +266,6 @@ export default function FinanceBalances() {
     () => accountBalances(lookups.accounts, ledger, realized),
     [lookups.accounts, ledger, realized],
   )
-  const forecastBalances = useMemo(
-    () => accountBalances(lookups.accounts, ledger),
-    [lookups.accounts, ledger],
-  )
   const systemBalanceOn = (account: FinAccount, day: string) =>
     accountBalances(
       [account],
@@ -499,11 +495,6 @@ export default function FinanceBalances() {
                       <div className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
                         {formatCents(system)}
                       </div>
-                      {(forecastBalances[a.id] || 0) !== (systemBalances[a.id] || 0) && (
-                        <div className="text-[11.5px] text-slate-500">
-                          Previsto {formatCents(forecastBalances[a.id] || 0)}
-                        </div>
-                      )}
                       {b && (
                         <div
                           className={cn(
