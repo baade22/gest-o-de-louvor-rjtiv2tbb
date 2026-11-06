@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock3, Download } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { accountBalances } from '@/lib/financeSummary'
@@ -209,23 +208,6 @@ export function LedgerStatement({
           </div>
         </div>
       </div>
-
-      {data.pending > 0 && (
-        <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50/60 px-4 py-2 text-xs text-amber-800">
-          <Clock3 className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 flex-1">
-            {data.pending === 1
-              ? '1 lançamento deste mês ainda não foi conciliado e fica fora do extrato.'
-              : `${data.pending} lançamentos deste mês ainda não foram conciliados e ficam fora do extrato.`}
-          </span>
-          <Link
-            to={`/financeiro/conciliacao?conta=${id}`}
-            className="shrink-0 font-semibold text-teal-700 hover:underline"
-          >
-            Conciliar
-          </Link>
-        </div>
-      )}
 
       {data.items.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-slate-500">

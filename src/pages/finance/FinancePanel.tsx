@@ -59,7 +59,7 @@ import {
 } from '@/components/ui/select'
 import { realizedFilter } from '@/lib/realizedBalance'
 import { useReconcileStarts } from './useReconcileStarts'
-import { UnreconciledDialog } from './UnreconciledDialog'
+import { UnvoidBanner } from './UnvoidBanner'
 import {
   MonthSwitcher,
   PageHeader,
@@ -124,7 +124,6 @@ function Stat({
 export default function FinancePanel() {
   const { currentChurch } = useAuth()
   const { canEdit } = useFinanceAccess('painel')
-  const { canEdit: canVoid } = useFinanceAccess('lancamentos')
   const churchId = currentChurch?.id
   const [month, setMonth] = useState(() => getLocalTodayYMD().slice(0, 7))
   const [accounts, setAccounts] = useState<FinAccount[]>([])
@@ -134,7 +133,6 @@ export default function FinancePanel() {
   // Movimentos do extrato a conciliar, por conta
   const [pendingByAccount, setPendingByAccount] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
-  const [showPending, setShowPending] = useState(false)
   // '' = todas as congregações
   const [congregation, setCongregation] = useState('')
   // Último mês fechado ('' = nenhum; null = não carregou)
@@ -191,9 +189,7 @@ export default function FinancePanel() {
     () => accountBalances(scopedAccounts, ledger, realizedFilter(starts)),
     [scopedAccounts, ledger, starts],
   )
-  const forecast = useMemo(() => accountBalances(scopedAccounts, ledger), [scopedAccounts, ledger])
   const total = Object.values(balances).reduce((sum, v) => sum + v, 0)
-  const forecastTotal = Object.values(forecast).reduce((sum, v) => sum + v, 0)
   const monthTxs = useMemo(
     () => scopedLedger.filter((tx) => monthOf(tx.date) === month),
     [scopedLedger, month],
@@ -286,6 +282,7 @@ export default function FinancePanel() {
       </PageHeader>
 
       {!canEdit && <ReadOnlyNotice />}
+      {churchId && <UnvoidBanner churchId={churchId} />}
 
       {unclosed && (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center">
@@ -353,12 +350,7 @@ export default function FinancePanel() {
             tone="bg-teal-50 text-teal-700"
             label="Saldo conciliado"
             value={formatCents(total)}
-            hint={
-              forecastTotal !== total
-                ? `Previsto ${formatCents(forecastTotal)}: ver o que falta conciliar`
-                : `${visibleAccounts.length} ${visibleAccounts.length === 1 ? 'conta' : 'contas'}`
-            }
-            onHintClick={forecastTotal !== total ? () => setShowPending(true) : undefined}
+            hint={`${visibleAccounts.length} ${visibleAccounts.length === 1 ? 'conta' : 'contas'}`}
           />
           <Stat
             icon={ArrowDownLeft}
@@ -555,11 +547,6 @@ export default function FinancePanel() {
                       )}
                     >
                       {formatCents(balances[a.id] || 0)}
-                      {(forecast[a.id] || 0) !== (balances[a.id] || 0) && (
-                        <div className="text-right text-[11px] font-normal text-slate-500">
-                          previsto {formatCents(forecast[a.id] || 0)}
-                        </div>
-                      )}
                     </div>
                   </li>
                 )
@@ -568,19 +555,6 @@ export default function FinancePanel() {
           )}
         </div>
       </div>
-      {showPending && (
-        <UnreconciledDialog
-          accounts={scopedAccounts}
-          ledger={ledger}
-          starts={starts}
-          categories={categories}
-          canEdit={canVoid}
-          onVoided={(id) =>
-            setLedger((l) => l.map((tx) => (tx.id === id ? { ...tx, status: 'ESTORNADO' } : tx)))
-          }
-          onClose={() => setShowPending(false)}
-        />
-      )}
     </div>
   )
 }
