@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock3 } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock3, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatCents } from '@/lib/money'
 import { accountBalances } from '@/lib/financeSummary'
@@ -13,6 +13,7 @@ import {
 } from '@/lib/realizedBalance'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
 import type { FinAccount, FinTransaction } from '@/types/finance'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -25,22 +26,28 @@ import type { FinanceLookups } from './TransactionSheet'
 import { cardClass, shortDate } from './shared'
 
 /**
- * Movimentos de cada conta no LouvorFlow (banco, aplicação ou caixa em espécie), com o saldo
- * conciliado linha a linha. Na conta bancária, o que ainda não foi conciliado aparece como
- * "a conciliar" e só entra no saldo previsto.
+ * Extrato de cada conta (banco, aplicação ou caixa em espécie): só o que sabemos que
+ * aconteceu. Na conta bancária, só o que foi conciliado com o banco; o resto fica na
+ * conciliação e aparece aqui só como um aviso.
  */
 export function LedgerStatement({
+  accountId: controlledId,
+  onAccountChange,
   churchAccounts,
   ledger,
   starts,
   lookups,
 }: {
+  accountId?: string
+  onAccountChange?: (id: string) => void
   churchAccounts: FinAccount[]
   ledger: FinTransaction[]
   starts: ReconcileStarts
   lookups: FinanceLookups
 }) {
-  const [accountId, setAccountId] = useState('')
+  const [ownId, setOwnId] = useState('')
+  const accountId = controlledId ?? ownId
+  const setAccountId = onAccountChange ?? setOwnId
   const [month, setMonth] = useState(getLocalTodayYMD().slice(0, 7))
   const account = churchAccounts.find((a) => a.id === accountId) || churchAccounts[0]
   const id = account?.id || ''
@@ -61,17 +68,28 @@ export function LedgerStatement({
       })
       .sort((a, b) => a.date.localeCompare(b.date))
     let running = opening
-    let pendingIn = 0
-    let pendingOut = 0
-    const items = rows.map((tx) => {
+    let entradas = 0
+    let saidas = 0
+    let pending = 0
+    const items: {
+      tx: FinTransaction
+      effect: number
+      reconciled: boolean
+      running: number
+    }[] = []
+    for (const tx of rows) {
       const effect = txEffect(tx, id)
-      const realized = isRealized(tx, id, starts)
-      if (realized) running += effect
-      else if (effect > 0) pendingIn += effect
-      else pendingOut += -effect
-      return { tx, effect, realized, reconciled: isReconciledSide(tx, id), running }
-    })
-    return { opening, closing: running, pendingIn, pendingOut, items }
+      // Ainda não conciliado: fica fora do extrato (está na conciliação)
+      if (!isRealized(tx, id, starts)) {
+        pending++
+        continue
+      }
+      running += effect
+      if (effect > 0) entradas += effect
+      else saidas += -effect
+      items.push({ tx, effect, reconciled: isReconciledSide(tx, id), running })
+    }
+    return { opening, closing: running, entradas, saidas, pending, items }
   }, [account, id, ledger, month, starts])
 
   const describe = (tx: FinTransaction) => {
@@ -95,19 +113,43 @@ export function LedgerStatement({
   if (!account || !data) return null
   const hasStart = !!starts[id]
 
+  const exportCsv = () => {
+    const q = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const money = (c: number) => (c / 100).toFixed(2).replace('.', ',')
+    const head = 'Data;Descrição;Categoria;Valor;Saldo'
+    const body = data.items.map(({ tx, effect, running }) =>
+      [
+        shortDate(tx.date, true),
+        q(describe(tx)),
+        q(category(tx)),
+        money(effect),
+        money(running),
+      ].join(';'),
+    )
+    const blob = new Blob(['\ufeff' + [head, ...body].join('\n')], {
+      type: 'text/csv;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `extrato-${account.name.toLowerCase().replace(/\s+/g, '-')}-${month}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
-    <div className={cardClass}>
+    <div id="extrato" className={cn(cardClass, 'scroll-mt-4')}>
       <div className="flex flex-col gap-3 border-b border-slate-200 p-3 lg:flex-row lg:items-center">
         <div className="px-1">
-          <h2 className="font-semibold text-slate-900">Movimentos no LouvorFlow</h2>
+          <h2 className="font-semibold text-slate-900">Extrato</h2>
           <p className="text-xs text-slate-500">
             {isCash
               ? 'Dinheiro em espécie: vale tudo o que foi lançado.'
               : hasStart && isFundAccount(starts, id)
-                ? 'Fundo: rendimentos e outros lançamentos valem na hora; aplicações e resgates, depois de conciliados.'
+                ? 'Fundo: rendimentos entram na hora; aplicações e resgates, depois de conciliados.'
                 : hasStart
-                  ? `Só o que foi conciliado com o extrato entra no saldo (conciliação desde ${shortDate(starts[id], true)}).`
-                  : 'Sem extrato carregado: vale tudo o que foi lançado.'}
+                  ? 'Só o que foi conciliado com o banco.'
+                  : 'Sem extrato do banco: vale tudo o que foi lançado.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
@@ -130,6 +172,14 @@ export function LedgerStatement({
             className="h-9 w-full sm:w-[170px]"
             aria-label="Mês"
           />
+          <Button
+            variant="outline"
+            className="h-9 gap-1.5 rounded-lg"
+            onClick={exportCsv}
+            disabled={!data.items.length}
+          >
+            <Download className="h-4 w-4" /> Planilha
+          </Button>
         </div>
       </div>
 
@@ -141,31 +191,41 @@ export function LedgerStatement({
           </div>
         </div>
         <div className="p-3">
-          <div className="text-xs text-slate-500">Saldo conciliado no fim</div>
+          <div className="text-xs text-slate-500">Entradas</div>
+          <div className="text-sm font-bold tabular-nums text-emerald-700 sm:text-base">
+            {formatCents(data.entradas)}
+          </div>
+        </div>
+        <div className="p-3">
+          <div className="text-xs text-slate-500">Saídas</div>
+          <div className="text-sm font-bold tabular-nums text-rose-700 sm:text-base">
+            {formatCents(data.saidas)}
+          </div>
+        </div>
+        <div className="p-3">
+          <div className="text-xs text-slate-500">Saldo no fim</div>
           <div className="text-sm font-bold tabular-nums sm:text-base">
             {formatCents(data.closing)}
           </div>
         </div>
-        <div className="p-3">
-          <div className="text-xs text-slate-500">A conciliar</div>
-          <div className="text-sm font-bold tabular-nums text-amber-700 sm:text-base">
-            {data.pendingIn || data.pendingOut ? (
-              <>
-                <span className="whitespace-nowrap">+{formatCents(data.pendingIn)}</span>{' '}
-                <span className="whitespace-nowrap">−{formatCents(data.pendingOut)}</span>
-              </>
-            ) : (
-              '—'
-            )}
-          </div>
-        </div>
-        <div className="p-3">
-          <div className="text-xs text-slate-500">Previsto no fim</div>
-          <div className="text-sm font-bold tabular-nums sm:text-base">
-            {formatCents(data.closing + data.pendingIn - data.pendingOut)}
-          </div>
-        </div>
       </div>
+
+      {data.pending > 0 && (
+        <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50/60 px-4 py-2 text-xs text-amber-800">
+          <Clock3 className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">
+            {data.pending === 1
+              ? '1 lançamento deste mês ainda não foi conciliado e fica fora do extrato.'
+              : `${data.pending} lançamentos deste mês ainda não foram conciliados e ficam fora do extrato.`}
+          </span>
+          <Link
+            to={`/financeiro/conciliacao?conta=${id}`}
+            className="shrink-0 font-semibold text-teal-700 hover:underline"
+          >
+            Conciliar
+          </Link>
+        </div>
+      )}
 
       {data.items.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-slate-500">
@@ -173,7 +233,7 @@ export function LedgerStatement({
         </p>
       ) : (
         <ul className="divide-y divide-slate-100">
-          {[...data.items].reverse().map(({ tx, effect, realized, reconciled, running }) => (
+          {[...data.items].reverse().map(({ tx, effect, reconciled, running }) => (
             <li key={tx.id} className="flex items-center gap-3 px-4 py-2.5">
               <div
                 className={cn(
@@ -206,14 +266,6 @@ export function LedgerStatement({
                       <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
                       Conciliado
                     </span>
-                  ) : !realized ? (
-                    <Link
-                      to={`/financeiro/conciliacao?conta=${id}`}
-                      className="font-semibold text-amber-700 hover:underline"
-                    >
-                      <Clock3 className="mr-1 inline h-3.5 w-3.5" />A conciliar
-                      <span className="hidden sm:inline"> (fora do saldo)</span>
-                    </Link>
                   ) : (
                     <span className="text-slate-500">
                       {isCash ? 'Em espécie' : hasStart ? 'Antes da conciliação' : 'Lançado'}
@@ -227,14 +279,13 @@ export function LedgerStatement({
                   className={cn(
                     'text-sm font-semibold tabular-nums',
                     effect > 0 ? 'text-emerald-700' : 'text-rose-700',
-                    !realized && 'opacity-60',
                   )}
                 >
                   {effect < 0 ? '− ' : ''}
                   {formatCents(Math.abs(effect))}
                 </div>
                 <div className="text-[11px] tabular-nums text-slate-500">
-                  {realized ? `saldo ${formatCents(running)}` : 'não entra no saldo'}
+                  saldo {formatCents(running)}
                 </div>
               </div>
             </li>
