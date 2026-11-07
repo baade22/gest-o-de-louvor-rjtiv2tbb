@@ -107,6 +107,55 @@ routerAdd(
       return out
     }
 
+    // Por que a conexão caiu: a Evolution guarda o código e o motivo que o WhatsApp mandou
+    // (disconnectionReasonCode / disconnectionObject em /instance/fetchInstances)
+    const lastDrop = (inst) => {
+      try {
+        const f = evo('GET', '/instance/fetchInstances?instanceName=' + encodeURIComponent(inst))
+        const row = Array.isArray(f.json) ? f.json[0] : null
+        const info = row && row.instance ? row.instance : row
+        if (!info || !info.disconnectionReasonCode) return ''
+        const code = Number(info.disconnectionReasonCode)
+        let raw = ''
+        try {
+          raw =
+            typeof info.disconnectionObject === 'string'
+              ? info.disconnectionObject
+              : JSON.stringify(info.disconnectionObject || '')
+        } catch (_) {}
+        let when = ''
+        if (info.disconnectionAt) {
+          const d = new Date(new Date(String(info.disconnectionAt)).getTime() - 3 * 3600 * 1000)
+          if (!isNaN(d.getTime()))
+            when =
+              ' em ' +
+              d.toISOString().slice(8, 10) +
+              '/' +
+              d.toISOString().slice(5, 7) +
+              ' às ' +
+              d.toISOString().slice(11, 16)
+        }
+        let why = 'A conexão caiu (código ' + code + ')'
+        if (code === 401 && /device_removed/.test(raw))
+          why =
+            'O WhatsApp removeu este aparelho (401 device_removed)' +
+            when +
+            '. Isso acontece quando a conta está com restrição (depois de alerta de spam) ou a conexão parece suspeita'
+        else if (code === 401)
+          why = 'Saíram da conta pelo celular (401)' + when + '. Leia o QR Code de novo'
+        else if (code === 403) why = 'O WhatsApp bloqueou esta conta (403)' + when
+        else if (code === 402 || code === 406)
+          why = 'Conta do WhatsApp banida ou suspensa (código ' + code + ')' + when
+        else if (code === 440)
+          why = 'Outra conexão do mesmo número tomou o lugar desta (440)' + when
+        else why += when
+        const detail = raw.replace(/\s+/g, ' ').slice(0, 300)
+        return (why + '.' + (detail ? ' Detalhe: ' + detail : '')).slice(0, 900)
+      } catch (_) {
+        return ''
+      }
+    }
+
     // Pergunta à Evolution como está a conexão e guarda na configuração
     const refreshState = (rec) => {
       if (!configured) return 'unconfigured'
@@ -127,7 +176,7 @@ routerAdd(
             rec.set('profile_name', String(info.profileName || ''))
           }
         }
-        rec.set('last_error', '')
+        rec.set('last_error', state === 'open' ? '' : lastDrop(inst))
       } catch (err) {
         state = 'error'
         rec.set('last_error', 'Servidor do WhatsApp não respondeu: ' + String(err).slice(0, 300))
@@ -165,9 +214,46 @@ routerAdd(
 
     const rec = loadSettings()
 
+    // Limite do dia (mesma conta da fila em whatsapp_queue.js)
+    const dailyInfo = () => {
+      const DAILY = [20, 30, 45, 60, 80, 100, 120, 150, 150, 150, 150, 150, 150, 150]
+      const BRT = 3 * 3600 * 1000
+      const dayStart = (t) => {
+        const b = new Date(t - BRT)
+        return Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()) + BRT
+      }
+      const firstAt = rec.getString('first_connected_at')
+      const first = firstAt ? new Date(firstAt.replace(' ', 'T')).getTime() || 0 : 0
+      if (!first) return { day: 0, limit: DAILY[0], sent: 0, started: false }
+      const day = Math.max(0, Math.floor((dayStart(Date.now()) - dayStart(first)) / 864e5))
+      let sent = 0
+      try {
+        sent = $app.countRecords(
+          'whatsapp_messages',
+          $dbx.exp(
+            "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR')",
+            { c: churchId, d: new Date(dayStart(Date.now())).toISOString().replace('T', ' ') },
+          ),
+        )
+      } catch (_) {}
+      return {
+        day: day + 1,
+        limit: day < DAILY.length ? DAILY[day] : 250,
+        sent: sent,
+        started: true,
+      }
+    }
+    const pauseInfo = () => {
+      const until = rec.getString('paused_until')
+      const t = until ? new Date(until.replace(' ', 'T')).getTime() || 0 : 0
+      return t > Date.now() ? { until: until, note: rec.getString('pause_note') } : null
+    }
+
     if (action === 'status') {
       const state = refreshState(rec)
       return e.json(200, {
+        daily: dailyInfo(),
+        paused: pauseInfo(),
         configured: configured,
         state: state,
         phone: rec.getString('phone'),
@@ -339,6 +425,14 @@ routerAdd(
           message: 'Servidor do WhatsApp não respondeu: ' + String(err).slice(0, 200),
         })
       }
+    }
+
+    if (action === 'resume_queue') {
+      rec.set('paused_until', '')
+      rec.set('pause_note', '')
+      rec.set('fail_streak', 0)
+      $app.save(rec)
+      return e.json(200, { paused: null })
     }
 
     if (action === 'disconnect') {

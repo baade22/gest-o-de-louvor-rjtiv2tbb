@@ -35,6 +35,7 @@ import {
   disconnectWhatsApp,
   getWhatsAppStatus,
   listWhatsAppMessages,
+  resumeWhatsAppQueue,
   retryWhatsAppMessage,
   saveWhatsAppAuto,
   sendWhatsAppTest,
@@ -205,7 +206,7 @@ export default function WhatsAppSettings() {
     confirm({
       title: 'Desconectar o WhatsApp?',
       description:
-        'Os envios automáticos param até alguém ler o QR Code de novo. As mensagens na fila esperam até 12 horas. Depois de conectar, os envios começam devagar (nada nos primeiros 30 minutos e uma mensagem a cada 3 minutos até completar 24 horas), para o WhatsApp não tirar o aparelho.',
+        'Os envios automáticos param até alguém ler o QR Code de novo. As mensagens na fila esperam até 12 horas. Depois de conectar, os envios começam devagar (nada nos primeiros 30 minutos e uma mensagem a cada 3 minutos até completar 24 horas), para o WhatsApp não tirar o aparelho. Evite desconectar e conectar várias vezes: isso também faz o WhatsApp desconfiar.',
       confirmLabel: 'Desconectar',
       destructive: true,
       onConfirm: async () => {
@@ -221,6 +222,15 @@ export default function WhatsAppSettings() {
         }
       },
     })
+
+  const handleResumeQueue = async () => {
+    try {
+      await resumeWhatsAppQueue(churchId)
+      await loadStatus()
+    } catch (err) {
+      toast({ title: 'Erro ao voltar a fila', description: errorText(err), variant: 'destructive' })
+    }
+  }
 
   const toggleAuto = async (kind: WhatsAppAutoKind, on: boolean) => {
     if (!status) return
@@ -380,6 +390,30 @@ export default function WhatsAppSettings() {
             </div>
             <Button variant="outline" className="rounded-xl gap-1.5" onClick={handleDisconnect}>
               <Unplug className="h-4 w-4" /> Desconectar
+            </Button>
+          </div>
+        )}
+        {connected && status?.daily?.started && (
+          <p className="text-sm text-slate-600">
+            Hoje: <strong>{status.daily.sent}</strong> de {status.daily.limit} mensagens
+            {status.daily.day <= 14
+              ? ` · número em aquecimento (dia ${status.daily.day} de 14, o limite sobe a cada dia)`
+              : ''}
+            . O que passar do limite sai no dia seguinte.
+          </p>
+        )}
+        {status?.paused && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-sm text-amber-900">
+              {status.paused.note || 'Fila pausada'} (volta sozinha às{' '}
+              {new Date(status.paused.until.replace(' ', 'T')).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+              ).
+            </p>
+            <Button variant="outline" className="rounded-xl" onClick={handleResumeQueue}>
+              Voltar agora
             </Button>
           </div>
         )}
