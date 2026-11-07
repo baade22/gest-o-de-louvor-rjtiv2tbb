@@ -1465,6 +1465,32 @@ routerAdd(
           continue
         }
 
+        // Agent 0.0.45+: a playlist inteira (títulos, músicas e mídias) é montada de uma vez
+        // pelo SYNC_MEDIA_PLAYLIST logo abaixo. Incluir música por música aqui (cada uma entra
+        // no começo no Holyrics 2.30) deixava a ordem invertida e obrigava o Agent a esvaziar a
+        // playlist, que é a parte em que o Holyrics falha (culto 08/11).
+        if (supportsMirror) {
+          countAdded++
+          eventSongRec.set('holyrics_status', 'ADDED_TO_PLAYLIST')
+          eventSongRec.set('holyrics_synced_at', nowIso)
+          eventSongRec.set('holyrics_playlist_order', repertoireOrder)
+          eventSongRec.set('holyrics_error', '')
+          try {
+            $app.save(eventSongRec)
+          } catch (_) {}
+          results.push({
+            order: repertoireOrder,
+            event_song_id: eventSongRec.id,
+            song_id: songId,
+            song_title: songTitle,
+            holyrics_song_id: holyricsSongId,
+            action: songWasCreatedNow ? 'CREATED_AND_QUEUED' : 'QUEUED_FOR_PLAYLIST',
+            status: 'SUCCESS',
+            detail: `${songStatusLabel} • Vai para a playlist na ordem do repertório`,
+          })
+          continue
+        }
+
         // -------------------------------------------------------------
         // ETAPA 5 & 6: ADD_TO_PLAYLIST + Confirmação via GetSchedules (media_playlist do culto)
         // Semântica da API oficial unificada (Etapa 3B): ação AddToPlaylist com event_id do Holyrics.
@@ -1760,7 +1786,7 @@ routerAdd(
 
     let summaryMessage = ''
     if (isFullSuccess) {
-      summaryMessage = `Sincronização concluída com sucesso! ${totalProcessed} música(s) processada(s): ${countAdded} adicionada(s) à playlist${countAlreadyInPlaylist > 0 ? `, ${countAlreadyInPlaylist} já constava(m) na playlist` : ''}${countCreated > 0 ? `, ${countCreated} criada(s) no Holyrics` : ''}.`
+      summaryMessage = `Sincronização concluída com sucesso! ${totalProcessed} música(s) processada(s): ${countAdded} ${supportsMirror ? 'enviada(s) para' : 'adicionada(s) à'} playlist${countAlreadyInPlaylist > 0 ? `, ${countAlreadyInPlaylist} já constava(m) na playlist` : ''}${countCreated > 0 ? `, ${countCreated} criada(s) no Holyrics` : ''}.`
     } else {
       summaryMessage = `Sincronização concluída com avisos — ${totalProcessed} músicas processadas / ${countAdded + countAlreadyInPlaylist} na playlist / ${countErrors} com erro.`
     }
