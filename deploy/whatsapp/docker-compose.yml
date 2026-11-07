@@ -26,8 +26,12 @@ services:
       CACHE_LOCAL_ENABLED: 'true'
       DEL_INSTANCE: 'false'
       QRCODE_LIMIT: '30'
-      CONFIG_SESSION_PHONE_CLIENT: LouvorFlow
+      # Nos "aparelhos conectados" do celular aparece como um Chrome comum no Ubuntu, e não
+      # com um nome de sistema (nome diferente chama atenção do WhatsApp)
+      CONFIG_SESSION_PHONE_CLIENT: Ubuntu
       CONFIG_SESSION_PHONE_NAME: Chrome
+      # Proxy residencial: vem do .env (PROXY_HOST, PROXY_PORT, PROXY_PROTOCOL, PROXY_USERNAME,
+      # PROXY_PASSWORD). Vazio = sem proxy. Veja "Proxy residencial" no README.
       # Sem isto o celular recusa o QR ("não é possível conectar novos dispositivos"):
       # a 2.3.7 se apresenta com uma versão antiga do WhatsApp Web (EvolutionAPI issue #2437).
       # Se o erro voltar, troque pela versão atual do WhatsApp Web.

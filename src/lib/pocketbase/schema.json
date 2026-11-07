@@ -5173,6 +5173,36 @@
           "type": "date",
           "required": false,
           "system": false
+        },
+        {
+          "name": "first_connected_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "first_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paused_until",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pause_note",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fail_streak",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

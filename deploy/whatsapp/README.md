@@ -54,15 +54,55 @@ chave nova e sobe tudo. O HTTPS sai sozinho (Caddy). No fim ele mostra os dois s
 
 ## Cuidados para o WhatsApp não bloquear o número
 
-Esta forma de conexão não é a oficial do WhatsApp. O risco é pequeno com poucas mensagens para
-pessoas que conhecem a igreja, e o LouvorFlow já ajuda:
+Esta forma de conexão não é a oficial do WhatsApp. Em 2026-10-31 o número da igreja foi
+marcado como spam e depois suspenso: muitas reconexões seguidas, conexão saindo do IP de um
+datacenter e uma rajada de mensagens logo depois de conectar. Para não repetir:
 
-- manda no máximo 6 mensagens por minuto por igreja, com "digitando..." antes de cada uma;
-- só manda para quem tem celular com DDD na ficha;
-- não faz disparo em massa (avisos individuais de escala, eventos e parabéns).
+**O que o LouvorFlow já faz sozinho**
+- Nada sai nos primeiros 30 minutos depois de conectar; até 24 horas, uma mensagem a cada 3
+  minutos. Depois, 1 por minuto na primeira semana e 2 por minuto em seguida.
+- Limite por dia, contado desde que o número conectou pela primeira vez (chip novo recomeça):
+  20 no 1º dia, 30, 45, 60, 80, 100, 120 e 150 por dia na 2ª semana; depois 250. Avisos em massa
+  e parabéns param em 70% do limite, para sobrar espaço para escalas e lembretes. O que passa do
+  limite sai no dia seguinte, a partir das 08:00.
+- Mensagem com mais de 12 horas de atraso não é enviada.
+- Depois de 5 falhas seguidas do servidor, a fila pausa 15 minutos.
+- "Digitando..." antes de cada mensagem; avisos em massa só na janela de horário.
 
-Do lado da igreja: use um número que já é usado normalmente (conversa nos dois sentidos ajuda),
-não use para propaganda e peça para as pessoas salvarem o contato da igreja.
+**O que fazer do lado da igreja**
+- De preferência, um **chip só para o sistema**, e não o número principal da igreja. Use esse
+  chip no celular por uma semana antes (conversas nos dois sentidos, foto e nome no perfil,
+  entrar em grupos da igreja) e só então conecte.
+- Use **proxy residencial com IP fixo do Brasil** (veja abaixo).
+- Conecte **uma vez** e deixe. Cada desconectar e conectar de novo aumenta a desconfiança.
+  Se cair, espere algumas horas antes de ler o QR de novo.
+- Deixe o celular ligado e com internet; ele precisa abrir o WhatsApp de vez em quando.
+- Peça para as pessoas salvarem o contato da igreja. Mensagens para quem não tem o número
+  salvo e nunca conversou são o que mais gera denúncia.
+- Para avisos gerais, prefira **grupos do WhatsApp** (1 mensagem por grupo) em vez de mandar
+  para 120 pessoas uma a uma.
+
+### Proxy residencial
+
+O servidor fica num datacenter, e o WhatsApp desconfia de conexões vindas de datacenter. Com
+um proxy residencial, a conexão do WhatsApp sai por um IP de internet de casa, no Brasil.
+
+1. Contrate um proxy **residencial (ou ISP) com IP fixo, dedicado, do Brasil**, protocolo HTTP.
+   Não use proxy rotativo (trocar de IP derruba a sessão) nem IP de fora do Brasil. Custa em
+   torno de R$ 15 a 25 por mês.
+2. No servidor, edite o `.env` (`nano ~/louvorflow/deploy/whatsapp/.env`) e acrescente no fim
+   (servidores instalados antes de 2026-11 não têm essas linhas):
+   ```
+   PROXY_HOST=endereço-do-proxy
+   PROXY_PORT=porta
+   PROXY_PROTOCOL=http
+   PROXY_USERNAME=usuário
+   PROXY_PASSWORD=senha
+   ```
+3. Rode `docker compose up -d evolution`.
+4. Confira se o proxy funciona (deve mostrar o IP do proxy, e não 187.41.100.15):
+   `curl -x http://USUARIO:SENHA@HOST:PORTA https://icanhazip.com`
+5. Só então leia o QR Code no LouvorFlow.
 
 ## Manutenção
 
@@ -73,7 +113,7 @@ não use para propaganda e peça para as pessoas salvarem o contato da igreja.
   apague a conexão antiga (`curl -X DELETE https://zap.ibmaldeia.com.br/instance/delete/lf-... -H "apikey: $WHATSAPP_API_KEY"`)
   e gere um QR novo. Se continuar, ponha a versão atual do WhatsApp Web em
   `CONFIG_SESSION_PHONE_VERSION` no `.env` e rode `docker compose up -d evolution`.
-- **Se a conexão cair:** a tela do LouvorFlow mostra "Desconectado"; é só ler o QR Code de novo.
-  As mensagens esperam na fila por até 2 dias.
+- **Se a conexão cair:** a tela do LouvorFlow mostra "Desconectado". Espere algumas horas e
+  leia o QR Code de novo uma vez só. As mensagens esperam na fila por até 12 horas.
 - **Servidor perdido:** basta instalar de novo e ler o QR Code. Nenhum dado da igreja fica aqui:
   o servidor guarda só a sessão do WhatsApp, não as conversas.

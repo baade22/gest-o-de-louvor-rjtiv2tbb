@@ -6,26 +6,51 @@
 // - Todo dia às 8h (Brasília): lembrete para quem está escalado no dia seguinte (menos quem
 //   recusou) e parabéns de aniversário e de casamento (fica registrado na linha do tempo,
 //   igual ao botão da tela de Aniversariantes).
-// - A cada minuto o cron manda o que está na fila, devagar (no máximo 6 por igreja por
-//   minuto, com "digitando..." antes), para o WhatsApp não estranhar. Se o celular estiver
+// - A cada minuto o cron manda o que está na fila, devagar (no máximo 2 por igreja por
+//   minuto, 1 na primeira semana do número, com "digitando..." antes), para o WhatsApp não
+//   estranhar. Se o celular estiver
 //   desconectado, espera; depois de 12 horas de atraso desiste e marca erro (para não despejar
 //   mensagens velhas quando ele voltar).
 // - Aquecimento: logo depois de conectar (ou reconectar) o celular, uma rajada de mensagens faz
 //   o WhatsApp desconfiar e tirar o aparelho (erro "device_removed" na Evolution). Por isso,
 //   nos primeiros 30 minutos não sai nada e, até completar 24 horas, sai no máximo uma
 //   mensagem a cada 3 minutos. O horário da conexão fica em whatsapp_settings.connected_at.
+// - Limite por dia (número novo começa devagar): conta a partir de first_connected_at, o dia
+//   em que ESTE número conectou pela primeira vez (trocar de chip recomeça). Dia 1: 20
+//   mensagens; sobe aos poucos até 250/dia depois de 2 semanas. Avisos em massa e parabéns
+//   usam no máximo 70% do limite, para sobrar espaço para escalas e lembretes. O que passa do
+//   limite fica para o dia seguinte, a partir das 08:00. Teste e respostas de comprovante
+//   não contam no limite.
+// - Depois do aquecimento, no máximo 1 mensagem por minuto na primeira semana e 2 depois.
+// - Pausa sozinha por 15 minutos depois de 5 falhas seguidas do servidor (paused_until).
 // Inscrição e pagamento de eventos entram na fila pelos hooks church_event_signup.js e
 // church_event_payments.js; os avisos da Mídia (com imagem, vídeo, documento ou áudio), pelo
 // whatsapp_avisos.js, já com o horário de cada pessoa e a janela de envio.
 //
 // Cada envio automático só acontece se estiver ligado em Configurações > WhatsApp.
 
-// Guarda quando o celular conectou (status passou a 'open'), para o aquecimento da fila
+// Guarda quando o celular conectou (status passou a 'open'), para o aquecimento da fila, e
+// quando este número conectou pela primeira vez (limite por dia). Outro número (chip novo)
+// recomeça o aquecimento do zero.
 onRecordUpdate((e) => {
   const rec = e.record
-  const before = rec.original() ? rec.original().getString('status') : ''
+  const orig = rec.original()
+  const before = orig ? orig.getString('status') : ''
+  const now = new Date().toISOString()
   if (rec.getString('status') === 'open' && before !== 'open') {
-    rec.set('connected_at', new Date().toISOString())
+    rec.set('connected_at', now)
+  }
+  const phone = rec.getString('phone')
+  const oldPhone = orig ? orig.getString('phone') : ''
+  const known = rec.getString('first_phone')
+  if (rec.getString('status') === 'open' && !rec.getString('first_connected_at')) {
+    rec.set('first_connected_at', now)
+    if (phone) rec.set('first_phone', phone)
+  } else if (phone && known && phone !== known) {
+    rec.set('first_connected_at', now)
+    rec.set('first_phone', phone)
+  } else if (phone && !known && phone !== oldPhone) {
+    rec.set('first_phone', phone)
   }
   e.next()
 }, 'whatsapp_settings')
@@ -132,7 +157,22 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
   const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
   if (!apiUrl || !apiKey) return
 
-  const PER_CHURCH = 6
+  const PER_MIN_FIRST_WEEK = 1
+  const PER_MIN = 2
+  // Limite por dia, pelo dia desde que este número conectou pela primeira vez
+  const DAILY = [20, 30, 45, 60, 80, 100, 120, 150, 150, 150, 150, 150, 150, 150]
+  const DAILY_AFTER = 250
+  const BULK_SHARE = 0.7 // avisos em massa e parabéns: até 70% do limite do dia
+  const BULK_KINDS = ['AVISO', 'ANIVERSARIO', 'CASAMENTO']
+  const FREE_KINDS = ['TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR'] // não contam
+  const FAIL_PAUSE = 5
+  const PAUSE_MS = 15 * 60 * 1000
+  const BRT = 3 * 3600 * 1000
+  const brtDayStart = (t) => {
+    const b = new Date(t - BRT)
+    return Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()) + BRT
+  }
+  const parseTs = (s) => (s ? new Date(String(s).replace(' ', 'T')).getTime() || 0 : 0)
   const WARMUP_QUIET_MS = 30 * 60 * 1000 // nada sai nos primeiros 30 minutos
   const WARMUP_MS = 24 * 3600 * 1000 // até 24 h: uma mensagem a cada 3 minutos
   const WARMUP_GAP_MS = 3 * 60 * 1000
@@ -168,17 +208,54 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
     return { code: res.statusCode, json: json }
   }
 
+  // Falhas seguidas do servidor: depois de 5, pausa a igreja por 15 minutos
+  const noteResult = (c, res) => {
+    const st = c.st
+    if (!st || res === 'skip') return
+    const before = st.getInt('fail_streak')
+    const n = res === 'ok' ? 0 : before + 1
+    if (n === before) return
+    st.set('fail_streak', n)
+    if (n >= FAIL_PAUSE) {
+      st.set('fail_streak', 0)
+      st.set('paused_until', new Date(Date.now() + PAUSE_MS).toISOString())
+      st.set(
+        'pause_note',
+        'Fila pausada por 15 minutos depois de ' + FAIL_PAUSE + ' falhas seguidas do servidor',
+      )
+      c.paused = true
+      c.limit = 0
+    }
+    try {
+      $app.save(st)
+    } catch (_) {}
+  }
+
   const churches = {}
   for (const msg of due) {
     const churchId = msg.getString('church_id')
     let c = churches[churchId]
     if (!c) {
-      c = churches[churchId] = { sent: 0, open: false, inst: '', limit: PER_CHURCH }
+      c = churches[churchId] = {
+        sent: 0,
+        open: false,
+        inst: '',
+        limit: PER_MIN,
+        st: null,
+        daily: 0,
+        dailySent: 0,
+        paused: false,
+      }
       try {
         const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
           c: churchId,
         })
         c.inst = st.getString('instance')
+        c.st = st
+        if (parseTs(st.getString('paused_until')) > Date.now()) {
+          c.paused = true
+          throw new Error('pausado')
+        }
         const r = evo('GET', '/instance/connectionState/' + encodeURIComponent(c.inst))
         const state =
           r.json && r.json.instance && r.json.instance.state
@@ -192,6 +269,26 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
           $app.save(st)
         }
         if (c.open) {
+          // Limite do dia e ritmo pela idade do número
+          const first = parseTs(st.getString('first_connected_at')) || Date.now()
+          const day = Math.max(
+            0,
+            Math.floor((brtDayStart(Date.now()) - brtDayStart(first)) / 864e5),
+          )
+          c.daily = day < DAILY.length ? DAILY[day] : DAILY_AFTER
+          if (day < 7) c.limit = PER_MIN_FIRST_WEEK
+          try {
+            c.dailySent = $app.countRecords(
+              'whatsapp_messages',
+              $dbx.exp(
+                "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR')",
+                {
+                  c: churchId,
+                  d: new Date(brtDayStart(Date.now())).toISOString().replace('T', ' '),
+                },
+              ),
+            )
+          } catch (_) {}
           const at = st.getString('connected_at')
           const since = at ? Date.now() - new Date(at.replace(' ', 'T')).getTime() : Infinity
           if (since < WARMUP_QUIET_MS) c.limit = 0
@@ -249,6 +346,22 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
       }
     }
     if (c.sent >= c.limit) continue // limite do minuto (ou aquecimento)
+    // Limite do dia: o que passar fica para amanhã a partir das 08:00 (avisos em massa e
+    // parabéns param antes, em 70%, para sobrar espaço para escalas e lembretes)
+    const kind = msg.getString('kind')
+    if (FREE_KINDS.indexOf(kind) === -1) {
+      const cap = BULK_KINDS.indexOf(kind) !== -1 ? Math.floor(c.daily * BULK_SHARE) : c.daily
+      if (c.dailySent >= cap) {
+        const next = brtDayStart(Date.now()) + 864e5 + 8 * 3600 * 1000
+        msg.set('send_after', new Date(next + Math.floor(Math.random() * 30) * 60000).toISOString())
+        msg.set('error', 'Limite de mensagens do dia atingido: sai amanhã')
+        try {
+          $app.save(msg)
+        } catch (_) {}
+        continue
+      }
+      c.dailySent++
+    }
     c.sent++
 
     const attempts = msg.getInt('attempts') + 1
@@ -309,6 +422,7 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
           delay: delay,
         })
       }
+      noteResult(c, r.code >= 200 && r.code < 300 ? 'ok' : r.code === 400 ? 'skip' : 'fail')
       if (r.code >= 200 && r.code < 300) {
         msg.set('status', 'ENVIADO')
         msg.set('error', '')
@@ -330,6 +444,7 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
         msg.set('send_after', new Date(Date.now() + attempts * 5 * 60 * 1000).toISOString())
       }
     } catch (err) {
+      noteResult(c, 'fail')
       if (attempts >= 3) {
         msg.set('status', 'ERRO')
         msg.set('error', 'Servidor do WhatsApp não respondeu')
