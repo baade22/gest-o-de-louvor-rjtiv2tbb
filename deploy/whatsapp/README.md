@@ -117,3 +117,39 @@ um proxy residencial, a conexão do WhatsApp sai por um IP de internet de casa, 
   leia o QR Code de novo uma vez só. As mensagens esperam na fila por até 12 horas.
 - **Servidor perdido:** basta instalar de novo e ler o QR Code. Nenhum dado da igreja fica aqui:
   o servidor guarda só a sessão do WhatsApp, não as conversas.
+
+## Baixar do YouTube (Mídia)
+
+Este mesmo servidor também baixa vídeo ou áudio do YouTube para a Mídia do LouvorFlow
+(botão **Baixar do YouTube**). Ele roda junto com o WhatsApp (serviço `youtube` no
+`docker-compose.yml`) e responde em `https://zap.ibmaldeia.com.br/youtube/...`.
+
+```
+LouvorFlow (Skip) -> pede o download -> este servidor (yt-dlp + ffmpeg)
+LouvorFlow (Skip) <- busca o arquivo pronto (a cada minuto) e guarda na mídia do culto
+Se este servidor falhar -> o computador do Holyrics (Agent 0.0.50+) baixa quando estiver conectado
+```
+
+**Instalar ou atualizar** (no servidor, por SSH):
+
+```bash
+cd ~/louvorflow && git pull
+cd deploy/whatsapp
+docker compose up -d --build youtube caddy
+curl https://zap.ibmaldeia.com.br/youtube/health   # deve mostrar {"ok": true}
+```
+
+Não precisa de segredo novo no Skip: o LouvorFlow usa `WHATSAPP_API_URL` + `/youtube` e a
+mesma `WHATSAPP_API_KEY`. Para usar outro servidor ou outra chave, cadastre no Skip
+`YOUTUBE_API_URL` (ex.: `https://outro.servidor/youtube`) e `YOUTUBE_API_KEY`, e ponha a mesma
+chave como `YOUTUBE_API_KEY` no `.env` daqui.
+
+**Limites e cuidados**
+- Vídeo até 720p e arquivo até 100 MB (limite da mídia no LouvorFlow). Maior que isso, o
+  computador do Holyrics baixa (até 1080p, sem esse limite).
+- O YouTube às vezes bloqueia servidores de datacenter ("confirme que não é um robô"). Nesse
+  caso o pedido passa sozinho para o computador do Holyrics. Se acontecer sempre, dá para
+  usar o proxy residencial: acrescente `YOUTUBE_PROXY=http://usuario:senha@host:porta` no
+  `.env` e rode `docker compose up -d youtube`.
+- O yt-dlp se atualiza sozinho uma vez por dia. Os arquivos ficam aqui no máximo 24 horas.
+- Baixe só vídeos que a igreja tem direito de exibir.

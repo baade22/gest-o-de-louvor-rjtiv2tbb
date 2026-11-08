@@ -123,3 +123,39 @@ export async function syncEventMediaPlaylistWithHolyrics(
     },
   })
 }
+
+export interface YoutubeMediaResponse {
+  success: boolean
+  media_id?: string
+  stage?: 'VPS' | 'AGENT' | 'FAILED'
+  name?: string
+  message?: string
+  error_code?: string
+}
+
+/**
+ * Baixa vídeo ou áudio do YouTube para a mídia do culto.
+ * Primeiro o servidor (VPS); se falhar, o computador do Holyrics quando estiver conectado.
+ */
+export async function requestYoutubeMedia(params: {
+  churchId: string
+  eventId: string
+  url: string
+  format: 'VIDEO' | 'AUDIO'
+  category: string
+  name?: string
+  assignedOperator?: string
+}): Promise<YoutubeMediaResponse> {
+  return pb.send<YoutubeMediaResponse>('/backend/v1/saas/media/youtube', {
+    method: 'POST',
+    body: {
+      church_id: params.churchId,
+      event_id: params.eventId,
+      url: params.url,
+      format: params.format,
+      category: params.category,
+      name: params.name || '',
+      assigned_operator: params.assignedOperator || '',
+    },
+  })
+}

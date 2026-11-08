@@ -14,6 +14,10 @@ export interface AgentConfig {
   holyricsMediaPath: string
   maxDownloadSizeBytes?: number
   downloadTimeoutMs?: number
+  /** Caminho do yt-dlp (opcional; sem isso o Agent baixa em tools/). */
+  ytDlpPath?: string
+  /** Caminho do ffmpeg ou da pasta dele (opcional). */
+  ffmpegPath?: string
 }
 
 export interface HolyricsSongItem {
@@ -90,6 +94,7 @@ export interface AgentCommand {
     | 'GET_SCHEDULES'
     | 'REMOVE_FROM_EVENT_PLAYLIST'
     | 'REORDER_EVENT_SONGS'
+    | 'YOUTUBE_DOWNLOAD'
   payload: Record<string, any>
   created_at: string
 }

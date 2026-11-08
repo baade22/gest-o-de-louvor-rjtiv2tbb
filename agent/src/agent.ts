@@ -30,6 +30,16 @@ import {
   summarizePlaylist,
   titleIndexForSection,
 } from './eventPlaylist.js'
+import {
+  buildYtDlpArgs,
+  canonicalYoutubeUrl,
+  ensureFfmpeg,
+  ensureYtDlp,
+  explainYtDlpError,
+  parseTitleFromOutput,
+  parseYoutubeVideoId,
+  run,
+} from './youtube.js'
 
 export class LouvorFlowAgent {
   private config: AgentConfig
@@ -37,6 +47,8 @@ export class LouvorFlowAgent {
   private isRunning = false
   private pollTimer: NodeJS.Timeout | null = null
   private heartbeatTimer: NodeJS.Timeout | null = null
+  private youtubeRunning = new Set<string>()
+  private youtubeQueue: Promise<unknown> = Promise.resolve()
 
   private lastHeartbeat: string | undefined
   private lastPoll: string | undefined
@@ -135,7 +147,7 @@ export class LouvorFlowAgent {
           pairing_code: code,
           machine_name: this.config.machineName || os.hostname(),
           platform: `${os.platform()} ${os.arch()}`,
-          version: '0.0.49',
+          version: '0.0.50',
           api_port: this.config.holyricsPort,
         }),
       })
@@ -281,7 +293,7 @@ export class LouvorFlowAgent {
         },
         body: JSON.stringify({
           agent_id: this.config.agentId,
-          version: '0.0.49',
+          version: '0.0.50',
           holyrics_detected: this.holyricsDetected,
           holyrics_version: this.holyricsVersion || '',
           api_port: this.config.holyricsPort,
@@ -327,6 +339,16 @@ export class LouvorFlowAgent {
         console.log(
           `[Agent] [${new Date().toISOString()}] Comando recebido via poll: action="${cmd.action}", command_id="${cmd.command_id}"`,
         )
+        if (cmd.action === 'YOUTUBE_DOWNLOAD') {
+          // Pode levar minutos: roda em segundo plano, um por vez, sem travar a playlist.
+          if (this.youtubeRunning.has(cmd.command_id)) continue
+          this.youtubeRunning.add(cmd.command_id)
+          this.youtubeQueue = this.youtubeQueue
+            .then(() => this.executeCommand(cmd))
+            .catch(() => {})
+            .finally(() => this.youtubeRunning.delete(cmd.command_id))
+          continue
+        }
         await this.executeCommand(cmd)
       }
     } catch (err: any) {
@@ -628,6 +650,20 @@ export class LouvorFlowAgent {
             errorMsg = transferRes.error || 'Erro na transferência da mídia.'
             errorCode = transferRes.error_code || 'TRANSFER_MEDIA_FAILED'
             resultPayload = { error_code: errorCode, ...transferRes.result }
+          }
+          break
+        }
+
+        case 'YOUTUBE_DOWNLOAD': {
+          const ytRes = await this.handleYoutubeDownload(cmd)
+          if (ytRes.success) {
+            status = 'DONE'
+            resultPayload = ytRes.result
+          } else {
+            status = 'FAILED'
+            errorMsg = ytRes.error || 'Erro ao baixar do YouTube.'
+            errorCode = ytRes.error_code || 'YOUTUBE_DOWNLOAD_FAILED'
+            resultPayload = { error_code: errorCode, ...ytRes.result }
           }
           break
         }
@@ -2017,6 +2053,152 @@ export class LouvorFlowAgent {
       },
       error: summaryError,
       error_code: summaryErrorCode,
+    }
+  }
+
+  /**
+   * YOUTUBE_DOWNLOAD (0.0.50): baixa vídeo ou áudio do YouTube direto na pasta de mídias
+   * do Holyrics. Usado quando o servidor do LouvorFlow não conseguiu baixar.
+   */
+  public async handleYoutubeDownload(cmd: AgentCommand): Promise<{
+    success: boolean
+    result?: Record<string, any>
+    error?: string
+    error_code?: string
+  }> {
+    const payload = cmd.payload || {}
+    const mediaId = String(payload.media_id || '').trim()
+    const format =
+      String(payload.format || payload.media_type || 'VIDEO').toUpperCase() === 'AUDIO'
+        ? 'AUDIO'
+        : 'VIDEO'
+    const videoId =
+      parseYoutubeVideoId(String(payload.youtube_url || '')) ||
+      (/^[A-Za-z0-9_-]{11}$/.test(String(payload.video_id || '')) ? String(payload.video_id) : null)
+    if (!mediaId || !videoId) {
+      return {
+        success: false,
+        error: 'Link do YouTube inválido no pedido.',
+        error_code: 'INVALID_YOUTUBE_URL',
+      }
+    }
+
+    const baseLibrary = path.resolve(this.config.holyricsMediaPath)
+    if (!fs.existsSync(baseLibrary)) {
+      return {
+        success: false,
+        error: `O diretório da biblioteca do Holyrics não existe: "${baseLibrary}". Configure o caminho correto no painel local (http://localhost:${this.config.agentWebPort}).`,
+        error_code: 'LIBRARY_PATH_NOT_FOUND',
+      }
+    }
+    const typeFolder = format === 'AUDIO' ? 'audio' : 'video'
+    const targetDir = path.join(baseLibrary, typeFolder)
+    fs.mkdirSync(targetDir, { recursive: true })
+
+    let ytDlp: string
+    try {
+      ytDlp = await ensureYtDlp(this.config.ytDlpPath)
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `Não foi possível preparar o yt-dlp neste computador: ${err.message}`,
+        error_code: 'YTDLP_UNAVAILABLE',
+      }
+    }
+    const ffmpegFound = await ensureFfmpeg(this.config.ffmpegPath)
+    const ffmpegDir = ffmpegFound === 'PATH' ? null : ffmpegFound
+    const hasFfmpeg = Boolean(ffmpegFound)
+
+    const workDir = path.join(
+      process.cwd(),
+      'agent_temp',
+      `yt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+    )
+    fs.mkdirSync(workDir, { recursive: true })
+    try {
+      const finalArgs = buildYtDlpArgs({
+        format,
+        outputTemplate: path.join(workDir, 'media.%(ext)s'),
+        ffmpeg: hasFfmpeg,
+        ffmpegDir,
+      })
+      console.log(`[Agent YouTube] Baixando ${format} de ${videoId}...`)
+      const res = await run(ytDlp, [...finalArgs, '--', canonicalYoutubeUrl(videoId)], {
+        cwd: workDir,
+        timeoutMs: 30 * 60 * 1000,
+      })
+      const produced = fs.readdirSync(workDir).filter((f) => f.startsWith('media.'))
+      if (res.code !== 0 || produced.length === 0) {
+        const why = res.timedOut
+          ? {
+              code: 'YOUTUBE_TIMEOUT',
+              message: 'O download passou de 30 minutos.',
+            }
+          : explainYtDlpError(res.stderr)
+        return { success: false, error: why.message, error_code: why.code }
+      }
+      const producedFile = path.join(workDir, produced[0])
+      const ext = path.extname(produced[0]).replace('.', '').toLowerCase()
+      const title = parseTitleFromOutput(res.stdout)
+
+      let wanted = String(payload.holyrics_filename || payload.name || `YouTube ${videoId}`)
+      wanted = path
+        .basename(wanted.replace(/\\/g, '/'))
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+        .trim()
+      wanted = wanted.replace(/\.[a-zA-Z0-9]{2,4}$/, '') || `YouTube ${videoId}`
+      let finalPath = path.join(targetDir, `${wanted}.${ext}`)
+      if (fs.existsSync(finalPath))
+        finalPath = this.generateUniqueFilePath(targetDir, `${wanted}.${ext}`)
+      try {
+        fs.renameSync(producedFile, finalPath)
+      } catch (_) {
+        fs.copyFileSync(producedFile, finalPath)
+      }
+      const finalName = path.basename(finalPath)
+      const size = fs.statSync(finalPath).size
+
+      let holyricsDetected = false
+      for (let attempt = 1; attempt <= 3 && !holyricsDetected; attempt++) {
+        try {
+          const check = await this.holyrics.verifyMediaRecognition(
+            format === 'AUDIO' ? 'audio' : 'video',
+            finalName,
+          )
+          holyricsDetected = Boolean(check.recognized)
+        } catch (_) {}
+        if (!holyricsDetected && attempt < 3) await new Promise((r) => setTimeout(r, 500))
+      }
+      console.log(`[Agent YouTube] Pronto: "${finalName}" (${size} bytes).`)
+      return {
+        success: true,
+        result: {
+          media_id: mediaId,
+          file_name: finalName,
+          final_file_name: finalName,
+          target_path: finalPath,
+          bytes_written: size,
+          holyrics_detected: holyricsDetected,
+          title,
+          ext,
+          ffmpeg: hasFfmpeg,
+          note: hasFfmpeg
+            ? undefined
+            : format === 'AUDIO'
+              ? 'Sem ffmpeg: áudio salvo em M4A.'
+              : 'Sem ffmpeg: vídeo em qualidade menor.',
+        },
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `Erro ao baixar do YouTube: ${err.message}`,
+        error_code: 'YOUTUBE_DOWNLOAD_FAILED',
+      }
+    } finally {
+      try {
+        fs.rmSync(workDir, { recursive: true, force: true })
+      } catch (_) {}
     }
   }
 

@@ -9,6 +9,7 @@ import {
   Trash2,
   AlertCircle,
   FolderCheck,
+  Youtube,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -42,6 +43,8 @@ import {
   deleteMediaAsset,
 } from '@/services/media'
 import { generateHolyricsFileName } from '@/lib/mediaNaming'
+import { isYoutubePending, youtubeStageLabel } from '@/lib/youtube'
+import { YoutubeMediaDialog } from '@/components/YoutubeMediaDialog'
 
 const ALLOWED_EXTENSIONS_BY_TYPE: Record<string, string[]> = {
   IMAGEM: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
@@ -91,6 +94,7 @@ export default function MediaModule() {
   >('AVISOS')
   const [assignedOperator, setAssignedOperator] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [youtubeOpen, setYoutubeOpen] = useState(false)
 
   // Cálculo reativo do nome físico final do arquivo
   const selectedEvent = events.find((e) => e.id === selectedEventId)
@@ -126,6 +130,19 @@ export default function MediaModule() {
       setIsLoading(false)
     }
   }
+
+  // Enquanto alguma mídia do YouTube está sendo baixada, atualiza a lista a cada 15 s
+  const hasPendingYoutube = medias.some(isYoutubePending)
+  useEffect(() => {
+    if (!hasPendingYoutube) return
+    const timer = setInterval(() => {
+      if (!currentChurch) return
+      listAllChurchMedia(currentChurch.id)
+        .then(setMedias)
+        .catch(() => {})
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [hasPendingYoutube, currentChurch?.id])
 
   useEffect(() => {
     const checkBackend = async () => {
@@ -323,13 +340,23 @@ export default function MediaModule() {
         </div>
 
         {canManageMedia && (
-          <Button
-            onClick={() => setUploadModalOpen(true)}
-            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm gap-2"
-          >
-            <UploadCloud className="h-4 w-4" />
-            Enviar Nova Mídia
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setYoutubeOpen(true)}
+              className="rounded-xl font-semibold text-xs sm:text-sm gap-2"
+            >
+              <Youtube className="h-4 w-4 text-red-600" />
+              Baixar do YouTube
+            </Button>
+            <Button
+              onClick={() => setUploadModalOpen(true)}
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm gap-2"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Enviar Nova Mídia
+            </Button>
+          </div>
         )}
       </div>
 
@@ -404,6 +431,18 @@ export default function MediaModule() {
                                 ? 'Cadastrada no SaaS (Aguardando transferência)'
                                 : item.status}
                         </Badge>
+                        {youtubeStageLabel(item) && (
+                          <Badge
+                            className={`text-[10px] gap-1 ${
+                              item.youtube_stage === 'FAILED'
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-red-50 text-slate-800 border-red-200'
+                            }`}
+                          >
+                            <Youtube className="h-3 w-3 text-red-600" />
+                            {youtubeStageLabel(item)}
+                          </Badge>
+                        )}
                         {item.holyrics_status && (
                           <Badge
                             variant="secondary"
@@ -451,16 +490,18 @@ export default function MediaModule() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload(item)}
-                        className="text-xs rounded-xl gap-1.5"
-                        title="Visualizar/baixar cópia do arquivo"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Baixar Cópia
-                      </Button>
+                      {item.file && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownload(item)}
+                          className="text-xs rounded-xl gap-1.5"
+                          title="Visualizar/baixar cópia do arquivo"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Baixar Cópia
+                        </Button>
+                      )}
 
                       {canManageMedia && (
                         <Button
@@ -636,6 +677,15 @@ export default function MediaModule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {currentChurch && (
+        <YoutubeMediaDialog
+          open={youtubeOpen}
+          onOpenChange={setYoutubeOpen}
+          churchId={currentChurch.id}
+          events={events}
+          onCreated={loadData}
+        />
+      )}
       {confirmDialog}
     </div>
   )

@@ -1,4 +1,10 @@
 {$WHATSAPP_DOMAIN} {
 	encode gzip
-	reverse_proxy evolution:8080
+	# Baixador do YouTube da Mídia
+	handle /youtube/* {
+		reverse_proxy youtube:8090
+	}
+	handle {
+		reverse_proxy evolution:8080
+	}
 }

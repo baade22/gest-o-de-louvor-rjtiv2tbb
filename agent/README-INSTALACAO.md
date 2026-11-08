@@ -1,4 +1,4 @@
-# 🚀 Guia de Instalação e Uso do LouvorFlow Agent v0.0.49
+# 🚀 Guia de Instalação e Uso do LouvorFlow Agent v0.0.50
 
 Este guia passo a passo foi preparado para permitir que qualquer operador de multimídia, som ou projeção instale e execute o **LouvorFlow Agent** no computador da igreja (onde está instalado o Holyrics).
 
@@ -30,7 +30,7 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 
 ## 📥 Como Descompactar e Iniciar o Agent
 
-1. Descompacte o arquivo `LouvorFlow-Agent-0.0.49.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
+1. Descompacte o arquivo `LouvorFlow-Agent-0.0.50.zip` em uma pasta de sua preferência (por exemplo: `C:\LouvorFlow-Agent` ou na Área de Trabalho).
 2. Abra o terminal na pasta descompactada:
    - **No Windows:** Abra a pasta, segure `Shift`, clique com o botão direito do mouse em um espaço vazio e escolha **"Abrir na janela do PowerShell"** (ou **"Abrir no Terminal"**).
 3. Como os arquivos compilados já estão na pasta `dist/`, você pode iniciar com um duplo clique no script ou via terminal:
@@ -42,7 +42,7 @@ Este guia passo a passo foi preparado para permitir que qualquer operador de mul
 4. Ao iniciar, o terminal mostrará:
    ```text
    ====================================================
-         LouvorFlow Agent v0.0.49 — Holyrics Bridge
+         LouvorFlow Agent v0.0.50 — Holyrics Bridge
    ====================================================
    [Agent Web] Painel local disponível em http://localhost:8765
    [Agent] Serviço iniciado.
@@ -112,6 +112,16 @@ Agora você pode enviar músicas diretamente do LouvorFlow para a playlist do Ho
 - O LouvorFlow envia o repertório na ordem exata configurada para o Agent.
 - Se alguma música do repertório não existir no banco do Holyrics, o Agent aciona o comando `CREATE_SONG` para criá-la automaticamente com slides/estrofes formatados e salva o ID retornado no LouvorFlow para sincronizações futuras instantâneas.
 - O comando `GET_LYRICS_PLAYLIST` e `ADD_LYRICS_TO_PLAYLIST` garantem que as músicas entrem na ordem da escala sem duplicar itens já existentes na playlist do dia.
+
+### 5. Baixar do YouTube (v0.0.50)
+
+- Na Mídia, **Baixar do YouTube** pede o download primeiro ao servidor do LouvorFlow.
+- Se o servidor não conseguir (YouTube bloqueou, arquivo maior que 100 MB), este computador baixa
+  direto na pasta de mídias do Holyrics (`video` ou `audio`) assim que o Agent estiver conectado.
+- Na primeira vez o Agent baixa sozinho o **yt-dlp** e o **ffmpeg** (cerca de 100 MB) do GitHub
+  oficial para a pasta `tools/` ao lado do Agent. O yt-dlp se atualiza toda semana.
+- Sem ffmpeg o vídeo vem em qualidade menor e o áudio em M4A. Para usar programas já instalados,
+  ponha `ytDlpPath` e `ffmpegPath` no `agent.config.json`.
 
 ---
 

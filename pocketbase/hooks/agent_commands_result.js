@@ -234,7 +234,7 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
       }
     }
 
-    if (action === 'TRANSFER_MEDIA') {
+    if (action === 'TRANSFER_MEDIA' || action === 'YOUTUBE_DOWNLOAD') {
       const mediaId = (p && p.media_id) || (result && result.media_id) || ''
       if (mediaId) {
         try {
@@ -268,8 +268,29 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
             // Falha reportada pelo Agent
             mediaRecord.set(
               'holyrics_status',
-              'ERRO_TRANSFERENCIA: ' + (errorMsg || 'Falha no download/gravação local'),
+              (action === 'YOUTUBE_DOWNLOAD' ? 'ERRO_YOUTUBE: ' : 'ERRO_TRANSFERENCIA: ') +
+                (errorMsg || 'Falha no download/gravação local'),
             )
+          }
+          if (action === 'YOUTUBE_DOWNLOAD') {
+            // Download do YouTube no computador do Holyrics (migração 0094)
+            mediaRecord.set('youtube_stage', status === 'DONE' ? 'DONE' : 'FAILED')
+            if (status === 'DONE' && result) {
+              // Nome real gravado (ex.: .m4a sem ffmpeg, ou "(1)" se já havia outro)
+              if (result.final_file_name) {
+                mediaRecord.set('holyrics_filename', String(result.final_file_name))
+              }
+              if (result.bytes_written) mediaRecord.set('size', Number(result.bytes_written) || 0)
+              let yj = {}
+              try {
+                yj = JSON.parse(mediaRecord.getString('youtube_job') || '{}') || {}
+              } catch (_) {}
+              if (yj.auto_name && result.title) {
+                mediaRecord.set('name', String(result.title).slice(0, 200))
+              }
+              yj.done_by = 'AGENT'
+              mediaRecord.set('youtube_job', yj)
+            }
           }
           $app.save(mediaRecord)
         } catch (_) {}
@@ -281,7 +302,7 @@ routerAdd('POST', '/backend/v1/agent/commands/{id}/result', (e) => {
         const logRec = new Record(logsCol)
         logRec.set('church_id', cmdRecord.getString('church_id'))
         logRec.set('agent_id', agentId)
-        logRec.set('action', 'TRANSFER_MEDIA')
+        logRec.set('action', action)
         logRec.set('status', status === 'FAILED' ? 'ERROR' : 'SUCCESS')
         logRec.set('error', errorMsg)
         logRec.set('created_at', now)

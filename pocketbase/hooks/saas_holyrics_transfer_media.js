@@ -96,7 +96,10 @@ routerAdd(
 
     // Validação cruzada estrita entre media_type e extensão do arquivo antes de enfileirar comando
     const mediaType = (media.getString('media_type') || 'VIDEO').toUpperCase()
-    const rawFileForValidation = media.getString('file') || media.getString('name') || ''
+    const rawFileForValidation =
+      media.getString('file') ||
+      (media.getString('source_url') ? '' : media.getString('name')) ||
+      ''
     const extMatchVal = rawFileForValidation.match(/\.([a-zA-Z0-9]+)$/)
     const fileExt = extMatchVal ? extMatchVal[1].toLowerCase() : ''
 
@@ -173,6 +176,99 @@ routerAdd(
 
     const agentId = agentRecord.id
     const isOnline = agentRecord.getString('status') === 'ONLINE'
+
+    // 3b. Mídia do YouTube que ainda não tem arquivo no LouvorFlow (migração 0094):
+    // o computador do Holyrics baixa direto do YouTube (YOUTUBE_DOWNLOAD).
+    if (media.getString('source_url') && !media.getString('file')) {
+      if (media.getString('youtube_stage') === 'VPS') {
+        return e.json(200, {
+          success: false,
+          pending: true,
+          error_code: 'YOUTUBE_DOWNLOADING',
+          message: 'A mídia ainda está sendo baixada do YouTube no servidor. Tente em 1 minuto.',
+        })
+      }
+      try {
+        const running = $app.findRecordsByFilter(
+          'holyrics_commands',
+          'agent_id = {:agentId} && action = "YOUTUBE_DOWNLOAD" && (status = "PENDING" || status = "SENT")',
+          '-created',
+          10,
+          0,
+          { agentId: agentId },
+        )
+        for (let i = 0; i < running.length; i++) {
+          let rp = null
+          try {
+            const raw = running[i].get('payload')
+            rp =
+              typeof raw === 'string'
+                ? JSON.parse(raw)
+                : JSON.parse(running[i].getString('payload') || '{}')
+          } catch (_) {}
+          if (rp && rp.media_id === mediaId) {
+            return e.json(200, {
+              success: true,
+              pending: true,
+              already_enqueued: true,
+              agent_online: isOnline,
+              command_id: running[i].getString('command_id'),
+              message: isOnline
+                ? 'O computador do Holyrics já está baixando do YouTube.'
+                : 'Download do YouTube agendado. Aguardando o computador do Holyrics ficar online.',
+            })
+          }
+        }
+      } catch (_) {}
+
+      const ytFormat = mediaType === 'AUDIO' ? 'AUDIO' : 'VIDEO'
+      const ytExt = ytFormat === 'AUDIO' ? 'mp3' : 'mp4'
+      const vidMatch = media.getString('source_url').match(/[?&]v=([A-Za-z0-9_-]{11})/)
+      const ytCommandId = 'cmd_yt_' + Date.now() + '_' + $security.randomString(8)
+      const ytCmd = new Record($app.findCollectionByNameOrId('holyrics_commands'))
+      ytCmd.set('command_id', ytCommandId)
+      ytCmd.set('church_id', churchId)
+      ytCmd.set('agent_id', agentId)
+      ytCmd.set('action', 'YOUTUBE_DOWNLOAD')
+      ytCmd.set('status', 'PENDING')
+      ytCmd.set('created_at', new Date().toISOString().replace('T', ' ').substring(0, 19))
+      ytCmd.set('payload', {
+        media_id: mediaId,
+        church_id: churchId,
+        event_id: media.getString('event_id'),
+        name: media.getString('name'),
+        video_id: vidMatch ? vidMatch[1] : '',
+        youtube_url: media.getString('source_url'),
+        format: ytFormat,
+        media_type: ytFormat,
+        category: media.getString('category'),
+        holyrics_filename:
+          (media.getString('holyrics_filename') || '').replace(/\.[a-zA-Z0-9]+$/, '') + '.' + ytExt,
+      })
+      try {
+        $app.save(ytCmd)
+      } catch (err) {
+        return e.json(500, {
+          success: false,
+          error_code: 'SAVE_COMMAND_ERROR',
+          message: 'Erro ao enfileirar download do YouTube: ' + err.message,
+        })
+      }
+      try {
+        media.set('youtube_stage', 'AGENT')
+        media.set('holyrics_status', 'AGUARDANDO_COMPUTADOR_HOLYRICS (YouTube)')
+        $app.save(media)
+      } catch (_) {}
+      return e.json(200, {
+        success: true,
+        command_id: ytCommandId,
+        agent_online: isOnline,
+        target_subfolder: ytFormat === 'AUDIO' ? 'audio' : 'video',
+        message: isOnline
+          ? 'O computador do Holyrics vai baixar do YouTube agora.'
+          : 'O computador do Holyrics vai baixar do YouTube assim que estiver conectado.',
+      })
+    }
 
     // 4. Prepara mapeamento de subpasta com base no tipo da mídia
     let subfolder = 'video'

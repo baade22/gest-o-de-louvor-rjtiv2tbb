@@ -306,6 +306,10 @@ export interface MediaAsset {
   imported_by?: string
   /** Momento do roteiro em que a mídia entra. */
   moment_id?: string
+  /** Link do YouTube de onde a mídia veio (migração 0094). */
+  source_url?: string
+  /** VPS (baixando no servidor) | AGENT (computador do Holyrics) | DONE | FAILED */
+  youtube_stage?: '' | 'VPS' | 'AGENT' | 'DONE' | 'FAILED'
   created: string
   updated: string
   expand?: {
