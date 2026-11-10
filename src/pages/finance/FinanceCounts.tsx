@@ -906,7 +906,8 @@ function CountSheet({
               <p className="text-sm text-slate-500">
                 Aprovada por {count.approved_by_name || 'outra pessoa'}
                 {count.approved_at ? ` em ${shortDate(count.approved_at, true)}` : ''}. Os
-                lançamentos estão em Lançamentos, marcados como contagem do culto.
+                lançamentos estão em Contas a pagar e receber, em todas as entradas, marcados como
+                contagem do culto.
               </p>
             )}
           </div>

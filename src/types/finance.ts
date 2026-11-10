@@ -90,6 +90,9 @@ export interface FinTransaction extends BaseRecord {
   count_id?: string
   /** Conta a pagar ou a receber que o lançamento quitou. */
   bill_id?: string
+  /** Desconto e juros/multa da baixa de um título. */
+  discount_cents?: number
+  interest_cents?: number
   /** Movimento do extrato com que o lançamento foi conciliado. */
   bank_line_id?: string
   /** Transferência: movimento do extrato da conta de destino */
@@ -185,8 +188,12 @@ export interface FinBill extends BaseRecord {
   installments?: number
   status: FinBillStatus
   paid_at?: string
+  /** Quanto já entrou ou saiu da conta nas baixas (com juros, sem desconto). */
   paid_amount_cents?: number
+  /** Quanto do valor do título já foi quitado; com baixa parcial, falta o resto. */
+  settled_cents?: number
   paid_account_id?: string
+  /** Lançamento da última baixa. */
   transaction_id?: string
   expand?: {
     category_id?: FinCategory

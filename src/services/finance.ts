@@ -286,7 +286,7 @@ export async function listBills(churchId: string, kind?: FinBillKind) {
 export async function listOpenBills(churchId: string) {
   return pb.collection('fin_bills').getFullList<FinBill>({
     filter: pb.filter("church_id = {:churchId} && status = 'ABERTO'", { churchId }),
-    fields: 'id,kind,description,amount_cents,due_date,status',
+    fields: 'id,kind,description,amount_cents,settled_cents,due_date,status',
     sort: 'due_date',
   })
 }
@@ -322,12 +322,30 @@ function billForm(input: BillInput, extra: Record<string, string | number> = {})
   return form
 }
 
+/** Repetição do título, como no Eklesia. */
+export type BillRepeat = 'UNICA' | 'RECORRENTE' | 'PARCELADA'
+
+/** Valor de cada parcela: divide o total e põe os centavos que sobram na primeira. */
+export function splitInstallments(total: number, times: number) {
+  const base = Math.floor(total / times)
+  return Array.from({ length: times }, (_, i) => (i === 0 ? total - base * (times - 1) : base))
+}
+
 /**
- * Cria a conta. Com `repeat` > 1, cria uma por mês com o mesmo dia de vencimento (1/12, 2/12...);
- * o anexo fica só na primeira.
+ * Cria o título. Recorrente: `repeat` títulos de mesmo valor, um por mês, no mesmo dia.
+ * Parcelada: o valor é dividido em `repeat` parcelas mensais. O anexo fica só no primeiro.
  */
-export async function createBills(churchId: string, input: BillInput, repeat = 1) {
+export async function createBills(
+  churchId: string,
+  input: BillInput,
+  repeat = 1,
+  mode: BillRepeat = 'RECORRENTE',
+) {
   const times = Math.max(1, Math.min(60, Math.floor(repeat)))
+  const amounts =
+    mode === 'PARCELADA' && times > 1
+      ? splitInstallments(input.amount_cents, times)
+      : Array(times).fill(input.amount_cents)
   const group =
     times > 1 ? `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` : ''
   const created: FinBill[] = []
@@ -335,6 +353,7 @@ export async function createBills(churchId: string, input: BillInput, repeat = 1
     const form = billForm(
       {
         ...input,
+        amount_cents: amounts[i],
         due_date: addMonthsToDate(input.due_date, i),
         attachment: i === 0 ? input.attachment : null,
       },
@@ -363,6 +382,17 @@ export interface SettleInput {
   account_id: string
   amount_cents: number
   payment_method: string
+  discount_cents?: number
+  interest_cents?: number
+}
+
+/** Baixas de um título (pagamentos ou recebimentos), as estornadas também. */
+export async function listBillPayments(billId: string) {
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter('bill_id = {:billId}', { billId }),
+    sort: 'date,created',
+    expand: 'account_id',
+  })
 }
 
 /** Baixa: o servidor cria o lançamento e marca a conta como paga, numa transação só. */
