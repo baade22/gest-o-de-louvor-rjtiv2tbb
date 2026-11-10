@@ -12,6 +12,8 @@
 //    5 dias depois. Desempata pelo código da transação, CPF/CNPJ e nome de quem recebeu, forma
 //    de pagamento e distância da data. Movimento que ainda não chegou: AGUARDANDO, confere de
 //    hora em hora por 7 dias. Empate de verdade ou falta de categoria: ANALISE, para uma pessoa.
+//    Se o movimento já foi conciliado por alguém (lançamento feito antes do comprovante), só
+//    anexa o comprovante a esse lançamento.
 // 4. Com um movimento só: dá baixa na conta a pagar em aberto de mesmo valor (vencimento até
 //    15 dias de distância) ou abre a conta a pagar já paga, cria o lançamento com o comprovante
 //    anexado e concilia (CONCILIADO). Quem mandou recebe a resposta pelo WhatsApp.
@@ -604,15 +606,19 @@ cronAdd('finance_receipts', '* * * * *', () => {
     return out
   }
 
-  // Movimentos de saída pendentes com o mesmo valor, perto da data, que nenhum outro
-  // comprovante já pegou
-  const findCandidates = (rec, d) => {
+  // Movimentos de saída com o mesmo valor, perto da data, que nenhum outro comprovante já
+  // pegou. Por padrão os pendentes; com linked = true, os já conciliados com um lançamento
+  // (alguém conciliou antes do comprovante chegar).
+  const findCandidates = (rec, d, linked) => {
     const churchId = rec.getString('church_id')
     let rows = []
     try {
       rows = $app.findRecordsByFilter(
         'fin_bank_lines',
-        "church_id = {:c} && status = 'PENDENTE' && amount_cents = {:a} && date >= {:f} && date <= {:t}",
+        (linked
+          ? "church_id = {:c} && status = 'CONCILIADO' && transaction_id != ''"
+          : "church_id = {:c} && status = 'PENDENTE'") +
+          ' && amount_cents = {:a} && date >= {:f} && date <= {:t}',
         'date',
         50,
         0,
@@ -834,10 +840,90 @@ cronAdd('finance_receipts', '* * * * *', () => {
     return result
   }
 
+  // Movimento já conciliado com um lançamento: só anexa o comprovante ao lançamento (e à
+  // conta a pagar dele), sem criar nada de novo
+  const attachToLinked = (rec, lineId) => {
+    const churchId = rec.getString('church_id')
+    const d = readJson(rec, 'data', {}) || {}
+    const b64 = rec.getString('media_b64')
+    const ext = EXT[rec.getString('mime')] || 'jpg'
+    const file = () => (b64 ? $filesystem.fileFromBytes(decode(b64), 'comprovante.' + ext) : null)
+    const note =
+      'Comprovante mandado por ' +
+      (rec.getString('sender_name') || rec.getString('sender_phone')) +
+      ' pelo WhatsApp' +
+      (d.transaction_code ? '. Código: ' + d.transaction_code : '') +
+      '.'
+    const result = {}
+    $app.runInTransaction((txApp) => {
+      const line = txApp.findRecordById('fin_bank_lines', lineId)
+      if (line.getString('church_id') !== churchId) throw new Error('Movimento de outra igreja.')
+      const txId = line.getString('transaction_id')
+      if (line.getString('status') !== 'CONCILIADO' || !txId) {
+        throw new Error('O movimento não está conciliado com um lançamento.')
+      }
+      const tx = txApp.findRecordById('fin_transactions', txId)
+      if (!tx.getString('attachment')) {
+        const f = file()
+        if (f) tx.set('attachment', f)
+      }
+      const notes = tx.getString('notes')
+      if (notes.indexOf(note) === -1)
+        tx.set('notes', ((notes ? notes + ' ' : '') + note).slice(0, 1000))
+      txApp.save(tx)
+      const billId = tx.getString('bill_id')
+      if (billId) {
+        try {
+          const bill = txApp.findRecordById('fin_bills', billId)
+          if (!bill.getString('attachment')) {
+            const f = file()
+            if (f) {
+              bill.set('attachment', f)
+              txApp.save(bill)
+            }
+          }
+          result.bill_id = bill.id
+        } catch (_) {}
+      }
+      result.line_id = line.id
+      result.transaction_id = tx.id
+    })
+    return result
+  }
+
   const match = (rec) => {
     const d = readJson(rec, 'data', {}) || {}
     const cands = findCandidates(rec, d)
     if (cands.length === 0) {
+      // Já conciliado por alguém antes do comprovante: anexa ao lançamento que existe
+      const linked = findCandidates(rec, d, true)
+      if (linked.length) {
+        const best = linked[0]
+        const tied = linked.filter((c) => c.score === best.score)
+        if (tied.length > 1) {
+          return finish(
+            rec,
+            'ANALISE',
+            'Há ' +
+              tied.length +
+              ' movimentos iguais já conciliados. Escolha qual é este pagamento.',
+            { candidates: linked.slice(0, 10).map((c) => c.line.id) },
+          )
+        }
+        try {
+          const r = attachToLinked(rec, best.line.id)
+          return finish(
+            rec,
+            'CONCILIADO',
+            'Já estava conciliado: comprovante anexado ao lançamento.',
+            r,
+          )
+        } catch (err) {
+          return finish(rec, 'ANALISE', 'Não deu para anexar: ' + String(err.message || err), {
+            candidates: [best.line.id],
+          })
+        }
+      }
       const age = (now - Date.parse(rec.getString('created').replace(' ', 'T'))) / 86400000
       if (age >= MAX_WAIT_DAYS) {
         return finish(rec, 'ANALISE', 'O pagamento não apareceu no extrato em 7 dias.', {
@@ -892,7 +978,11 @@ cronAdd('finance_receipts', '* * * * *', () => {
     try {
       if (status === 'CONFIRMANDO') {
         try {
-          const r = reconcile(rec, rec.getString('line_id'), rec.getString('chosen_category_id'))
+          const chosen = $app.findRecordById('fin_bank_lines', rec.getString('line_id'))
+          const r =
+            chosen.getString('status') === 'CONCILIADO'
+              ? attachToLinked(rec, chosen.id)
+              : reconcile(rec, chosen.id, rec.getString('chosen_category_id'))
           finish(rec, 'CONCILIADO', '', r)
         } catch (err) {
           finish(rec, 'ANALISE', 'Não deu para conciliar: ' + String(err.message || err))
@@ -1311,22 +1401,27 @@ routerAdd(
       if (!line || line.getString('church_id') !== churchId) {
         return e.json(400, { message: 'Escolha o movimento do extrato.' })
       }
-      if (line.getString('status') !== 'PENDENTE' || line.getInt('amount_cents') >= 0) {
-        return e.json(400, { message: 'O movimento precisa ser uma saída ainda não conciliada.' })
+      const linkedLine =
+        line.getString('status') === 'CONCILIADO' && !!line.getString('transaction_id')
+      if (
+        (line.getString('status') !== 'PENDENTE' && !linkedLine) ||
+        line.getInt('amount_cents') >= 0
+      ) {
+        return e.json(400, { message: 'O movimento precisa ser uma saída do extrato.' })
       }
       let cat = null
       try {
         cat = $app.findRecordById('fin_categories', String(body.category_id || ''))
       } catch (_) {}
+      // Movimento já conciliado: o comprovante só é anexado, a categoria é a do lançamento
       if (
-        !cat ||
-        cat.getString('church_id') !== churchId ||
-        cat.getString('direction') !== 'SAIDA'
+        !linkedLine &&
+        (!cat || cat.getString('church_id') !== churchId || cat.getString('direction') !== 'SAIDA')
       ) {
         return e.json(400, { message: 'Escolha a categoria de saída.' })
       }
       rec.set('line_id', line.id)
-      rec.set('chosen_category_id', cat.id)
+      rec.set('chosen_category_id', cat ? cat.id : '')
       rec.set('chosen_by', auth.id)
       rec.set('done_by_name', userName)
       rec.set('status', 'CONFIRMANDO')
