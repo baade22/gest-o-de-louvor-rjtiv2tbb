@@ -41,8 +41,10 @@ export function useFinanceAccess(screen = 'painel') {
 
 export const ACCOUNT_KIND_LABELS: Record<FinAccountKind, string> = {
   CAIXA: 'Caixa (dinheiro)',
-  BANCO: 'Conta bancária',
-  APLICACAO: 'Aplicação',
+  BANCO: 'Conta banco',
+  APLICACAO: 'Conta aplicação',
+  CARTAO: 'Cartão',
+  PLATAFORMA: 'Plataforma de pagamento',
   OUTRA: 'Outra',
 }
 

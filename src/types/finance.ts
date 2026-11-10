@@ -5,7 +5,7 @@ import type { Person as MemberPerson } from './index'
 export type FinDirection = 'ENTRADA' | 'SAIDA'
 /** Transferência tira de uma conta e põe em outra; não é entrada nem saída. */
 export type FinTransactionType = FinDirection | 'TRANSFERENCIA'
-export type FinAccountKind = 'CAIXA' | 'BANCO' | 'APLICACAO' | 'OUTRA'
+export type FinAccountKind = 'CAIXA' | 'BANCO' | 'APLICACAO' | 'CARTAO' | 'PLATAFORMA' | 'OUTRA'
 export type FinPaymentMethod =
   | 'DINHEIRO'
   | 'PIX'
@@ -32,6 +32,12 @@ export interface FinAccount extends BaseRecord {
   bank_name?: string
   agency?: string
   account_number?: string
+  /** Dígito da conta. */
+  account_digit?: string
+  /** Código reduzido (atalho de digitação, como no Eklesia). */
+  short_code?: string
+  /** Chaves PIX da conta, uma por linha. */
+  pix_keys?: string
   opening_balance_cents: number
   opening_date?: string
   /** Congregação dona da conta (ex.: Aldeia); vazio = da igreja toda. */
@@ -46,7 +52,12 @@ export interface FinAccount extends BaseRecord {
 export interface FinCategory extends BaseRecord {
   name: string
   direction: FinDirection
+  /** Grupo do plano de contas (sempre um grupo totalizador). */
   parent_id?: string
+  /** Grupo totalizador: só soma as categorias de dentro; não recebe lançamento. */
+  is_group?: boolean
+  /** Código reduzido (atalho de digitação, como no Eklesia). */
+  short_code?: string
   is_contribution: boolean
   /** Conta no plano do contador, para a exportação contábil. */
   accounting_code?: string

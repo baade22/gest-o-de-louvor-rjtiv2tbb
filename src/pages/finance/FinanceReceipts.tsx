@@ -142,7 +142,9 @@ export default function FinanceReceipts() {
   }, [busy, load])
 
   const expenseCategories = useMemo(() => {
-    const byId = new Map(lookups.categories.map((c) => [c.id, c]))
+    const byId = new Map(
+      [...lookups.categories, ...(lookups.categoryGroups || [])].map((c) => [c.id, c]),
+    )
     return lookups.categories
       .filter((c) => c.direction === 'SAIDA' && c.is_active)
       .map((c) => {
@@ -150,7 +152,7 @@ export default function FinanceReceipts() {
         return { id: c.id, name: parent ? `${parent.name} › ${c.name}` : c.name }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [lookups.categories])
+  }, [lookups.categories, lookups.categoryGroups])
 
   const pending = status?.counts.ANALISE || 0
 
