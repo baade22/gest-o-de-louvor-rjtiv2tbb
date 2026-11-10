@@ -4,7 +4,7 @@
 
 import type { FinAccount, FinCategory, FinTransaction } from '@/types/finance'
 import { treeOrder } from './categoryTree'
-import { accountMovements } from './financeReports'
+import { accountMovements, type BalanceRule } from './financeReports'
 
 export type TreeTx = Pick<
   FinTransaction,
@@ -13,7 +13,14 @@ export type TreeTx = Pick<
   Partial<
     Pick<
       FinTransaction,
-      'to_account_id' | 'category_id' | 'person_id' | 'supplier_id' | 'description' | 'is_anonymous'
+      | 'to_account_id'
+      | 'category_id'
+      | 'person_id'
+      | 'supplier_id'
+      | 'description'
+      | 'is_anonymous'
+      | 'bank_line_id'
+      | 'to_bank_line_id'
     >
   >
 
@@ -226,10 +233,12 @@ export function cashFlowReport(
     suppliers: Map<string, string>
   },
   transfers = false,
+  include?: BalanceRule,
 ): CashFlowReport {
   const scope = new Set(accounts.map((a) => a.id))
   const accName = new Map(accounts.map((a) => [a.id, a.name]))
-  const moves = accountMovements(accounts, txs, from, to)
+  const moves = accountMovements(accounts, txs, from, to, include)
+  const counts = (tx: TreeTx, accountId: string) => !include || include(tx, accountId)
   const code = (a: Account, i: number) => a.short_code || String(i + 1).padStart(4, '0')
   const list = accounts
     .map((a, i) => ({ a, i, m: moves.find((m) => m.id === a.id)! }))
@@ -261,8 +270,8 @@ export function cashFlowReport(
       description: tx.description || '',
     }
     if (tx.type === 'TRANSFERENCIA') {
-      const outIn = scope.has(tx.account_id)
-      const inIn = !!tx.to_account_id && scope.has(tx.to_account_id)
+      const outIn = scope.has(tx.account_id) && counts(tx, tx.account_id)
+      const inIn = !!tx.to_account_id && scope.has(tx.to_account_id) && counts(tx, tx.to_account_id)
       if (outIn && inIn && !transfers) continue
       const label = `Transferência ${accName.get(tx.account_id) || ''} → ${
         accName.get(tx.to_account_id || '') || ''
@@ -287,7 +296,7 @@ export function cashFlowReport(
         })
       continue
     }
-    if (!scope.has(tx.account_id)) continue
+    if (!scope.has(tx.account_id) || !counts(tx, tx.account_id)) continue
     lines.push({
       ...base,
       id: tx.id,

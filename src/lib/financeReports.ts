@@ -23,6 +23,8 @@ type Tx = Pick<FinTransaction, 'type' | 'date' | 'amount_cents' | 'account_id' |
       | 'payment_method'
       | 'event_id'
       | 'description'
+      | 'bank_line_id'
+      | 'to_bank_line_id'
     >
   >
 type Account = Pick<FinAccount, 'id' | 'name' | 'opening_balance_cents'> &
@@ -256,12 +258,19 @@ export interface AccountMovement {
   closing: number
 }
 
+/**
+ * Lançamento entra no saldo desta conta? Na conta bancária só vale o que foi conciliado com o
+ * extrato (mesma regra da tela Saldos e extratos); sem a função, vale tudo.
+ */
+export type BalanceRule = (tx: Tx, accountId: string) => boolean
+
 /** Saldo inicial, entradas, saídas, transferências e saldo final de cada conta no período. */
 export function accountMovements(
   accounts: Account[],
   txs: Tx[],
   from: string,
   to: string,
+  include?: BalanceRule,
 ): AccountMovement[] {
   const rows = new Map<string, AccountMovement>()
   for (const a of accounts) {
@@ -286,7 +295,7 @@ export function accountMovements(
     const before = d < from
     const add = (id: string | undefined, cents: number, field: keyof AccountMovement) => {
       const row = id ? rows.get(id) : undefined
-      if (!row) return
+      if (!row || (include && !include(tx, row.id))) return
       if (before) row.opening += cents
       else (row[field] as number) += Math.abs(cents)
       row.closing += cents
@@ -301,8 +310,13 @@ export function accountMovements(
 }
 
 /** Saldo de cada conta no fim de um dia, agrupado por congregação. */
-export function availabilityReport(accounts: Account[], txs: Tx[], date: string) {
-  const rows = accountMovements(accounts, txs, date, date)
+export function availabilityReport(
+  accounts: Account[],
+  txs: Tx[],
+  date: string,
+  include?: BalanceRule,
+) {
+  const rows = accountMovements(accounts, txs, date, date, include)
     .filter((r) => r.closing !== 0 || accounts.find((a) => a.id === r.id)?.is_active !== false)
     .map((r) => ({
       id: r.id,
