@@ -51,7 +51,14 @@ export async function listRegistry<T>(collection: RegistryCollection, churchId: 
 }
 
 export const listAccounts = (churchId: string) => listRegistry<FinAccount>('fin_accounts', churchId)
+/** Categorias que recebem lançamento (sem os grupos totalizadores do plano de contas). */
 export const listCategories = (churchId: string) =>
+  pb.collection('fin_categories').getFullList<FinCategory>({
+    filter: pb.filter('church_id = {:churchId} && is_group != true', { churchId }),
+    sort: 'name',
+  })
+/** Plano de contas inteiro: grupos e categorias. */
+export const listCategoryTree = (churchId: string) =>
   listRegistry<FinCategory>('fin_categories', churchId)
 export const listCostCenters = (churchId: string) =>
   listRegistry<FinCostCenter>('fin_cost_centers', churchId)
@@ -72,11 +79,25 @@ export async function saveRegistry<T>(
 
 /** Cria o plano de contas sugerido (só quando a igreja ainda não tem nenhuma categoria). */
 export async function seedDefaultCategories(churchId: string) {
+  const groups = new Map<string, string>()
   for (const c of DEFAULT_CATEGORIES) {
+    const key = `${c.direction}:${c.group}`
+    if (!groups.has(key)) {
+      const g = await pb.collection('fin_categories').create({
+        church_id: churchId,
+        name: c.group,
+        direction: c.direction,
+        is_group: true,
+        is_contribution: false,
+        is_active: true,
+      })
+      groups.set(key, g.id)
+    }
     await pb.collection('fin_categories').create({
       church_id: churchId,
       name: c.name,
       direction: c.direction,
+      parent_id: groups.get(key),
       is_contribution: Boolean(c.is_contribution),
       is_active: true,
     })

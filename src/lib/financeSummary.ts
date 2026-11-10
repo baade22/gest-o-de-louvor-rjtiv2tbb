@@ -197,23 +197,30 @@ export const DEFAULT_CATEGORIES: {
   name: string
   direction: FinDirection
   is_contribution?: boolean
+  /** Grupo totalizador onde a categoria fica no plano de contas. */
+  group: string
 }[] = [
-  { name: 'Dízimo', direction: 'ENTRADA', is_contribution: true },
-  { name: 'Oferta', direction: 'ENTRADA', is_contribution: true },
-  { name: 'Oferta de missões', direction: 'ENTRADA', is_contribution: true },
-  { name: 'Campanha', direction: 'ENTRADA', is_contribution: true },
-  { name: 'Eventos e inscrições', direction: 'ENTRADA' },
-  { name: 'Outras entradas', direction: 'ENTRADA' },
-  { name: 'Aluguel', direction: 'SAIDA' },
-  { name: 'Energia', direction: 'SAIDA' },
-  { name: 'Água', direction: 'SAIDA' },
-  { name: 'Internet e telefone', direction: 'SAIDA' },
-  { name: 'Manutenção e limpeza', direction: 'SAIDA' },
-  { name: 'Material de escritório', direction: 'SAIDA' },
-  { name: 'Ministérios', direction: 'SAIDA' },
-  { name: 'Missões', direction: 'SAIDA' },
-  { name: 'Ação social', direction: 'SAIDA' },
-  { name: 'Prebenda pastoral', direction: 'SAIDA' },
-  { name: 'Tarifas bancárias', direction: 'SAIDA' },
-  { name: 'Outras saídas', direction: 'SAIDA' },
+  { name: 'Dízimo', direction: 'ENTRADA', is_contribution: true, group: 'Contribuições' },
+  { name: 'Oferta', direction: 'ENTRADA', is_contribution: true, group: 'Contribuições' },
+  {
+    name: 'Oferta de missões',
+    direction: 'ENTRADA',
+    is_contribution: true,
+    group: 'Contribuições',
+  },
+  { name: 'Campanha', direction: 'ENTRADA', is_contribution: true, group: 'Contribuições' },
+  { name: 'Eventos e inscrições', direction: 'ENTRADA', group: 'Outras receitas' },
+  { name: 'Outras entradas', direction: 'ENTRADA', group: 'Outras receitas' },
+  { name: 'Aluguel', direction: 'SAIDA', group: 'Despesas fixas' },
+  { name: 'Energia', direction: 'SAIDA', group: 'Despesas fixas' },
+  { name: 'Água', direction: 'SAIDA', group: 'Despesas fixas' },
+  { name: 'Internet e telefone', direction: 'SAIDA', group: 'Despesas fixas' },
+  { name: 'Manutenção e limpeza', direction: 'SAIDA', group: 'Despesas administrativas' },
+  { name: 'Material de escritório', direction: 'SAIDA', group: 'Despesas administrativas' },
+  { name: 'Prebenda pastoral', direction: 'SAIDA', group: 'Despesas administrativas' },
+  { name: 'Ministérios', direction: 'SAIDA', group: 'Ministérios e missões' },
+  { name: 'Missões', direction: 'SAIDA', group: 'Ministérios e missões' },
+  { name: 'Ação social', direction: 'SAIDA', group: 'Ministérios e missões' },
+  { name: 'Tarifas bancárias', direction: 'SAIDA', group: 'Despesas bancárias' },
+  { name: 'Outras saídas', direction: 'SAIDA', group: 'Outras despesas' },
 ]
