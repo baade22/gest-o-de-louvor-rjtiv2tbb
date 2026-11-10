@@ -60,6 +60,22 @@ onRecordValidate(
       }
     }
 
+    // Grupo totalizador do plano de contas só soma: lançamento escolhe uma categoria de baixo
+    const catFields = {
+      fin_transactions: ['category_id'],
+      fin_bills: ['category_id'],
+      fin_counts: ['offering_category_id'],
+    }[rec.collection().name]
+    for (const field of catFields || []) {
+      const id = rec.getString(field)
+      if (!id) continue
+      let isGroup = false
+      try {
+        isGroup = e.app.findRecordById('fin_categories', id).getBool('is_group')
+      } catch (_) {}
+      if (isGroup) throw new BadRequestError('Escolha uma categoria, não um grupo.')
+    }
+
     if (rec.collection().name === 'fin_counts' && rec.getString('counted_by')) {
       try {
         const user = e.app.findRecordById('_pb_users_auth_', rec.getString('counted_by'))
@@ -146,3 +162,64 @@ onRecordValidate(
   'fin_bank_lines',
   'fin_bank_connections',
 )
+
+// Plano de contas em árvore: o nível pai é sempre um grupo da mesma igreja e do mesmo tipo
+// (entrada/saída), sem voltas; grupo com categorias dentro, ou categoria já usada, não troca de
+// papel.
+onRecordValidate((e) => {
+  const rec = e.record
+  const churchId = rec.getString('church_id')
+  const parentId = rec.getString('parent_id')
+  if (parentId) {
+    if (parentId === rec.id) throw new BadRequestError('O nível pai não pode ser ele mesmo.')
+    let p = null
+    try {
+      p = e.app.findRecordById('fin_categories', parentId)
+    } catch (_) {}
+    if (!p || p.getString('church_id') !== churchId) {
+      throw new BadRequestError('Nível pai não encontrado.')
+    }
+    if (!p.getBool('is_group')) throw new BadRequestError('O nível pai precisa ser um grupo.')
+    if (p.getString('direction') !== rec.getString('direction')) {
+      throw new BadRequestError('O nível pai precisa ser do mesmo tipo (entrada ou saída).')
+    }
+    // Sem voltas: subir pelos pais não pode chegar nele mesmo
+    let cur = p
+    for (let i = 0; i < 20 && cur; i++) {
+      if (cur.id === rec.id) throw new BadRequestError('Esse nível pai criaria uma volta.')
+      const up = cur.getString('parent_id')
+      if (!up) break
+      try {
+        cur = e.app.findRecordById('fin_categories', up)
+      } catch (_) {
+        cur = null
+      }
+    }
+  }
+  if (!rec.isNew()) {
+    const old = rec.original()
+    if (old.getBool('is_group') && !rec.getBool('is_group')) {
+      const kids = e.app.findRecordsByFilter('fin_categories', 'parent_id = {:id}', '', 1, 0, {
+        id: rec.id,
+      })
+      if (kids.length) {
+        throw new BadRequestError('Tire as categorias de dentro do grupo antes.')
+      }
+    }
+    if (!old.getBool('is_group') && rec.getBool('is_group')) {
+      const used = e.app.findRecordsByFilter('fin_transactions', 'category_id = {:id}', '', 1, 0, {
+        id: rec.id,
+      })
+      if (used.length) {
+        throw new BadRequestError('Esta categoria já tem lançamentos e não pode virar grupo.')
+      }
+    }
+    if (old.getString('direction') !== rec.getString('direction')) {
+      const kids = e.app.findRecordsByFilter('fin_categories', 'parent_id = {:id}', '', 1, 0, {
+        id: rec.id,
+      })
+      if (kids.length) throw new BadRequestError('Grupo com categorias não muda de tipo.')
+    }
+  }
+  e.next()
+}, 'fin_categories')

@@ -51,7 +51,10 @@ import { PAYMENT_METHOD_LABELS, SearchPicker, errorMessage, shortDate } from './
 
 export interface FinanceLookups {
   accounts: FinAccount[]
+  /** Categorias que recebem lançamento (sem grupos). */
   categories: FinCategory[]
+  /** Grupos totalizadores do plano de contas. */
+  categoryGroups?: FinCategory[]
   costCenters: FinCostCenter[]
   suppliers: FinSupplier[]
   people: Person[]

@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Archive, ArchiveRestore, Loader2, Pencil, Plus, Printer, Sparkles } from 'lucide-react'
+import {
+  Archive,
+  ArchiveRestore,
+  FolderOpen,
+  Loader2,
+  Pencil,
+  Plus,
+  Printer,
+  Sparkles,
+} from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
@@ -47,16 +56,25 @@ import {
 import { DEFAULT_STATEMENT_NOTE } from './AnnualStatementSheet'
 import { PIX_KEY_OPTIONS, PixPosterSheet, PixQr } from './PixQr'
 import { printSheet } from './print'
+import { treeOrder } from '@/lib/categoryTree'
 import { pixKeyProblem, pixPayload, type PixKeyType } from '@/lib/pix'
 import type { FinSettings } from '@/types/finance'
 
 type Row = Record<string, any> & { id: string; name: string; is_active: boolean }
+type Option = { value: string; label: string }
+
+/** Valor do Select para "nenhum" (o Select não aceita valor vazio). */
+const NONE = '__none__'
 
 interface Field {
   key: string
   label: string
-  type?: 'text' | 'money' | 'date' | 'select' | 'switch'
+  type?: 'text' | 'money' | 'date' | 'select' | 'switch' | 'textarea'
   options?: { value: string; label: string }[]
+  /** Opções que dependem dos cadastros e do que está sendo preenchido. */
+  optionsFor?: (rows: Row[], values: Record<string, any>, editing: Row | null) => Option[]
+  /** Só aparece quando a condição vale (ex.: dados do banco só fora do caixa). */
+  showIf?: (values: Record<string, any>) => boolean
   placeholder?: string
   required?: boolean
   /** Só aparece na criação (ex.: saldo inicial e tipo de categoria não mudam depois). */
@@ -75,6 +93,36 @@ interface TabConfig {
   defaults?: Record<string, unknown>
   summary: (row: Row) => string
   group?: (row: Row) => string
+  /** Mostra em árvore pelo parent_id (plano de contas). */
+  tree?: boolean
+}
+
+/** Ids de um item e de tudo o que está abaixo dele na árvore. */
+function subtreeIds(rows: Row[], id: string) {
+  const out = new Set([id])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const r of rows) {
+      if (r.parent_id && out.has(r.parent_id) && !out.has(r.id)) {
+        out.add(r.id)
+        grew = true
+      }
+    }
+  }
+  return out
+}
+
+/** Caminho do grupo: "Despesas › Despesas fixas". */
+function pathOf(rows: Row[], id: string) {
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  const names: string[] = []
+  let cur = byId.get(id)
+  for (let i = 0; cur && i < 20; i++) {
+    names.unshift(cur.name)
+    cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
+  }
+  return names.join(' › ')
 }
 
 const TABS: TabConfig[] = [
@@ -93,9 +141,15 @@ const TABS: TabConfig[] = [
       },
       {
         key: 'kind',
-        label: 'Tipo',
+        label: 'Tipo de conta',
         type: 'select',
         options: Object.entries(ACCOUNT_KIND_LABELS).map(([value, label]) => ({ value, label })),
+      },
+      {
+        key: 'short_code',
+        label: 'Código reduzido (opcional)',
+        placeholder: 'Ex.: 7',
+        hint: 'Número curto para achar a conta mais rápido nas listas.',
       },
       {
         key: 'congregation',
@@ -103,9 +157,22 @@ const TABS: TabConfig[] = [
         placeholder: 'Ex.: Aldeia',
         hint: 'Deixe em branco se a conta é da igreja toda. O painel filtra por congregação.',
       },
-      { key: 'bank_name', label: 'Banco', placeholder: 'Ex.: Banco do Brasil' },
-      { key: 'agency', label: 'Agência' },
-      { key: 'account_number', label: 'Conta' },
+      {
+        key: 'bank_name',
+        label: 'Banco',
+        placeholder: 'Ex.: Bradesco',
+        showIf: (v) => v.kind !== 'CAIXA',
+      },
+      { key: 'agency', label: 'Agência', showIf: (v) => v.kind !== 'CAIXA' },
+      { key: 'account_number', label: 'Conta', showIf: (v) => v.kind !== 'CAIXA' },
+      { key: 'account_digit', label: 'Dígito', showIf: (v) => v.kind !== 'CAIXA' },
+      {
+        key: 'pix_keys',
+        label: 'Chaves PIX (opcional)',
+        type: 'textarea',
+        placeholder: 'Uma chave por linha',
+        showIf: (v) => v.kind !== 'CAIXA',
+      },
       {
         key: 'opening_balance_cents',
         label: 'Saldo inicial (R$)',
@@ -128,10 +195,12 @@ const TABS: TabConfig[] = [
     ],
     summary: (r) =>
       [
+        r.short_code && `Cód. ${r.short_code}`,
         ACCOUNT_KIND_LABELS[r.kind as keyof typeof ACCOUNT_KIND_LABELS],
         r.congregation,
         r.bank_name,
-        r.account_number,
+        r.agency && `ag. ${r.agency}`,
+        r.account_number && `${r.account_number}${r.account_digit ? '-' + r.account_digit : ''}`,
       ]
         .filter(Boolean)
         .join(' · ') +
@@ -144,12 +213,19 @@ const TABS: TabConfig[] = [
     singular: 'categoria',
     empty:
       'As categorias dizem de onde vem e para onde vai o dinheiro (Dízimo, Energia, Aluguel...).',
-    defaults: { direction: 'SAIDA', is_contribution: false },
+    defaults: { direction: 'SAIDA', is_contribution: false, is_group: false, parent_id: NONE },
+    tree: true,
     fields: [
-      { key: 'name', label: 'Nome', required: true },
+      {
+        key: 'is_group',
+        label: 'Grupo totalizador',
+        type: 'switch',
+        hint: 'Grupo só soma as categorias de dentro (ex.: Despesas fixas). Os lançamentos usam as categorias, nunca o grupo.',
+      },
+      { key: 'name', label: 'Descrição', required: true },
       {
         key: 'direction',
-        label: 'Tipo',
+        label: 'Entrada ou saída',
         type: 'select',
         createOnly: true,
         options: [
@@ -158,10 +234,35 @@ const TABS: TabConfig[] = [
         ],
       },
       {
+        key: 'parent_id',
+        label: 'Nível pai',
+        type: 'select',
+        hint: 'O grupo onde fica. Sem nível pai, fica no primeiro nível.',
+        optionsFor: (rows, values, editing) => {
+          const blocked = editing ? subtreeIds(rows, editing.id) : new Set<string>()
+          const direction = editing?.direction || values.direction
+          return [
+            { value: NONE, label: 'Nenhum (primeiro nível)' },
+            ...rows
+              .filter(
+                (r) => r.is_group && r.is_active && r.direction === direction && !blocked.has(r.id),
+              )
+              .map((r) => ({ value: r.id, label: pathOf(rows, r.id) }))
+              .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')),
+          ]
+        },
+      },
+      {
         key: 'is_contribution',
         label: 'É contribuição (pede pessoa ou anônimo)',
         type: 'switch',
         hint: 'Use para dízimo, ofertas e missões.',
+        showIf: (v) => !v.is_group,
+      },
+      {
+        key: 'short_code',
+        label: 'Código reduzido (opcional)',
+        placeholder: 'Ex.: 12',
       },
       {
         key: 'accounting_code',
@@ -171,7 +272,14 @@ const TABS: TabConfig[] = [
       },
     ],
     group: (r) => (r.direction === 'ENTRADA' ? 'Entradas' : 'Saídas'),
-    summary: (r) => (r.is_contribution ? 'Contribuição: pessoa ou anônimo' : ''),
+    summary: (r) =>
+      [
+        r.short_code && `Cód. ${r.short_code}`,
+        r.is_group && 'Grupo',
+        r.is_contribution && 'Contribuição: pessoa ou anônimo',
+      ]
+        .filter(Boolean)
+        .join(' · '),
   },
   {
     key: 'fin_cost_centers',
@@ -269,6 +377,7 @@ function RegistryTab({
       if (f.type === 'money') initial[f.key] = row ? centsToInput(v || 0) : ''
       else if (f.type === 'date') initial[f.key] = v ? String(v).slice(0, 10) : ''
       else if (f.type === 'switch') initial[f.key] = row ? Boolean(v) : Boolean(initial[f.key])
+      else if (f.optionsFor) initial[f.key] = row ? v || NONE : initial[f.key] || NONE
       else initial[f.key] = row ? v || '' : initial[f.key] || ''
     }
     setValues(initial)
@@ -280,7 +389,12 @@ function RegistryTab({
     const data: Record<string, unknown> = {}
     for (const f of config.fields) {
       if (editing && f.createOnly) continue
-      const v = values[f.key]
+      if (f.showIf && !f.showIf(values)) {
+        // Campo escondido: switch volta a falso; texto fica como estava
+        if (f.type === 'switch') data[f.key] = false
+        continue
+      }
+      const v = values[f.key] === NONE ? '' : values[f.key]
       if (f.required && !String(v || '').trim()) {
         toast({ title: `Preencha: ${f.label}`, variant: 'destructive' })
         return
@@ -410,16 +524,35 @@ function RegistryTab({
               </div>
             )}
             <ul className="divide-y divide-slate-100">
-              {group.rows.map((row) => (
+              {(config.tree
+                ? treeOrder(group.rows)
+                : group.rows.map((row) => ({ row, depth: 0 }))
+              ).map(({ row, depth }) => (
                 <li
                   key={row.id}
                   className={cn(
                     'flex items-center gap-3 px-4 py-3',
                     !row.is_active && 'opacity-60',
+                    row.is_group && 'bg-slate-50/60',
                   )}
+                  style={depth ? { paddingLeft: `${16 + Math.min(depth, 6) * 20}px` } : undefined}
                 >
+                  {config.tree && (
+                    <span className="shrink-0 text-slate-400" aria-hidden>
+                      {row.is_group ? (
+                        <FolderOpen className="h-4 w-4" />
+                      ) : (
+                        <span className="block h-4 w-4 text-center leading-4">·</span>
+                      )}
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-slate-900">
+                    <div
+                      className={cn(
+                        'truncate font-semibold text-slate-900',
+                        row.is_group && 'uppercase tracking-wide text-slate-700',
+                      )}
+                    >
                       {row.name}
                       {!row.is_active && (
                         <span className="ml-2 text-xs font-medium text-slate-400">arquivado</span>
@@ -475,6 +608,7 @@ function RegistryTab({
           <form onSubmit={handleSave} className="space-y-3.5">
             {config.fields
               .filter((f) => !(editing && f.createOnly))
+              .filter((f) => !f.showIf || f.showIf(values))
               .map((f) => (
                 <div key={f.key} className="space-y-1.5">
                   {f.type === 'switch' ? (
@@ -496,19 +630,37 @@ function RegistryTab({
                       {f.type === 'select' ? (
                         <Select
                           value={values[f.key]}
-                          onValueChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))}
+                          onValueChange={(v) =>
+                            setValues((s) => ({
+                              ...s,
+                              [f.key]: v,
+                              ...(f.key === 'direction' && 'parent_id' in s
+                                ? { parent_id: NONE }
+                                : {}),
+                            }))
+                          }
                         >
                           <SelectTrigger className="h-10 rounded-lg">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {f.options?.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
+                            {(f.optionsFor ? f.optionsFor(rows, values, editing) : f.options)?.map(
+                              (o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ),
+                            )}
                           </SelectContent>
                         </Select>
+                      ) : f.type === 'textarea' ? (
+                        <Textarea
+                          rows={3}
+                          placeholder={f.placeholder}
+                          value={values[f.key] ?? ''}
+                          onChange={(e) => setValues((s) => ({ ...s, [f.key]: e.target.value }))}
+                          className="rounded-lg"
+                        />
                       ) : (
                         <Input
                           type={f.type === 'date' ? 'date' : 'text'}

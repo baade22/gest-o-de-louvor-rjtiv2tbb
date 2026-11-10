@@ -476,13 +476,15 @@ cronAdd('finance_receipts', '* * * * *', () => {
       )
       const byId = {}
       for (const r of rows) byId[r.id] = r
-      return rows.map((r) => {
-        const parent = byId[r.getString('parent_id')]
-        return {
-          id: r.id,
-          name: (parent ? parent.getString('name') + ' › ' : '') + r.getString('name'),
-        }
-      })
+      return rows
+        .filter((r) => !r.getBool('is_group'))
+        .map((r) => {
+          const parent = byId[r.getString('parent_id')]
+          return {
+            id: r.id,
+            name: (parent ? parent.getString('name') + ' › ' : '') + r.getString('name'),
+          }
+        })
     } catch (_) {
       return []
     }

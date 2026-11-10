@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   listAccounts,
   listCampaigns,
-  listCategories,
+  listCategoryTree,
   listCostCenters,
   listPeople,
   listRecentEvents,
@@ -27,17 +27,27 @@ export function useFinanceLookups(churchId?: string) {
 
   const reload = useCallback(async () => {
     if (!churchId) return
-    const [accounts, categories, costCenters, suppliers, people, events, campaigns] =
-      await Promise.all([
-        listAccounts(churchId),
-        listCategories(churchId),
-        listCostCenters(churchId),
-        listSuppliers(churchId),
-        listPeople(churchId),
-        listRecentEvents(churchId).then((r) => r.items),
-        listCampaigns(churchId).catch(() => []),
-      ])
-    setLookups({ accounts, categories, costCenters, suppliers, people, events, campaigns })
+    const [accounts, tree, costCenters, suppliers, people, events, campaigns] = await Promise.all([
+      listAccounts(churchId),
+      listCategoryTree(churchId),
+      listCostCenters(churchId),
+      listSuppliers(churchId),
+      listPeople(churchId),
+      listRecentEvents(churchId).then((r) => r.items),
+      listCampaigns(churchId).catch(() => []),
+    ])
+    const categories = tree.filter((c) => !c.is_group)
+    const categoryGroups = tree.filter((c) => c.is_group)
+    setLookups({
+      accounts,
+      categories,
+      categoryGroups,
+      costCenters,
+      suppliers,
+      people,
+      events,
+      campaigns,
+    })
   }, [churchId])
 
   useEffect(() => {

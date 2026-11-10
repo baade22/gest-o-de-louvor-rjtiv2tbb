@@ -15,6 +15,7 @@ import {
   Scale,
   Wallet,
   type LucideIcon,
+  CreditCard,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
@@ -76,6 +77,8 @@ const KIND_ICON: Record<FinAccountKind, LucideIcon> = {
   CAIXA: Banknote,
   BANCO: Landmark,
   APLICACAO: PiggyBank,
+  CARTAO: CreditCard,
+  PLATAFORMA: Wallet,
   OUTRA: Wallet,
 }
 
