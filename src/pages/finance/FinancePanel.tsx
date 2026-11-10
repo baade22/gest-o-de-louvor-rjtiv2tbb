@@ -276,9 +276,9 @@ export default function FinancePanel() {
         <MonthSwitcher value={month} onChange={setMonth} />
         {canEdit && !needsSetup && (
           <Button asChild className={primaryButtonClass}>
-            <Link to="/financeiro/lancamentos?novo=1">
+            <Link to="/financeiro/contas?novo=1">
               <Plus className="h-4 w-4" />
-              Novo lançamento
+              Novo título
             </Link>
           </Button>
         )}

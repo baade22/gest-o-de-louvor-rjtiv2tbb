@@ -85,7 +85,18 @@ function detail(tx: FinTransaction) {
   return parts.filter(Boolean).join(' · ')
 }
 
-export default function FinanceTransactions() {
+/**
+ * Movimentos do mês. Sem "Lançamentos" no menu (padrão do Eklesia), a lista aparece em dois
+ * lugares: a tela Transferência (só transferências, com "Nova transferência") e a aba de todas
+ * as entradas ou saídas em Contas a pagar e receber (`embedded`).
+ */
+export default function FinanceTransactions({
+  only,
+  embedded = false,
+}: {
+  only?: 'ENTRADA' | 'SAIDA' | 'TRANSFERENCIA'
+  embedded?: boolean
+} = {}) {
   const { currentChurch } = useAuth()
   const { canEdit } = useFinanceAccess('lancamentos')
   const { toast } = useToast()
@@ -95,7 +106,7 @@ export default function FinanceTransactions() {
   const [month, setMonth] = useState(() => getLocalTodayYMD().slice(0, 7))
   const [txs, setTxs] = useState<FinTransaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Filter>('TODOS')
+  const [filter, setFilter] = useState<Filter>(only || 'TODOS')
   const [search, setSearch] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<FinTransaction | null>(null)
@@ -122,15 +133,15 @@ export default function FinanceTransactions() {
     load()
   }, [load])
 
-  // Atalho vindo do painel: /financeiro/lancamentos?novo=1
+  // Atalho: /financeiro/transferencias?novo=1
   useEffect(() => {
-    if (params.get('novo') && canEdit) {
+    if (!embedded && params.get('novo') && canEdit) {
       setEditing(null)
       setSheetOpen(true)
       params.delete('novo')
       setParams(params, { replace: true })
     }
-  }, [params, setParams, canEdit])
+  }, [params, setParams, canEdit, embedded])
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -170,32 +181,47 @@ export default function FinanceTransactions() {
     load()
   }
 
+  const isTransfers = only === 'TRANSFERENCIA'
+  const actions = (
+    <>
+      <MonthSwitcher value={month} onChange={setMonth} />
+      {canEdit && !isTransfers && (
+        <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <FileUp className="h-4 w-4" />
+          Importar do Eklesia
+        </Button>
+      )}
+      {canEdit && isTransfers && (
+        <Button onClick={openNew} className={primaryButtonClass}>
+          <Plus className="h-4 w-4" />
+          Nova transferência
+        </Button>
+      )}
+    </>
+  )
+
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Lançamentos"
-        subtitle="Entradas, saídas e transferências de todas as contas"
-      >
-        <MonthSwitcher value={month} onChange={setMonth} />
-        {canEdit && (
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <FileUp className="h-4 w-4" />
-            Importar do Eklesia
-          </Button>
-        )}
-        {canEdit && (
-          <Button onClick={openNew} className={primaryButtonClass}>
-            <Plus className="h-4 w-4" />
-            Novo lançamento
-          </Button>
-        )}
-      </PageHeader>
+      {embedded ? (
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      ) : (
+        <PageHeader
+          title={isTransfers ? 'Transferência' : 'Movimentos'}
+          subtitle={
+            isTransfers
+              ? 'Dinheiro que passa de uma conta da igreja para outra'
+              : 'Entradas, saídas e transferências de todas as contas'
+          }
+        >
+          {actions}
+        </PageHeader>
+      )}
 
-      {!canEdit && <ReadOnlyNotice />}
+      {!canEdit && !embedded && <ReadOnlyNotice />}
 
       <div className={cardClass}>
         <div className="flex flex-col gap-3 border-b border-slate-200 p-3 sm:flex-row sm:items-center">
-          <div className="flex flex-wrap gap-1.5">
+          <div className={cn('flex flex-wrap gap-1.5', only && 'hidden')}>
             {FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -231,11 +257,15 @@ export default function FinanceTransactions() {
           </div>
         ) : visible.length === 0 ? (
           <div className="px-6 py-14 text-center">
-            <p className="font-semibold text-slate-800">Nenhum lançamento neste período</p>
+            <p className="font-semibold text-slate-800">
+              {isTransfers ? 'Nenhuma transferência neste mês' : 'Nenhum movimento neste mês'}
+            </p>
             <p className="mt-1 text-sm text-slate-500">
-              {canEdit
-                ? 'Use “Novo lançamento” para registrar uma entrada ou saída.'
-                : 'Troque o mês para ver outros períodos.'}
+              {!canEdit
+                ? 'Troque o mês para ver outros períodos.'
+                : isTransfers
+                  ? 'Use “Nova transferência” para passar dinheiro de uma conta para outra.'
+                  : 'Para lançar, crie um título e registre o pagamento ou recebimento.'}
             </p>
           </div>
         ) : (
@@ -365,7 +395,12 @@ export default function FinanceTransactions() {
           </ul>
         )}
 
-        <div className="grid grid-cols-3 border-t border-slate-200 text-sm">
+        <div
+          className={cn(
+            'grid grid-cols-3 border-t border-slate-200 text-sm',
+            isTransfers && 'hidden',
+          )}
+        >
           <div className="px-4 py-3">
             <div className="text-xs text-slate-500">Entradas</div>
             <div className="font-bold tabular-nums text-emerald-700">
@@ -402,6 +437,7 @@ export default function FinanceTransactions() {
           churchId={churchId}
           lookups={lookups}
           editing={editing}
+          newType={only}
           onSaved={load}
           onLookupsChanged={reloadLookups}
         />

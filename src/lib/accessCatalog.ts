@@ -161,7 +161,7 @@ export const ACCESS_MODULES: AccessModule[] = [
     scoped: true,
     screens: [
       { key: 'painel', label: 'Painel', actions: ['ver'] },
-      { key: 'lancamentos', label: 'Lançamentos', actions: ['ver', 'novo', 'alterar'] },
+      { key: 'lancamentos', label: 'Movimentos e transferências', actions: ['ver', 'novo', 'alterar'] },
       {
         key: 'contagem',
         label: 'Contagem do culto',

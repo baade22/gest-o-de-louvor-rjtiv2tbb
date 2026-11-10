@@ -171,10 +171,10 @@ export default function Layout() {
           end: true,
         },
         {
-          to: '/financeiro/lancamentos',
-          label: 'Lançamentos',
-          icon: ArrowLeftRight,
-          allowed: fin('lancamentos'),
+          to: '/financeiro/contas',
+          label: 'Contas a pagar e receber',
+          icon: CalendarClock,
+          allowed: fin('contas_pagar'),
         },
         {
           to: '/financeiro/contagem',
@@ -183,10 +183,10 @@ export default function Layout() {
           allowed: fin('contagem'),
         },
         {
-          to: '/financeiro/contas',
-          label: 'Contas a pagar e receber',
-          icon: CalendarClock,
-          allowed: fin('contas_pagar'),
+          to: '/financeiro/transferencias',
+          label: 'Transferência',
+          icon: ArrowLeftRight,
+          allowed: fin('lancamentos'),
         },
         {
           to: '/financeiro/saldos',
