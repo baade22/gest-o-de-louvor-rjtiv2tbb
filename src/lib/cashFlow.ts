@@ -9,7 +9,7 @@ type Account = Pick<FinAccount, 'id' | 'name' | 'opening_balance_cents'> &
   Partial<Pick<FinAccount, 'kind' | 'congregation' | 'min_balance_cents' | 'is_active'>>
 type Tx = Pick<FinTransaction, 'type' | 'date' | 'amount_cents' | 'account_id' | 'status'> &
   Partial<Pick<FinTransaction, 'id' | 'to_account_id' | 'category_id' | 'description'>>
-type Bill = Pick<FinBill, 'kind' | 'status' | 'amount_cents' | 'due_date'> &
+type Bill = Pick<FinBill, 'kind' | 'status' | 'amount_cents' | 'due_date' | 'settled_cents'> &
   Partial<Pick<FinBill, 'id' | 'account_id' | 'description'>>
 type Category = Pick<FinCategory, 'id'> & Partial<Pick<FinCategory, 'is_contribution' | 'name'>>
 
@@ -187,7 +187,7 @@ export function cashFlow(
     items.push({
       date: overdue ? tomorrow : due,
       label: b.description || (b.kind === 'PAGAR' ? 'Conta a pagar' : 'Conta a receber'),
-      cents: b.kind === 'PAGAR' ? -b.amount_cents : b.amount_cents,
+      cents: (b.kind === 'PAGAR' ? -1 : 1) * Math.max(0, b.amount_cents - (b.settled_cents || 0)),
       group: g,
       source: overdue ? 'VENCIDA' : 'CONTA',
       id: b.id,

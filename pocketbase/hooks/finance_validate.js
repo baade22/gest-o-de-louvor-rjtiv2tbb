@@ -76,6 +76,15 @@ onRecordValidate(
       if (isGroup) throw new BadRequestError('Escolha uma categoria, não um grupo.')
     }
 
+    // Título pago por qualquer caminho (baixa, conciliação, comprovante) está quitado por inteiro
+    if (
+      rec.collection().name === 'fin_bills' &&
+      rec.getString('status') === 'PAGO' &&
+      rec.getInt('settled_cents') < rec.getInt('amount_cents')
+    ) {
+      rec.set('settled_cents', rec.getInt('amount_cents'))
+    }
+
     if (rec.collection().name === 'fin_counts' && rec.getString('counted_by')) {
       try {
         const user = e.app.findRecordById('_pb_users_auth_', rec.getString('counted_by'))

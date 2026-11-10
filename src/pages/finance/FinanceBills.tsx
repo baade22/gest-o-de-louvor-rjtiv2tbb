@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CalendarDays,
   CheckCircle2,
+  ListChecks,
   Loader2,
   MoreHorizontal,
   Paperclip,
@@ -22,7 +23,6 @@ import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { formatCents, centsToInput, parseMoneyToCents } from '@/lib/money'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
-import { billTotals, daysBetween } from '@/lib/financeSummary'
 import {
   cancelBill,
   createBills,
@@ -31,9 +31,22 @@ import {
   saveRegistry,
   settleBill,
   updateBill,
+  listBillPayments,
+  listLedger,
+  splitInstallments,
+  voidTransaction,
   type BillInput,
+  type BillRepeat,
 } from '@/services/finance'
-import type { FinBill, FinBillKind, FinSupplier, Person } from '@/types/finance'
+import type {
+  FinAccountKind,
+  FinBill,
+  FinBillKind,
+  FinPaymentMethod,
+  FinSupplier,
+  FinTransaction,
+  Person,
+} from '@/types/finance'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,6 +74,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { accountBalances, billRemaining, billTotals, daysBetween } from '@/lib/financeSummary'
+import { realizedFilter } from '@/lib/realizedBalance'
+import { useReconcileStarts } from './useReconcileStarts'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -444,6 +460,8 @@ export default function FinanceBills() {
                           )}
                         >
                           {due.text}
+                          {(bill.settled_cents || 0) > 0 &&
+                            ` · ${w.paid.toLowerCase()} ${formatCents(bill.settled_cents || 0)} de ${formatCents(bill.amount_cents)}`}
                         </span>
                       ) : bill.status === 'PAGO' ? (
                         <span className="font-semibold text-emerald-700">
@@ -462,7 +480,9 @@ export default function FinanceBills() {
                     {formatCents(
                       bill.status === 'PAGO'
                         ? bill.paid_amount_cents || bill.amount_cents
-                        : bill.amount_cents,
+                        : bill.status === 'ABERTO'
+                          ? billRemaining(bill)
+                          : bill.amount_cents,
                     )}
                   </div>
                   {canEdit && open && (
@@ -515,13 +535,13 @@ export default function FinanceBills() {
                           <XCircle className="mr-2 h-4 w-4" /> Cancelar
                         </DropdownMenuItem>
                       )}
-                      {bill.status === 'PAGO' && (
-                        <DropdownMenuItem disabled className="max-w-64 whitespace-normal text-xs">
-                          Para desfazer, estorne o lançamento em Lançamentos: a conta volta para em
-                          aberto.
+                      {(bill.paid_amount_cents || 0) > 0 && (
+                        <DropdownMenuItem onClick={() => setSettling(bill)}>
+                          <ListChecks className="mr-2 h-4 w-4" />
+                          {kind === 'PAGAR' ? 'Pagamentos realizados' : 'Recebimentos realizados'}
                         </DropdownMenuItem>
                       )}
-                      {!bill.attachment && !(canEdit && open) && bill.status !== 'PAGO' && (
+                      {!bill.attachment && !(canEdit && open) && !bill.paid_amount_cents && (
                         <DropdownMenuItem disabled>Sem ações disponíveis</DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -536,7 +556,7 @@ export default function FinanceBills() {
           <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm">
             <span className="text-slate-500">Total em aberto</span>
             <span className="font-bold tabular-nums text-slate-900">
-              {formatCents(visible.reduce((s, b) => s + b.amount_cents, 0))}
+              {formatCents(visible.reduce((s, b) => s + billRemaining(b), 0))}
             </span>
           </div>
         )}
@@ -552,11 +572,21 @@ export default function FinanceBills() {
           editing={editing}
           onSaved={load}
           onLookupsChanged={reloadLookups}
+          onCreated={(bill) =>
+            confirm({
+              title: 'Atenção!',
+              description: `Deseja registrar o ${bill.kind === 'PAGAR' ? 'pagamento' : 'recebimento'} desse título?`,
+              confirmLabel: 'Sim, registrar',
+              onConfirm: () => setSettling(bill),
+            })
+          }
         />
       )}
 
       <SettleDialog
         bill={settling}
+        churchId={churchId}
+        canEdit={canEdit}
         lookups={lookups}
         onClose={() => setSettling(null)}
         onSettled={load}
@@ -577,13 +607,13 @@ const emptyForm = () => ({
   category_id: '',
   cost_center_id: '',
   campaign_id: '',
-  supplier_id: '',
-  person_id: '',
+  /** Nome: "s:<id>" (fornecedor) ou "p:<id>" (pessoa). */
+  who: '',
   account_id: '',
   document_type: '',
   document_number: '',
   notes: '',
-  repeat: false,
+  repeat: 'UNICA' as BillRepeat,
   times: '12',
 })
 
@@ -596,6 +626,7 @@ function BillSheet({
   editing,
   onSaved,
   onLookupsChanged,
+  onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -605,6 +636,8 @@ function BillSheet({
   editing: FinBill | null
   onSaved: () => void
   onLookupsChanged: () => void
+  /** Título novo salvo: a tela pergunta se já registra o pagamento. */
+  onCreated?: (bill: FinBill) => void
 }) {
   const { toast } = useToast()
   const [form, setForm] = useState(emptyForm())
@@ -626,13 +659,16 @@ function BillSheet({
         category_id: editing.category_id || '',
         cost_center_id: editing.cost_center_id || '',
         campaign_id: editing.campaign_id || '',
-        supplier_id: editing.supplier_id || '',
-        person_id: editing.person_id || '',
+        who: editing.supplier_id
+          ? `s:${editing.supplier_id}`
+          : editing.person_id
+            ? `p:${editing.person_id}`
+            : '',
         account_id: editing.account_id || '',
         document_type: editing.document_type || '',
         document_number: editing.document_number || '',
         notes: editing.notes || '',
-        repeat: false,
+        repeat: 'UNICA',
         times: '12',
       })
     } else {
@@ -653,22 +689,44 @@ function BillSheet({
   )
   const cents = parseMoneyToCents(form.amount) || 0
   const times = Math.max(2, Math.min(60, Number(form.times) || 0))
+  const repeating = !editing && form.repeat !== 'UNICA'
+  const parts = form.repeat === 'PARCELADA' && cents > 0 ? splitInstallments(cents, times) : []
 
-  const createSupplier = async (name: string) => {
-    const s = await saveRegistry<FinSupplier>('fin_suppliers', churchId, { name })
-    onLookupsChanged()
-    return s.id
-  }
-  const createPerson = async (name: string) => {
+  // Nome: pessoas e fornecedores numa busca só, como no Eklesia
+  const whoOptions = [
+    ...lookups.people
+      .filter((p) => p.is_active || `p:${p.id}` === form.who)
+      .map((p) => ({ id: `p:${p.id}`, label: p.name, hint: 'Pessoa' })),
+    ...lookups.suppliers
+      .filter((s) => s.is_active || `s:${s.id}` === form.who)
+      .map((s) => ({ id: `s:${s.id}`, label: s.name, hint: 'Fornecedor' })),
+  ].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  const whoName = whoOptions.find((o) => o.id === form.who)?.label || ''
+
+  const createWho = async (name: string) => {
+    if (isPay) {
+      const s = await saveRegistry<FinSupplier>('fin_suppliers', churchId, { name })
+      onLookupsChanged()
+      return `s:${s.id}`
+    }
     const p = await saveRegistry<Person>('people', churchId, { name })
     onLookupsChanged()
-    return p.id
+    return `p:${p.id}`
   }
 
   const handleSave = async (e: React.SyntheticEvent) => {
     e.preventDefault()
-    if (!form.description.trim()) {
-      toast({ title: 'Descreva a conta', description: 'Ex.: Conta de luz', variant: 'destructive' })
+    const description =
+      form.description.trim() ||
+      whoName ||
+      lookups.categories.find((c) => c.id === form.category_id)?.name ||
+      ''
+    if (!description) {
+      toast({
+        title: 'Informe o nome ou o histórico',
+        description: 'Ex.: Conta de luz',
+        variant: 'destructive',
+      })
       return
     }
     if (!cents || cents <= 0) {
@@ -681,15 +739,15 @@ function BillSheet({
     }
     const input: BillInput = {
       kind,
-      description: form.description.trim(),
+      description,
       amount_cents: cents,
       due_date: form.due_date,
       issue_date: form.issue_date,
       category_id: form.category_id,
       cost_center_id: form.cost_center_id,
       campaign_id: form.campaign_id,
-      supplier_id: isPay ? form.supplier_id : '',
-      person_id: isPay ? '' : form.person_id,
+      supplier_id: form.who.startsWith('s:') ? form.who.slice(2) : '',
+      person_id: form.who.startsWith('p:') ? form.who.slice(2) : '',
       account_id: form.account_id,
       document_type: form.document_type,
       document_number: form.document_number.trim(),
@@ -702,14 +760,20 @@ function BillSheet({
         await updateBill(editing.id, input)
         toast({ title: 'Conta atualizada' })
       } else {
-        const created = await createBills(churchId, input, form.repeat ? times : 1)
+        const created = await createBills(
+          churchId,
+          input,
+          repeating ? times : 1,
+          form.repeat === 'PARCELADA' ? 'PARCELADA' : 'RECORRENTE',
+        )
         toast({
-          title: created.length > 1 ? `${created.length} contas criadas` : 'Conta criada',
+          title: created.length > 1 ? `${created.length} títulos criados` : 'Título salvo',
           description:
             created.length > 1
-              ? `Uma por mês, até ${shortDate(created[created.length - 1].due_date, true)}.`
+              ? `Um por mês, até ${shortDate(created[created.length - 1].due_date, true)}.`
               : undefined,
         })
+        onCreated?.(created[0])
       }
       onSaved()
       onOpenChange(false)
@@ -743,45 +807,29 @@ function BillSheet({
 
         <form onSubmit={handleSave} className="mt-5 space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="bill-desc" className={fieldLabel}>
-              Descrição
-            </Label>
-            <Input
-              id="bill-desc"
-              autoFocus
-              maxLength={200}
-              placeholder={isPay ? 'Ex.: Conta de luz' : 'Ex.: Aluguel do salão'}
-              value={form.description}
-              onChange={(e) => set({ description: e.target.value })}
-              className="h-10 rounded-lg"
+            <Label className={fieldLabel}>Nome</Label>
+            <SearchPicker
+              value={form.who}
+              onChange={(id) => set({ who: id })}
+              placeholder={isPay ? 'Para quem vai pagar' : 'De quem vai receber'}
+              options={whoOptions}
+              onCreate={createWho}
+              createLabel={isPay ? 'Cadastrar fornecedor' : 'Cadastrar pessoa'}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label className={fieldLabel}>{w.who} (opcional)</Label>
-            {isPay ? (
-              <SearchPicker
-                value={form.supplier_id}
-                onChange={(id) => set({ supplier_id: id })}
-                placeholder="Para quem vai pagar"
-                options={lookups.suppliers
-                  .filter((s) => s.is_active || s.id === form.supplier_id)
-                  .map((s) => ({ id: s.id, label: s.name }))}
-                onCreate={createSupplier}
-                createLabel="Cadastrar fornecedor"
-              />
-            ) : (
-              <SearchPicker
-                value={form.person_id}
-                onChange={(id) => set({ person_id: id })}
-                placeholder="Quem vai pagar à igreja"
-                options={lookups.people
-                  .filter((p) => p.is_active || p.id === form.person_id)
-                  .map((p) => ({ id: p.id, label: p.name, hint: p.phone }))}
-                onCreate={createPerson}
-                createLabel="Cadastrar pessoa"
-              />
-            )}
+            <Label htmlFor="bill-desc" className={fieldLabel}>
+              Histórico (opcional)
+            </Label>
+            <Input
+              id="bill-desc"
+              maxLength={200}
+              placeholder={isPay ? 'Ex.: Conta de luz de outubro' : 'Ex.: Aluguel do salão'}
+              value={form.description}
+              onChange={(e) => set({ description: e.target.value })}
+              className="h-10 rounded-lg"
+            />
           </div>
 
           <div className="grid grid-cols-[1fr_150px] gap-3">
@@ -814,32 +862,48 @@ function BillSheet({
 
           {!editing && (
             <div className="space-y-2 rounded-xl border border-slate-200 p-3">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={form.repeat}
-                  onChange={(e) => set({ repeat: e.target.checked })}
-                  className="h-4 w-4 accent-teal-700"
-                />
-                <Repeat className="h-4 w-4 text-slate-500" />
-                Repetir todo mês
-              </label>
-              {form.repeat && (
-                <div className="flex flex-wrap items-center gap-2 pl-6 text-sm text-slate-600">
-                  <span>Criar</span>
-                  <Input
-                    aria-label="Quantos meses"
-                    inputMode="numeric"
-                    value={form.times}
-                    onChange={(e) => set({ times: e.target.value.replace(/\D/g, '').slice(0, 2) })}
-                    className="h-8 w-16 rounded-lg text-center"
-                  />
-                  <span>
-                    contas, uma por mês, no mesmo dia
-                    {cents > 0 && ` (total ${formatCents(cents * times)})`}
-                  </span>
+              <div className="grid grid-cols-[1fr_96px] gap-3">
+                <div className="space-y-1.5">
+                  <Label className={fieldLabel}>Repetição</Label>
+                  <Select
+                    value={form.repeat}
+                    onValueChange={(v) => set({ repeat: v as BillRepeat })}
+                  >
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UNICA">Única</SelectItem>
+                      <SelectItem value="RECORRENTE">Recorrente</SelectItem>
+                      <SelectItem value="PARCELADA">Parcelada</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                {form.repeat !== 'UNICA' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bill-times" className={fieldLabel}>
+                      {form.repeat === 'PARCELADA' ? 'Parcelas' : 'Meses'}
+                    </Label>
+                    <Input
+                      id="bill-times"
+                      inputMode="numeric"
+                      value={form.times}
+                      onChange={(e) =>
+                        set({ times: e.target.value.replace(/\D/g, '').slice(0, 2) })
+                      }
+                      className="h-10 rounded-lg text-center"
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="flex items-start gap-1.5 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {form.repeat === 'UNICA'
+                  ? 'Título único.'
+                  : form.repeat === 'RECORRENTE'
+                    ? `${times} títulos de ${cents > 0 ? formatCents(cents) : 'mesmo valor'}, um por mês, no mesmo dia${cents > 0 ? ` (total ${formatCents(cents * times)})` : ''}.`
+                    : `${formatCents(cents)} em ${times} parcelas mensais${parts.length ? ` de ${formatCents(parts[parts.length - 1])}${parts[0] !== parts[parts.length - 1] ? ` (a primeira de ${formatCents(parts[0])})` : ''}` : ''}.`}
+              </p>
             </div>
           )}
 
@@ -1029,7 +1093,7 @@ function BillSheet({
             className="h-10 w-full gap-2 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {!editing && form.repeat ? `Criar ${times} contas` : 'Salvar'}
+            {repeating ? `Criar ${times} títulos` : 'Salvar'}
           </Button>
         </form>
       </SheetContent>
@@ -1039,36 +1103,106 @@ function BillSheet({
 
 // ---- Baixa ----
 
+/** Tipo de acerto conforme a conta: no caixa, dinheiro ou cheque; no banco, os meios eletrônicos. */
+export function methodsForAccount(kind?: FinAccountKind): FinPaymentMethod[] {
+  if (!kind) return []
+  if (kind === 'CAIXA') return ['DINHEIRO', 'CHEQUE']
+  return ['PIX', 'TRANSFERENCIA', 'BOLETO', 'CARTAO', 'CHEQUE', 'OUTRO']
+}
+
+const ACERTO_LABELS: Partial<Record<FinPaymentMethod, string>> = {
+  TRANSFERENCIA: 'Depósito/transferência',
+}
+
 function SettleDialog({
   bill,
+  churchId,
+  canEdit,
   lookups,
   onClose,
   onSettled,
 }: {
   bill: FinBill | null
+  churchId?: string
+  canEdit: boolean
   lookups: FinanceLookups
   onClose: () => void
   onSettled: () => void
 }) {
   const { toast } = useToast()
+  const { confirm, dialog } = useConfirm()
   const [date, setDate] = useState(getLocalTodayYMD())
   const [accountId, setAccountId] = useState('')
+  const [discount, setDiscount] = useState('')
+  const [interest, setInterest] = useState('')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('')
   const [busy, setBusy] = useState(false)
+  const [payments, setPayments] = useState<FinTransaction[]>([])
+  const [ledger, setLedger] = useState<FinTransaction[]>([])
   const isPay = bill?.kind === 'PAGAR'
+  const open = bill?.status === 'ABERTO' && canEdit
+  const starts = useReconcileStarts(churchId, lookups.accounts)
+
+  const loadPayments = useCallback(async () => {
+    if (!bill) return
+    try {
+      setPayments(await listBillPayments(bill.id))
+    } catch (err) {
+      console.error(err)
+    }
+  }, [bill])
 
   useEffect(() => {
     if (!bill) return
     setDate(getLocalTodayYMD())
     const preferred = lookups.accounts.find((a) => a.id === bill.account_id && a.is_active)
     const bank = lookups.accounts.find((a) => a.is_active && a.kind === 'BANCO')
-    setAccountId(preferred?.id || bank?.id || lookups.accounts.find((a) => a.is_active)?.id || '')
-    setAmount(centsToInput(bill.amount_cents))
-    setMethod(bill.document_type === 'BOLETO' ? 'BOLETO' : 'PIX')
-  }, [bill, lookups.accounts])
+    const acc = preferred || bank || lookups.accounts.find((a) => a.is_active)
+    setAccountId(acc?.id || '')
+    setDiscount('')
+    setInterest('')
+    setAmount(centsToInput(billRemaining(bill)))
+    const options = methodsForAccount(acc?.kind)
+    const wanted: FinPaymentMethod = bill.document_type === 'BOLETO' ? 'BOLETO' : 'PIX'
+    setMethod(options.includes(wanted) ? wanted : options[0] || '')
+    setPayments([])
+    loadPayments()
+  }, [bill, lookups.accounts, loadPayments])
 
+  useEffect(() => {
+    if (!bill || !churchId) return
+    listLedger(churchId)
+      .then(setLedger)
+      .catch((err) => console.error(err))
+  }, [bill, churchId])
+
+  const remaining = bill ? billRemaining(bill) : 0
+  const discountCents = parseMoneyToCents(discount || '0') || 0
+  const interestCents = parseMoneyToCents(interest || '0') || 0
   const cents = parseMoneyToCents(amount) || 0
+  const principal = cents + discountCents - interestCents
+  const account = lookups.accounts.find((a) => a.id === accountId)
+  const methods = methodsForAccount(account?.kind)
+  const balances = useMemo(
+    () => accountBalances(lookups.accounts, ledger, realizedFilter(starts)),
+    [lookups.accounts, ledger, starts],
+  )
+  const done = payments.filter((p) => p.status !== 'ESTORNADO')
+  const sum = (f: (p: FinTransaction) => number) => done.reduce((s, p) => s + f(p), 0)
+
+  // Desconto e juros mudam o valor pago (o que sai da conta), como no Eklesia
+  const recalc = (d: string, i: string) => {
+    const dc = parseMoneyToCents(d || '0') || 0
+    const ic = parseMoneyToCents(i || '0') || 0
+    setAmount(centsToInput(Math.max(0, remaining - dc + ic)))
+  }
+
+  const changeAccount = (id: string) => {
+    setAccountId(id)
+    const options = methodsForAccount(lookups.accounts.find((a) => a.id === id)?.kind)
+    if (!options.includes(method as FinPaymentMethod)) setMethod(options[0] || '')
+  }
 
   const handleSettle = async () => {
     if (!bill) return
@@ -1080,6 +1214,22 @@ function SettleDialog({
       toast({ title: 'Escolha a conta', variant: 'destructive' })
       return
     }
+    if (!method) {
+      toast({ title: 'Escolha o tipo de acerto', variant: 'destructive' })
+      return
+    }
+    if (principal > remaining) {
+      toast({
+        title: 'Valor maior que o saldo do título',
+        description: `Falta ${formatCents(remaining)}. O que passar disso entra em juros ou multa.`,
+        variant: 'destructive',
+      })
+      return
+    }
+    if (principal <= 0) {
+      toast({ title: 'O valor não quita nada do título', variant: 'destructive' })
+      return
+    }
     setBusy(true)
     try {
       await settleBill(bill.id, {
@@ -1087,10 +1237,20 @@ function SettleDialog({
         account_id: accountId,
         amount_cents: cents,
         payment_method: method,
+        discount_cents: discountCents,
+        interest_cents: interestCents,
       })
+      const partial = principal < remaining
       toast({
-        title: isPay ? 'Conta paga' : 'Conta recebida',
-        description: `O lançamento de ${formatCents(cents)} já está em Lançamentos.`,
+        title: partial
+          ? `Baixa parcial: falta ${formatCents(remaining - principal)}`
+          : isPay
+            ? 'Título pago'
+            : 'Título recebido',
+        description:
+          account?.kind === 'CAIXA'
+            ? 'Já entrou no saldo do caixa.'
+            : 'Entra no saldo quando bater com o extrato na Conciliação.',
       })
       onSettled()
       onClose()
@@ -1107,100 +1267,277 @@ function SettleDialog({
     }
   }
 
+  const handleVoid = (tx: FinTransaction) =>
+    confirm({
+      title: `Estornar ${isPay ? 'este pagamento' : 'este recebimento'}?`,
+      description: `${formatCents(tx.amount_cents)} em ${shortDate(tx.date, true)}. O título volta a ter esse valor em aberto${
+        tx.bank_line_id ? ' e o movimento do extrato volta para conciliar' : ''
+      }.`,
+      confirmLabel: 'Estornar',
+      destructive: true,
+      onConfirm: async () => {
+        await voidTransaction(tx.id, 'Baixa estornada no título')
+        toast({ title: 'Baixa estornada' })
+        onSettled()
+        onClose()
+      },
+    })
+
   const fieldLabel = 'text-xs font-semibold text-slate-600'
+  const word = isPay ? 'Pago' : 'Recebido'
 
   return (
     <Dialog open={Boolean(bill)} onOpenChange={(next) => !next && !busy && onClose()}>
-      <DialogContent className="rounded-xl sm:max-w-md">
+      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isPay ? 'Pagar conta' : 'Receber conta'}</DialogTitle>
+          <DialogTitle>
+            {open
+              ? isPay
+                ? 'Registrar pagamento'
+                : 'Registrar recebimento'
+              : isPay
+                ? 'Pagamentos realizados'
+                : 'Recebimentos realizados'}
+          </DialogTitle>
           <DialogDescription>
-            {bill && `${counterpartOf(bill)} · vence ${shortDate(bill.due_date, true)}`}
+            {bill &&
+              `${counterpartOf(bill)} · vence ${shortDate(bill.due_date, true)}${
+                bill.installments ? ` · parcela ${bill.installment}/${bill.installments}` : ''
+              }`}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-[1fr_150px] gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="settle-amount" className={fieldLabel}>
-                Valor {isPay ? 'pago' : 'recebido'} (R$)
-              </Label>
-              <Input
-                id="settle-amount"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="h-11 rounded-lg text-lg font-bold"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="settle-date" className={fieldLabel}>
-                Data
-              </Label>
-              <Input
-                id="settle-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="h-11 rounded-lg"
-              />
-            </div>
+
+        {bill && (
+          <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 p-3 text-center sm:grid-cols-5">
+            {[
+              { label: 'Total', cents: bill.amount_cents, tone: 'text-slate-900' },
+              { label: 'Juros', cents: sum((p) => p.interest_cents || 0), tone: 'text-rose-700' },
+              {
+                label: 'Descontos',
+                cents: sum((p) => p.discount_cents || 0),
+                tone: 'text-emerald-700',
+              },
+              { label: word, cents: sum((p) => p.amount_cents), tone: 'text-sky-700' },
+              {
+                label: isPay ? 'Saldo a pagar' : 'Saldo a receber',
+                cents: remaining,
+                tone: 'text-amber-700',
+              },
+            ].map((x) => (
+              <div key={x.label} className="min-w-0">
+                <div className="text-sm font-bold tabular-nums text-slate-900">
+                  {formatCents(x.cents)}
+                </div>
+                <div className={cn('text-[11px] font-semibold', x.tone)}>{x.label}</div>
+              </div>
+            ))}
           </div>
-          {bill && cents > 0 && cents !== bill.amount_cents && (
-            <p className="text-xs text-amber-700">
-              {cents > bill.amount_cents
-                ? `${formatCents(cents - bill.amount_cents)} a mais que o valor da conta (juros ou multa).`
-                : `${formatCents(bill.amount_cents - cents)} a menos que o valor da conta (desconto).`}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className={fieldLabel}>{isPay ? 'Saiu da conta' : 'Entrou na conta'}</Label>
-              <Select value={accountId} onValueChange={setAccountId}>
-                <SelectTrigger className="h-10 rounded-lg">
-                  <SelectValue placeholder="Conta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lookups.accounts
-                    .filter((a) => a.is_active)
-                    .map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+        )}
+
+        {open && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="settle-date" className={fieldLabel}>
+                  Data {isPay ? 'do pagamento' : 'do recebimento'}
+                </Label>
+                <Input
+                  id="settle-date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="h-10 rounded-lg"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className={fieldLabel}>Conta corrente</Label>
+                <Select value={accountId} onValueChange={changeAccount}>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue placeholder="Conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lookups.accounts
+                      .filter((a) => a.is_active)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                          {a.short_code ? ` (${a.short_code})` : ''}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {account && ledger.length > 0 && (
+                  <p className="text-right text-xs text-slate-500">
+                    Saldo:{' '}
+                    <span className="font-semibold text-sky-700">
+                      {formatCents(balances[account.id] || 0)}
+                    </span>
+                  </p>
+                )}
+              </div>
             </div>
+
             <div className="space-y-1.5">
-              <Label className={fieldLabel}>Forma</Label>
+              <Label className={fieldLabel}>Tipo de acerto</Label>
               <Select value={method || NONE} onValueChange={(v) => setMethod(v === NONE ? '' : v)}>
                 <SelectTrigger className="h-10 rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>Não informar</SelectItem>
-                  {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
+                  <SelectItem value={NONE} disabled>
+                    Escolha
+                  </SelectItem>
+                  {methods.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {ACERTO_LABELS[m] || PAYMENT_METHOD_LABELS[m]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+              {[
+                {
+                  id: 'settle-left',
+                  label: isPay ? 'Valor a pagar' : 'Valor a receber',
+                  value: centsToInput(remaining),
+                  readOnly: true,
+                },
+                {
+                  id: 'settle-discount',
+                  label: '(-) Desconto',
+                  value: discount,
+                  onChange: (v: string) => {
+                    setDiscount(v)
+                    recalc(v, interest)
+                  },
+                },
+                {
+                  id: 'settle-interest',
+                  label: '(+) Juros/multa',
+                  value: interest,
+                  onChange: (v: string) => {
+                    setInterest(v)
+                    recalc(discount, v)
+                  },
+                },
+                {
+                  id: 'settle-amount',
+                  label: `Valor ${isPay ? 'pago' : 'recebido'}`,
+                  value: amount,
+                  onChange: setAmount,
+                  strong: true,
+                },
+              ].map((f) => (
+                <div key={f.id} className="grid grid-cols-[1fr_150px] items-center gap-3">
+                  <Label htmlFor={f.id} className="text-sm text-slate-700">
+                    {f.label}
+                  </Label>
+                  <Input
+                    id={f.id}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    readOnly={f.readOnly}
+                    value={f.value}
+                    onChange={(e) => f.onChange?.(e.target.value)}
+                    className={cn(
+                      'h-10 rounded-lg text-right tabular-nums',
+                      f.readOnly && 'bg-slate-50',
+                      f.strong && 'font-bold',
+                    )}
+                  />
+                </div>
+              ))}
+              {cents > 0 && principal > 0 && principal < remaining && (
+                <p className="text-xs font-medium text-amber-700">
+                  Baixa parcial: o título continua em aberto com{' '}
+                  {formatCents(remaining - principal)}.
+                </p>
+              )}
+              {principal > remaining && (
+                <p className="text-xs font-medium text-rose-700">
+                  Passa do saldo do título em {formatCents(principal - remaining)}: informe a
+                  diferença em juros/multa.
+                </p>
+              )}
+            </div>
+            {account && (
+              <p className="text-xs text-slate-500">
+                {account.kind === 'CAIXA'
+                  ? 'No caixa, a baixa entra no saldo na hora.'
+                  : 'Na conta de banco, a baixa entra no saldo quando bater com o extrato na Conciliação.'}
+              </p>
+            )}
           </div>
-        </div>
+        )}
+
+        {payments.length > 0 && (
+          <div className="rounded-lg border border-slate-200">
+            <div className="border-b border-slate-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+              {isPay ? 'Pagamentos realizados' : 'Recebimentos realizados'}
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {payments.map((p) => {
+                const voided = p.status === 'ESTORNADO'
+                return (
+                  <li
+                    key={p.id}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2 text-sm',
+                      voided && 'opacity-60',
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className={cn('truncate font-semibold', voided && 'line-through')}>
+                        {p.expand?.account_id?.name || 'Conta'}
+                      </div>
+                      <div className="truncate text-xs text-slate-500">
+                        {shortDate(p.date, true)}
+                        {p.payment_method ? ` · ${PAYMENT_METHOD_LABELS[p.payment_method]}` : ''}
+                        {voided
+                          ? ' · estornado'
+                          : p.bank_line_id || p.to_bank_line_id
+                            ? ' · conciliado'
+                            : ''}
+                        {p.discount_cents ? ` · desconto ${formatCents(p.discount_cents)}` : ''}
+                        {p.interest_cents ? ` · juros ${formatCents(p.interest_cents)}` : ''}
+                      </div>
+                    </div>
+                    <div className="font-semibold tabular-nums">{formatCents(p.amount_cents)}</div>
+                    {canEdit && !voided && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-rose-700"
+                        onClick={() => handleVoid(p)}
+                      >
+                        Estornar
+                      </Button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" disabled={busy} onClick={onClose} className="rounded-lg">
             Voltar
           </Button>
-          <Button
-            onClick={handleSettle}
-            disabled={busy}
-            className="gap-2 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isPay ? 'Confirmar pagamento' : 'Confirmar recebimento'}
-          </Button>
+          {open && (
+            <Button
+              onClick={handleSettle}
+              disabled={busy}
+              className="gap-2 rounded-lg bg-teal-700 font-semibold text-white hover:bg-teal-800"
+            >
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isPay ? 'Baixar título' : 'Baixar título'}
+            </Button>
+          )}
         </DialogFooter>
+        {dialog}
       </DialogContent>
     </Dialog>
   )

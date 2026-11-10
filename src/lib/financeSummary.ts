@@ -160,7 +160,12 @@ interface BillLike {
   status: string
   paid_at?: string
   paid_amount_cents?: number
+  settled_cents?: number
 }
+
+/** O que falta quitar de um título (com baixa parcial, menos que o valor). */
+export const billRemaining = (b: { amount_cents: number; settled_cents?: number }) =>
+  Math.max(0, b.amount_cents - (b.settled_cents || 0))
 
 export interface BillTotals {
   overdue: { count: number; cents: number }
@@ -182,9 +187,10 @@ export function billTotals(bills: BillLike[], today: string): BillTotals {
   for (const bill of bills) {
     if (bill.status === 'ABERTO') {
       const days = daysBetween(today, bill.due_date)
-      if (days < 0) add(out.overdue, bill.amount_cents)
-      else if (days <= 7) add(out.next7, bill.amount_cents)
-      if (monthOf(bill.due_date) === month) add(out.openMonth, bill.amount_cents)
+      const left = billRemaining(bill)
+      if (days < 0) add(out.overdue, left)
+      else if (days <= 7) add(out.next7, left)
+      if (monthOf(bill.due_date) === month) add(out.openMonth, left)
     } else if (bill.status === 'PAGO' && monthOf(bill.paid_at || '') === month) {
       add(out.paidMonth, bill.paid_amount_cents || bill.amount_cents)
     }
