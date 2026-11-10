@@ -220,6 +220,8 @@ export default function FinanceReports() {
   const [from, setFrom] = useState(previous.from)
   const [to, setTo] = useState(previous.to)
   const [congregation, setCongregation] = useState(ALL)
+  /** Contas escolhidas (null = todas da congregação). */
+  const [chosenAccounts, setChosenAccounts] = useState<string[] | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [chosenSigners, setChosenSigners] = useState<string[] | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
@@ -307,17 +309,41 @@ export default function FinanceReports() {
     () => [...new Set(accounts.map((a) => a.congregation || '').filter(Boolean))].sort(),
     [accounts],
   )
-  const scopedAccounts = useMemo(
+  const congregationAccounts = useMemo(
     () =>
       congregation === ALL
         ? accounts
         : accounts.filter((a) => (a.congregation || '') === congregation),
     [accounts, congregation],
   )
-  const accountSet = useMemo(
-    () => (congregation === ALL ? null : new Set(scopedAccounts.map((a) => a.id))),
-    [congregation, scopedAccounts],
+  /** Contas que dá para escolher: as ativas, mais as inativas já escolhidas. */
+  const pickableAccounts = useMemo(
+    () =>
+      congregationAccounts.filter(
+        (a) => a.is_active !== false || (chosenAccounts ?? []).includes(a.id),
+      ),
+    [congregationAccounts, chosenAccounts],
   )
+  const scopedAccounts = useMemo(
+    () =>
+      chosenAccounts === null
+        ? congregationAccounts
+        : congregationAccounts.filter((a) => chosenAccounts.includes(a.id)),
+    [congregationAccounts, chosenAccounts],
+  )
+  const accountSet = useMemo(
+    () =>
+      congregation === ALL && chosenAccounts === null
+        ? null
+        : new Set(scopedAccounts.map((a) => a.id)),
+    [congregation, chosenAccounts, scopedAccounts],
+  )
+  const accountsLabel =
+    chosenAccounts === null
+      ? 'Todas as contas'
+      : scopedAccounts.length
+        ? scopedAccounts.map((a) => a.name).join(', ')
+        : 'Nenhuma conta'
   const activeSigners = signers.filter((s) => s.is_active !== false)
   const signerIds = chosenSigners ?? activeSigners.map((s) => s.id)
   const shownSigners = signers.filter((s) => signerIds.includes(s.id))
@@ -512,11 +538,17 @@ export default function FinanceReports() {
                           <td className={cn(cellClass, numClass)}>{num(l.cents)}</td>
                         </tr>
                       ))}
-                      <tr className="border-b border-slate-400 bg-slate-100 font-bold">
+                      <tr className="bg-slate-50 font-semibold">
                         <td colSpan={5} className="px-1.5 py-[3px] text-right uppercase">
-                          Subtotal ({shortDate(d.date, true)})
+                          Movimento do dia ({shortDate(d.date, true)})
                         </td>
                         <td className={cn('px-1.5 py-[3px]', numClass)}>{num(d.subtotal)}</td>
+                      </tr>
+                      <tr className="border-b border-slate-400 bg-slate-100 font-bold">
+                        <td colSpan={5} className="px-1.5 py-[3px] text-right uppercase">
+                          Saldo das contas em {shortDate(d.date, true)}
+                        </td>
+                        <td className={cn('px-1.5 py-[3px]', numClass)}>{num(d.balance)}</td>
                       </tr>
                     </Fragment>
                   ))}
@@ -1221,7 +1253,13 @@ export default function FinanceReports() {
               {congregations.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <Label>Congregação</Label>
-                  <Select value={congregation} onValueChange={setCongregation}>
+                  <Select
+                    value={congregation}
+                    onValueChange={(v) => {
+                      setCongregation(v)
+                      setChosenAccounts(null)
+                    }}
+                  >
                     <SelectTrigger className="w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -1323,6 +1361,50 @@ export default function FinanceReports() {
                 </div>
               )}
               <div className="flex flex-col gap-1.5">
+                <Label>Contas</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[220px] justify-between font-normal">
+                      <span className="truncate">{accountsLabel}</span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-2" align="start">
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-md border-b border-slate-100 px-2 py-2 hover:bg-slate-50">
+                      <Checkbox
+                        checked={chosenAccounts === null}
+                        onCheckedChange={(on) => setChosenAccounts(on ? null : [])}
+                      />
+                      <span className="text-sm font-medium text-slate-900">Todas as contas</span>
+                    </label>
+                    {pickableAccounts.map((a) => {
+                      const ids = chosenAccounts ?? congregationAccounts.map((c) => c.id)
+                      return (
+                        <label
+                          key={a.id}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 hover:bg-slate-50"
+                        >
+                          <Checkbox
+                            checked={ids.includes(a.id)}
+                            onCheckedChange={(on) => {
+                              const next = on ? [...ids, a.id] : ids.filter((id) => id !== a.id)
+                              const all = congregationAccounts.every((c) => next.includes(c.id))
+                              setChosenAccounts(all ? null : next)
+                            }}
+                          />
+                          <span className="text-sm">
+                            <span className="font-medium text-slate-900">{a.name}</span>
+                            {a.congregation && (
+                              <span className="text-slate-500"> · {a.congregation}</span>
+                            )}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex flex-col gap-1.5">
                 <Label>Quem assina</Label>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1420,6 +1502,7 @@ export default function FinanceReports() {
                       ? `Data: ${shortDate(to, true)}`
                       : `Período: ${shortDate(from, true)} a ${shortDate(to, true)}`,
                     `Congregação: ${scopeLabel}`,
+                    chosenAccounts !== null && `Contas: ${accountsLabel}`,
                     ...(built.params || []),
                   ]}
                 />

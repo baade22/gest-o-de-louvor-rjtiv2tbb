@@ -107,6 +107,15 @@ describe('cashFlowReport', () => {
     expect(r.closingTotal).toBe(r.openingTotal + 120)
   })
 
+  it('o saldo do dia soma todas as contas e nunca fica só no movimento', () => {
+    const r = cashFlowReport(accounts, txs, '2026-01-01', '2026-01-31', names)
+    expect(r.days.map((d) => d.balance)).toEqual([1700, 1620])
+    expect(r.days[r.days.length - 1].balance).toBe(r.closingTotal)
+    // Só o Banco: a transferência para o Caixa sai do saldo
+    const one = cashFlowReport([accounts[0]], txs, '2026-01-01', '2026-01-31', names)
+    expect(one.days.map((d) => d.balance)).toEqual([1400, 1320])
+  })
+
   it('transferência entre contas do relatório só aparece se pedir', () => {
     const r = cashFlowReport(accounts, txs, '2026-01-01', '2026-01-31', names, true)
     expect(r.days[0].lines.map((l) => l.cents)).toEqual([300, 200, -300])

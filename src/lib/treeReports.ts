@@ -203,7 +203,10 @@ export interface FlowLine {
 export interface FlowDay {
   date: string
   lines: FlowLine[]
+  /** Movimento do dia (entradas menos saídas). */
   subtotal: number
+  /** Quanto havia somando as contas do relatório no fim do dia. */
+  balance: number
 }
 
 export interface CashFlowReport {
@@ -310,11 +313,18 @@ export function cashFlowReport(
   for (const l of lines) {
     let d = days[days.length - 1]
     if (!d || d.date !== l.date) {
-      d = { date: l.date, lines: [], subtotal: 0 }
+      d = { date: l.date, lines: [], subtotal: 0, balance: 0 }
       days.push(d)
     }
     d.lines.push(l)
     d.subtotal += l.cents
+  }
+  // Saldo do fim de cada dia: saldo inicial de todas as contas + o movimento até ali
+  const openingTotal = moves.reduce((s, m) => s + m.opening, 0)
+  let running = openingTotal
+  for (const d of days) {
+    running += d.subtotal
+    d.balance = running
   }
   return {
     opening,
