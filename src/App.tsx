@@ -60,6 +60,7 @@ import PublicSignup from '@/pages/membership/PublicSignup'
 import NotFound from '@/pages/NotFound'
 import FinancePanel from '@/pages/finance/FinancePanel'
 import FinanceTransactions from '@/pages/finance/FinanceTransactions'
+import FinanceBankItems from '@/pages/finance/FinanceBankItems'
 import FinanceRegistry from '@/pages/finance/FinanceRegistry'
 import FinanceCounts from '@/pages/finance/FinanceCounts'
 import FinanceBills from '@/pages/finance/FinanceBills'
@@ -331,6 +332,22 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="financeiro.lancamentos.ver">
                   <FinanceTransactions only="TRANSFERENCIA" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/rendimentos"
+              element={
+                <RequireAuth requirePermission="financeiro.conciliacao.ver">
+                  <FinanceBankItems key="rendimento" kind="RENDIMENTO" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financeiro/despesas-bancarias"
+              element={
+                <RequireAuth requirePermission="financeiro.conciliacao.ver">
+                  <FinanceBankItems key="despesa" kind="DESPESA" />
                 </RequireAuth>
               }
             />
