@@ -548,6 +548,57 @@ export async function unreconcileLine(lineId: string) {
   })
 }
 
+/**
+ * Lançamentos de algumas categorias num período (telas de rendimentos e despesas bancárias),
+ * com o movimento do extrato a que estão ligados.
+ */
+export async function listCategoryTransactions(
+  churchId: string,
+  categoryIds: string[],
+  from: string,
+  to: string,
+  opts: { accountId?: string; voided?: boolean } = {},
+) {
+  if (!categoryIds.length) return []
+  const params: Record<string, string> = {
+    churchId,
+    from: `${from} 00:00:00`,
+    to: `${to} 23:59:59`,
+  }
+  const cats = categoryIds.map((id, i) => {
+    params[`c${i}`] = id
+    return `category_id = {:c${i}}`
+  })
+  let filter = `church_id = {:churchId} && date >= {:from} && date <= {:to} && (${cats.join(' || ')})`
+  filter += opts.voided ? " && status = 'ESTORNADO'" : " && status != 'ESTORNADO'"
+  if (opts.accountId) {
+    params.accountId = opts.accountId
+    filter += ' && account_id = {:accountId}'
+  }
+  return pb.collection('fin_transactions').getFullList<FinTransaction>({
+    filter: pb.filter(filter, params),
+    sort: '-date,-created',
+    expand: 'bank_line_id,account_id,category_id',
+  })
+}
+
+/** Movimentos pendentes do extrato de uma conta num período. */
+export async function listPendingLinesOf(
+  churchId: string,
+  accountId: string,
+  from: string,
+  to: string,
+) {
+  return pb.collection('fin_bank_lines').getFullList<FinBankLine>({
+    filter: pb.filter(
+      "church_id = {:churchId} && account_id = {:accountId} && status = 'PENDENTE' && date >= {:from} && date <= {:to}",
+      { churchId, accountId, from: `${from} 00:00:00`, to: `${to} 23:59:59` },
+    ),
+    sort: '-date',
+    fields: 'id,account_id,date,amount_cents,description,status',
+  })
+}
+
 /** Movimentos ainda não conciliados, só a conta de cada um (para o painel). */
 export async function listPendingLines(churchId: string) {
   return pb.collection('fin_bank_lines').getFullList<FinBankLine>({

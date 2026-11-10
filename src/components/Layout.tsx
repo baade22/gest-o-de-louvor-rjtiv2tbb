@@ -45,6 +45,8 @@ import {
   QrCode,
   UsersRound,
   TrendingUp,
+  TrendingDown,
+  Percent,
   ShieldCheck,
   Flag,
   Target,
@@ -198,6 +200,18 @@ export default function Layout() {
           to: '/financeiro/conciliacao',
           label: 'Conciliação bancária',
           icon: Landmark,
+          allowed: fin('conciliacao'),
+        },
+        {
+          to: '/financeiro/rendimentos',
+          label: 'Rendimentos bancários',
+          icon: Percent,
+          allowed: fin('conciliacao'),
+        },
+        {
+          to: '/financeiro/despesas-bancarias',
+          label: 'Despesas bancárias',
+          icon: TrendingDown,
           allowed: fin('conciliacao'),
         },
         {

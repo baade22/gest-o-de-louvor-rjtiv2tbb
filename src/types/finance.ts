@@ -120,6 +120,7 @@ export interface FinTransaction extends BaseRecord {
     supplier_id?: FinSupplier
     event_id?: { id: string; title: string; date: string }
     campaign_id?: FinCampaign
+    bank_line_id?: FinBankLine
   }
 }
 
