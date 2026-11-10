@@ -34,6 +34,7 @@ import type {
   FinTransaction,
 } from '@/types/finance'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -291,11 +292,11 @@ export default function FinanceBalances() {
     .sort()
     .pop()
 
-  const syncNow = async () => {
+  const syncNow = async (redoHistoryOf?: string) => {
     if (!churchId) return
     setSyncing(true)
     try {
-      const res = await requestBankSync(churchId)
+      const res = await requestBankSync(churchId, redoHistoryOf)
       toast({
         title: res.dispatched ? 'Buscando nos bancos' : 'Não deu para buscar na hora',
         description: res.dispatched
@@ -350,7 +351,11 @@ export default function FinanceBalances() {
           </Select>
         )}
         {canEdit && activeConnections.length > 0 && (
-          <Button onClick={syncNow} disabled={syncing || waiting} className={primaryButtonClass}>
+          <Button
+            onClick={() => syncNow()}
+            disabled={syncing || waiting}
+            className={primaryButtonClass}
+          >
             {syncing || waiting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -651,13 +656,15 @@ export default function FinanceBalances() {
               ),
           )}
           onClose={() => setEditing(null)}
-          onSave={async (input) => {
+          onSave={async (input, redoHistory) => {
             await saveBankConnection(churchId, input, editing.conn?.id)
             toast({ title: editing.conn ? 'Conexão atualizada' : 'Conta conectada ao banco' })
             setEditing(null)
             // Histórico novo pedido numa conta já conectada: já pede a busca ao conector
             const old = editing.conn
-            if (
+            if (redoHistory && old?.id && input.enabled) {
+              syncNow(old.id)
+            } else if (
               old?.enabled &&
               input.enabled &&
               (Boolean(old.history_max) !== Boolean(input.history_max) ||
@@ -754,9 +761,11 @@ function ConnectionDialog({
   conn?: FinBankConnection
   investChoices: FinAccount[]
   onClose: () => void
-  onSave: (input: BankConnectionInput) => Promise<void>
+  onSave: (input: BankConnectionInput, redoHistory: boolean) => Promise<void>
   onDelete?: () => Promise<void>
 }) {
+  const [redoHistory, setRedoHistory] = useState(false)
+  const historyDone = !!historyState(conn)?.done
   const guess = /cora/i.test(`${account.bank_name} ${account.name}`) ? 'CORA' : 'BRADESCO'
   const [form, setForm] = useState<BankConnectionInput>({
     account_id: account.id,
@@ -796,16 +805,19 @@ function ConnectionDialog({
     }
     setBusy(true)
     try {
-      await onSave({
-        ...form,
-        history_max: history === 'max',
-        history_from: history === 'date' ? form.history_from : '',
-        reconcile_from: reconcile ? form.reconcile_from : '',
-        branch: bradesco ? form.branch : '',
-        account_number: bradesco ? form.account_number : '',
-        invest_account_id: bradesco ? form.invest_account_id || '' : '',
-        credential_key: (form.credential_key || '').toUpperCase(),
-      })
+      await onSave(
+        {
+          ...form,
+          history_max: history === 'max',
+          history_from: history === 'date' ? form.history_from : '',
+          reconcile_from: reconcile ? form.reconcile_from : '',
+          branch: bradesco ? form.branch : '',
+          account_number: bradesco ? form.account_number : '',
+          invest_account_id: bradesco ? form.invest_account_id || '' : '',
+          credential_key: (form.credential_key || '').toUpperCase(),
+        },
+        redoHistory && history !== 'none' && historyDone,
+      )
     } catch (err) {
       setError(serverMessage(err, 'Não foi possível salvar.'))
     } finally {
@@ -1007,6 +1019,22 @@ function ConnectionDialog({
                 O conector busca em partes de 3 meses, do mais novo para o mais antigo, a cada
                 rodada. Anos de extrato podem levar algumas rodadas.
               </p>
+            )}
+            {history !== 'none' && historyDone && (
+              <label className="flex items-start gap-2 pt-1 text-sm text-slate-700">
+                <Checkbox
+                  checked={redoHistory}
+                  onCheckedChange={(on) => setRedoHistory(on === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Buscar o histórico todo de novo
+                  <span className="block text-xs text-slate-500">
+                    Completa o que o banco passou a mandar depois (como o CPF/CNPJ de quem pagou).
+                    Nada é duplicado.
+                  </span>
+                </span>
+              </label>
             )}
           </div>
 

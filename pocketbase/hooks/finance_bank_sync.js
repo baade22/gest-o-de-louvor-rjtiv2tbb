@@ -880,7 +880,14 @@ routerAdd(
       return e.json(400, { message: 'Nenhuma conta está conectada à API do banco.' })
     }
     const nowIso = new Date().toISOString().replace('T', ' ')
+    // Buscar o histórico de novo (ex.: completar o CPF/CNPJ de movimentos antigos): o conector
+    // volta do mais novo até a data pedida; o que já existe não duplica, só é completado
+    const redo = String(body.redo_history || '')
     for (const c of conns) {
+      if (redo && c.id === redo) {
+        c.set('history_loaded_from', '')
+        c.set('history_done_for', '')
+      }
       c.set('sync_requested_at', nowIso)
       $app.save(c)
     }

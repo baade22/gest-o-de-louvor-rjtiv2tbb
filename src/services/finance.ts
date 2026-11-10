@@ -674,10 +674,14 @@ export type BankSyncRequestResult = {
   message?: string
 }
 
-export async function requestBankSync(churchId: string): Promise<BankSyncRequestResult> {
+/** Pede a busca nos bancos. redoHistoryOf: conexão cujo histórico é buscado todo de novo. */
+export async function requestBankSync(
+  churchId: string,
+  redoHistoryOf?: string,
+): Promise<BankSyncRequestResult> {
   return pb.send('/backend/v1/finance/bank-sync/request', {
     method: 'POST',
-    body: { church_id: churchId },
+    body: { church_id: churchId, redo_history: redoHistoryOf || '' },
   })
 }
 
