@@ -97,6 +97,10 @@ export interface FinTransaction extends BaseRecord {
   bank_line_id?: string
   /** Transferência: movimento do extrato da conta de destino */
   to_bank_line_id?: string
+  /** CPF/CNPJ (só dígitos) de quem pagou, vindo do extrato */
+  payer_doc?: string
+  /** Nome de quem pagou, como o banco mandou */
+  payer_name?: string
   category_id?: string
   cost_center_id?: string
   /** Campanha para a qual a entrada (ou saída) conta. */
@@ -224,6 +228,9 @@ export interface FinBankLine extends BaseRecord {
   match_code?: string
   /** Quem pagou ou recebeu, quando o extrato diz */
   counterparty?: string
+  /** CPF (11 dígitos) ou CNPJ (14) de quem pagou ou recebeu, quando o banco manda */
+  counterparty_doc?: string
+  counterparty_name?: string
   expand?: {
     transaction_id?: FinTransaction
   }

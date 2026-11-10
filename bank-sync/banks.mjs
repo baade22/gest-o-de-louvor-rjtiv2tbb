@@ -35,6 +35,7 @@ export function brtDate(iso) {
 
 /**
  * Movimentos do extrato da Cora (GET /bank-statement/statement).
+ * Quando a Cora manda o CPF/CNPJ de quem pagou ou recebeu, vai em counterparty_doc/_name.
  * BLOCK e UNBLOCK são bloqueios de saldo, não entram nem saem da conta: ficam de fora.
  */
 export function coraLines(entries) {
@@ -51,12 +52,19 @@ export function coraLines(entries) {
     const description = [what, who && !what.toUpperCase().includes(who.toUpperCase()) ? who : '']
       .filter(Boolean)
       .join(' · ')
-    out.push({
+    const line = {
       id: String(en.id),
       date,
       amount_cents: en.type === 'CREDIT' ? Math.abs(amount) : -Math.abs(amount),
       description,
-    })
+    }
+    // CPF (11 dígitos) ou CNPJ (14) de quem pagou ou recebeu, quando a Cora manda
+    const doc = String(tr.counterParty?.identity || '').replace(/\D/g, '')
+    if (doc.length === 11 || doc.length === 14) {
+      line.counterparty_doc = doc
+      line.counterparty_name = who.trim().slice(0, 120)
+    }
+    out.push(line)
   }
   return out
 }

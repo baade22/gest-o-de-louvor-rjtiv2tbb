@@ -25,6 +25,8 @@ type Tx = Pick<FinTransaction, 'type' | 'date' | 'amount_cents' | 'account_id' |
       | 'description'
       | 'bank_line_id'
       | 'to_bank_line_id'
+      | 'payer_doc'
+      | 'payer_name'
     >
   >
 type Account = Pick<FinAccount, 'id' | 'name' | 'opening_balance_cents'> &
@@ -174,6 +176,128 @@ export function contributionsReport(
     byCategory: rowsFrom(byCategory),
     byMethod: rowsFrom(byMethod),
   }
+}
+
+// ---- Créditos por pagador ----
+
+export interface PayerRow {
+  key: string
+  /** Nome no cadastro, ou como o banco mandou. */
+  label: string
+  /** CPF/CNPJ, só dígitos ('' quando ninguém sabe). */
+  doc: string
+  /** Pessoa em Membros (vazio = ainda sem cadastro). */
+  personId: string
+  cents: number
+  count: number
+  pct: number
+  /** Último crédito (YYYY-MM-DD). */
+  last: string
+}
+
+export interface PayersReport {
+  rows: PayerRow[]
+  total: number
+  /** Quantos pagadores têm cadastro em Membros. */
+  registered: number
+  /** Créditos sem nome nem documento. */
+  unknown: number
+  records: number
+}
+
+const onlyDigits = (s?: string) => (s || '').replace(/\D/g, '')
+
+/**
+ * Entradas do período por quem pagou: a pessoa do lançamento, ou o CPF/CNPJ e o nome que o
+ * banco mandou (quem ainda não tem cadastro). O mesmo CPF de alguém cadastrado soma na pessoa.
+ * `categoryIds` limita às categorias escolhidas (null = todas as entradas).
+ */
+export function payersReport(
+  txs: Tx[],
+  people: Pick<Person, 'id' | 'name' | 'document'>[],
+  from: string,
+  to: string,
+  accounts: Set<string> | null = null,
+  categoryIds: Set<string> | null = null,
+): PayersReport {
+  const names = new Map(people.map((p) => [p.id, p.name]))
+  const byDoc = new Map<string, string>()
+  for (const p of people) {
+    const d = onlyDigits(p.document)
+    if (d.length === 11 || d.length === 14) byDoc.set(d, p.id)
+  }
+  const docOf = new Map<string, string>()
+  for (const p of people) docOf.set(p.id, onlyDigits(p.document))
+  const map = new Map<string, Omit<PayerRow, 'pct'>>()
+  let total = 0
+  let unknown = 0
+  let records = 0
+  for (const tx of txs) {
+    if (!valid(tx) || tx.type !== 'ENTRADA' || !inPeriod(tx, from, to)) continue
+    if (accounts && !accounts.has(tx.account_id)) continue
+    if (categoryIds && (!tx.category_id || !categoryIds.has(tx.category_id))) continue
+    records++
+    total += tx.amount_cents
+    const doc = onlyDigits(tx.payer_doc)
+    const personId = tx.person_id || (doc && byDoc.get(doc)) || ''
+    const name = (tx.payer_name || '').trim()
+    let key: string
+    let label: string
+    if (personId) {
+      key = `p:${personId}`
+      label = names.get(personId) || name || 'Pessoa'
+    } else if (doc) {
+      key = `d:${doc}`
+      label = name || 'Sem nome'
+    } else if (name) {
+      key = `n:${name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()}`
+      label = name
+    } else {
+      unknown += tx.amount_cents
+      key = 'none'
+      label = 'Não identificado'
+    }
+    const row = map.get(key) || {
+      key,
+      label,
+      doc: doc || (personId ? docOf.get(personId) || '' : ''),
+      personId,
+      cents: 0,
+      count: 0,
+      last: '',
+    }
+    row.cents += tx.amount_cents
+    row.count++
+    if (!row.doc && doc) row.doc = doc
+    if (day(tx.date) > row.last) row.last = day(tx.date)
+    map.set(key, row)
+  }
+  const rows = [...map.values()]
+    .map((r) => ({ ...r, pct: total ? (r.cents / total) * 100 : 0 }))
+    .sort(
+      (a, b) =>
+        Number(a.key === 'none') - Number(b.key === 'none') ||
+        b.cents - a.cents ||
+        a.label.localeCompare(b.label),
+    )
+  return {
+    rows,
+    total,
+    registered: rows.filter((r) => r.personId).length,
+    unknown,
+    records,
+  }
+}
+
+/** CPF 000.000.000-00 ou CNPJ 00.000.000/0000-00. */
+export function formatDoc(doc?: string) {
+  const d = onlyDigits(doc)
+  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
+  return doc || ''
 }
 
 // ---- Declaração de faturamento ----
