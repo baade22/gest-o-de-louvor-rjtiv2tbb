@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Scale,
   Wallet,
+  UserSearch,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
@@ -31,6 +32,8 @@ import {
   categoryLedger,
   centsToText,
   contributionsReport,
+  formatDoc,
+  payersReport,
   revenueReport,
   toCsv,
   type AccountingOptions,
@@ -115,6 +118,7 @@ type ReportKey =
   | 'dre'
   | 'cashflow'
   | 'contributions'
+  | 'payers'
   | 'counts'
   | 'trial'
   | 'ledger'
@@ -140,6 +144,12 @@ const REPORTS: { key: ReportKey; title: string; hint: string; icon: typeof FileT
     title: 'Contribuições',
     hint: 'Por pessoa, categoria e forma',
     icon: HandCoins,
+  },
+  {
+    key: 'payers',
+    title: 'Créditos por pagador',
+    hint: 'Entradas por nome e CPF/CNPJ de quem pagou',
+    icon: UserSearch,
   },
   { key: 'counts', title: 'Fechamento do culto', hint: 'Contagens aprovadas', icon: Calculator },
   {
@@ -234,6 +244,7 @@ export default function FinanceReports() {
   const [nature, setNature] = useState<Nature>('TODAS')
   const [showAccounts, setShowAccounts] = useState(true)
   const [showTransfers, setShowTransfers] = useState(false)
+  const [onlyContributions, setOnlyContributions] = useState(false)
   const [people, setPeople] = useState<Person[]>([])
   const [signers, setSigners] = useState<FinSigner[]>([])
   const [settings, setSettings] = useState<FinSettings | null>(null)
@@ -690,6 +701,57 @@ export default function FinanceReports() {
           ),
         }
       }
+      case 'payers': {
+        const contribution = onlyContributions
+          ? new Set(categories.filter((c) => c.is_contribution).map((c) => c.id))
+          : null
+        const r = payersReport(txs, people, from, to, accountSet, contribution)
+        return {
+          title: 'Créditos por Pagador',
+          params: [onlyContributions ? 'Só categorias de contribuição' : 'Todas as entradas'],
+          csv: [
+            ['Nome', 'CPF/CNPJ', 'Cadastro', 'Lançamentos', 'Último crédito', 'Valor'],
+            ...r.rows.map((x) => [
+              x.label,
+              formatDoc(x.doc),
+              x.personId ? 'Membros' : x.key === 'none' ? '' : 'Sem cadastro',
+              x.count,
+              shortDate(x.last, true),
+              centsToText(x.cents),
+            ]),
+          ],
+          body: (
+            <>
+              <Totals
+                items={[
+                  { label: 'Total de entradas', value: money(r.total), strong: true },
+                  {
+                    label: 'Pagadores',
+                    value: String(r.rows.filter((x) => x.key !== 'none').length),
+                  },
+                  { label: 'Com cadastro', value: String(r.registered) },
+                  { label: 'Não identificado', value: money(r.unknown) },
+                ]}
+              />
+              <Table
+                head={['Nome', 'CPF/CNPJ', 'Cadastro', 'Lanç.', 'Último', 'Valor', '%']}
+                align={['l', 'l', 'l', 'r', 'r', 'r', 'r']}
+                rows={r.rows.map((x) => [
+                  x.label,
+                  formatDoc(x.doc),
+                  x.personId ? 'Membros' : x.key === 'none' ? '' : 'Sem cadastro',
+                  x.count,
+                  shortDate(x.last, true),
+                  num(x.cents),
+                  pct(x.pct),
+                ])}
+                foot={['Total', '', '', String(r.records), '', num(r.total), '']}
+                count={r.rows.length}
+              />
+            </>
+          ),
+        }
+      }
       case 'counts': {
         const list = counts.filter((c) => !accountSet || accountSet.has(c.account_id))
         const envelopes = (c: FinCount) =>
@@ -1110,6 +1172,7 @@ export default function FinanceReports() {
     detail,
     nature,
     showAccounts,
+    onlyContributions,
     showTransfers,
     realized,
   ])
@@ -1339,6 +1402,15 @@ export default function FinanceReports() {
                     </Select>
                   </div>
                 </>
+              )}
+              {report === 'payers' && (
+                <label className="flex items-center gap-2 pb-1 text-sm text-slate-700">
+                  <Checkbox
+                    checked={onlyContributions}
+                    onCheckedChange={(on) => setOnlyContributions(on === true)}
+                  />
+                  Só dízimos e ofertas (categorias de contribuição)
+                </label>
               )}
               {(report === 'trial' || report === 'cashflow') && (
                 <div className="flex flex-col gap-2 pb-1 text-sm text-slate-700">

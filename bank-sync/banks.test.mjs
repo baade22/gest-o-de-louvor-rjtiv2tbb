@@ -60,6 +60,8 @@ test('extrato da Cora (exemplo da documentação)', () => {
       date: '2023-04-06',
       amount_cents: -1500,
       description: 'Teste · Test Account Company Name',
+      counterparty_doc: '98537607000165',
+      counterparty_name: 'Test Account Company Name',
     },
     { id: 'ent_2', date: '2023-04-07', amount_cents: 5000, description: 'Pix · JOAO MENDES' },
     { id: 'ent_4', date: '2023-04-07', amount_cents: 300, description: 'NOVO_TIPO' },

@@ -420,6 +420,14 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         }
         return false
       }
+      // CPF (11) ou CNPJ (14) de quem pagou ou recebeu, quando o banco manda
+      const setPayer = (rec, l) => {
+        const doc = String(l.counterparty_doc || '').replace(/\D/g, '')
+        if (doc.length !== 11 && doc.length !== 14) return false
+        rec.set('counterparty_doc', doc)
+        rec.set('counterparty_name', String(l.counterparty_name || '').slice(0, 120))
+        return true
+      }
       const batch = {}
       for (const l of lines) batch[(prefix + String(l.id).trim()).slice(0, 255)] = true
       let orphans = []
@@ -482,6 +490,7 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         rec.set('description', String(l.description || 'Movimento').slice(0, 500))
         const st = rec.getString('status')
         if (st === 'PENDENTE' || st === 'EXTRATO') rec.set('status', statusFor(l.date))
+        setPayer(rec, l)
         txApp.save(rec)
       }
       for (const l of lines) {
@@ -502,6 +511,8 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
           )
         } catch (_) {}
         if (current) {
+          // Movimento gravado antes de guardarmos o CPF/CNPJ: completa
+          if (!current.getString('counterparty_doc') && setPayer(current, l)) txApp.save(current)
           // Já entrou em dobro antes desta correção: junta os dois
           const twin = takeTwin(fitid, l.date)
           if (twin) {
@@ -568,6 +579,7 @@ routerAdd('POST', '/backend/v1/finance/bank-sync/push', (e) => {
         rec.set('amount_cents', amount)
         rec.set('description', String(l.description || 'Movimento').slice(0, 500))
         rec.set('status', statusFor(l.date))
+        setPayer(rec, l)
         txApp.save(rec)
         if (rec.getString('status') === 'PENDENTE') newLines.push(rec)
         created++
