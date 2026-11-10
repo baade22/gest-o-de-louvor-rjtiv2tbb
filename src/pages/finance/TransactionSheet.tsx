@@ -72,6 +72,8 @@ interface Props {
   onSaved: () => void
   /** Avisa quando uma pessoa ou fornecedor foi cadastrado direto no formulário. */
   onLookupsChanged: () => void
+  /** Tipo de um lançamento novo (ex.: a tela de Transferência abre já como transferência). */
+  newType?: FinTransactionType
 }
 
 const NONE = '__none__'
@@ -109,6 +111,7 @@ export function TransactionSheet({
   churchId,
   lookups,
   editing,
+  newType,
   onSaved,
   onLookupsChanged,
 }: Props) {
@@ -149,7 +152,11 @@ export function TransactionSheet({
     } else {
       const base = emptyForm()
       const firstAccount = lookups.accounts.find((a) => a.is_active)
-      setForm({ ...base, account_id: firstAccount?.id || '' })
+      setForm({
+        ...base,
+        account_id: firstAccount?.id || '',
+        ...(newType ? { type: newType, payment_method: defaultMethod(newType) } : {}),
+      })
     }
     // Só reinicia ao abrir: recarregar cadastros (ex.: pessoa criada aqui) não pode apagar o que foi digitado.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -278,16 +285,29 @@ export function TransactionSheet({
     <Sheet open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>{editing ? 'Editar lançamento' : 'Novo lançamento'}</SheetTitle>
+          <SheetTitle>
+            {editing
+              ? 'Editar lançamento'
+              : newType === 'TRANSFERENCIA'
+                ? 'Nova transferência'
+                : 'Novo lançamento'}
+          </SheetTitle>
           <SheetDescription>
             {editing
               ? `Lançado em ${shortDate(editing.created, true)}`
-              : 'Entrada, saída ou transferência entre contas.'}
+              : newType === 'TRANSFERENCIA'
+                ? 'De uma conta da igreja para outra.'
+                : 'Entrada, saída ou transferência entre contas.'}
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={(e) => handleSave(e)} className="mt-5 space-y-4">
-          <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+          <div
+            className={cn(
+              'grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1',
+              !editing && newType && 'hidden',
+            )}
+          >
             {TYPE_OPTIONS.map(({ type, label, icon: Icon, tone }) => (
               <button
                 key={type}

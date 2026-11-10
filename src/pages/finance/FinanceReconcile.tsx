@@ -1137,10 +1137,10 @@ export default function FinanceReconcile() {
         <p className="text-xs text-slate-500">
           Desfazer a conciliação não apaga o lançamento. Para tirar um lançamento dos saldos,
           estorne em{' '}
-          <Link to="/financeiro/lancamentos" className="underline">
-            Lançamentos
+          <Link to="/financeiro/contas?status=todos" className="underline">
+            Contas a pagar e receber
           </Link>
-          .
+          , na aba de todas as entradas ou saídas.
         </p>
       )}
 
@@ -1621,7 +1621,7 @@ function ChooseTransactionDialog({
         {options.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-600">
             Nenhum lançamento com esse valor perto dessa data. Se o lançamento foi feito com outro
-            valor ou em outra conta, corrija em Lançamentos e volte aqui.
+            valor ou em outra conta, corrija em Contas a pagar e receber e volte aqui.
           </p>
         ) : (
           <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">

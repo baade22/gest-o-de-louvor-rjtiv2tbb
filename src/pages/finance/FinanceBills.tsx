@@ -86,6 +86,7 @@ import {
 import { useConfirm } from '@/components/ConfirmDialog'
 import type { FinanceLookups } from './TransactionSheet'
 import { useFinanceLookups } from './useFinanceLookups'
+import FinanceTransactions from './FinanceTransactions'
 import {
   DOCUMENT_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -101,7 +102,8 @@ import {
 
 const NONE = '__none__'
 
-type StatusFilter = 'ABERTO' | 'PAGO' | 'CANCELADO'
+/** TODOS: todas as entradas ou saídas do mês, com ou sem título (contagens, conciliação...). */
+type StatusFilter = 'ABERTO' | 'PAGO' | 'CANCELADO' | 'TODOS'
 
 const words = (kind: FinBillKind) =>
   kind === 'PAGAR'
@@ -180,7 +182,9 @@ export default function FinanceBills() {
 
   const [bills, setBills] = useState<FinBill[]>([])
   const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<StatusFilter>('ABERTO')
+  const [status, setStatus] = useState<StatusFilter>(() =>
+    params.get('status') === 'todos' ? 'TODOS' : 'ABERTO',
+  )
   const [search, setSearch] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<FinBill | null>(null)
@@ -260,6 +264,7 @@ export default function FinanceBills() {
     { value: 'ABERTO', label: 'Em aberto' },
     { value: 'PAGO', label: w.paidPlural },
     { value: 'CANCELADO', label: 'Canceladas' },
+    { value: 'TODOS', label: kind === 'PAGAR' ? 'Todas as saídas' : 'Todas as entradas' },
   ]
 
   return (
@@ -361,7 +366,7 @@ export default function FinanceBills() {
               </button>
             ))}
           </div>
-          <div className="relative sm:ml-auto sm:w-64">
+          <div className={cn('relative sm:ml-auto sm:w-64', status === 'TODOS' && 'hidden')}>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               value={search}
@@ -372,7 +377,12 @@ export default function FinanceBills() {
           </div>
         </div>
 
-        {loading ? (
+        {status === 'TODOS' ? (
+          <p className="px-4 py-3 text-xs text-slate-500">
+            Tudo o que {kind === 'PAGAR' ? 'saiu' : 'entrou'} no mês, com ou sem título: baixas,
+            contagens do culto, lançamentos da conciliação e importados.
+          </p>
+        ) : loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-12 w-full" />
@@ -561,6 +571,10 @@ export default function FinanceBills() {
           </div>
         )}
       </div>
+
+      {status === 'TODOS' && (
+        <FinanceTransactions key={kind} only={kind === 'PAGAR' ? 'SAIDA' : 'ENTRADA'} embedded />
+      )}
 
       {churchId && (
         <BillSheet

@@ -321,11 +321,16 @@ const App = () => (
                 </RequireAuth>
               }
             />
+            {/* Lançamentos saiu do menu (padrão do Eklesia): tudo entra por título */}
             <Route
               path="/financeiro/lancamentos"
+              element={<Navigate to="/financeiro/contas" replace />}
+            />
+            <Route
+              path="/financeiro/transferencias"
               element={
                 <RequireAuth requirePermission="financeiro.lancamentos.ver">
-                  <FinanceTransactions />
+                  <FinanceTransactions only="TRANSFERENCIA" />
                 </RequireAuth>
               }
             />
