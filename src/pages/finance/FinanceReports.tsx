@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowLeftRight,
   BookOpen,
   Calculator,
   ChevronDown,
@@ -30,7 +31,6 @@ import {
   categoryLedger,
   centsToText,
   contributionsReport,
-  dreReport,
   revenueReport,
   toCsv,
   type AccountingOptions,
@@ -41,11 +41,14 @@ import {
   listApprovedCounts,
   listBills,
   getFinSettings,
-  listCategories,
+  listCategoryTree,
   listPeople,
   listReportTransactions,
   listSigners,
+  listSuppliers,
 } from '@/services/finance'
+import pb from '@/lib/pocketbase/client'
+import { cashFlowReport, monthsBetween, treeTotals, type TreeLine } from '@/lib/treeReports'
 import type {
   FinAccount,
   FinBill,
@@ -53,6 +56,7 @@ import type {
   FinCount,
   FinSettings,
   FinSigner,
+  FinSupplier,
   FinTransaction,
   Person,
 } from '@/types/finance'
@@ -87,9 +91,27 @@ import {
   useFinanceAccess,
 } from './shared'
 import { download, printSheet } from './print'
+import {
+  Band,
+  Params,
+  RecordCount,
+  Section,
+  SheetHeader,
+  Table,
+  Totals,
+  cellClass,
+  headClass,
+  indent,
+  numClass,
+  num,
+  pct,
+  totalRowClass,
+  treeName,
+} from './reportParts'
 
 type ReportKey =
   | 'dre'
+  | 'cashflow'
   | 'contributions'
   | 'counts'
   | 'trial'
@@ -99,7 +121,18 @@ type ReportKey =
   | 'revenue'
 
 const REPORTS: { key: ReportKey; title: string; hint: string; icon: typeof FileText }[] = [
-  { key: 'dre', title: 'DRE (resultado)', hint: 'Entradas e saídas por categoria', icon: Landmark },
+  {
+    key: 'dre',
+    title: 'D.R.E. (resultado)',
+    hint: 'Plano de contas mês a mês',
+    icon: Landmark,
+  },
+  {
+    key: 'cashflow',
+    title: 'Fluxo de caixa',
+    hint: 'Saldo inicial, movimento por dia e saldo final',
+    icon: ArrowLeftRight,
+  },
   {
     key: 'contributions',
     title: 'Contribuições',
@@ -107,7 +140,12 @@ const REPORTS: { key: ReportKey; title: string; hint: string; icon: typeof FileT
     icon: HandCoins,
   },
   { key: 'counts', title: 'Fechamento do culto', hint: 'Contagens aprovadas', icon: Calculator },
-  { key: 'trial', title: 'Balancete', hint: 'Movimento de cada conta', icon: Scale },
+  {
+    key: 'trial',
+    title: 'Balancete',
+    hint: 'Entradas, saídas e saldo pelo plano de contas',
+    icon: Scale,
+  },
   {
     key: 'ledger',
     title: 'Razão por categoria',
@@ -152,120 +190,9 @@ function periodLabel(from: string, to: string) {
   return `${shortDate(from, true)} a ${shortDate(to, true)}`
 }
 
-const pct = (value: number) => `${Math.round(value)}%`
-
-// ---- Peças da folha ----
-
-function Table({
-  head,
-  rows,
-  foot,
-  align,
-}: {
-  head: string[]
-  rows: (string | number)[][]
-  foot?: (string | number)[]
-  /** 'r' alinha a coluna à direita. */
-  align?: ('l' | 'r')[]
-}) {
-  const cls = (i: number) => (align?.[i] === 'r' ? 'text-right tabular-nums' : 'text-left')
-  return (
-    <table className="w-full border-collapse text-[13px]">
-      <thead>
-        <tr className="border-b border-slate-300 text-[11px] uppercase tracking-wide text-slate-500">
-          {head.map((h, i) => (
-            <th key={i} className={cn('px-2 py-1.5 font-semibold', cls(i))}>
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.length === 0 && (
-          <tr>
-            <td colSpan={head.length} className="px-2 py-4 text-center text-slate-400">
-              Nada no período.
-            </td>
-          </tr>
-        )}
-        {rows.map((r, ri) => (
-          <tr key={ri} className="border-b border-slate-100">
-            {r.map((v, i) => (
-              <td key={i} className={cn('px-2 py-1.5 text-slate-700', cls(i))}>
-                {v}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-      {foot && (
-        <tfoot>
-          <tr className="border-t-2 border-slate-800 font-bold text-slate-900">
-            {foot.map((v, i) => (
-              <td key={i} className={cn('px-2 py-2', cls(i))}>
-                {v}
-              </td>
-            ))}
-          </tr>
-        </tfoot>
-      )}
-    </table>
-  )
-}
-
-function GroupRows({ title, rows, total }: { title: string; rows: ReportRow[]; total: number }) {
-  return (
-    <>
-      <tr className="bg-slate-50 font-semibold text-slate-900">
-        <td className="px-2 py-2">{title}</td>
-        <td className="px-2 py-2 text-right tabular-nums">{formatCents(total)}</td>
-        <td className="px-2 py-2 text-right text-slate-400">{total ? '100%' : ''}</td>
-      </tr>
-      {rows.length === 0 && (
-        <tr>
-          <td colSpan={3} className="px-6 py-2 text-slate-400">
-            Nada no período.
-          </td>
-        </tr>
-      )}
-      {rows.map((r) => (
-        <tr key={r.key} className="border-b border-slate-100">
-          <td className="px-2 py-1.5 pl-6 text-slate-700">{r.label}</td>
-          <td className="px-2 py-1.5 text-right tabular-nums text-slate-700">
-            {formatCents(r.cents)}
-          </td>
-          <td className="px-2 py-1.5 text-right text-slate-400">{pct(r.pct)}</td>
-        </tr>
-      ))}
-    </>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mt-6 break-inside-avoid first:mt-0">
-      <h3 className="mb-2 text-sm font-bold text-slate-900">{title}</h3>
-      {children}
-    </div>
-  )
-}
-
-function Totals({ items }: { items: { label: string; value: string; strong?: boolean }[] }) {
-  return (
-    <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {items.map((t) => (
-        <div key={t.label} className="rounded-lg border border-slate-200 px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">{t.label}</p>
-          <p
-            className={cn('tabular-nums text-slate-900', t.strong ? 'font-bold' : 'font-semibold')}
-          >
-            {t.value}
-          </p>
-        </div>
-      ))}
-    </div>
-  )
-}
+const LEVELS = ['1', '2', '3', '4']
+type Detail = 'SINTETICO' | 'ANALITICO'
+type Nature = 'TODAS' | 'ENTRADA' | 'SAIDA'
 
 // ---- Página ----
 
@@ -273,6 +200,10 @@ interface Built {
   title: string
   body: React.ReactNode
   csv: (string | number)[][]
+  /** Folha deitada (muitas colunas). */
+  landscape?: boolean
+  /** O que vai em "Parâmetros aplicados", além do período e da congregação. */
+  params?: string[]
 }
 
 export default function FinanceReports() {
@@ -292,7 +223,13 @@ export default function FinanceReports() {
   const [exportOpen, setExportOpen] = useState(false)
 
   const [accounts, setAccounts] = useState<FinAccount[]>([])
-  const [categories, setCategories] = useState<FinCategory[]>([])
+  const [tree, setTree] = useState<FinCategory[]>([])
+  const [suppliers, setSuppliers] = useState<FinSupplier[]>([])
+  const [levels, setLevels] = useState('3')
+  const [detail, setDetail] = useState<Detail>('SINTETICO')
+  const [nature, setNature] = useState<Nature>('TODAS')
+  const [showAccounts, setShowAccounts] = useState(true)
+  const [showTransfers, setShowTransfers] = useState(false)
   const [people, setPeople] = useState<Person[]>([])
   const [signers, setSigners] = useState<FinSigner[]>([])
   const [settings, setSettings] = useState<FinSettings | null>(null)
@@ -310,16 +247,18 @@ export default function FinanceReports() {
     setLoading(true)
     Promise.all([
       listAccounts(churchId),
-      listCategories(churchId),
+      listCategoryTree(churchId),
       listPeople(churchId),
       listSigners(churchId),
       listBills(churchId),
       getFinSettings(churchId).catch(() => null),
+      listSuppliers(churchId).catch(() => [] as FinSupplier[]),
     ])
-      .then(([acc, cat, ppl, sig, bl, st]) => {
+      .then(([acc, cat, ppl, sig, bl, st, sup]) => {
         setSettings(st)
         setAccounts(acc)
-        setCategories(cat)
+        setTree(cat)
+        setSuppliers(sup)
         setPeople(ppl)
         setSigners(sig)
         setBills(bl)
@@ -357,6 +296,8 @@ export default function FinanceReports() {
     }
   }, [churchId, from, to, validPeriod, toast])
 
+  /** Categorias que recebem lançamento (sem os grupos do plano de contas). */
+  const categories = useMemo(() => tree.filter((c) => !c.is_group), [tree])
   const congregations = useMemo(
     () => [...new Set(accounts.map((a) => a.congregation || '').filter(Boolean))].sort(),
     [accounts],
@@ -376,6 +317,9 @@ export default function FinanceReports() {
   const signerIds = chosenSigners ?? activeSigners.map((s) => s.id)
   const shownSigners = signers.filter((s) => signerIds.includes(s.id))
 
+  const logoUrl = currentChurch?.logo
+    ? `${pb.baseURL.replace(/\/$/, '')}/api/files/churches/${currentChurch.id}/${currentChurch.logo}`
+    : undefined
   const scopeLabel = congregation === ALL ? 'Todas as congregações' : congregation
   const period = periodLabel(from, to)
 
@@ -383,38 +327,214 @@ export default function FinanceReports() {
     const money = formatCents
     switch (report) {
       case 'dre': {
-        const r = dreReport(txs, categories, from, to, accountSet)
+        const months = monthsBetween(from, to)
+        const r = treeTotals(tree, txs, {
+          from,
+          to,
+          columns: months.length,
+          column: (t) => months.indexOf(t.date.slice(0, 7)),
+          accounts: accountSet,
+          levels: Number(levels),
+        })
+        const result = months.map((_, i) => r.incomeValues[i] - r.expenseValues[i])
+        const sumOf = (v: number[]) => v.reduce((s, x) => s + x, 0)
+        const head = months.map((m) => `${m.slice(5)}/${m.slice(0, 4)}`)
+        const signed = (l: TreeLine) => (l.direction === 'SAIDA' ? -1 : 1)
+        const lineRow = (l: TreeLine) => (
+          <tr key={l.id} className={cn('border-b border-slate-200', l.isGroup && 'font-bold')}>
+            <td className={cellClass} style={indent(l.depth)}>
+              {treeName(l)}
+            </td>
+            {l.values.map((v, i) => (
+              <td key={i} className={cn(cellClass, numClass)}>
+                {num(signed(l) * v)}
+              </td>
+            ))}
+            <td className={cn(cellClass, numClass, 'font-bold')}>{num(signed(l) * l.total)}</td>
+          </tr>
+        )
+        const totalRow = (label: string, values: number[], red = false) => (
+          <tr className={totalRowClass}>
+            <td className="px-1.5 py-1 uppercase">{label}</td>
+            {values.map((v, i) => (
+              <td key={i} className={cn('px-1.5 py-1', numClass, red && v < 0 && 'text-red-700')}>
+                {num(v)}
+              </td>
+            ))}
+            <td className={cn('px-1.5 py-1', numClass, red && sumOf(values) < 0 && 'text-red-700')}>
+              {num(sumOf(values))}
+            </td>
+          </tr>
+        )
+        const csvLine = (l: TreeLine) => [
+          `${'  '.repeat(l.depth)}${treeName(l)}`,
+          ...l.values.map((v) => centsToText(signed(l) * v)),
+          centsToText(signed(l) * l.total),
+        ]
         return {
-          title: 'Demonstração do Resultado',
+          title: 'D.R.E. - Demonstração do Resultado do Exercício',
+          landscape: months.length > 3,
+          params: [`Agrupado até o nível ${levels}`],
           csv: [
-            ['Grupo', 'Categoria', 'Valor', '%'],
-            ...r.income.map((x) => ['Entradas', x.label, centsToText(x.cents), pct(x.pct)]),
-            ...r.expense.map((x) => ['Saídas', x.label, centsToText(x.cents), pct(x.pct)]),
-            ['Total', 'Entradas', centsToText(r.totalIncome), ''],
-            ['Total', 'Saídas', centsToText(r.totalExpense), ''],
-            ['Resultado', '', centsToText(r.result), ''],
+            ['Plano de contas', ...head, 'Total'],
+            ...r.income.map(csvLine),
+            [
+              'Total das entradas',
+              ...r.incomeValues.map((v) => centsToText(v)),
+              centsToText(sumOf(r.incomeValues)),
+            ],
+            ...r.expense.map(csvLine),
+            [
+              'Total das saídas',
+              ...r.expenseValues.map((v) => centsToText(-v)),
+              centsToText(-sumOf(r.expenseValues)),
+            ],
+            ['Resultado', ...result.map((v) => centsToText(v)), centsToText(sumOf(result))],
           ],
           body: (
-            <table className="w-full border-collapse text-[13px]">
-              <tbody>
-                <GroupRows title="Entradas" rows={r.income} total={r.totalIncome} />
-                <GroupRows title="Saídas" rows={r.expense} total={r.totalExpense} />
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-slate-800 font-bold text-slate-900">
-                  <td className="px-2 py-2">Resultado do período</td>
-                  <td
-                    className={cn(
-                      'px-2 py-2 text-right tabular-nums',
-                      r.result < 0 && 'text-red-600',
+            <>
+              <table
+                className={cn(
+                  'w-full border-collapse',
+                  months.length > 8 ? 'text-[9.5px]' : 'text-[11px]',
+                )}
+              >
+                <thead>
+                  <tr>
+                    <th className={cn(headClass, 'text-left')}>Plano de contas</th>
+                    {head.map((h) => (
+                      <th key={h} className={cn(headClass, 'text-right')}>
+                        {h}
+                      </th>
+                    ))}
+                    <th className={cn(headClass, 'text-right')}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.income.map(lineRow)}
+                  {totalRow('Total das entradas', r.incomeValues)}
+                  {r.expense.map(lineRow)}
+                  {totalRow(
+                    'Total das saídas',
+                    r.expenseValues.map((v) => -v),
+                  )}
+                  {totalRow('Resultado', result, true)}
+                </tbody>
+              </table>
+              <RecordCount count={r.records} />
+            </>
+          ),
+        }
+      }
+      case 'cashflow': {
+        const r = cashFlowReport(
+          scopedAccounts,
+          txs,
+          from,
+          to,
+          {
+            categories: new Map(tree.map((c) => [c.id, c.name])),
+            people: new Map(people.map((p) => [p.id, p.name])),
+            suppliers: new Map(suppliers.map((p) => [p.id, p.name])),
+          },
+          showTransfers,
+        )
+        const balances = (title: string, rows: typeof r.opening, total: number) => (
+          <>
+            <Band>{title}</Band>
+            <Table
+              head={['Código', 'Conta', 'Saldo']}
+              align={['l', 'l', 'r']}
+              rows={rows.map((o) => [o.code, o.name, num(o.cents)])}
+              foot={['', 'Totais', num(total)]}
+            />
+          </>
+        )
+        return {
+          title: 'Fluxo de Caixa',
+          landscape: true,
+          params: [showTransfers ? 'Com transferências entre as contas' : ''].filter(Boolean),
+          csv: [
+            ['Data', 'Conta', 'Fornecedor/contribuinte', 'Categoria', 'Histórico', 'Valor'],
+            ...r.days.flatMap((d) =>
+              d.lines.map((l) => [
+                shortDate(l.date, true),
+                l.accountName,
+                l.who,
+                l.category,
+                l.description,
+                centsToText(l.cents),
+              ]),
+            ),
+          ],
+          body: (
+            <>
+              {balances('Saldo inicial das contas', r.opening, r.openingTotal)}
+              <Band>Movimentação do período</Band>
+              <table className="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr>
+                    {['Data', 'Conta', 'Fornecedor/contribuinte', 'Categoria', 'Histórico'].map(
+                      (h) => (
+                        <th key={h} className={cn(headClass, 'text-left')}>
+                          {h}
+                        </th>
+                      ),
                     )}
-                  >
-                    {money(r.result)}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
+                    <th className={cn(headClass, 'text-right')}>Valor total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.days.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-2 py-3 text-center text-slate-500">
+                        Nada no período.
+                      </td>
+                    </tr>
+                  )}
+                  {r.days.map((d) => (
+                    <Fragment key={d.date}>
+                      {d.lines.map((l) => (
+                        <tr key={l.id} className="border-b border-slate-200">
+                          <td className={cn(cellClass, 'whitespace-nowrap')}>
+                            {shortDate(l.date, true)}
+                          </td>
+                          <td className={cellClass}>{l.accountName}</td>
+                          <td className={cellClass}>{l.who}</td>
+                          <td className={cellClass}>{l.category}</td>
+                          <td className={cellClass}>{l.description}</td>
+                          <td className={cn(cellClass, numClass)}>{num(l.cents)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-b border-slate-400 bg-slate-100 font-bold">
+                        <td colSpan={5} className="px-1.5 py-[3px] text-right uppercase">
+                          Subtotal ({shortDate(d.date, true)})
+                        </td>
+                        <td className={cn('px-1.5 py-[3px]', numClass)}>{num(d.subtotal)}</td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+                <tfoot>
+                  {(
+                    [
+                      ['Total de entradas', r.income],
+                      ['Total de saídas', -r.expense],
+                      ['Resultado do período', r.income - r.expense],
+                    ] as const
+                  ).map(([label, v]) => (
+                    <tr key={label} className={totalRowClass}>
+                      <td colSpan={5} className="px-1.5 py-1 text-right uppercase">
+                        {label}
+                      </td>
+                      <td className={cn('px-1.5 py-1', numClass)}>{num(v)}</td>
+                    </tr>
+                  ))}
+                </tfoot>
+              </table>
+              <RecordCount count={r.records} />
+              {balances('Saldo final das contas', r.closing, r.closingTotal)}
+            </>
           ),
         }
       }
@@ -586,54 +706,206 @@ export default function FinanceReports() {
         }
       }
       case 'trial': {
+        const r = treeTotals(tree, txs, {
+          from,
+          to,
+          columns: 2,
+          column: (t) => (t.type === 'ENTRADA' ? 0 : 1),
+          accounts: accountSet,
+          levels: Number(levels),
+        })
+        const lines = [
+          ...(nature !== 'SAIDA' ? r.income : []),
+          ...(nature !== 'ENTRADA' ? r.expense : []),
+        ]
+        const totalIn = nature === 'SAIDA' ? 0 : r.incomeValues[0]
+        const totalOut = nature === 'ENTRADA' ? 0 : r.expenseValues[1]
+        const records = lines.filter((l) => l.depth === 0).reduce((s, l) => s + l.count, 0)
+        const whoOf = (t: TreeLine['items'][number]) =>
+          (t.person_id && people.find((p) => p.id === t.person_id)?.name) ||
+          (t.supplier_id && suppliers.find((p) => p.id === t.supplier_id)?.name) ||
+          ''
         const list = accountMovements(scopedAccounts, txs, from, to).filter(
           (m) => m.opening || m.income || m.expense || m.transfersIn || m.transfersOut || m.closing,
         )
         const sum = (f: (m: (typeof list)[number]) => number) => list.reduce((s, m) => s + f(m), 0)
         const net = (m: (typeof list)[number]) => m.transfersIn - m.transfersOut
+        const accName = new Map(accounts.map((a) => [a.id, a.name]))
+        const transfers = txs.filter(
+          (t) =>
+            t.type === 'TRANSFERENCIA' &&
+            t.status !== 'ESTORNADO' &&
+            t.date.slice(0, 10) >= from &&
+            t.date.slice(0, 10) <= to &&
+            (!accountSet ||
+              accountSet.has(t.account_id) ||
+              (!!t.to_account_id && accountSet.has(t.to_account_id))),
+        )
+        const analytic = detail === 'ANALITICO'
         return {
-          title: 'Balancete',
+          title: analytic ? 'Balancete Analítico' : 'Balancete Sintético',
+          params: [
+            nature === 'TODAS' ? 'Entradas e saídas' : nature === 'ENTRADA' ? 'Entradas' : 'Saídas',
+            `Agrupado até o nível ${levels}`,
+          ],
           csv: [
-            [
-              'Conta',
-              'Congregação',
-              'Saldo inicial',
-              'Entradas',
-              'Saídas',
-              'Transferências',
-              'Saldo final',
-            ],
-            ...list.map((m) => [
-              m.name,
-              m.congregation || '',
-              centsToText(m.opening),
-              centsToText(m.income),
-              centsToText(m.expense),
-              centsToText(net(m)),
-              centsToText(m.closing),
+            ['Plano de contas', 'Data', 'Histórico', 'Entrada', 'Saída', 'Saldo'],
+            ...lines.flatMap((l) => [
+              [
+                `${'  '.repeat(l.depth)}${treeName(l)}`,
+                '',
+                '',
+                centsToText(l.values[0]),
+                centsToText(l.values[1]),
+                centsToText(l.values[0] - l.values[1]),
+              ],
+              ...(analytic
+                ? l.items.map((t) => [
+                    '',
+                    shortDate(t.date, true),
+                    t.description || whoOf(t),
+                    t.type === 'ENTRADA' ? centsToText(t.amount_cents) : '',
+                    t.type === 'ENTRADA' ? '' : centsToText(t.amount_cents),
+                    '',
+                  ])
+                : []),
             ]),
+            [
+              'Total geral',
+              '',
+              '',
+              centsToText(totalIn),
+              centsToText(totalOut),
+              centsToText(totalIn - totalOut),
+            ],
           ],
           body: (
-            <Table
-              head={['Conta', 'Saldo inicial', 'Entradas', 'Saídas', 'Transf.', 'Saldo final']}
-              align={['l', 'r', 'r', 'r', 'r', 'r']}
-              rows={list.map((m) => [
-                m.congregation ? `${m.name} (${m.congregation})` : m.name,
-                money(m.opening),
-                money(m.income),
-                money(m.expense),
-                money(net(m)),
-                money(m.closing),
-              ])}
-              foot={[
-                'Total',
-                money(sum((m) => m.opening)),
-                money(sum((m) => m.income)),
-                money(sum((m) => m.expense)),
-                money(sum(net)),
-                money(sum((m) => m.closing)),
-              ]}
-            />
+            <>
+              <table className="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr>
+                    <th className={cn(headClass, 'text-left')}>
+                      {analytic ? 'Plano de contas / lançamento' : 'Plano de contas'}
+                    </th>
+                    {analytic && <th className={cn(headClass, 'text-left')}>Data</th>}
+                    <th className={cn(headClass, 'text-right')}>Entrada</th>
+                    <th className={cn(headClass, 'text-right')}>Saída</th>
+                    <th className={cn(headClass, 'text-right')}>Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-2 py-3 text-center text-slate-500">
+                        Nada no período.
+                      </td>
+                    </tr>
+                  )}
+                  {lines.map((l) => (
+                    <Fragment key={l.id}>
+                      <tr
+                        className={cn(
+                          'border-b border-slate-200',
+                          (l.isGroup || analytic) && 'font-bold',
+                          analytic && 'bg-slate-50',
+                        )}
+                      >
+                        <td
+                          className={cellClass}
+                          style={indent(l.depth)}
+                          colSpan={analytic ? 2 : 1}
+                        >
+                          {treeName(l)}
+                        </td>
+                        <td className={cn(cellClass, numClass)}>{num(l.values[0])}</td>
+                        <td className={cn(cellClass, numClass)}>{num(l.values[1])}</td>
+                        <td className={cn(cellClass, numClass)}>
+                          {num(l.values[0] - l.values[1])}
+                        </td>
+                      </tr>
+                      {analytic &&
+                        l.items.map((t) => (
+                          <tr key={t.id} className="border-b border-slate-100 text-slate-700">
+                            <td className={cellClass} style={indent(l.depth + 1)}>
+                              {[t.description, whoOf(t)].filter(Boolean).join(' · ') || '—'}
+                            </td>
+                            <td className={cn(cellClass, 'whitespace-nowrap')}>
+                              {shortDate(t.date, true)}
+                            </td>
+                            <td className={cn(cellClass, numClass)}>
+                              {t.type === 'ENTRADA' ? num(t.amount_cents) : ''}
+                            </td>
+                            <td className={cn(cellClass, numClass)}>
+                              {t.type === 'ENTRADA' ? '' : num(t.amount_cents)}
+                            </td>
+                            <td />
+                          </tr>
+                        ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className={totalRowClass}>
+                    <td className="px-1.5 py-1 uppercase" colSpan={analytic ? 2 : 1}>
+                      Total geral
+                    </td>
+                    <td className={cn('px-1.5 py-1', numClass)}>{num(totalIn)}</td>
+                    <td className={cn('px-1.5 py-1', numClass)}>{num(totalOut)}</td>
+                    <td className={cn('px-1.5 py-1', numClass)}>{num(totalIn - totalOut)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              <RecordCount count={records} />
+              {showAccounts && (
+                <div className="break-inside-avoid">
+                  <Band>Saldos iniciais e finais das contas</Band>
+                  <Table
+                    head={[
+                      'Conta',
+                      'Saldo inicial',
+                      'Entradas',
+                      'Saídas',
+                      'Transf.',
+                      'Saldo final',
+                    ]}
+                    align={['l', 'r', 'r', 'r', 'r', 'r']}
+                    rows={list.map((m) => [
+                      m.congregation ? `${m.name} (${m.congregation})` : m.name,
+                      num(m.opening),
+                      num(m.income),
+                      num(m.expense),
+                      num(net(m)),
+                      num(m.closing),
+                    ])}
+                    foot={[
+                      'Totais',
+                      num(sum((m) => m.opening)),
+                      num(sum((m) => m.income)),
+                      num(sum((m) => m.expense)),
+                      num(sum(net)),
+                      num(sum((m) => m.closing)),
+                    ]}
+                  />
+                </div>
+              )}
+              {showTransfers && (
+                <div className="break-inside-avoid">
+                  <Band>Transferências</Band>
+                  <Table
+                    head={['Data', 'De', 'Para', 'Histórico', 'Valor']}
+                    align={['l', 'l', 'l', 'l', 'r']}
+                    rows={transfers.map((t) => [
+                      shortDate(t.date, true),
+                      accName.get(t.account_id) || '',
+                      accName.get(t.to_account_id || '') || '',
+                      t.description || '',
+                      num(t.amount_cents),
+                    ])}
+                    count={transfers.length}
+                  />
+                </div>
+              )}
+            </>
           ),
         }
       }
@@ -786,6 +1058,8 @@ export default function FinanceReports() {
     currentChurch?.name,
     accounts,
     categories,
+    tree,
+    suppliers,
     people,
     counts,
     bills,
@@ -794,6 +1068,11 @@ export default function FinanceReports() {
     from,
     to,
     categoryId,
+    levels,
+    detail,
+    nature,
+    showAccounts,
+    showTransfers,
   ])
 
   const setMonth = (ym: string) => {
@@ -970,6 +1249,72 @@ export default function FinanceReports() {
                   </Select>
                 </div>
               )}
+              {(report === 'dre' || report === 'trial') && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Agrupar até o nível</Label>
+                  <Select value={levels} onValueChange={setLevels}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LEVELS.map((l) => (
+                        <SelectItem key={l} value={l}>
+                          Nível {l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {report === 'trial' && (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Natureza</Label>
+                    <Select value={nature} onValueChange={(v) => setNature(v as Nature)}>
+                      <SelectTrigger className="w-[170px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="TODAS">Entradas e saídas</SelectItem>
+                        <SelectItem value="ENTRADA">Só entradas</SelectItem>
+                        <SelectItem value="SAIDA">Só saídas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Detalhes</Label>
+                    <Select value={detail} onValueChange={(v) => setDetail(v as Detail)}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SINTETICO">Sintético</SelectItem>
+                        <SelectItem value="ANALITICO">Analítico</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+              {(report === 'trial' || report === 'cashflow') && (
+                <div className="flex flex-col gap-2 pb-1 text-sm text-slate-700">
+                  {report === 'trial' && (
+                    <label className="flex items-center gap-2">
+                      <Checkbox
+                        checked={showAccounts}
+                        onCheckedChange={(on) => setShowAccounts(on === true)}
+                      />
+                      Listar saldos iniciais e finais das contas
+                    </label>
+                  )}
+                  <label className="flex items-center gap-2">
+                    <Checkbox
+                      checked={showTransfers}
+                      onCheckedChange={(on) => setShowTransfers(on === true)}
+                    />
+                    Listar transferências
+                  </label>
+                </div>
+              )}
               <div className="flex flex-col gap-1.5">
                 <Label>Quem assina</Label>
                 <Popover>
@@ -1023,7 +1368,13 @@ export default function FinanceReports() {
                 <Button
                   className={primaryButtonClass}
                   disabled={loadingData}
-                  onClick={() => sheetRef.current && printSheet(sheetRef.current, built.title)}
+                  onClick={() =>
+                    sheetRef.current &&
+                    printSheet(sheetRef.current, built.title, {
+                      landscape: built.landscape,
+                      footer: built.title,
+                    })
+                  }
                 >
                   <Printer className="mr-2 h-4 w-4" />
                   Imprimir / PDF
@@ -1042,30 +1393,40 @@ export default function FinanceReports() {
             ) : !validPeriod ? (
               <p className="py-8 text-center text-slate-400">Confira as datas do período.</p>
             ) : (
-              <div ref={sheetRef} className="mx-auto max-w-3xl bg-white text-slate-900">
-                <header className="mb-5 text-center">
-                  <h2 className="text-lg font-bold">{built.title}</h2>
-                  <p className="text-sm text-slate-500">
-                    {[currentChurch?.name, report === 'availability' ? null : period, scopeLabel]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </header>
+              <div
+                ref={sheetRef}
+                data-sheet
+                className={cn(
+                  'mx-auto bg-white font-[Arial,Helvetica,sans-serif] text-black',
+                  built.landscape ? 'max-w-5xl' : 'max-w-3xl',
+                )}
+              >
+                <SheetHeader
+                  church={settings?.legal_name || currentChurch?.name || ''}
+                  title={built.title}
+                  logoUrl={logoUrl}
+                />
                 {built.body}
+                <Params
+                  items={[
+                    report === 'availability'
+                      ? `Data: ${shortDate(to, true)}`
+                      : `Período: ${shortDate(from, true)} a ${shortDate(to, true)}`,
+                    `Congregação: ${scopeLabel}`,
+                    ...(built.params || []),
+                  ]}
+                />
                 {shownSigners.length > 0 && (
-                  <div className="mt-16 grid break-inside-avoid grid-cols-2 gap-x-10 gap-y-12">
+                  <div className="mt-14 grid break-inside-avoid grid-cols-2 gap-x-10 gap-y-12">
                     {shownSigners.map((s) => (
-                      <div key={s.id} className="border-t border-slate-800 pt-1.5 text-center">
-                        <p className="text-sm font-medium">{s.name}</p>
-                        {s.title && <p className="text-xs text-slate-500">{s.title}</p>}
-                        {s.document && <p className="text-xs text-slate-500">{s.document}</p>}
+                      <div key={s.id} className="border-t border-black pt-1 text-center">
+                        <p className="text-[12px] font-semibold">{s.name}</p>
+                        {s.title && <p className="text-[10px] text-slate-600">{s.title}</p>}
+                        {s.document && <p className="text-[10px] text-slate-600">{s.document}</p>}
                       </div>
                     ))}
                   </div>
                 )}
-                <p className="mt-10 text-right text-[10px] text-slate-400">
-                  Emitido em {shortDate(today(), true)} pelo LouvorFlow
-                </p>
               </div>
             )}
           </div>
