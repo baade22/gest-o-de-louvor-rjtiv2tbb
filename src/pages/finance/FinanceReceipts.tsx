@@ -371,6 +371,8 @@ function ReceiptCard({
   }
 
   const choices = r.candidates.length ? r.candidates : r.line ? [r.line] : []
+  // Movimento já conciliado com um lançamento: o comprovante só é anexado a ele
+  const linkedChoice = choices.find((l) => l.id === lineId)?.status === 'CONCILIADO'
   const StatusIcon =
     r.status === 'CONCILIADO'
       ? CheckCircle2
@@ -427,7 +429,9 @@ function ReceiptCard({
             <div className="mt-2 rounded-lg bg-emerald-50/60 px-3 py-2">
               <LineRow line={r.line} />
               <div className="mt-1 text-xs text-emerald-800">
-                Lançado e conciliado
+                {r.reason?.startsWith('Já estava conciliado')
+                  ? 'O movimento já estava conciliado: o comprovante foi anexado ao lançamento'
+                  : 'Lançado e conciliado'}
                 {r.done_by_name ? ` por ${r.done_by_name}` : ' sozinho'}.{' '}
                 <Link to="/financeiro/contas" className="underline">
                   Ver em contas a pagar
@@ -470,7 +474,7 @@ function ReceiptCard({
             </p>
           )}
           <div className="flex flex-wrap items-end gap-2">
-            {choices.length > 0 && (
+            {choices.length > 0 && !linkedChoice && (
               <div className="min-w-56 flex-1 space-y-1.5">
                 <Label className="text-xs text-slate-500">Categoria</Label>
                 <Select value={categoryId} onValueChange={setCategoryId}>
@@ -490,7 +494,7 @@ function ReceiptCard({
             {choices.length > 0 && (
               <Button
                 className={primaryButtonClass}
-                disabled={!lineId || !categoryId || !!working}
+                disabled={!lineId || (!categoryId && !linkedChoice) || !!working}
                 onClick={() =>
                   run(
                     'choose',
@@ -504,7 +508,7 @@ function ReceiptCard({
                 ) : (
                   <CheckCircle2 className="h-4 w-4" />
                 )}
-                Lançar e conciliar
+                {linkedChoice ? 'Anexar ao lançamento' : 'Lançar e conciliar'}
               </Button>
             )}
             {r.can_retry && (
