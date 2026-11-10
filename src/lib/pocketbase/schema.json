@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T01:18:12.029Z",
+  "generatedAt": "2026-11-10T01:46:08.059Z",
   "collections": [
     {
       "name": "users",
@@ -4049,6 +4049,18 @@
           "required": false,
           "system": false,
           "collectionRef": "fin_bank_lines"
+        },
+        {
+          "name": "discount_cents",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "interest_cents",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -4393,6 +4405,12 @@
           "required": false,
           "system": false,
           "collectionRef": "fin_campaigns"
+        },
+        {
+          "name": "settled_cents",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
