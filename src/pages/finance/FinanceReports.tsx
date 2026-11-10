@@ -91,6 +91,8 @@ import {
   useFinanceAccess,
 } from './shared'
 import { download, printSheet } from './print'
+import { useReconcileStarts } from './useReconcileStarts'
+import { realizedFilter } from '@/lib/realizedBalance'
 import {
   Band,
   Params,
@@ -296,6 +298,9 @@ export default function FinanceReports() {
     }
   }, [churchId, from, to, validPeriod, toast])
 
+  // Saldo de conta bancária: só o que foi conciliado com o extrato (igual a Saldos e extratos)
+  const starts = useReconcileStarts(churchId, accounts)
+  const realized = useMemo(() => realizedFilter(starts), [starts])
   /** Categorias que recebem lançamento (sem os grupos do plano de contas). */
   const categories = useMemo(() => tree.filter((c) => !c.is_group), [tree])
   const congregations = useMemo(
@@ -438,6 +443,7 @@ export default function FinanceReports() {
             suppliers: new Map(suppliers.map((p) => [p.id, p.name])),
           },
           showTransfers,
+          realized,
         )
         const balances = (title: string, rows: typeof r.opening, total: number) => (
           <>
@@ -725,7 +731,7 @@ export default function FinanceReports() {
           (t.person_id && people.find((p) => p.id === t.person_id)?.name) ||
           (t.supplier_id && suppliers.find((p) => p.id === t.supplier_id)?.name) ||
           ''
-        const list = accountMovements(scopedAccounts, txs, from, to).filter(
+        const list = accountMovements(scopedAccounts, txs, from, to, realized).filter(
           (m) => m.opening || m.income || m.expense || m.transfersIn || m.transfersOut || m.closing,
         )
         const sum = (f: (m: (typeof list)[number]) => number) => list.reduce((s, m) => s + f(m), 0)
@@ -950,7 +956,7 @@ export default function FinanceReports() {
         }
       }
       case 'availability': {
-        const r = availabilityReport(scopedAccounts, txs, to)
+        const r = availabilityReport(scopedAccounts, txs, to, realized)
         return {
           title: `Disponibilidades em ${shortDate(to, true)}`,
           csv: [
@@ -1073,6 +1079,7 @@ export default function FinanceReports() {
     nature,
     showAccounts,
     showTransfers,
+    realized,
   ])
 
   const setMonth = (ym: string) => {

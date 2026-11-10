@@ -808,7 +808,7 @@ export async function listReportTransactions(churchId: string, to: string) {
       to: `${to} 23:59:59`,
     }),
     fields:
-      'id,type,amount_cents,account_id,to_account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,event_id,supplier_id',
+      'id,type,amount_cents,account_id,to_account_id,category_id,person_id,is_anonymous,status,date,description,payment_method,event_id,supplier_id,bank_line_id,to_bank_line_id',
     sort: 'date',
   })
 }

@@ -114,3 +114,25 @@ describe('cashFlowReport', () => {
     expect(one.days[0].lines.map((l) => l.cents)).toEqual([200, -300])
   })
 })
+
+describe('saldos só com o conciliado', () => {
+  const accounts = [{ id: 'A', name: 'Banco', opening_balance_cents: 1000 }]
+  const names = {
+    categories: new Map<string, string>(),
+    people: new Map<string, string>(),
+    suppliers: new Map<string, string>(),
+  }
+  const txs = [
+    tx({ amount_cents: 500, bank_line_id: 'l1' }),
+    tx({ type: 'SAIDA', amount_cents: 9000 }),
+  ]
+  const onlyLinked = (t: TreeTx) => !!t.bank_line_id
+
+  it('deixa de fora o que não foi conciliado, no saldo e no movimento', () => {
+    const all = cashFlowReport(accounts, txs, '2026-01-01', '2026-01-31', names)
+    expect(all.closingTotal).toBe(1000 + 500 - 9000)
+    const r = cashFlowReport(accounts, txs, '2026-01-01', '2026-01-31', names, false, onlyLinked)
+    expect(r.closingTotal).toBe(1500)
+    expect(r.records).toBe(1)
+  })
+})

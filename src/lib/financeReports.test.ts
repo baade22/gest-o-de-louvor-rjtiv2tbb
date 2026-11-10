@@ -253,3 +253,31 @@ describe('revenueReport', () => {
     expect(r.average).toBe(600)
   })
 })
+
+describe('availabilityReport com a regra do conciliado', () => {
+  it('na conta bancária só soma o que foi conciliado', () => {
+    const r = availabilityReport(
+      [{ id: 'B', name: 'Banco', opening_balance_cents: 100 }],
+      [
+        {
+          type: 'ENTRADA',
+          date: '2026-01-02',
+          amount_cents: 50,
+          account_id: 'B',
+          status: 'CONFIRMADO',
+          bank_line_id: 'x',
+        },
+        {
+          type: 'SAIDA',
+          date: '2026-01-03',
+          amount_cents: 999,
+          account_id: 'B',
+          status: 'CONFIRMADO',
+        },
+      ],
+      '2026-01-31',
+      (tx) => !!tx.bank_line_id,
+    )
+    expect(r.total).toBe(150)
+  })
+})
