@@ -10,6 +10,8 @@
 // prefere deixá-las só aqui, continuam valendo as variáveis:
 //   CORA_CLIENT_ID, CORA_CERT, CORA_KEY
 //   BRADESCO_CLIENT_ID, BRADESCO_CLIENT_SECRET, BRADESCO_CERT, BRADESCO_KEY
+//   (opcional) BRADESCO_PIX_CLIENT_ID, BRADESCO_PIX_CLIENT_SECRET: app da API Pix, para
+//   completar as entradas por Pix com o CPF/CNPJ de quem mandou
 //   (CERT e KEY com o conteúdo PEM, ou *_CERT_FILE / *_KEY_FILE com o caminho do arquivo).
 //   Com "Credencial" preenchida na conexão (ex.: DIAMANTE), os nomes ganham o sufixo:
 //   CORA_DIAMANTE_CLIENT_ID, CORA_DIAMANTE_CERT...
@@ -17,8 +19,10 @@
 import https from 'node:https'
 import { readFileSync } from 'node:fs'
 import {
+  addPixPayers,
   backfill,
   bradescoBalance,
+  bradescoPixList,
   bradescoError,
   bradescoLines,
   coraLines,
@@ -35,6 +39,11 @@ const HOSTS = {
     PRODUCAO: 'https://openapi.bradesco.com.br',
     TESTE: 'https://openapisandbox.prebanco.com.br',
   },
+}
+// API Pix do Bradesco (Pix recebidos): outro host e outro app (client ID/secret próprios)
+const BRADESCO_PIX_HOSTS = {
+  PRODUCAO: 'https://qrpix.bradesco.com.br',
+  TESTE: 'https://openapisandbox.prebanco.com.br',
 }
 const BRADESCO_TOKEN_PATH = {
   PRODUCAO: '/auth/server-mtls/v1/token',
@@ -60,11 +69,20 @@ function credentials(provider, key, fromServer, serverProblem) {
   if (fromServer?.client_id && fromServer.cert && fromServer.key) {
     // Entram na lista do que nunca pode aparecer em log ou mensagem de erro
     serverSecrets.push(
-      ...[fromServer.client_id, fromServer.client_secret, fromServer.cert, fromServer.key],
+      ...[
+        fromServer.client_id,
+        fromServer.client_secret,
+        fromServer.cert,
+        fromServer.key,
+        fromServer.pix_client_id,
+        fromServer.pix_client_secret,
+      ].filter(Boolean),
     )
     return {
       clientId: fromServer.client_id,
       clientSecret: fromServer.client_secret || '',
+      pixClientId: fromServer.pix_client_id || '',
+      pixClientSecret: fromServer.pix_client_secret || '',
       cert: fromServer.cert,
       key: fromServer.key,
     }
@@ -79,6 +97,8 @@ function credentials(provider, key, fromServer, serverProblem) {
   const c = {
     clientId: env(`${p}_CLIENT_ID`),
     clientSecret: env(`${p}_CLIENT_SECRET`),
+    pixClientId: env(`${p}_PIX_CLIENT_ID`),
+    pixClientSecret: env(`${p}_PIX_CLIENT_SECRET`),
     cert: pem('CERT'),
     key: pem('KEY'),
   }
@@ -218,6 +238,46 @@ async function openBradesco(conn, cred) {
   const auth = { Authorization: `Bearer ${tok.json.access_token}`, Accept: 'application/json' }
   const account = { agencia: conn.branch, conta: conn.account_number }
 
+  // API Pix: Pix recebidos com CPF/CNPJ e nome de quem mandou (só com o app da API Pix)
+  const pixBase = BRADESCO_PIX_HOSTS[conn.environment]
+  let pixAuth = null
+  async function pixReceived(from, to) {
+    if (!pixAuth) {
+      const pt = await request(`${pixBase}/auth/server/oauth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: cred.pixClientId,
+          client_secret: cred.pixClientSecret,
+        }).toString(),
+        ...tls,
+      })
+      if (pt.status !== 200 || !pt.json?.access_token) {
+        throw new Error(`API Pix recusou o acesso: ${short(pt)}`)
+      }
+      pixAuth = { Authorization: `Bearer ${pt.json.access_token}`, Accept: 'application/json' }
+    }
+    const list = []
+    // Um dia antes: Pix da madrugada pode cair no extrato no dia seguinte
+    for (const [start, end] of splitPeriod(shiftYmd(from, -1), to, 30)) {
+      for (let page = 0; page < 200; page++) {
+        const qs = new URLSearchParams({
+          inicio: `${start}T03:00:00.000Z`,
+          fim: `${shiftYmd(end, 1)}T02:59:59.999Z`,
+          'paginacao.paginaAtual': String(page),
+          'paginacao.itensPorPagina': '100',
+        })
+        const r = await request(`${pixBase}/v2/pix?${qs}`, { headers: pixAuth, ...tls })
+        if (r.status !== 200) throw new Error(`Pix recebidos do Bradesco: ${short(r)}`)
+        list.push(...bradescoPixList(r.json))
+        const pages = Number(r.json?.parametros?.paginacao?.quantidadeDePaginas) || 1
+        if (page + 1 >= pages) break
+      }
+    }
+    return list
+  }
+
   return {
     async balance() {
       const bal = await request(
@@ -248,9 +308,27 @@ async function openBradesco(conn, cred) {
       if (st.status !== 200) throw new BankError(`Extrato do Bradesco: ${short(st)}`, st.status)
       const stErr = bradescoError(st.json)
       if (stErr) throw new BankError(`Extrato do Bradesco: ${stErr}`, 400)
-      return bradescoLines(st.json)
+      const lines = bradescoLines(st.json)
+      if (cred.pixClientId && cred.pixClientSecret && lines.some((l) => l.amount_cents > 0)) {
+        // Sem a API Pix o extrato segue normal: só não ganha o CPF/CNPJ
+        try {
+          const pix = await pixReceived(from, to)
+          addPixPayers(lines, pix)
+          const found = lines.filter((l) => l.counterparty_doc).length
+          this.lastRaw.pix = { received: pix.length, matched: found }
+          console.log(`Bradesco: ${pix.length} Pix recebido(s), ${found} com CPF/CNPJ no extrato.`)
+        } catch (err) {
+          this.lastRaw.pix = { error: redact(err.message) }
+          console.error(`Bradesco: API Pix: ${redact(err.message)}`)
+        }
+      }
+      return lines
     },
   }
+}
+
+function shiftYmd(ymd, n) {
+  return new Date(Date.parse(ymd + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10)
 }
 
 class BankError extends Error {
