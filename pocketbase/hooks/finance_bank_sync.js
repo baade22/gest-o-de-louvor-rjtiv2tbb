@@ -140,6 +140,8 @@ routerAdd('GET', '/backend/v1/finance/bank-sync/connections', (e) => {
         credentials: {
           client_id: v.client_id || '',
           client_secret: v.client_secret || '',
+          pix_client_id: v.pix_client_id || '',
+          pix_client_secret: v.pix_client_secret || '',
           cert: v.cert || '',
           key: v.key || '',
         },

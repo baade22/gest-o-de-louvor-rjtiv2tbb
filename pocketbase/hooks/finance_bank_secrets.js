@@ -7,7 +7,9 @@
 //      MASTER, quem vê as integrações ou quem tem alguma permissão do financeiro.
 // POST /backend/v1/finance/bank-secrets   (só MASTER)
 //      { church_id, action: 'save', kind: 'CORA'|'BRADESCO', environment: 'PRODUCAO'|'TESTE',
-//        credential_key?, client_id?, client_secret?, cert?, key? }
+//        credential_key?, client_id?, client_secret?, cert?, key?,
+//        pix_client_id?, pix_client_secret? }   (Bradesco: credenciais da API Pix, opcionais,
+//        para buscar CPF/CNPJ de quem mandou Pix)
 //        Campo em branco mantém o valor já salvo; na primeira vez todos são obrigatórios.
 //      { church_id, action: 'delete', id }
 //      { church_id, action: 'new_key' }  gera a chave do conector e devolve UMA vez (o
@@ -404,8 +406,15 @@ routerAdd(
       client_secret: clean(body.client_secret, 500),
       cert: clean(body.cert, 20000).replace(/\r\n/g, '\n'),
       key: clean(body.key, 20000).replace(/\r\n/g, '\n'),
+      pix_client_id: kind === 'BRADESCO' ? clean(body.pix_client_id, 200) : '',
+      pix_client_secret: kind === 'BRADESCO' ? clean(body.pix_client_secret, 500) : '',
     }
-    if (input.client_id.length > 200 || input.client_secret.length > 500) {
+    if (
+      input.client_id.length > 200 ||
+      input.client_secret.length > 500 ||
+      input.pix_client_id.length > 200 ||
+      input.pix_client_secret.length > 500
+    ) {
       return e.json(400, { message: 'Client ID ou segredo grande demais.' })
     }
     if (input.cert.length > 20000 || input.key.length > 20000) {
@@ -447,8 +456,13 @@ routerAdd(
       client_secret: input.client_secret || current.client_secret || '',
       cert: input.cert || current.cert || '',
       key: input.key || current.key || '',
+      pix_client_id: input.pix_client_id || current.pix_client_id || '',
+      pix_client_secret: input.pix_client_secret || current.pix_client_secret || '',
     }
     const missing = []
+    if (!!merged.pix_client_id !== !!merged.pix_client_secret) {
+      missing.push(merged.pix_client_id ? 'Client secret da API Pix' : 'Client ID da API Pix')
+    }
     if (!merged.client_id) missing.push('Client ID')
     if (kind === 'BRADESCO' && !merged.client_secret) missing.push('Client secret')
     if (!merged.cert) missing.push('certificado')
@@ -467,6 +481,7 @@ routerAdd(
     rec.set('summary', {
       client_id: mask(merged.client_id),
       has_secret: !!merged.client_secret,
+      pix_client_id: merged.pix_client_id ? mask(merged.pix_client_id) : '',
       has_cert: true,
       has_key: true,
       // Primeiros caracteres do SHA-256 do certificado, para conferir qual está salvo

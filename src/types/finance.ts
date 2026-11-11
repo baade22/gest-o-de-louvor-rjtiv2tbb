@@ -468,6 +468,8 @@ export interface BankSecretSet {
   summary: {
     client_id?: string
     has_secret?: boolean
+    /** Client ID da API Pix (Bradesco), mascarado; vazio quando não cadastrado. */
+    pix_client_id?: string
     has_cert?: boolean
     has_key?: boolean
     cert_fingerprint?: string
@@ -520,6 +522,8 @@ export interface BankSecretInput {
   client_secret?: string
   cert?: string
   key?: string
+  pix_client_id?: string
+  pix_client_secret?: string
 }
 
 /** Comprovante de pagamento mandado pelo WhatsApp da igreja (lido pela IA). */

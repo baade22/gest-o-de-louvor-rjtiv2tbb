@@ -248,6 +248,8 @@ interface FormState {
   client_secret: string
   cert: string
   key: string
+  pix_client_id: string
+  pix_client_secret: string
 }
 
 function CredentialDialog({
@@ -288,6 +290,8 @@ function CredentialDialog({
           client_secret: form.client_secret.trim(),
           cert: form.cert.trim(),
           key: form.key.trim(),
+          pix_client_id: form.pix_client_id.trim(),
+          pix_client_secret: form.pix_client_secret.trim(),
         },
         password,
       )
@@ -377,6 +381,41 @@ function CredentialDialog({
                 autoComplete="new-password"
                 className="font-mono text-xs"
               />
+            </div>
+          )}
+          {form.kind === 'BRADESCO' && (
+            <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+              <div>
+                <p className="text-sm font-medium text-slate-900">API Pix (opcional)</p>
+                <p className="text-xs text-slate-500">
+                  Credenciais do app da API Pix no portal do Bradesco (são outras, diferentes das do
+                  extrato). Com elas o conector busca o CPF/CNPJ e o nome de quem mandou cada Pix.
+                  Usa o mesmo certificado abaixo.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cred-pix-id">Client ID da API Pix</Label>
+                <Input
+                  id="cred-pix-id"
+                  value={form.pix_client_id}
+                  onChange={(e) => set({ pix_client_id: e.target.value })}
+                  placeholder={keep || 'Client ID do app da API Pix'}
+                  autoComplete="off"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cred-pix-secret">Client secret da API Pix</Label>
+                <Input
+                  id="cred-pix-secret"
+                  type="password"
+                  value={form.pix_client_secret}
+                  onChange={(e) => set({ pix_client_secret: e.target.value })}
+                  placeholder={keep || 'Client secret do app da API Pix'}
+                  autoComplete="new-password"
+                  className="font-mono text-xs"
+                />
+              </div>
             </div>
           )}
           <PemField
@@ -497,6 +536,8 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
         client_secret: '',
         cert: '',
         key: '',
+        pix_client_id: '',
+        pix_client_secret: '',
       },
     })
   const openEdit = (s: BankSecretSet) =>
@@ -510,6 +551,8 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
         client_secret: '',
         cert: '',
         key: '',
+        pix_client_id: '',
+        pix_client_secret: '',
       },
     })
   const remove = (s: BankSecretSet) =>
@@ -689,6 +732,15 @@ export function BankIntegrations({ churchId, isMaster }: { churchId: string; isM
                       Client ID <code className="text-slate-700">{s.summary.client_id}</code>
                       {kind === 'BRADESCO' &&
                         (s.summary.has_secret ? ' · com secret' : ' · sem secret')}
+                      {kind === 'BRADESCO' &&
+                        (s.summary.pix_client_id ? (
+                          <>
+                            {' · API Pix '}
+                            <code className="text-slate-700">{s.summary.pix_client_id}</code>
+                          </>
+                        ) : (
+                          ' · sem API Pix'
+                        ))}
                     </p>
                     {s.summary.cert_fingerprint && (
                       <p className="text-slate-500">
