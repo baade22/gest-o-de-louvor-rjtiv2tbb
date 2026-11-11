@@ -1,0 +1,29 @@
+[Unit]
+Description=LouvorFlow (PocketBase)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=louvorflow
+Group=louvorflow
+EnvironmentFile=/etc/louvorflow/louvorflow.env
+# --automigrate=false: mudanças feitas no painel /_/ não viram arquivos de migração aqui;
+# o esquema só muda pelas migrações do repositório.
+ExecStart=/opt/louvorflow/bin/pocketbase serve \
+  --http=127.0.0.1:8090 \
+  --dir=/opt/louvorflow/pb_data \
+  --hooksDir=/opt/louvorflow/pb_hooks \
+  --migrationsDir=/opt/louvorflow/pb_migrations \
+  --automigrate=false
+Restart=always
+RestartSec=5
+LimitNOFILE=4096
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/louvorflow/pb_data
+
+[Install]
+WantedBy=multi-user.target

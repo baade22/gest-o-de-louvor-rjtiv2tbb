@@ -1,0 +1,76 @@
+# Publica o LouvorFlow no servidor próprio a cada merge na main.
+# Fica desligado até a variável DEPLOY_HOST existir no repositório
+# (Settings → Secrets and variables → Actions). Passo a passo em deploy/README.md.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # O site fala com o PocketBase no mesmo domínio; isto passa por cima do .env.
+      VITE_POCKETBASE_URL: ${{ vars.SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Preparar hooks e migrações
+        # O PocketBase só carrega hooks terminados em .pb.js.
+        run: |
+          mkdir -p out/pb_hooks out/pb_migrations
+          for f in pocketbase/hooks/*.js; do
+            cp "$f" "out/pb_hooks/$(basename "${f%.js}").pb.js"
+          done
+          cp pocketbase/migrations/*.js out/pb_migrations/
+
+      - name: Chave SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Backup antes de publicar
+        run: ssh deploy@${{ vars.DEPLOY_HOST }} sudo systemctl start louvorflow-backup.service
+
+      - name: Enviar arquivos
+        run: |
+          rsync -az --delete dist/ deploy@${{ vars.DEPLOY_HOST }}:/opt/louvorflow/site/
+          rsync -az --delete out/pb_hooks/ deploy@${{ vars.DEPLOY_HOST }}:/opt/louvorflow/pb_hooks/
+          rsync -az --delete out/pb_migrations/ deploy@${{ vars.DEPLOY_HOST }}:/opt/louvorflow/pb_migrations/
+
+      - name: Reiniciar e conferir
+        # As migrações novas rodam sozinhas quando o PocketBase sobe.
+        run: |
+          ssh deploy@${{ vars.DEPLOY_HOST }} sudo systemctl restart louvorflow
+          for i in $(seq 1 20); do
+            if curl -fsS "${{ vars.SITE_URL }}/api/health" >/dev/null; then
+              echo "No ar."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "O PocketBase não respondeu depois do deploy." >&2
+          exit 1

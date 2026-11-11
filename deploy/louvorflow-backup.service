@@ -1,0 +1,7 @@
+[Unit]
+Description=Backup do LouvorFlow (banco e arquivos)
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/louvorflow/backup.env
+ExecStart=/usr/local/sbin/louvorflow-backup

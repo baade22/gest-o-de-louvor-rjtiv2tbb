@@ -1,0 +1,29 @@
+# Gerado por deploy/setup-server.sh a partir do modelo no repositório.
+__DOMAIN__ {
+	encode zstd gzip
+
+	# Mídias aceitam até 100 MB (migração 0023).
+	request_body {
+		max_size 110MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# O Caddy troca o X-Forwarded-For pelo IP real de quem chamou. A migração 0042
+	# usa esse cabeçalho para a trava de login contar por pessoa, não pelo proxy.
+	@backend path /api/* /_/* /backend/*
+	handle @backend {
+		reverse_proxy 127.0.0.1:8090
+	}
+
+	handle {
+		root * /opt/louvorflow/site
+		try_files {path} /index.html
+		file_server
+	}
+}
