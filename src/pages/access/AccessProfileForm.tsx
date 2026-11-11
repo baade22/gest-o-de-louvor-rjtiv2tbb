@@ -199,7 +199,7 @@ export default function AccessProfileForm() {
         title: 'Perfil salvo',
         description: id
           ? 'Quem tem este perfil já recebe os novos acessos (no próximo carregamento da página).'
-          : 'Agora é só dar o perfil às pessoas em Equipe do louvor.',
+          : 'Agora é só dar o perfil às pessoas em Usuários.',
       })
       navigate('/perfis-acesso')
     } catch (err) {

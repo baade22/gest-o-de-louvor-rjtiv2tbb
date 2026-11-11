@@ -596,7 +596,8 @@ const App = () => (
               }
             />
 
-            {/* Músicos */}
+            {/* Usuários (rota antiga /musicians continua valendo) */}
+            <Route path="/usuarios" element={<Navigate to="/musicians" replace />} />
             <Route
               path="/musicians"
               element={
