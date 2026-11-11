@@ -262,9 +262,12 @@ async function openBradesco(conn, cred) {
     // Um dia antes: Pix da madrugada pode cair no extrato no dia seguinte
     for (const [start, end] of splitPeriod(shiftYmd(from, -1), to, 30)) {
       for (let page = 0; page < 200; page++) {
+        // O Bradesco recusa "fim" depois da hora da consulta (412)
+        const endIso = `${shiftYmd(end, 1)}T02:59:59.999Z`
+        const nowIso = new Date(Date.now() - 60_000).toISOString()
         const qs = new URLSearchParams({
           inicio: `${start}T03:00:00.000Z`,
-          fim: `${shiftYmd(end, 1)}T02:59:59.999Z`,
+          fim: endIso < nowIso ? endIso : nowIso,
           'paginacao.paginaAtual': String(page),
           'paginacao.itensPorPagina': '100',
         })
