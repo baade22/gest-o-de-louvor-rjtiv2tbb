@@ -1,6 +1,8 @@
 // Roda junto com os testes do site (vitest)
 import { expect, test } from 'vitest'
 import {
+  addPixPayers,
+  bradescoPixList,
   backfill,
   splitPeriod,
   bradescoBalance,
@@ -345,4 +347,90 @@ test('período longo vira partes de até 31 dias, sem parte de um dia só', () =
   for (let i = 1; i < parts.length; i++) expect(parts[i][0] > parts[i - 1][1]).toBe(true)
   expect(splitPeriod('2026-10-01', '2026-11-01', 31)).toEqual([['2026-10-01', '2026-11-01']])
   expect(splitPeriod('2026-10-28', '2026-10-28', 31)).toEqual([['2026-10-28', '2026-10-29']])
+})
+
+test('Pix recebidos do Bradesco completam o CPF/CNPJ do extrato', () => {
+  const pix = bradescoPixList({
+    pix: [
+      {
+        valor: '50.00',
+        horario: '2026-11-08T13:00:00.000Z',
+        pagador: { nome: 'ANA PAULA SOUZA', cpf: '12345678909' },
+      },
+      {
+        valor: '50.00',
+        horario: '2026-11-08T14:00:00.000Z',
+        pagador: { nome: 'JOSE CARLOS LIMA', cpf: '98765432100' },
+      },
+      {
+        valor: '120.00',
+        horario: '2026-11-08T15:00:00.000Z',
+        pagador: { nome: 'EMPRESA EXEMPLO LTDA', cnpj: '11222333000181' },
+      },
+      {
+        valor: '30.00',
+        horario: '2026-11-09T02:30:00.000Z',
+        pagador: { nome: 'MARIA NOITE', cpf: '11122233344' },
+      },
+      { valor: '10.00', horario: '2026-11-08T15:00:00.000Z', pagador: { nome: 'SEM DOC' } },
+    ],
+  })
+  expect(pix).toHaveLength(4)
+  expect(pix[3].date).toBe('2026-11-08')
+  const lines = [
+    {
+      id: 'a',
+      date: '2026-11-08',
+      amount_cents: 5000,
+      description: 'TRANSFERENCIA PIX · REM: JOSE CARLOS L 08/11',
+    },
+    {
+      id: 'b',
+      date: '2026-11-08',
+      amount_cents: 5000,
+      description: 'TRANSFERENCIA PIX · REM: ANA PAULA SOUZA 08/11',
+    },
+    { id: 'c', date: '2026-11-08', amount_cents: 12000, description: 'TRANSFERENCIA PIX' },
+    {
+      id: 'd',
+      date: '2026-11-09',
+      amount_cents: 3000,
+      description: 'TRANSFERENCIA PIX · REM: MARIA NOITE 09/11',
+    },
+    { id: 'e', date: '2026-11-08', amount_cents: 12000, description: 'TED RECEBIDA' },
+    { id: 'f', date: '2026-11-08', amount_cents: -5000, description: 'PIX ENVIADO' },
+  ]
+  addPixPayers(lines, pix)
+  expect(lines.map((l) => l.counterparty_doc || '')).toEqual([
+    '98765432100',
+    '12345678909',
+    '11222333000181',
+    '11122233344',
+    '',
+    '',
+  ])
+  expect(lines[0].counterparty_name).toBe('JOSE CARLOS LIMA')
+})
+
+test('Pix iguais de pessoas diferentes sem nome no extrato ficam sem dono', () => {
+  const pix = bradescoPixList({
+    pix: [
+      {
+        valor: '50.00',
+        horario: '2026-11-08T13:00:00.000Z',
+        pagador: { nome: 'ANA', cpf: '12345678909' },
+      },
+      {
+        valor: '50.00',
+        horario: '2026-11-08T14:00:00.000Z',
+        pagador: { nome: 'JOSE', cpf: '98765432100' },
+      },
+    ],
+  })
+  const lines = [
+    { id: 'a', date: '2026-11-08', amount_cents: 5000, description: 'PIX RECEBIDO' },
+    { id: 'b', date: '2026-11-08', amount_cents: 5000, description: 'PIX RECEBIDO' },
+  ]
+  addPixPayers(lines, pix)
+  expect(lines.every((l) => !l.counterparty_doc)).toBe(true)
 })

@@ -273,3 +273,94 @@ export function splitPeriod(from, to, days) {
   }
   return parts
 }
+
+// ---------------- Bradesco: API Pix (Pix recebidos) ----------------
+
+const normName = (s) =>
+  String(s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/**
+ * Pix recebidos (GET /v2/pix da API Pix do Bradesco) → { date, amount_cents, doc, name }.
+ * date é o dia de Brasília do horário do Pix; doc é o CPF (11) ou CNPJ (14) do pagador.
+ */
+export function bradescoPixList(json) {
+  const out = []
+  for (const p of json?.pix || []) {
+    const cents = Math.round(Number(p.valor) * 100)
+    const date = brtDate(p.horario)
+    const doc = String(p.pagador?.cpf || p.pagador?.cnpj || '').replace(/\D/g, '')
+    if (!Number.isInteger(cents) || cents <= 0 || !date) continue
+    if (doc.length !== 11 && doc.length !== 14) continue
+    out.push({ date, amount_cents: cents, doc, name: String(p.pagador?.nome || '').trim() })
+  }
+  return out
+}
+
+/** Nome de quem mandou, como o extrato do Bradesco escreve ("... · REM: FULANO DE TAL 22/01"). */
+function senderOf(description) {
+  const m = /\bREM\s*[:.]\s*([^·]+)/i.exec(String(description || ''))
+  return m ? normName(m[1].replace(/\d{1,2}\/\d{1,2}(\/\d{2,4})?/g, ' ')) : ''
+}
+
+/** O nome do extrato (às vezes cortado) é o começo do nome do Pix? */
+function sameName(sender, pixName) {
+  const a = normName(pixName)
+  if (!sender || !a) return false
+  return a.startsWith(sender) || sender.startsWith(a)
+}
+
+const dayShift = (ymd, n) =>
+  new Date(Date.parse(ymd + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10)
+
+/**
+ * Completa as entradas do extrato do Bradesco com o CPF/CNPJ e o nome de quem mandou o Pix.
+ * Casa pelo dia e valor; quando há mais de um Pix igual no dia, desempata pelo nome que o
+ * extrato traz. Sem certeza, o movimento fica como está. Pix que caiu no extrato no dia
+ * seguinte (ex.: madrugada) só casa com o nome batendo.
+ */
+export function addPixPayers(lines, pixList) {
+  const free = [...pixList]
+  const take = (p) => free.splice(free.indexOf(p), 1)
+  const credits = lines.filter((l) => l.amount_cents > 0 && !l.counterparty_doc)
+  const assign = (l, p) => {
+    l.counterparty_doc = p.doc
+    l.counterparty_name = p.name.slice(0, 120)
+    take(p)
+  }
+  const isPix = (l) => /\bPIX\b/i.test(l.description || '')
+  const pass = (sameDay) => {
+    for (const l of credits) {
+      if (l.counterparty_doc || !isPix(l)) continue
+      const cands = free.filter(
+        (p) =>
+          p.amount_cents === l.amount_cents &&
+          (sameDay ? p.date === l.date : p.date === dayShift(l.date, -1)),
+      )
+      if (!cands.length) continue
+      const byName = cands.filter((p) => sameName(senderOf(l.description), p.name))
+      if (new Set(byName.map((p) => p.doc)).size === 1) {
+        assign(l, byName[0])
+        continue
+      }
+      if (!sameDay || byName.length) continue
+      // Nome do extrato não ajuda: só quando todos os Pix iguais do dia são da mesma pessoa e
+      // há pelo menos tantos Pix quanto entradas iguais sem dono
+      const twins = credits.filter(
+        (x) =>
+          !x.counterparty_doc && isPix(x) && x.date === l.date && x.amount_cents === l.amount_cents,
+      )
+      if (new Set(cands.map((p) => p.doc)).size === 1 && cands.length >= twins.length) {
+        assign(l, cands[0])
+      }
+    }
+  }
+  pass(true)
+  pass(false)
+  return lines
+}
