@@ -925,6 +925,36 @@ export class HolyricsClient {
   }
 
   /**
+   * RemoveFromMediaPlaylist com parâmetros livres (index, indexes) na playlist do culto.
+   * Usado para esvaziar a playlist tentando formas diferentes, porque o Holyrics com
+   * event_id nem sempre respeita a posição pedida.
+   */
+  public async removeFromMediaPlaylistRaw(
+    params: { index?: number; indexes?: number[] },
+    eventId: string,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const cleanEventId = String(eventId || '').trim()
+    if (!cleanEventId) {
+      return {
+        success: false,
+        error: 'event_id da ocorrência no Holyrics é obrigatório para RemoveFromMediaPlaylist.',
+        error_code: 'MISSING_EVENT_ID',
+      }
+    }
+    const res = await this.request(
+      'RemoveFromMediaPlaylist',
+      { ...params, event_id: cleanEventId },
+      5000,
+    )
+    if (res.status === 'ok') return { success: true }
+    const errStr =
+      typeof res.error === 'string'
+        ? res.error
+        : res.error?.message || 'Falha ao remover item da playlist'
+    return { success: false, error: errStr, error_code: 'REMOVE_FROM_PLAYLIST_FAILED' }
+  }
+
+  /**
    * RemoveFromMediaPlaylist: remove itens (pelo id do item na playlist) da playlist
    * da ocorrência do culto no Holyrics.
    * POST /api/RemoveFromMediaPlaylist?token=...

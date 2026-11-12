@@ -21,7 +21,7 @@ const view = (pl: PlaylistItem[]) =>
 function fakeHolyrics(
   agent: LouvorFlowAgent,
   initial: PlaylistItem[],
-  removeMode: 'all' | 'first' = 'all',
+  removeMode: 'all' | 'first' | 'ignoreIndex0' = 'all',
 ) {
   const playlist = [...initial]
   let seq = 0
@@ -36,10 +36,19 @@ function fakeHolyrics(
     schedules: [{ media_playlist: [...playlist], metadata: { event: { id: EVENT_ID } } }],
   }))
   const removeById = vi.spyOn(h, 'removeFromMediaPlaylist')
-  const removeAt = vi.spyOn(h, 'removeFromMediaPlaylistIndex').mockImplementation(async () => {
-    playlist.splice(0, removeMode === 'all' ? playlist.length : 1)
-    return { success: true }
-  })
+  const removeAt = vi
+    .spyOn(h, 'removeFromMediaPlaylistRaw')
+    .mockImplementation(async (params: any) => {
+      if (removeMode === 'ignoreIndex0') {
+        // Culto 08/11: {index: 0} não faz nada, as outras formas funcionam
+        if (params.index === 0) return { success: true }
+        const idx: number[] = params.indexes ?? [params.index]
+        ;[...idx].sort((a, b) => b - a).forEach((i) => playlist.splice(i, 1))
+        return { success: true }
+      }
+      playlist.splice(0, removeMode === 'all' ? playlist.length : 1)
+      return { success: true }
+    })
   const add = vi.spyOn(h, 'addItemsToPlaylist').mockImplementation(async (items: any) => {
     const created = (items as any[]).map((it) => ({
       id: `n${++seq}`,
@@ -229,9 +238,21 @@ describe('Agent 0.0.46: Enviar ao Holyrics deixa a playlist igual ao LouvorFlow'
     const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2')]))
     expect(res.success).toBe(false)
     expect(res.error_code).toBe('REMOVE_FAILED')
-    // tenta de novo uma vez antes de desistir
-    expect(removeAt).toHaveBeenCalledTimes(2)
+    // tenta os 4 jeitos de remover antes de desistir e conta o que tentou
+    expect(removeAt).toHaveBeenCalledTimes(4)
+    expect((res as any).result?.remove_attempts ?? (res as any).remove_attempts).toBeTruthy()
     expect(add).not.toHaveBeenCalled()
+  })
+
+  it('0.0.49: Holyrics que ignora {index: 0} (culto 08/11) esvazia por outro jeito', async () => {
+    const { playlist } = fakeHolyrics(
+      agent,
+      [song('a', '5'), song('b', '4'), song('c', '3'), song('d', '2'), song('e', '1')],
+      'ignoreIndex0',
+    )
+    const res = await agent.handleSyncMediaPlaylist(mirror([louvor('1', '2', '3', '4', '5')]))
+    expect(res.success).toBe(true)
+    expect(view(playlist)).toEqual(['# LOUVOR', 'song 1', 'song 2', 'song 3', 'song 4', 'song 5'])
   })
 
   it('0.0.48: Holyrics que ignora a primeira remoção (primeiro envio) tenta de novo e dá certo', async () => {

@@ -7,9 +7,9 @@ describe('LouvorFlow Agent ZIP Asset Verification', () => {
     // Executa buildZipScript para garantir compilação do Agent e regeneração do ZIP antes dos testes
     await import('../buildZipScript.mjs')
   })
-  it('confirma existência e integridade do LouvorFlow-Agent-0.0.48.zip em public/', () => {
-    const publicZip = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.48.zip')
-    expect(fs.existsSync(publicZip), 'LouvorFlow-Agent-0.0.48.zip deve existir em public/').toBe(
+  it('confirma existência e integridade do LouvorFlow-Agent-0.0.49.zip em public/', () => {
+    const publicZip = path.resolve(process.cwd(), 'public/LouvorFlow-Agent-0.0.49.zip')
+    expect(fs.existsSync(publicZip), 'LouvorFlow-Agent-0.0.49.zip deve existir em public/').toBe(
       true,
     )
 
