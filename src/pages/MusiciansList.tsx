@@ -69,7 +69,7 @@ export default function MusiciansList() {
         errorObj.message ||
         'Não foi possível carregar a equipe de música.'
       toast({
-        title: 'Erro ao buscar músicos',
+        title: 'Erro ao buscar usuários',
         description: errorMsg,
         variant: 'destructive',
       })
@@ -95,7 +95,7 @@ export default function MusiciansList() {
           await removeMusician(memberId)
           toast({
             title: 'Membro removido',
-            description: 'O músico foi desvinculado com sucesso.',
+            description: 'O usuário foi desvinculado com sucesso.',
           })
           fetchMusicians()
         } catch (err) {
@@ -128,10 +128,10 @@ export default function MusiciansList() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Equipe de Músicos
+            Usuários
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Músicos, cantores e instrumentistas cadastrados na {currentChurch?.name}
+            Pessoas com acesso ao sistema na {currentChurch?.name}
           </p>
         </div>
 
@@ -140,7 +140,7 @@ export default function MusiciansList() {
             <Link to="/musicians/new">
               <Button className="h-10 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold gap-2 shadow-sm">
                 <Plus className="h-4 w-4" />
-                Novo Músico
+                Novo usuário
               </Button>
             </Link>
           </div>
@@ -153,7 +153,7 @@ export default function MusiciansList() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar músico por nome, e-mail ou telefone..."
+          placeholder="Buscar usuário por nome, e-mail ou telefone..."
           className="pl-10 h-10 rounded-xl border-slate-200 focus-visible:ring-teal-700 bg-white"
         />
       </div>
@@ -169,17 +169,17 @@ export default function MusiciansList() {
         <Card className="rounded-2xl border-dashed border-2 border-slate-200 bg-white/50 p-12 text-center">
           <Users className="mx-auto h-12 w-12 text-slate-400" />
           <h3 className="mt-3 text-lg font-bold text-slate-900">
-            {search ? 'Nenhum músico encontrado' : 'Nenhum músico cadastrado ainda'}
+            {search ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado ainda'}
           </h3>
           <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
             {search
               ? 'Tente buscar com outro termo ou limpe a busca.'
-              : 'Cadastre os músicos da sua igreja para começar a compor as escalas.'}
+              : 'Cadastre as pessoas da sua igreja que vão usar o sistema.'}
           </p>
           {canCreate && !search && (
             <Link to="/musicians/new" className="mt-5 inline-block">
               <Button className="rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold">
-                Cadastrar Primeiro Músico
+                Cadastrar primeiro usuário
               </Button>
             </Link>
           )}
@@ -297,7 +297,7 @@ export default function MusiciansList() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label="Opções do músico"
+                          aria-label="Opções do usuário"
                           className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-lg"
                         >
                           <MoreVertical className="h-4 w-4" />
@@ -319,7 +319,7 @@ export default function MusiciansList() {
                           className="gap-2 text-xs text-red-600 hover:bg-red-50"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          Desvincular Músico
+                          Desvincular usuário
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
