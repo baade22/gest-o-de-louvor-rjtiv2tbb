@@ -312,7 +312,7 @@ export default function Layout() {
       items: [
         {
           to: '/musicians',
-          label: 'Equipe do louvor',
+          label: 'Usuários',
           icon: Users,
           allowed: can('admin.pessoas.ver'),
         },

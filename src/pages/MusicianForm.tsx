@@ -116,9 +116,9 @@ export default function MusicianForm() {
           const errorMsg =
             errorObj.data?.message ||
             errorObj.message ||
-            'Músico não encontrado ou sem permissão de acesso.'
+            'Usuário não encontrado ou sem permissão de acesso.'
           toast({
-            title: 'Erro ao carregar músico',
+            title: 'Erro ao carregar usuário',
             description: errorMsg,
             variant: 'destructive',
           })
@@ -244,7 +244,7 @@ export default function MusicianForm() {
     if (!trimmedEmail) {
       toast({
         title: 'E-mail obrigatório',
-        description: 'Por favor, informe o e-mail do músico.',
+        description: 'Por favor, informe o e-mail do usuário.',
         variant: 'destructive',
       })
       return
@@ -287,7 +287,7 @@ export default function MusicianForm() {
 
       // Mensagem de sucesso confirmada SOMENTE após resposta positiva do banco
       toast({
-        title: isEditing ? 'Músico atualizado!' : 'Músico cadastrado!',
+        title: isEditing ? 'Usuário atualizado!' : 'Usuário cadastrado!',
         description: result.message || 'Dados e funções persistidos com sucesso.',
       })
 
@@ -298,7 +298,7 @@ export default function MusicianForm() {
       const errorMsg =
         errorObj.data?.message ||
         errorObj.message ||
-        'Não foi possível salvar o músico no banco de dados. Tente novamente.'
+        'Não foi possível salvar o usuário no banco de dados. Tente novamente.'
 
       toast({
         title: 'Erro ao salvar',
@@ -326,7 +326,7 @@ export default function MusicianForm() {
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar para Músicos
+          Voltar para Usuários
         </Link>
       </div>
 
@@ -664,7 +664,7 @@ export default function MusicianForm() {
                 ? 'Gravando no banco...'
                 : isEditing
                   ? 'Salvar Alterações'
-                  : 'Cadastrar Músico'}
+                  : 'Cadastrar usuário'}
             </Button>
           </div>
         </form>
