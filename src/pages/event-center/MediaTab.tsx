@@ -9,6 +9,7 @@ import {
   Send,
   Trash2,
   UploadCloud,
+  Youtube,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -46,6 +47,8 @@ import {
   uploadMediaAsset,
 } from '@/services/media'
 import { MEDIA_READY_STATUSES } from '@/lib/eventReadiness'
+import { isYoutubePending, youtubeStageLabel } from '@/lib/youtube'
+import { YoutubeMediaDialog } from '@/components/YoutubeMediaDialog'
 import type { ChurchMember, EventItem, MediaAsset } from '@/types'
 import type { EventCenter } from './useEventCenter'
 import {
@@ -100,6 +103,17 @@ export function MediaTab({
 }: MediaTabProps) {
   const { toast } = useToast()
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [youtubeOpen, setYoutubeOpen] = useState(false)
+
+  // Enquanto alguma mídia do YouTube está sendo baixada, atualiza a cada 15 s
+  const hasPendingYoutube = medias.some(isYoutubePending)
+  React.useEffect(() => {
+    if (!hasPendingYoutube) return
+    const timer = setInterval(() => {
+      reload().catch(() => {})
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [hasPendingYoutube])
   const [transferring, setTransferring] = useState<Record<string, boolean>>({})
   const [toDelete, setToDelete] = useState<MediaAsset | null>(null)
 
@@ -167,6 +181,17 @@ export function MediaTab({
       }
       actions={
         <>
+          {canManage && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setYoutubeOpen(true)}
+              className="h-8 gap-1.5 rounded-lg"
+            >
+              <Youtube className="h-3.5 w-3.5 text-red-600" />
+              YouTube
+            </Button>
+          )}
           {canManage && (
             <Button
               size="sm"
@@ -241,9 +266,18 @@ export function MediaTab({
                     </div>
                   )}
                 </div>
-                <Chip tone={status.tone} title={media.holyrics_status || undefined}>
-                  {status.label}
-                </Chip>
+                {youtubeStageLabel(media) ? (
+                  <Chip
+                    tone={media.youtube_stage === 'FAILED' ? 'danger' : 'warn'}
+                    title={media.holyrics_status || undefined}
+                  >
+                    {youtubeStageLabel(media)}
+                  </Chip>
+                ) : (
+                  <Chip tone={status.tone} title={media.holyrics_status || undefined}>
+                    {status.label}
+                  </Chip>
+                )}
                 {canOperate && (
                   <Button
                     size="sm"
@@ -277,10 +311,21 @@ export function MediaTab({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onSelect={() => download(media)} className="gap-2">
-                      <Download className="h-4 w-4 text-slate-500" />
-                      Baixar cópia
-                    </DropdownMenuItem>
+                    {media.file && (
+                      <DropdownMenuItem onSelect={() => download(media)} className="gap-2">
+                        <Download className="h-4 w-4 text-slate-500" />
+                        Baixar cópia
+                      </DropdownMenuItem>
+                    )}
+                    {media.source_url && (
+                      <DropdownMenuItem
+                        onSelect={() => window.open(media.source_url, '_blank', 'noopener')}
+                        className="gap-2"
+                      >
+                        <Youtube className="h-4 w-4 text-red-600" />
+                        Abrir no YouTube
+                      </DropdownMenuItem>
+                    )}
                     {canManage && (
                       <>
                         <DropdownMenuSeparator />
@@ -309,6 +354,13 @@ export function MediaTab({
         churchMembers={churchMembers}
         currentMemberId={currentMemberId}
         onSaved={reload}
+      />
+      <YoutubeMediaDialog
+        open={youtubeOpen}
+        onOpenChange={setYoutubeOpen}
+        churchId={event.church_id}
+        fixedEvent={event}
+        onCreated={reload}
       />
       <ConfirmDialog
         open={Boolean(toDelete)}
