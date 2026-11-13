@@ -43,7 +43,7 @@ function fakeHolyrics(agent: LouvorFlowAgent, initial: PlaylistItem[]) {
       return { success: true }
     })
   // Como o Holyrics real (2.30 com event_id): remover pela posição esvaziou a playlist
-  vi.spyOn(holyrics, 'removeFromMediaPlaylistIndex').mockImplementation(async () => {
+  vi.spyOn(holyrics, 'removeFromMediaPlaylistRaw').mockImplementation(async () => {
     playlist.splice(0, playlist.length)
     return { success: true }
   })

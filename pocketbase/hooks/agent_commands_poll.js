@@ -79,6 +79,12 @@ routerAdd('POST', '/backend/v1/agent/commands/poll', (e) => {
       const rawRes = orphan.get('result')
       const hasResult =
         rawRes !== null && rawRes !== undefined && rawRes !== '' && rawRes !== 'null'
+      // Download do YouTube pode levar vários minutos: só reentrega depois de 45 minutos
+      // (o Agent ignora o mesmo command_id enquanto ainda está baixando).
+      if (orphan.getString('action') === 'YOUTUBE_DOWNLOAD') {
+        const sentAt = new Date(String(orphan.getString('updated')).replace(' ', 'T')).getTime()
+        if (sentAt && Date.now() - sentAt < 45 * 60 * 1000) continue
+      }
       if (!hasResult) {
         orphan.set('status', 'PENDING')
         try {
