@@ -3,6 +3,7 @@ import type { ChurchEvent, EventQuestion, EventRegistration } from '@/types'
 import type { PixKeyType } from '@/lib/pix'
 import type { ClosedReason } from '@/lib/eventPage'
 import { newSignupKey } from '@/lib/signups'
+import { publicOrigin } from '@/lib/publicOrigin'
 
 export type ChurchEventPayload = Pick<
   ChurchEvent,
@@ -290,6 +291,6 @@ export async function lookupCep(cep: string): Promise<unknown> {
   return res.ok ? res.json() : null
 }
 
-export function eventSignupUrl(key: string, origin = window.location.origin): string {
+export function eventSignupUrl(key: string, origin = publicOrigin()): string {
   return `${origin}/inscricao/${key}`
 }
