@@ -45,6 +45,7 @@ import {
   type WaGroup,
 } from '@/services/whatsappAvisos'
 import { StatusBadge, errorText } from './AvisosPanel'
+import { publicOrigin } from '@/lib/publicOrigin'
 
 const PACES = [
   { value: '3-5', label: 'Devagar (3 a 5 min)', min: 3, max: 5 },
@@ -497,7 +498,7 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
         ? `${selectedEvent.starts_on.slice(8, 10)}/${selectedEvent.starts_on.slice(5, 7)}`
         : '20/11',
       local: selectedEvent?.location || 'Local',
-      link_inscricao: `${window.location.origin}/inscricao/…`,
+      link_inscricao: `${publicOrigin()}/inscricao/…`,
     }
   }, [user?.name, currentChurch?.name, selectedEvent, toGroups])
 

@@ -3,6 +3,7 @@
  * ficha enviada vira (ou completa) uma ficha de membro.
  */
 import type { Person, PersonSignup, PersonStatus, SignupRelationship } from '@/types'
+import { publicOrigin } from '@/lib/publicOrigin'
 
 export const RELATIONSHIP_LABELS: Record<SignupRelationship, string> = {
   VISITANTE: 'Estou visitando',
@@ -112,6 +113,6 @@ export function newSignupKey(): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join('')
 }
 
-export function signupUrl(key: string, origin = window.location.origin): string {
+export function signupUrl(key: string, origin = publicOrigin()): string {
   return `${origin}/cadastro/${key}`
 }
