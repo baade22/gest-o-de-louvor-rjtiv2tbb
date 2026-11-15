@@ -140,3 +140,36 @@ export function eventDateLabel(
   }
   return event.start_time ? `${label} · ${event.start_time}` : label
 }
+
+// ---------- Mensagem da equipe aos inscritos (WhatsApp) ----------
+
+export type EventMessageTarget = 'TODOS' | 'PAGOS' | 'PENDENTES' | 'PRESENTES' | 'AUSENTES'
+
+export const EVENT_MESSAGE_TARGETS: Array<[EventMessageTarget, string]> = [
+  ['TODOS', 'Todos'],
+  ['PENDENTES', 'Pagamento pendente'],
+  ['PAGOS', 'Já pagaram'],
+  ['PRESENTES', 'Presentes'],
+  ['AUSENTES', 'Ausentes'],
+]
+
+/** Mesma escolha do servidor (hooks/church_event_whatsapp.js) para quem recebe a mensagem. */
+export function inMessageTarget(
+  event: Pick<ChurchEvent, 'price'>,
+  reg: Pick<EventRegistration, 'amount_due' | 'paid' | 'payment_method' | 'attended'>,
+  target: EventMessageTarget,
+): boolean {
+  const pays = registrationDue(event, reg) > 0 && reg.payment_method !== 'ISENTO'
+  switch (target) {
+    case 'PAGOS':
+      return pays && !!reg.paid
+    case 'PENDENTES':
+      return pays && !reg.paid
+    case 'PRESENTES':
+      return !!reg.attended
+    case 'AUSENTES':
+      return !reg.attended
+    default:
+      return true
+  }
+}

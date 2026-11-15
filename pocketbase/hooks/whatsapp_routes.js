@@ -25,6 +25,8 @@ routerAdd(
       'PAGAMENTO',
       'ANIVERSARIO',
       'CASAMENTO',
+      'EVENTO_ALTERACAO',
+      'LEMBRETE_EVENTO',
     ]
 
     const auth = e.auth
