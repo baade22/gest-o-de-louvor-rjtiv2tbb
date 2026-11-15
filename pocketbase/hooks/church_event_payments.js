@@ -148,7 +148,9 @@ onRecordUpdateRequest((e) => {
     }
   }
 
-  // 2. Confirmação de pagamento pelo WhatsApp da igreja, se o envio automático estiver ligado
+  // 2. Confirmação de pagamento pelo WhatsApp da igreja, se o envio automático estiver ligado.
+  //    Saindo pelo WhatsApp, o e-mail não vai.
+  let waQueued = false
   try {
     const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
       c: churchId,
@@ -209,12 +211,14 @@ onRecordUpdateRequest((e) => {
       msg.set('ref_id', reg.id)
       msg.set('send_after', new Date().toISOString())
       $app.save(msg)
+      waQueued = true
     }
   } catch (_) {
     // WhatsApp não configurado: segue só com o e-mail
   }
 
-  // 3. Mensagem de pagamento por e-mail
+  // 3. Mensagem de pagamento por e-mail, só para quem não recebeu pelo WhatsApp
+  if (waQueued) return
   const email = reg.getString('email')
   const text = ev.getString('payment_message')
   if (!email || !text || !ev.getBool('send_payment_email')) return

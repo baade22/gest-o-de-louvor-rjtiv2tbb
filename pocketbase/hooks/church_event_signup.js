@@ -327,7 +327,52 @@ routerAdd('POST', '/backend/v1/event-signup', (e) => {
     Object.prototype.hasOwnProperty.call(vars, k.toLowerCase()) ? vars[k.toLowerCase()] : all,
   )
 
-  if (email && message && ev.getBool('send_confirm_email')) {
+  // Confirmação pelo WhatsApp da igreja, se o envio automático estiver ligado. Saindo pelo
+  // WhatsApp, o e-mail não vai.
+  let waQueued = false
+  try {
+    const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
+      c: ev.getString('church_id'),
+    })
+    let auto = {}
+    try {
+      auto = JSON.parse(st.getString('auto') || '{}') || {}
+    } catch (_) {}
+    let to = phone.replace(/\D/g, '')
+    while (to.indexOf('0') === 0) to = to.slice(1)
+    if (to.length === 10 || to.length === 11) to = '55' + to
+    if (auto.INSCRICAO === true && to.length >= 12 && to.length <= 13) {
+      const wa = (
+        message ||
+        'Olá, {nome}! Recebemos sua inscrição em **{evento}** ({data}). Até lá!'.replace(
+          /\{(\w+)\}/g,
+          (all, k) => (Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : all),
+        )
+      )
+        .split('\n')
+        .map((l) => l.replace(/^#{1,3}\s+(.*)$/, '**$1**'))
+        .join('\n')
+        .replace(/\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*/g, (_, b, i) =>
+          b !== undefined ? '*' + b + '*' : '_' + i + '_',
+        )
+      const msg = new Record($app.findCollectionByNameOrId('whatsapp_messages'))
+      msg.set('church_id', ev.getString('church_id'))
+      msg.set('kind', 'INSCRICAO')
+      msg.set('phone', to)
+      msg.set('name', name)
+      msg.set('text', wa.slice(0, 4000))
+      msg.set('status', 'FILA')
+      msg.set('attempts', 0)
+      msg.set('ref_id', rec.id)
+      msg.set('send_after', new Date().toISOString())
+      $app.save(msg)
+      waQueued = true
+    }
+  } catch (_) {
+    // WhatsApp não configurado: segue só com o e-mail
+  }
+
+  if (!waQueued && email && message && ev.getBool('send_confirm_email')) {
     try {
       const settings = $app.settings()
       if (settings.smtp.enabled) {
@@ -378,48 +423,6 @@ routerAdd('POST', '/backend/v1/event-signup', (e) => {
       // A inscrição já foi gravada; falha no e-mail não volta atrás
       $app.logger().warn('event signup email failed', 'error', String(err))
     }
-  }
-
-  // Confirmação pelo WhatsApp da igreja, se o envio automático estiver ligado
-  try {
-    const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', {
-      c: ev.getString('church_id'),
-    })
-    let auto = {}
-    try {
-      auto = JSON.parse(st.getString('auto') || '{}') || {}
-    } catch (_) {}
-    let to = phone.replace(/\D/g, '')
-    while (to.indexOf('0') === 0) to = to.slice(1)
-    if (to.length === 10 || to.length === 11) to = '55' + to
-    if (auto.INSCRICAO === true && to.length >= 12 && to.length <= 13) {
-      const wa = (
-        message ||
-        'Olá, {nome}! Recebemos sua inscrição em **{evento}** ({data}). Até lá!'.replace(
-          /\{(\w+)\}/g,
-          (all, k) => (Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : all),
-        )
-      )
-        .split('\n')
-        .map((l) => l.replace(/^#{1,3}\s+(.*)$/, '**$1**'))
-        .join('\n')
-        .replace(/\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*/g, (_, b, i) =>
-          b !== undefined ? '*' + b + '*' : '_' + i + '_',
-        )
-      const msg = new Record($app.findCollectionByNameOrId('whatsapp_messages'))
-      msg.set('church_id', ev.getString('church_id'))
-      msg.set('kind', 'INSCRICAO')
-      msg.set('phone', to)
-      msg.set('name', name)
-      msg.set('text', wa.slice(0, 4000))
-      msg.set('status', 'FILA')
-      msg.set('attempts', 0)
-      msg.set('ref_id', rec.id)
-      msg.set('send_after', new Date().toISOString())
-      $app.save(msg)
-    }
-  } catch (_) {
-    // WhatsApp não configurado: segue só com o e-mail
   }
 
   return e.json(200, {

@@ -36,6 +36,8 @@ describe('WhatsApp service API', () => {
         PAGAMENTO: false,
         ANIVERSARIO: false,
         CASAMENTO: false,
+        EVENTO_ALTERACAO: false,
+        LEMBRETE_EVENTO: false,
       },
       queue: { fila: 0, erro: 0 },
     })
@@ -56,6 +58,8 @@ describe('WhatsApp service API', () => {
       PAGAMENTO: false,
       ANIVERSARIO: true,
       CASAMENTO: false,
+      EVENTO_ALTERACAO: false,
+      LEMBRETE_EVENTO: false,
     }
 
     vi.mocked(pb.send).mockResolvedValueOnce({
@@ -79,6 +83,8 @@ describe('WhatsApp service API', () => {
       PAGAMENTO: false,
       ANIVERSARIO: false,
       CASAMENTO: false,
+      EVENTO_ALTERACAO: false,
+      LEMBRETE_EVENTO: false,
     }
     const secondPayload = {
       ESCALA: true,
@@ -87,6 +93,8 @@ describe('WhatsApp service API', () => {
       PAGAMENTO: false,
       ANIVERSARIO: false,
       CASAMENTO: false,
+      EVENTO_ALTERACAO: false,
+      LEMBRETE_EVENTO: false,
     }
 
     vi.mocked(pb.send).mockResolvedValueOnce({ auto: firstPayload })

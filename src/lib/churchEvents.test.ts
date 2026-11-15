@@ -3,6 +3,7 @@ import type { EventRegistration } from '@/types'
 import {
   eventDateLabel,
   filterRegistrations,
+  inMessageTarget,
   isPastEvent,
   summarizeRegistrations,
 } from './churchEvents'
@@ -74,5 +75,26 @@ describe('datas', () => {
       false,
     )
     expect(isPastEvent({ starts_on: '2026-10-20' }, '2026-10-25')).toBe(true)
+  })
+})
+
+describe('inMessageTarget', () => {
+  const ev = { price: 40 }
+  const base = { amount_due: 0, paid: false, payment_method: undefined, attended: false }
+  it('separa pagos, pendentes e isentos', () => {
+    expect(inMessageTarget(ev, base, 'PENDENTES')).toBe(true)
+    expect(inMessageTarget(ev, { ...base, paid: true }, 'PAGOS')).toBe(true)
+    expect(inMessageTarget(ev, { ...base, paid: true }, 'PENDENTES')).toBe(false)
+    expect(
+      inMessageTarget(ev, { ...base, paid: true, payment_method: 'ISENTO' as const }, 'PAGOS'),
+    ).toBe(false)
+  })
+  it('evento gratuito não tem pendente', () => {
+    expect(inMessageTarget({ price: 0 }, base, 'PENDENTES')).toBe(false)
+    expect(inMessageTarget({ price: 0 }, base, 'TODOS')).toBe(true)
+  })
+  it('presença', () => {
+    expect(inMessageTarget(ev, { ...base, attended: true }, 'PRESENTES')).toBe(true)
+    expect(inMessageTarget(ev, { ...base, attended: true }, 'AUSENTES')).toBe(false)
   })
 })
