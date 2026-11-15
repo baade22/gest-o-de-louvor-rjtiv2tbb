@@ -224,6 +224,8 @@ export const ACCESS_MODULES: AccessModule[] = [
       { key: 'funcoes', label: 'Funções e instrumentos', actions: ALL },
       { key: 'integracoes', label: 'Integrações', actions: ['ver', 'alterar'] },
       { key: 'configuracoes', label: 'Configurações da igreja', actions: ['ver', 'alterar'] },
+      { key: 'site', label: 'Site e App da igreja', actions: ['ver', 'alterar'] },
+      { key: 'oracao', label: 'Pedidos de oração do site', actions: ['ver', 'alterar'] },
     ],
   },
 ]

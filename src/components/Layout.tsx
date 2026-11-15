@@ -52,6 +52,8 @@ import {
   Target,
   KeyRound,
   type LucideIcon,
+  Globe,
+  HandHeart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -304,6 +306,18 @@ export default function Layout() {
           label: 'Relatórios',
           icon: FileBarChart,
           allowed: mem('relatorios'),
+        },
+      ],
+    },
+    {
+      label: 'Comunicação',
+      items: [
+        { to: '/site', label: 'Site e App', icon: Globe, allowed: can('admin.site.ver'), end: true },
+        {
+          to: '/site/pedidos',
+          label: 'Pedidos de oração',
+          icon: HandHeart,
+          allowed: can('admin.oracao.ver'),
         },
       ],
     },
