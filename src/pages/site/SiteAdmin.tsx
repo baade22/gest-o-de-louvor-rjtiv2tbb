@@ -81,6 +81,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { publicOrigin } from '@/lib/publicOrigin'
 
 const day10 = (s?: string) => (s ? s.slice(0, 10) : '')
 const toDate = (s: string) => (s ? `${s} 12:00:00.000Z` : '')
@@ -1490,7 +1491,7 @@ export default function SiteAdmin() {
 
   const siteUrl = useMemo(() => {
     const slug = settings?.slug
-    return `${window.location.origin}/igreja${slug ? `?s=${slug}` : ''}`
+    return `${publicOrigin()}/igreja${slug ? `?s=${slug}` : ''}`
   }, [settings?.slug])
 
   const copyLink = async () => {

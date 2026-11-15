@@ -32,6 +32,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
+import { publicOrigin } from '@/lib/publicOrigin'
 
 export default function InvitationsManagement() {
   const { currentChurch, isMaster, accessKeys } = useAuth()
@@ -173,7 +174,7 @@ export default function InvitationsManagement() {
       )
 
       // Monta o link completo com o origin do site
-      const inviteUrl = `${window.location.origin}/convite/${res.invitation.token}`
+      const inviteUrl = `${publicOrigin()}/convite/${res.invitation.token}`
 
       setGeneratedInvite({
         link: inviteUrl,
@@ -352,7 +353,7 @@ export default function InvitationsManagement() {
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {filtered.map((inv) => {
-            const inviteUrl = `${window.location.origin}/convite/${inv.token}`
+            const inviteUrl = `${publicOrigin()}/convite/${inv.token}`
             const isPending = inv.status === 'PENDING'
             const isAccepted = inv.status === 'ACCEPTED'
             const isExpired = inv.status === 'EXPIRED'

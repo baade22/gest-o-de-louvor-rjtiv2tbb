@@ -6,6 +6,7 @@
  * (hooks/church_event_signup.js e hooks/church_event_payments.js): mudou aqui, muda lá.
  */
 import type { ChurchEvent, EventCoupon, EventQuestion, EventRegistration } from '@/types'
+import { publicOrigin } from '@/lib/publicOrigin'
 
 export const DEFAULT_EVENT_COLOR = '#0f766e'
 
@@ -351,7 +352,7 @@ export function cleanAnswers(
 
 // ---------- Check-in ----------
 
-export function checkinUrl(code: string, origin = window.location.origin): string {
+export function checkinUrl(code: string, origin = publicOrigin()): string {
   return `${origin}/checkin/${code}`
 }
 
