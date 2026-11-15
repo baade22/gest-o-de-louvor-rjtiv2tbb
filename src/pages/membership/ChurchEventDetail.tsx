@@ -79,6 +79,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { QrCodeImage, downloadQrPng } from '@/components/QrCodeImage'
 import { StatusBadge, errorMessage } from './shared'
 import { EventPrintTab } from './EventPrintSheets'
+import { EventWhatsAppMessage } from './EventWhatsAppMessage'
 
 const PAY_METHODS: PaymentMethod[] = ['PIX', 'DINHEIRO', 'CARTAO', 'ISENTO', 'OUTRO']
 
@@ -301,7 +302,7 @@ export default function ChurchEventDetail() {
   const removeEvent = () =>
     confirm({
       title: `Apagar "${event.title}"?`,
-      description: `O evento e as ${regs.length} inscrições são apagados. Isso não pode ser desfeito.`,
+      description: `O evento e as ${regs.length} inscrições são apagados. Isso não pode ser desfeito. Se o evento ainda não aconteceu, os inscritos recebem o aviso de cancelamento pelo WhatsApp.`,
       confirmLabel: 'Apagar evento',
       destructive: true,
       onConfirm: async () => {
@@ -756,6 +757,9 @@ export default function ChurchEventDetail() {
                 mensagens, use Editar.
               </p>
             </div>
+          </div>
+          <div className="mt-4">
+            <EventWhatsAppMessage event={event} regs={regs} />
           </div>
           {(event.staff || []).length > 0 && (
             <div className="mt-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-2">

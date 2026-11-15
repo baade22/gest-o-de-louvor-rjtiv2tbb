@@ -15,6 +15,8 @@ export type WhatsAppAutoKind =
   | 'PAGAMENTO'
   | 'ANIVERSARIO'
   | 'CASAMENTO'
+  | 'EVENTO_ALTERACAO'
+  | 'LEMBRETE_EVENTO'
 
 /** Envios automáticos que a igreja liga em Configurações > WhatsApp, na ordem da tela. */
 export const WHATSAPP_AUTO: Array<{
@@ -43,6 +45,16 @@ export const WHATSAPP_AUTO: Array<{
     hint: 'Quando a inscrição é marcada como paga. Usa a mensagem de pagamento do evento.',
   },
   {
+    kind: 'EVENTO_ALTERACAO',
+    label: 'Mudança ou cancelamento de evento',
+    hint: 'Quando a data, o horário ou o local de um evento muda, ou quando ele é apagado. Sai 10 minutos depois da última edição.',
+  },
+  {
+    kind: 'LEMBRETE_EVENTO',
+    label: 'Lembrete na véspera do evento',
+    hint: 'Às 8h do dia anterior, para os inscritos. Avisa quando o pagamento está pendente.',
+  },
+  {
     kind: 'ANIVERSARIO',
     label: 'Parabéns de aniversário',
     hint: 'Às 8h, com o modelo da tela de Aniversariantes. Fica registrado na linha do tempo.',
@@ -54,13 +66,19 @@ export const WHATSAPP_AUTO: Array<{
   },
 ]
 
-export const WHATSAPP_KIND_LABEL: Record<WhatsAppAutoKind | 'TESTE' | 'AVISO', string> = {
+export const WHATSAPP_KIND_LABEL: Record<
+  WhatsAppAutoKind | 'TESTE' | 'AVISO' | 'EVENTO_MENSAGEM',
+  string
+> = {
   ESCALA: 'Escala',
   LEMBRETE_ESCALA: 'Lembrete de escala',
   INSCRICAO: 'Inscrição',
   PAGAMENTO: 'Pagamento',
   ANIVERSARIO: 'Aniversário',
   CASAMENTO: 'Casamento',
+  EVENTO_ALTERACAO: 'Mudança de evento',
+  LEMBRETE_EVENTO: 'Lembrete de evento',
+  EVENTO_MENSAGEM: 'Mensagem do evento',
   TESTE: 'Teste',
   AVISO: 'Aviso',
 }

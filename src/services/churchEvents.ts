@@ -2,6 +2,7 @@ import pb from '@/lib/pocketbase/client'
 import type { ChurchEvent, EventQuestion, EventRegistration } from '@/types'
 import type { PixKeyType } from '@/lib/pix'
 import type { ClosedReason } from '@/lib/eventPage'
+import type { EventMessageTarget } from '@/lib/churchEvents'
 import { newSignupKey } from '@/lib/signups'
 
 export type ChurchEventPayload = Pick<
@@ -292,4 +293,17 @@ export async function lookupCep(cep: string): Promise<unknown> {
 
 export function eventSignupUrl(key: string, origin = window.location.origin): string {
   return `${origin}/inscricao/${key}`
+}
+
+// ---------- Mensagem da equipe aos inscritos (WhatsApp da igreja) ----------
+
+export async function sendEventWhatsApp(
+  eventId: string,
+  text: string,
+  to: EventMessageTarget,
+): Promise<{ queued: number; no_phone: number }> {
+  return pb.send(`/backend/v1/church-events/${eventId}/whatsapp`, {
+    method: 'POST',
+    body: { text, to },
+  })
 }
