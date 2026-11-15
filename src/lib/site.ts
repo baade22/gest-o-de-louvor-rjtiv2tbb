@@ -44,7 +44,10 @@ export const SECTION_LABELS: Record<keyof SiteSections, { title: string; hint: s
     hint: 'Cultos da agenda do louvor: só nome, dia e hora (ensaios e reuniões ficam de fora)',
   },
   assistir: { title: 'Assistir', hint: 'Cultos e vídeos do canal do YouTube, entram sozinhos' },
-  contribuir: { title: 'Contribuir', hint: 'Chave PIX e campanhas públicas do Financeiro, sem valores' },
+  contribuir: {
+    title: 'Contribuir',
+    hint: 'Chave PIX e campanhas públicas do Financeiro, sem valores',
+  },
   oracao: { title: 'Pedido de oração', hint: 'Vai para a caixa da pastoral; nunca é publicado' },
   avisos: { title: 'Avisos da semana', hint: 'Os avisos cadastrados aqui, cada um com período' },
   novo: { title: 'Sou novo aqui', hint: 'Abre o link de autocadastro escolhido abaixo' },
@@ -88,7 +91,9 @@ export function cleanServiceTimes(list: unknown): ServiceTime[] {
   if (!Array.isArray(list)) return []
   return list
     .map((x) => x as Partial<ServiceTime>)
-    .filter((x) => Number.isInteger(x.day) && x.day! >= 0 && x.day! <= 6 && hm(x.time || '') !== null)
+    .filter(
+      (x) => Number.isInteger(x.day) && x.day! >= 0 && x.day! <= 6 && hm(x.time || '') !== null,
+    )
     .map((x) => ({
       day: x.day!,
       time: String(x.time).padStart(5, '0'),
@@ -161,7 +166,9 @@ export interface AgendaItemLike {
 }
 
 /** Agrupa a agenda por mês ("novembro de 2026"), mantendo a ordem. */
-export function groupByMonth<T extends AgendaItemLike>(items: T[]): { label: string; items: T[] }[] {
+export function groupByMonth<T extends AgendaItemLike>(
+  items: T[],
+): { label: string; items: T[] }[] {
   const out: { label: string; items: T[] }[] = []
   for (const it of items) {
     const [y, m] = it.date.split('-').map(Number)
@@ -214,7 +221,10 @@ export function buildIcs(input: {
   now?: Date
 }): string {
   const now = input.now || new Date()
-  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const stamp = now
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')
   const d = input.date.replace(/-/g, '')
   const lines = [
     'BEGIN:VCALENDAR',
@@ -227,7 +237,8 @@ export function buildIcs(input: {
   ]
   const start = hm(input.time || '')
   if (start !== null && (!input.end_date || input.end_date === input.date)) {
-    const t = (v: number) => `${String(Math.floor(v / 60)).padStart(2, '0')}${String(v % 60).padStart(2, '0')}00`
+    const t = (v: number) =>
+      `${String(Math.floor(v / 60)).padStart(2, '0')}${String(v % 60).padStart(2, '0')}00`
     const end = Math.min(start + 120, 23 * 60 + 59)
     lines.push(`DTSTART;TZID=America/Recife:${d}T${t(start)}`)
     lines.push(`DTEND;TZID=America/Recife:${d}T${t(end)}`)

@@ -130,8 +130,16 @@ export default function SitePrayer() {
           aria-hidden="true"
         />
         <label className="block space-y-1.5">
-          <span className="text-sm font-semibold text-slate-600">Seu nome {kind === 'ORACAO' && '(opcional)'}</span>
-          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="Como podemos te chamar?" className="h-11 bg-white" />
+          <span className="text-sm font-semibold text-slate-600">
+            Seu nome {kind === 'ORACAO' && '(opcional)'}
+          </span>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={120}
+            placeholder="Como podemos te chamar?"
+            className="h-11 bg-white"
+          />
         </label>
         <label className="block space-y-1.5">
           <span className="text-sm font-semibold text-slate-600">
@@ -148,7 +156,9 @@ export default function SitePrayer() {
         </label>
         {kind === 'ORACAO' && (
           <div className="space-y-1.5">
-            <span className="text-sm font-semibold text-slate-600">Quer que alguém entre em contato?</span>
+            <span className="text-sm font-semibold text-slate-600">
+              Quer que alguém entre em contato?
+            </span>
             <div className="grid grid-cols-2 gap-2">
               {[false, true].map((v) => (
                 <button
@@ -171,11 +181,21 @@ export default function SitePrayer() {
         {needContact && (
           <label className="block space-y-1.5">
             <span className="text-sm font-semibold text-slate-600">WhatsApp ou e-mail</span>
-            <Input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={120} placeholder="(81) 9 0000-0000" className="h-11 bg-white" />
+            <Input
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              maxLength={120}
+              placeholder="(81) 9 0000-0000"
+              className="h-11 bg-white"
+            />
           </label>
         )}
         <label className="flex items-start gap-3 text-sm text-slate-600">
-          <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5" />
+          <Checkbox
+            checked={consent}
+            onCheckedChange={(v) => setConsent(v === true)}
+            className="mt-0.5"
+          />
           <span>Concordo que a igreja use estes dados só para responder a este pedido (LGPD).</span>
         </label>
         {error && <p className="text-sm font-medium text-red-600">{error}</p>}

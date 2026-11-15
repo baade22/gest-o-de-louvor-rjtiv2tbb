@@ -59,7 +59,9 @@ export default function SiteWatch() {
             />
           </div>
           <p className="flex items-center gap-2 font-semibold">
-            <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">● AO VIVO</span>
+            <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">
+              ● AO VIVO
+            </span>
             {live.title}
           </p>
         </div>
@@ -113,7 +115,12 @@ export default function SiteWatch() {
         <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-slate-500">
           Os vídeos não carregaram agora.{' '}
           {data?.channel_url && (
-            <a href={data.channel_url} target="_blank" rel="noreferrer" className="font-semibold text-[var(--sa)]">
+            <a
+              href={data.channel_url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-[var(--sa)]"
+            >
               Ver no YouTube
             </a>
           )}

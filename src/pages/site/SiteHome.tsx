@@ -62,7 +62,9 @@ function Highlights() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent lg:bg-gradient-to-r lg:from-black/70 lg:via-black/30" />
             <div className="absolute inset-x-0 bottom-0 p-5 text-white lg:bottom-auto lg:top-1/2 lg:max-w-2xl lg:-translate-y-1/2 lg:p-12">
               <p className="font-serif text-2xl font-bold leading-tight lg:text-5xl">{h.title}</p>
-              {h.subtitle && <p className="mt-1 text-sm opacity-90 lg:mt-3 lg:text-lg">{h.subtitle}</p>}
+              {h.subtitle && (
+                <p className="mt-1 text-sm opacity-90 lg:mt-3 lg:text-lg">{h.subtitle}</p>
+              )}
               {h.link && (
                 <SmartLink
                   href={h.link}
@@ -80,7 +82,10 @@ function Highlights() {
           {list.map((h, i) => (
             <span
               key={h.id}
-              className={cn('h-1.5 rounded-full bg-white transition-all', i === index ? 'w-5' : 'w-1.5 opacity-60')}
+              className={cn(
+                'h-1.5 rounded-full bg-white transition-all',
+                i === index ? 'w-5' : 'w-1.5 opacity-60',
+              )}
             />
           ))}
         </div>
@@ -110,7 +115,9 @@ function LiveCard({ videos }: { videos: SiteVideos | null }) {
           <span className="inline-flex rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">
             ● AO VIVO
           </span>
-          <span className="mt-1 block font-semibold">{live?.title || current?.label || 'Culto'}</span>
+          <span className="mt-1 block font-semibold">
+            {live?.title || current?.label || 'Culto'}
+          </span>
           <span className="block text-[13px] text-slate-500">
             {href ? 'Toque para assistir no YouTube' : `Começou às ${formatTime(current!.time)}`}
           </span>
@@ -119,26 +126,39 @@ function LiveCard({ videos }: { videos: SiteVideos | null }) {
       </>
     )
     return href ? (
-      <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4">
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4"
+      >
         {content}
       </a>
     ) : (
-      <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4">{content}</div>
+      <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4">
+        {content}
+      </div>
     )
   }
   const next = nextService(site.service_times, now)
   if (!next) return null
   return (
-    <Link to={to('/agenda')} className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4">
+    <Link
+      to={to('/agenda')}
+      className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4"
+    >
       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--sa)_16%,white)] text-[var(--sp)]">
         <Clock className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] text-slate-500">Próximo culto</span>
         <span className="block font-semibold">
-          {whenLabel(next.daysAhead, next.service.day)}, {formatTime(next.service.time)} · {next.service.label}
+          {whenLabel(next.daysAhead, next.service.day)}, {formatTime(next.service.time)} ·{' '}
+          {next.service.label}
         </span>
-        {site.address && <span className="block truncate text-[13px] text-slate-500">{site.address}</span>}
+        {site.address && (
+          <span className="block truncate text-[13px] text-slate-500">{site.address}</span>
+        )}
       </span>
       <ChevronRight className="h-5 w-5 text-slate-400" />
     </Link>
@@ -159,18 +179,49 @@ export default function SiteHome() {
   const map = mapsUrl(site.address, site.maps_url)
   const shortcuts = [
     site.sections.contribuir && (site.pix || site.campaigns.length)
-      ? { to: to('/contribuir'), label: 'Pix', hint: 'Dízimos e ofertas', icon: QrCode, tone: 'bg-amber-50 text-amber-700' }
+      ? {
+          to: to('/contribuir'),
+          label: 'Pix',
+          hint: 'Dízimos e ofertas',
+          icon: QrCode,
+          tone: 'bg-amber-50 text-amber-700',
+        }
       : null,
     site.sections.oracao
-      ? { to: to('/oracao'), label: 'Oração', hint: 'A pastoral ora por você', icon: HandHeart, tone: 'bg-indigo-50 text-indigo-700' }
+      ? {
+          to: to('/oracao'),
+          label: 'Oração',
+          hint: 'A pastoral ora por você',
+          icon: HandHeart,
+          tone: 'bg-indigo-50 text-indigo-700',
+        }
       : null,
     map
-      ? { href: map, label: 'Como chegar', hint: 'Abrir no mapa', icon: MapPin, tone: 'bg-emerald-50 text-emerald-700' }
+      ? {
+          href: map,
+          label: 'Como chegar',
+          hint: 'Abrir no mapa',
+          icon: MapPin,
+          tone: 'bg-emerald-50 text-emerald-700',
+        }
       : null,
     site.sections.novo && site.signup_url
-      ? { to: site.signup_url, label: 'Sou novo', hint: 'Primeira vez aqui?', icon: Sparkles, tone: 'bg-sky-50 text-sky-700' }
+      ? {
+          to: site.signup_url,
+          label: 'Sou novo',
+          hint: 'Primeira vez aqui?',
+          icon: Sparkles,
+          tone: 'bg-sky-50 text-sky-700',
+        }
       : null,
-  ].filter(Boolean) as { to?: string; href?: string; label: string; hint: string; icon: typeof MapPin; tone: string }[]
+  ].filter(Boolean) as {
+    to?: string
+    href?: string
+    label: string
+    hint: string
+    icon: typeof MapPin
+    tone: string
+  }[]
 
   const upcoming = site.agenda.slice(0, 4)
   const recent = (videos?.items || []).filter((v) => !v.live).slice(0, 4)
@@ -179,7 +230,12 @@ export default function SiteHome() {
     <div className="space-y-6 lg:space-y-12">
       <Highlights />
 
-      <div className={cn('space-y-6 px-4 lg:space-y-12 lg:px-8', site.highlights.length ? '' : 'pt-4 lg:pt-10')}>
+      <div
+        className={cn(
+          'space-y-6 px-4 lg:space-y-12 lg:px-8',
+          site.highlights.length ? '' : 'pt-4 lg:pt-10',
+        )}
+      >
         {!site.highlights.length && (
           <div className="rounded-3xl bg-[var(--sp)] p-6 text-[var(--sp-text)] lg:p-12">
             <p className="font-serif text-2xl font-bold lg:text-5xl">{site.title}</p>
@@ -192,12 +248,25 @@ export default function SiteHome() {
         </div>
 
         {shortcuts.length > 0 && (
-          <div className={cn('grid gap-3', ['grid-cols-1', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][Math.min(shortcuts.length, 4)], 'lg:grid-cols-4')}>
+          <div
+            className={cn(
+              'grid gap-3',
+              ['grid-cols-1', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][
+                Math.min(shortcuts.length, 4)
+              ],
+              'lg:grid-cols-4',
+            )}
+          >
             {shortcuts.map((s) => {
               const Icon = s.icon
               const inner = (
                 <>
-                  <span className={cn('grid h-12 w-12 place-items-center rounded-2xl lg:h-11 lg:w-11 lg:rounded-xl', s.tone)}>
+                  <span
+                    className={cn(
+                      'grid h-12 w-12 place-items-center rounded-2xl lg:h-11 lg:w-11 lg:rounded-xl',
+                      s.tone,
+                    )}
+                  >
                     <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0">
@@ -232,7 +301,9 @@ export default function SiteHome() {
                   </span>
                   <div className="min-w-0">
                     <p className="font-semibold">{n.title}</p>
-                    {n.body && <p className="whitespace-pre-line text-sm text-slate-600">{n.body}</p>}
+                    {n.body && (
+                      <p className="whitespace-pre-line text-sm text-slate-600">{n.body}</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -242,10 +313,17 @@ export default function SiteHome() {
 
         {site.sections.agenda && upcoming.length > 0 && (
           <section className="space-y-3">
-            <SectionTitle action={<MoreLink to={to('/agenda')}>Ver agenda →</MoreLink>}>Agenda</SectionTitle>
+            <SectionTitle action={<MoreLink to={to('/agenda')}>Ver agenda →</MoreLink>}>
+              Agenda
+            </SectionTitle>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {upcoming.map((it) => (
-                <AgendaRow key={`${it.kind}-${it.id}`} item={it} siteTitle={site.title} address={site.address} />
+                <AgendaRow
+                  key={`${it.kind}-${it.id}`}
+                  item={it}
+                  siteTitle={site.title}
+                  address={site.address}
+                />
               ))}
             </div>
           </section>
@@ -284,7 +362,9 @@ export default function SiteHome() {
           <section className="space-y-3">
             <SectionTitle>Quem somos</SectionTitle>
             <Card>
-              <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-700">{site.about}</p>
+              <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-700">
+                {site.about}
+              </p>
               {site.pages.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {site.pages.map((p) => (
@@ -310,7 +390,9 @@ export default function SiteHome() {
             <Smartphone className="h-6 w-6" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-serif text-lg font-bold lg:text-2xl">Tenha a igreja no seu celular</span>
+            <span className="block font-serif text-lg font-bold lg:text-2xl">
+              Tenha a igreja no seu celular
+            </span>
             <span className="block text-sm text-slate-600">
               Agenda, avisos, cultos e Pix num ícone na tela de início. Sem baixar nada da loja.
             </span>

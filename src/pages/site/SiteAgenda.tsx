@@ -17,7 +17,8 @@ export default function SiteAgenda() {
   )
   const featured = site.agenda.filter((it) => it.kind === 'EVENTO' && it.signup_open).slice(0, 2)
   const groups = groupByMonth(items)
-  const hasBoth = site.agenda.some((i) => i.kind === 'CULTO') && site.agenda.some((i) => i.kind === 'EVENTO')
+  const hasBoth =
+    site.agenda.some((i) => i.kind === 'CULTO') && site.agenda.some((i) => i.kind === 'EVENTO')
 
   return (
     <div className="space-y-5 px-4 pt-5 lg:space-y-8 lg:px-8 lg:pt-10">
@@ -68,7 +69,12 @@ export default function SiteAgenda() {
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.label}</p>
           <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
             {g.items.map((it) => (
-              <AgendaRow key={`${it.kind}-${it.id}`} item={it} siteTitle={site.title} address={site.address} />
+              <AgendaRow
+                key={`${it.kind}-${it.id}`}
+                item={it}
+                siteTitle={site.title}
+                address={site.address}
+              />
             ))}
           </div>
         </section>

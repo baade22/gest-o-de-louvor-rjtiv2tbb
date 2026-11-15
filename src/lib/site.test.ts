@@ -62,11 +62,7 @@ describe('horários dos cultos', () => {
 
 describe('agenda', () => {
   it('agrupa por mês', () => {
-    const g = groupByMonth([
-      { date: '2026-11-16' },
-      { date: '2026-11-29' },
-      { date: '2026-12-01' },
-    ])
+    const g = groupByMonth([{ date: '2026-11-16' }, { date: '2026-11-29' }, { date: '2026-12-01' }])
     expect(g.map((x) => [x.label, x.items.length])).toEqual([
       ['novembro de 2026', 2],
       ['dezembro de 2026', 1],
@@ -86,7 +82,13 @@ describe('agenda', () => {
     expect(a).toContain('DTSTART;TZID=America/Recife:20261116T180000')
     expect(a).toContain('DTEND;TZID=America/Recife:20261116T200000')
     expect(a).toContain('SUMMARY:Culto\\, Ceia')
-    const b = buildIcs({ uid: 'y', title: 'Encontro', date: '2026-11-29', end_date: '2026-11-30', now })
+    const b = buildIcs({
+      uid: 'y',
+      title: 'Encontro',
+      date: '2026-11-29',
+      end_date: '2026-11-30',
+      now,
+    })
     expect(b).toContain('DTSTART;VALUE=DATE:20261129')
     expect(b).toContain('DTEND;VALUE=DATE:20261201')
   })

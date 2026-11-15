@@ -55,7 +55,8 @@ export default function SiteGive() {
             <PixQr payload={payload} className="h-48 w-48 rounded-xl border border-stone-200" />
             <div className="text-sm">
               <p>
-                <b>Chave:</b> {displayPixKey(pix.key, (pix.key_type || undefined) as PixKeyType | undefined)}{' '}
+                <b>Chave:</b>{' '}
+                {displayPixKey(pix.key, (pix.key_type || undefined) as PixKeyType | undefined)}{' '}
                 <button
                   type="button"
                   onClick={() => copy(pix.key, 'key')}
@@ -79,7 +80,9 @@ export default function SiteGive() {
             </p>
           </Card>
         ) : (
-          <Card className="text-center text-slate-500">A chave PIX da igreja ainda não foi cadastrada.</Card>
+          <Card className="text-center text-slate-500">
+            A chave PIX da igreja ainda não foi cadastrada.
+          </Card>
         )}
 
         <div className="space-y-3">
@@ -98,7 +101,9 @@ export default function SiteGive() {
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold">{c.name}</span>
                     {c.description && (
-                      <span className="line-clamp-2 block text-[13px] text-slate-500">{c.description}</span>
+                      <span className="line-clamp-2 block text-[13px] text-slate-500">
+                        {c.description}
+                      </span>
                     )}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-xl border border-stone-200 px-3 py-1.5 text-sm font-semibold">

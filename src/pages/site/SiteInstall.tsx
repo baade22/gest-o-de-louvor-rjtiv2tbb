@@ -51,8 +51,8 @@ export default function SiteInstall() {
           </span>
           <p className="text-lg font-semibold">{site.short_name || site.title}</p>
           <p className="text-sm text-slate-500">
-            Fica um ícone na tela de início, abre em tela cheia como um aplicativo. Não precisa baixar
-            nada da loja e não ocupa espaço.
+            Fica um ícone na tela de início, abre em tela cheia como um aplicativo. Não precisa
+            baixar nada da loja e não ocupa espaço.
           </p>
         </Card>
 
@@ -77,12 +77,14 @@ export default function SiteInstall() {
             <Step n={1}>
               {ios ? (
                 <>
-                  Toque em <b>Compartilhar</b> <Share className="inline h-4 w-4 align-[-2px] text-sky-600" /> na
-                  barra do Safari
+                  Toque em <b>Compartilhar</b>{' '}
+                  <Share className="inline h-4 w-4 align-[-2px] text-sky-600" /> na barra do Safari
                 </>
               ) : (
                 <>
-                  Abra o menu do navegador (<b>⋮</b> no Chrome do Android ou <Share className="inline h-4 w-4 align-[-2px] text-sky-600" /> no Safari do iPhone)
+                  Abra o menu do navegador (<b>⋮</b> no Chrome do Android ou{' '}
+                  <Share className="inline h-4 w-4 align-[-2px] text-sky-600" /> no Safari do
+                  iPhone)
                 </>
               )}
             </Step>
@@ -91,10 +93,13 @@ export default function SiteInstall() {
               <SquarePlus className="inline h-4 w-4 align-[-2px]" />
               {!ios && ' ou "Instalar app"'}
             </Step>
-            <Step n={3}>Toque em <b>Adicionar</b>. Depois é só abrir pelo ícone.</Step>
+            <Step n={3}>
+              Toque em <b>Adicionar</b>. Depois é só abrir pelo ícone.
+            </Step>
             {ios && (
               <p className="text-xs text-slate-500">
-                Se abriu este link pelo Instagram ou WhatsApp, toque em ••• e escolha “Abrir no Safari” primeiro.
+                Se abriu este link pelo Instagram ou WhatsApp, toque em ••• e escolha “Abrir no
+                Safari” primeiro.
               </p>
             )}
           </Card>

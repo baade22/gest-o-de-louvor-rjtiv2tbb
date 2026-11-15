@@ -63,10 +63,18 @@ routerAdd('POST', '/backend/v1/site/options', (e) => {
 
   const links = []
   try {
-    const rows = $app.findRecordsByFilter('people_signup_links', 'church_id = {:c}', 'title', 50, 0, {
-      c: churchId,
-    })
-    for (const l of rows) links.push({ id: l.id, title: l.getString('title'), active: l.getBool('active') })
+    const rows = $app.findRecordsByFilter(
+      'people_signup_links',
+      'church_id = {:c}',
+      'title',
+      50,
+      0,
+      {
+        c: churchId,
+      },
+    )
+    for (const l of rows)
+      links.push({ id: l.id, title: l.getString('title'), active: l.getBool('active') })
   } catch (_) {}
 
   let pix = false
@@ -89,7 +97,12 @@ routerAdd('POST', '/backend/v1/site/options', (e) => {
     for (const c of rows) campaigns.push({ id: c.id, name: c.getString('name') })
   } catch (_) {}
 
-  return e.json(200, { events: events, signup_links: links, pix_configured: pix, campaigns: campaigns })
+  return e.json(200, {
+    events: events,
+    signup_links: links,
+    pix_configured: pix,
+    campaigns: campaigns,
+  })
 })
 
 routerAdd('POST', '/backend/v1/site/event', (e) => {

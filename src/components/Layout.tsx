@@ -312,7 +312,13 @@ export default function Layout() {
     {
       label: 'Comunicação',
       items: [
-        { to: '/site', label: 'Site e App', icon: Globe, allowed: can('admin.site.ver'), end: true },
+        {
+          to: '/site',
+          label: 'Site e App',
+          icon: Globe,
+          allowed: can('admin.site.ver'),
+          end: true,
+        },
         {
           to: '/site/pedidos',
           label: 'Pedidos de oração',

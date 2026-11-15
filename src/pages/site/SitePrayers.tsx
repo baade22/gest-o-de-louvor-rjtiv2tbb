@@ -29,7 +29,13 @@ const STATUS: Record<PrayerStatus, { label: string; cls: string }> = {
 function when(s: string) {
   const d = new Date(s.replace(' ', 'T'))
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Recife' })
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Recife',
+  })
 }
 
 export default function SitePrayers() {
@@ -60,7 +66,11 @@ export default function SitePrayers() {
       await updatePrayer(p.id, patch)
       load()
     } catch (err) {
-      toast({ title: 'Não foi possível salvar', description: getErrorMessage(err), variant: 'destructive' })
+      toast({
+        title: 'Não foi possível salvar',
+        description: getErrorMessage(err),
+        variant: 'destructive',
+      })
     } finally {
       setBusy('')
     }
@@ -86,7 +96,9 @@ export default function SitePrayers() {
             onClick={() => setFilter(k)}
             className={cn(
               'rounded-xl border px-3.5 py-1.5 text-sm font-semibold',
-              filter === k ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-700',
+              filter === k
+                ? 'border-teal-700 bg-teal-700 text-white'
+                : 'border-slate-200 bg-white text-slate-700',
             )}
           >
             {k === 'TODOS' ? 'Todos' : STATUS[k].label}
@@ -98,21 +110,32 @@ export default function SitePrayers() {
         <Skeleton className="h-40 rounded-2xl" />
       ) : items.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-          Nenhum pedido {filter === 'TODOS' ? '' : `"${STATUS[filter].label.toLowerCase()}"`} por aqui.
+          Nenhum pedido {filter === 'TODOS' ? '' : `"${STATUS[filter].label.toLowerCase()}"`} por
+          aqui.
         </p>
       ) : (
         <div className="space-y-3">
           {items.map((p) => {
-            const wa = p.wants_contact && p.contact.replace(/\D/g, '').length >= 8 ? whatsappUrl(p.contact) : ''
+            const wa =
+              p.wants_contact && p.contact.replace(/\D/g, '').length >= 8
+                ? whatsappUrl(p.contact)
+                : ''
             const st = STATUS[p.status] || STATUS.NOVO
             return (
-              <div key={p.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div
+                key={p.id}
+                className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
                     {p.kind === 'CONTATO' ? 'Fale conosco' : 'Oração'}
                   </span>
-                  <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', st.cls)}>{st.label}</span>
-                  <span className="text-sm font-semibold text-slate-900">{p.name || 'Sem nome'}</span>
+                  <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', st.cls)}>
+                    {st.label}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {p.name || 'Sem nome'}
+                  </span>
                   <span className="ml-auto text-xs text-slate-500">{when(p.created)}</span>
                 </div>
                 <p className="whitespace-pre-line text-[15px] text-slate-800">{p.message}</p>
@@ -120,7 +143,12 @@ export default function SitePrayers() {
                   <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                     Pediu contato: <b>{p.contact}</b>
                     {wa && (
-                      <a href={wa} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-teal-700">
+                      <a
+                        href={wa}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold text-teal-700"
+                      >
                         <MessageCircle className="h-4 w-4" /> WhatsApp
                       </a>
                     )}
@@ -137,17 +165,32 @@ export default function SitePrayers() {
                     />
                     <div className="flex flex-wrap gap-2">
                       {notes[p.id] !== undefined && notes[p.id] !== p.note && (
-                        <Button size="sm" variant="outline" onClick={() => change(p, { note: notes[p.id] })} disabled={busy === p.id}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => change(p, { note: notes[p.id] })}
+                          disabled={busy === p.id}
+                        >
                           Salvar anotação
                         </Button>
                       )}
                       {p.status !== 'ACOMPANHANDO' && (
-                        <Button size="sm" variant="outline" onClick={() => change(p, { status: 'ACOMPANHANDO' })} disabled={busy === p.id}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => change(p, { status: 'ACOMPANHANDO' })}
+                          disabled={busy === p.id}
+                        >
                           Acompanhando
                         </Button>
                       )}
                       {p.status !== 'CONCLUIDO' && (
-                        <Button size="sm" className="bg-teal-700 text-white hover:bg-teal-800" onClick={() => change(p, { status: 'CONCLUIDO' })} disabled={busy === p.id}>
+                        <Button
+                          size="sm"
+                          className="bg-teal-700 text-white hover:bg-teal-800"
+                          onClick={() => change(p, { status: 'CONCLUIDO' })}
+                          disabled={busy === p.id}
+                        >
                           {busy === p.id && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                           Concluído
                         </Button>

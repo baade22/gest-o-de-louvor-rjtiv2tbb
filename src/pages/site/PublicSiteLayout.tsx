@@ -232,10 +232,14 @@ export default function PublicSiteLayout() {
   const tabs = TABS.filter((t) => !t.section || site.sections[t.section])
   const isTab = (p: string) => {
     const full = `/igreja${p}`
-    return p === '' ? location.pathname === '/igreja' || location.pathname === '/igreja/' : location.pathname.startsWith(full)
+    return p === ''
+      ? location.pathname === '/igreja' || location.pathname === '/igreja/'
+      : location.pathname.startsWith(full)
   }
   const navLinks = [
-    ...tabs.filter((t) => t.path !== '/eu').map((t) => ({ to: ctx.to(t.path), label: t.label, active: isTab(t.path) })),
+    ...tabs
+      .filter((t) => t.path !== '/eu')
+      .map((t) => ({ to: ctx.to(t.path), label: t.label, active: isTab(t.path) })),
     ...site.pages.map((p) => ({
       to: ctx.to(`/p/${p.slug}`),
       label: p.title,
@@ -265,7 +269,9 @@ export default function PublicSiteLayout() {
           <Link to={ctx.to('')} className="flex min-w-0 items-center gap-3">
             <SiteLogo site={site} className="h-10 w-10 shrink-0 lg:h-12 lg:w-12" />
             <span className="min-w-0 leading-tight">
-              <span className="block truncate font-semibold lg:text-lg">{site.short_name || site.title}</span>
+              <span className="block truncate font-semibold lg:text-lg">
+                {site.short_name || site.title}
+              </span>
               {site.tagline && (
                 <span className="block truncate text-xs opacity-75 lg:text-sm">{site.tagline}</span>
               )}
@@ -337,7 +343,10 @@ export default function PublicSiteLayout() {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+        <div
+          className="mx-auto grid max-w-lg"
+          style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
+        >
           {tabs.map((t) => {
             const Icon = t.icon
             const on = isTab(t.path)
@@ -393,7 +402,12 @@ function SiteFooter({ site }: { site: PublicSite }) {
             <p className="mb-2 font-semibold">Endereço</p>
             <p className="opacity-80">{site.address}</p>
             {map && (
-              <a href={map} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[var(--sa)]">
+              <a
+                href={map}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-[var(--sa)]"
+              >
                 <MapPin className="h-4 w-4" /> Como chegar
               </a>
             )}
@@ -421,21 +435,36 @@ function SiteFooter({ site }: { site: PublicSite }) {
             )}
             {site.instagram && (
               <li>
-                <a href={instagramUrl(site.instagram)} target="_blank" rel="noreferrer" className="flex items-center gap-2">
+                <a
+                  href={instagramUrl(site.instagram)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2"
+                >
                   <Instagram className="h-4 w-4" /> Instagram
                 </a>
               </li>
             )}
             {site.facebook && (
               <li>
-                <a href={facebookUrl(site.facebook)} target="_blank" rel="noreferrer" className="flex items-center gap-2">
+                <a
+                  href={facebookUrl(site.facebook)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2"
+                >
                   <span className="w-4 text-center font-bold">f</span> Facebook
                 </a>
               </li>
             )}
             {site.youtube && (
               <li>
-                <a href={youtubeUrl(site.youtube)} target="_blank" rel="noreferrer" className="flex items-center gap-2">
+                <a
+                  href={youtubeUrl(site.youtube)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2"
+                >
                   <Youtube className="h-4 w-4" /> YouTube
                 </a>
               </li>

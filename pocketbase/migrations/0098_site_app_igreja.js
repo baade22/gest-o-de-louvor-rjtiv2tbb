@@ -88,7 +88,13 @@ migrate(
         { name: 'primary_color', type: 'text', max: 7, pattern: '^(#[0-9a-fA-F]{6})?$' },
         { name: 'accent_color', type: 'text', max: 7, pattern: '^(#[0-9a-fA-F]{6})?$' },
         { name: 'logo', type: 'file', maxSelect: 1, maxSize: 2097152, mimeTypes: IMG },
-        { name: 'app_icon', type: 'file', maxSelect: 1, maxSize: 1048576, mimeTypes: ['image/png'] },
+        {
+          name: 'app_icon',
+          type: 'file',
+          maxSelect: 1,
+          maxSize: 1048576,
+          mimeTypes: ['image/png'],
+        },
         { name: 'address', type: 'text', max: 300 },
         { name: 'maps_url', type: 'url' },
         { name: 'phone', type: 'text', max: 40 },
@@ -184,9 +190,7 @@ migrate(
         { name: 'note', type: 'text', max: 1000 },
         { name: 'consent_at', type: 'date' },
       ].concat(stamps),
-      indexes: [
-        'CREATE INDEX idx_site_prayer_church ON site_prayer_requests (church_id, status)',
-      ],
+      indexes: ['CREATE INDEX idx_site_prayer_church ON site_prayer_requests (church_id, status)'],
     })
 
     const events = app.findCollectionByNameOrId('church_events')

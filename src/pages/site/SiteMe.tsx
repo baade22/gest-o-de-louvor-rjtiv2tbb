@@ -2,7 +2,14 @@
 // A versão completa (inscrições, carteirinha, contribuições) é a etapa 2.
 
 import { Link } from 'react-router-dom'
-import { CalendarCheck2, ChevronRight, LayoutDashboard, LogIn, Sparkles, UserPen } from 'lucide-react'
+import {
+  CalendarCheck2,
+  ChevronRight,
+  LayoutDashboard,
+  LogIn,
+  Sparkles,
+  UserPen,
+} from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useSite } from './siteContext'
 import { Card, SectionTitle } from './siteParts'
@@ -13,9 +20,19 @@ export default function SiteMe() {
   const name = String((pb.authStore.record as { name?: string } | null)?.name || '').split(' ')[0]
 
   const rows = [
-    { to: '/minhas-escalas', icon: CalendarCheck2, title: 'Minhas escalas', hint: 'Confirmar e ver o repertório' },
+    {
+      to: '/minhas-escalas',
+      icon: CalendarCheck2,
+      title: 'Minhas escalas',
+      hint: 'Confirmar e ver o repertório',
+    },
     { to: '/perfil', icon: UserPen, title: 'Meus dados', hint: 'Telefone, senha e foto' },
-    { to: '/dashboard', icon: LayoutDashboard, title: 'Abrir o LouvorFlow', hint: 'Tudo o que seu acesso libera' },
+    {
+      to: '/dashboard',
+      icon: LayoutDashboard,
+      title: 'Abrir o LouvorFlow',
+      hint: 'Tudo o que seu acesso libera',
+    },
   ]
 
   return (
@@ -54,13 +71,18 @@ export default function SiteMe() {
           </Card>
         )}
         {site.sections.novo && site.signup_url && (
-          <Link to={site.signup_url} className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4">
+          <Link
+            to={site.signup_url}
+            className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4"
+          >
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-700">
               <Sparkles className="h-5 w-5" />
             </span>
             <span className="flex-1">
               <span className="block font-semibold">Primeira vez aqui?</span>
-              <span className="block text-[13px] text-slate-500">Deixe seu contato e a igreja fala com você</span>
+              <span className="block text-[13px] text-slate-500">
+                Deixe seu contato e a igreja fala com você
+              </span>
             </span>
             <ChevronRight className="h-5 w-5 text-slate-400" />
           </Link>

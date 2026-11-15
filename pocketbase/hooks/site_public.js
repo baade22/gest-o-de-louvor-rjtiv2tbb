@@ -18,7 +18,8 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
   const slug = String(q.slug || '')
     .trim()
     .toLowerCase()
-  if (slug && !/^[a-z0-9-]{1,40}$/.test(slug)) return e.json(404, { message: 'Site não encontrado.' })
+  if (slug && !/^[a-z0-9-]{1,40}$/.test(slug))
+    return e.json(404, { message: 'Site não encontrado.' })
 
   let site = null
   try {
@@ -53,7 +54,15 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
     }
   }
   const sections = Object.assign(
-    { agenda: true, cultos: true, assistir: true, contribuir: true, oracao: true, avisos: true, novo: true },
+    {
+      agenda: true,
+      cultos: true,
+      assistir: true,
+      contribuir: true,
+      oracao: true,
+      avisos: true,
+      novo: true,
+    },
     json(site, 'sections', {}),
   )
 
@@ -82,7 +91,9 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
     if (!start || end < today) continue
     const deadline = day(ev, 'registration_deadline')
     const open =
-      ev.getBool('registration_open') && !ev.getBool('publish_only') && (!deadline || deadline >= today)
+      ev.getBool('registration_open') &&
+      !ev.getBool('publish_only') &&
+      (!deadline || deadline >= today)
     const url = '/inscricao/' + ev.getString('public_key')
     eventLinks[ev.id] = url
     if (!sections.agenda) continue
@@ -138,7 +149,9 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
       })
     }
   }
-  agenda.sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : a.date + a.time > b.date + b.time ? 1 : 0))
+  agenda.sort((a, b) =>
+    a.date + a.time < b.date + b.time ? -1 : a.date + a.time > b.date + b.time ? 1 : 0,
+  )
 
   const highlights = []
   try {
@@ -282,10 +295,15 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
 
 routerAdd('GET', '/backend/v1/public/site/page', (e) => {
   const q = e.requestInfo().query || {}
-  const slug = String(q.slug || '').trim().toLowerCase()
-  const page = String(q.page || '').trim().toLowerCase()
+  const slug = String(q.slug || '')
+    .trim()
+    .toLowerCase()
+  const page = String(q.page || '')
+    .trim()
+    .toLowerCase()
   const notFound = () => e.json(404, { message: 'Página não encontrada.' })
-  if ((slug && !/^[a-z0-9-]{1,40}$/.test(slug)) || !/^[a-z0-9-]{1,80}$/.test(page)) return notFound()
+  if ((slug && !/^[a-z0-9-]{1,40}$/.test(slug)) || !/^[a-z0-9-]{1,80}$/.test(page))
+    return notFound()
   let site = null
   try {
     const list = slug
@@ -302,7 +320,11 @@ routerAdd('GET', '/backend/v1/public/site/page', (e) => {
       'church_id = {:c} && slug = {:p} && active = true',
       { c: site.getString('church_id'), p: page },
     )
-    return e.json(200, { title: p.getString('title'), slug: p.getString('slug'), body: p.getString('body') })
+    return e.json(200, {
+      title: p.getString('title'),
+      slug: p.getString('slug'),
+      body: p.getString('body'),
+    })
   } catch (_) {
     return notFound()
   }
@@ -310,7 +332,9 @@ routerAdd('GET', '/backend/v1/public/site/page', (e) => {
 
 routerAdd('GET', '/backend/v1/public/site/videos', (e) => {
   const q = e.requestInfo().query || {}
-  const slug = String(q.slug || '').trim().toLowerCase()
+  const slug = String(q.slug || '')
+    .trim()
+    .toLowerCase()
   if (slug && !/^[a-z0-9-]{1,40}$/.test(slug)) return e.json(404, { items: [] })
   let site = null
   try {
@@ -369,7 +393,9 @@ routerAdd('GET', '/backend/v1/public/site/videos', (e) => {
       const html = bodyText(res)
       const m =
         /"externalId":"(UC[A-Za-z0-9_-]{22})"/.exec(html) ||
-        /<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})"/.exec(html) ||
+        /<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})"/.exec(
+          html,
+        ) ||
         /"channelId":"(UC[A-Za-z0-9_-]{22})"/.exec(html)
       if (m) channel = m[1]
     } catch (_) {}
@@ -384,7 +410,8 @@ routerAdd('GET', '/backend/v1/public/site/videos', (e) => {
     : handle
       ? 'https://www.youtube.com/@' + handle
       : ''
-  if (!channel) return e.json(200, { items: [], live: null, live_url: liveUrl, channel_url: channelUrl })
+  if (!channel)
+    return e.json(200, { items: [], live: null, live_url: liveUrl, channel_url: channelUrl })
 
   // As abas "Ao vivo" (cultos transmitidos) e "Vídeos" do canal trazem a lista na própria página
   // (ytInitialData). O feed RSS do YouTube fica de reserva (em 2026 respondia 404).
@@ -412,7 +439,9 @@ routerAdd('GET', '/backend/v1/public/site/videos', (e) => {
         const p = parts[i].slice(0, 12000)
         const id = (/i\.ytimg\.com\/vi\/([A-Za-z0-9_-]{11})\//.exec(p) || [])[1]
         if (!id || seen[id]) continue
-        const title = (/"lockupMetadataViewModel":\{"title":\{"content":"((?:[^"\\]|\\.)*)"/.exec(p) || [])[1]
+        const title = (/"lockupMetadataViewModel":\{"title":\{"content":"((?:[^"\\]|\\.)*)"/.exec(
+          p,
+        ) || [])[1]
         if (!title) continue
         const badge = (/"thumbnailBadgeViewModel":\{"text":"([^"]*)"/.exec(p) || [])[1] || ''
         const isLive = /BADGE_STYLE_LIVE/.test(p) || /^(AO VIVO|LIVE)$/i.test(badge)
@@ -482,7 +511,9 @@ routerAdd('GET', '/backend/v1/public/site/videos', (e) => {
 
 routerAdd('GET', '/backend/v1/public/site/manifest', (e) => {
   const q = e.requestInfo().query || {}
-  const slug = String(q.slug || '').trim().toLowerCase()
+  const slug = String(q.slug || '')
+    .trim()
+    .toLowerCase()
   if (slug && !/^[a-z0-9-]{1,40}$/.test(slug)) return e.json(404, {})
   let site = null
   try {
@@ -545,7 +576,8 @@ routerAdd('POST', '/backend/v1/public/site/prayer', (e) => {
   if (text(body.website, 200) !== '') return e.json(200, { ok: true })
 
   const slug = text(body.slug, 40).toLowerCase()
-  if (slug && !/^[a-z0-9-]{1,40}$/.test(slug)) return e.json(404, { message: 'Site não encontrado.' })
+  if (slug && !/^[a-z0-9-]{1,40}$/.test(slug))
+    return e.json(404, { message: 'Site não encontrado.' })
   let site = null
   try {
     const list = slug
@@ -568,7 +600,11 @@ routerAdd('POST', '/backend/v1/public/site/prayer', (e) => {
   const message = text(body.message, 3000)
   const wants = body.wants_contact === true
   if (message.length < 3) return e.json(400, { message: 'Escreva a sua mensagem.' })
-  if ((wants || kind === 'CONTATO') && contact.replace(/\D/g, '').length < 8 && contact.indexOf('@') === -1)
+  if (
+    (wants || kind === 'CONTATO') &&
+    contact.replace(/\D/g, '').length < 8 &&
+    contact.indexOf('@') === -1
+  )
     return e.json(400, { message: 'Informe um WhatsApp ou e-mail para a resposta.' })
   if (body.consent !== true)
     return e.json(400, { message: 'É preciso concordar com o uso dos dados só para este pedido.' })

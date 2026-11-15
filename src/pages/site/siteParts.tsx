@@ -76,7 +76,9 @@ export function DateBadge({ date, className }: { date: string; className?: strin
       )}
     >
       <b className="block text-lg text-[var(--sp)]">{p.day}</b>
-      <span className="text-[10.5px] font-bold uppercase text-[var(--sp)] opacity-70">{p.weekday}</span>
+      <span className="text-[10.5px] font-bold uppercase text-[var(--sp)] opacity-70">
+        {p.weekday}
+      </span>
     </div>
   )
 }
@@ -126,7 +128,9 @@ export function AgendaRow({
       <DateBadge date={item.date} />
       <div className="min-w-0 flex-1">
         <p className="font-semibold leading-snug text-slate-900">{item.title}</p>
-        <p className="text-[13px] text-slate-500">{when || (item.kind === 'CULTO' ? 'Culto' : 'Evento')}</p>
+        <p className="text-[13px] text-slate-500">
+          {when || (item.kind === 'CULTO' ? 'Culto' : 'Evento')}
+        </p>
         {item.signup_open && (
           <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
             <Ticket className="h-3 w-3" /> Inscrições abertas
@@ -166,7 +170,11 @@ export function EventCard({ item }: { item: PublicAgendaItem }) {
           className="relative aspect-[16/7] bg-gradient-to-br from-[var(--sa)] to-[var(--sp)]"
           style={
             item.cover_url
-              ? { backgroundImage: `url(${siteFileUrl(item.cover_url)})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+              ? {
+                  backgroundImage: `url(${siteFileUrl(item.cover_url)})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }
               : undefined
           }
         >
@@ -193,7 +201,8 @@ export function EventCard({ item }: { item: PublicAgendaItem }) {
             </p>
           )}
           <span className="mt-2 inline-flex items-center gap-1 rounded-xl bg-[var(--sa)] px-4 py-2 text-sm font-semibold text-[var(--sa-text)]">
-            {item.signup_open ? 'Quero me inscrever' : 'Saiba mais'} <ChevronRight className="h-4 w-4" />
+            {item.signup_open ? 'Quero me inscrever' : 'Saiba mais'}{' '}
+            <ChevronRight className="h-4 w-4" />
           </span>
         </div>
       </Link>
@@ -232,7 +241,12 @@ export function VideoTile({
   }
   const thumb = (
     <span className="relative block aspect-video shrink-0 overflow-hidden rounded-xl bg-slate-800">
-      <img src={videoThumb(video.id)} alt="" loading="lazy" className="h-full w-full object-cover" />
+      <img
+        src={videoThumb(video.id)}
+        alt=""
+        loading="lazy"
+        className="h-full w-full object-cover"
+      />
       <span className="absolute inset-0 grid place-items-center">
         <span className="grid h-10 w-10 place-items-center rounded-full bg-black/55 text-white">
           <Play className="h-5 w-5 fill-white" />
@@ -259,7 +273,11 @@ export function VideoTile({
     )
   }
   return (
-    <button type="button" onClick={() => setPlaying(true)} className="flex items-center gap-3 text-left">
+    <button
+      type="button"
+      onClick={() => setPlaying(true)}
+      className="flex items-center gap-3 text-left"
+    >
       <span className="w-32 shrink-0 sm:w-40">{thumb}</span>
       <span className="min-w-0">
         <span className="line-clamp-2 font-semibold leading-snug">{video.title}</span>
