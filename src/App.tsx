@@ -74,6 +74,17 @@ import FinanceCampaigns from '@/pages/finance/FinanceCampaigns'
 import FinanceBudget from '@/pages/finance/FinanceBudget'
 import FinanceCashFlow from '@/pages/finance/FinanceCashFlow'
 import FinanceAudit from '@/pages/finance/FinanceAudit'
+import PublicSiteLayout from '@/pages/site/PublicSiteLayout'
+import SiteHome from '@/pages/site/SiteHome'
+import SiteAgenda from '@/pages/site/SiteAgenda'
+import SiteWatch from '@/pages/site/SiteWatch'
+import SiteGive from '@/pages/site/SiteGive'
+import SitePrayer from '@/pages/site/SitePrayer'
+import SitePage from '@/pages/site/SitePage'
+import SiteInstall from '@/pages/site/SiteInstall'
+import SiteMe from '@/pages/site/SiteMe'
+import SiteAdmin from '@/pages/site/SiteAdmin'
+import SitePrayers from '@/pages/site/SitePrayers'
 
 const App = () => (
   <BrowserRouter>
@@ -110,6 +121,18 @@ const App = () => (
 
           {/* Página pública de doação de uma campanha do Financeiro */}
           <Route path="/doar/:id" element={<PublicCampaign />} />
+
+          {/* Site e App da igreja: público, sem login (vira app na tela de início do celular) */}
+          <Route path="/igreja" element={<PublicSiteLayout />}>
+            <Route index element={<SiteHome />} />
+            <Route path="agenda" element={<SiteAgenda />} />
+            <Route path="assistir" element={<SiteWatch />} />
+            <Route path="contribuir" element={<SiteGive />} />
+            <Route path="oracao" element={<SitePrayer />} />
+            <Route path="p/:page" element={<SitePage />} />
+            <Route path="instalar" element={<SiteInstall />} />
+            <Route path="eu" element={<SiteMe />} />
+          </Route>
 
           {/* Authenticated Layout and Routes */}
           <Route element={<Layout />}>
@@ -659,6 +682,22 @@ const App = () => (
             />
 
             {/* Perfil */}
+            <Route
+              path="/site"
+              element={
+                <RequireAuth requirePermission="admin.site.ver">
+                  <SiteAdmin />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/site/pedidos"
+              element={
+                <RequireAuth requirePermission="admin.oracao.ver">
+                  <SitePrayers />
+                </RequireAuth>
+              }
+            />
             <Route
               path="/perfil"
               element={
