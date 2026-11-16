@@ -17,7 +17,14 @@ export type AvisoStatus =
   | 'CANCELADO'
   | 'ATIVA'
   | 'INATIVA'
-export type AudienceType = 'TODOS' | 'GRUPO' | 'EVENTO' | 'PESSOAS' | 'WHATSAPP' | 'WA_NUMEROS'
+export type AudienceType =
+  | 'TODOS'
+  | 'GRUPO'
+  | 'EVENTO'
+  | 'PESSOAS'
+  | 'WHATSAPP'
+  | 'WA_NUMEROS'
+  | 'LISTAS'
 
 /** Grupo do WhatsApp escolhido no público (id = endereço "…@g.us") */
 export interface WaGroupRef {
@@ -33,6 +40,9 @@ export interface AvisoAudience {
   event_id?: string
   person_ids?: string[]
   wa_groups?: WaGroupRef[]
+  /** Público LISTAS: listas da base de contatos e números escolhidos um a um */
+  list_ids?: string[]
+  contact_ids?: string[]
 }
 
 export const MEDIA_TYPES: Array<{
@@ -95,6 +105,7 @@ export const STATUS_INFO: Record<AvisoStatus, { label: string; className: string
 
 export const AUDIENCE_TYPES: Array<{ value: AudienceType; label: string }> = [
   { value: 'TODOS', label: 'Membros da igreja' },
+  { value: 'LISTAS', label: 'Listas de números' },
   { value: 'GRUPO', label: 'Um ministério ou grupo' },
   { value: 'EVENTO', label: 'Inscritos de um evento' },
   { value: 'PESSOAS', label: 'Escolher pessoas' },

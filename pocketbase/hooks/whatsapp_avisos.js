@@ -175,6 +175,36 @@ routerAdd(
       return out
     }
 
+    // Público LISTAS: números da base de contatos (migração 0102) que estão nas listas
+    // escolhidas ou foram escolhidos um a um
+    const contactNumbers = (cid, aud) => {
+      const lists = Array.isArray(aud && aud.list_ids) ? aud.list_ids.map(String) : []
+      const ids = Array.isArray(aud && aud.contact_ids) ? aud.contact_ids.map(String) : []
+      const out = []
+      if (!lists.length && !ids.length) return out
+      const seen = {}
+      let rows = []
+      try {
+        rows = $app.findRecordsByFilter('whatsapp_contacts', 'church_id = {:c}', 'name', 10000, 0, {
+          c: cid,
+        })
+      } catch (_) {}
+      for (const r of rows) {
+        let ls = []
+        try {
+          ls = r.getStringSlice('lists') || []
+        } catch (_) {
+          ls = Array.isArray(r.get('lists')) ? r.get('lists') : []
+        }
+        const hit = ids.indexOf(r.id) !== -1 || ls.some((l) => lists.indexOf(String(l)) !== -1)
+        const phone = r.getString('phone')
+        if (!hit || !phone || seen[phone]) continue
+        seen[phone] = true
+        out.push({ phone: phone, name: r.getString('name') })
+      }
+      return out
+    }
+
     // Números dos participantes de grupos do WhatsApp (lidos na hora, direto da Evolution).
     // Quem esconde o número no grupo (endereço @lid) fica de fora e entra em "hidden".
     const groupNumbers = (cid, groups) => {
@@ -280,6 +310,7 @@ routerAdd(
         const r = groupNumbers(churchId, aud.wa_groups)
         return { list: r.list, noPhone: r.hidden, error: r.error }
       }
+      if (type === 'LISTAS') return { list: contactNumbers(churchId, aud), noPhone: 0 }
       const cong = String((aud && aud.congregation) || '')
       const okPerson = (p) =>
         p.getString('church_id') === churchId &&
@@ -351,7 +382,9 @@ routerAdd(
     const cleanAudience = (a) => {
       a = a && typeof a === 'object' ? a : {}
       const type =
-        ['TODOS', 'GRUPO', 'EVENTO', 'PESSOAS', 'WHATSAPP', 'WA_NUMEROS'].indexOf(a.type) !== -1
+        ['TODOS', 'GRUPO', 'EVENTO', 'PESSOAS', 'WHATSAPP', 'WA_NUMEROS', 'LISTAS'].indexOf(
+          a.type,
+        ) !== -1
           ? a.type
           : 'TODOS'
       const out = { type: type, congregation: String(a.congregation || '').slice(0, 50) }
@@ -375,6 +408,21 @@ routerAdd(
             return true
           })
           .slice(0, 50)
+      }
+      if (type === 'LISTAS') {
+        const ids = (arr, max) => {
+          const seen = {}
+          return (Array.isArray(arr) ? arr : [])
+            .map((x) => String(x || '').slice(0, 40))
+            .filter((x) => {
+              if (!/^[a-z0-9]{1,40}$/.test(x) || seen[x]) return false
+              seen[x] = true
+              return true
+            })
+            .slice(0, max)
+        }
+        out.list_ids = ids(a.list_ids, 50)
+        out.contact_ids = ids(a.contact_ids, 3000)
       }
       if (type === 'PESSOAS') {
         out.person_ids = (Array.isArray(a.person_ids) ? a.person_ids : [])
@@ -948,13 +996,15 @@ routerAdd(
           message:
             aud.type === 'WHATSAPP'
               ? 'Escolha pelo menos um grupo do WhatsApp.'
-              : aud.type === 'WA_NUMEROS'
-                ? res.error
-                  ? 'Não consegui ler os participantes do grupo (' +
-                    res.error +
-                    '). Confira se o WhatsApp está conectado.'
-                  : 'Nenhum número visível nos grupos escolhidos.'
-                : 'Ninguém do público escolhido tem celular cadastrado.',
+              : aud.type === 'LISTAS'
+                ? 'Escolha uma lista ou números da base de contatos.'
+                : aud.type === 'WA_NUMEROS'
+                  ? res.error
+                    ? 'Não consegui ler os participantes do grupo (' +
+                      res.error +
+                      '). Confira se o WhatsApp está conectado.'
+                    : 'Nenhum número visível nos grupos escolhidos.'
+                  : 'Ninguém do público escolhido tem celular cadastrado.',
         })
       r.set('status', 'PROGRAMADO')
       r.set('starts_at', iso(at))
@@ -1272,6 +1322,36 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
 
   const GROUP_JID = /^[\d-]{5,50}@g\.us$/
 
+  // Público LISTAS: números da base de contatos (migração 0102) que estão nas listas
+  // escolhidas ou foram escolhidos um a um
+  const contactNumbers = (cid, aud) => {
+    const lists = Array.isArray(aud && aud.list_ids) ? aud.list_ids.map(String) : []
+    const ids = Array.isArray(aud && aud.contact_ids) ? aud.contact_ids.map(String) : []
+    const out = []
+    if (!lists.length && !ids.length) return out
+    const seen = {}
+    let rows = []
+    try {
+      rows = $app.findRecordsByFilter('whatsapp_contacts', 'church_id = {:c}', 'name', 10000, 0, {
+        c: cid,
+      })
+    } catch (_) {}
+    for (const r of rows) {
+      let ls = []
+      try {
+        ls = r.getStringSlice('lists') || []
+      } catch (_) {
+        ls = Array.isArray(r.get('lists')) ? r.get('lists') : []
+      }
+      const hit = ids.indexOf(r.id) !== -1 || ls.some((l) => lists.indexOf(String(l)) !== -1)
+      const phone = r.getString('phone')
+      if (!hit || !phone || seen[phone]) continue
+      seen[phone] = true
+      out.push({ phone: phone, name: r.getString('name') })
+    }
+    return out
+  }
+
   // Números dos participantes de grupos do WhatsApp (lidos na hora, direto da Evolution).
   // Quem esconde o número no grupo (endereço @lid) fica de fora e entra em "hidden".
   const groupNumbers = (cid, groups) => {
@@ -1349,6 +1429,7 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
     const out = []
     const seen = {}
     if (aud && aud.type === 'WA_NUMEROS') return groupNumbers(churchId, aud.wa_groups).list
+    if (aud && aud.type === 'LISTAS') return contactNumbers(churchId, aud)
     if (aud && aud.type === 'WHATSAPP') {
       for (const g of Array.isArray(aud.wa_groups) ? aud.wa_groups : []) {
         const id = String((g && g.id) || '')
@@ -1506,7 +1587,9 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
           ? 'Nenhum grupo do WhatsApp escolhido'
           : parseJson(c.getString('audience'), {}).type === 'WA_NUMEROS'
             ? 'Nenhum número lido dos grupos escolhidos (WhatsApp desconectado?)'
-            : 'Ninguém do público tem celular cadastrado',
+            : parseJson(c.getString('audience'), {}).type === 'LISTAS'
+              ? 'Nenhum número nas listas escolhidas'
+              : 'Ninguém do público tem celular cadastrado',
       )
       c.set('finished_at', iso(now))
       $app.save(c)

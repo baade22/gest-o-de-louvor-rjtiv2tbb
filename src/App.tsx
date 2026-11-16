@@ -31,6 +31,7 @@ import AvisosPanel from '@/pages/avisos/AvisosPanel'
 import AvisoEditor from '@/pages/avisos/AvisoEditor'
 import AvisosCultos from '@/pages/avisos/AvisosCultos'
 import AvisoEnvio from '@/pages/avisos/AvisoEnvio'
+import AvisosContatos from '@/pages/avisos/AvisosContatos'
 import SoundModule from '@/pages/SoundModule'
 import ProjectionModule from '@/pages/ProjectionModule'
 import MediaModule from '@/pages/MediaModule'
@@ -274,6 +275,14 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="culto.avisos.novo">
                   <AvisoEditor kind="AVULSO" />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/avisos/contatos"
+              element={
+                <RequireAuth requirePermission="culto.avisos.ver">
+                  <AvisosContatos />
                 </RequireAuth>
               }
             />
