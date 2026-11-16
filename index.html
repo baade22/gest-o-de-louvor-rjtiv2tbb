@@ -3,23 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- App web: ao "Adicionar à Tela de Início" no iPhone/Android abre como aplicativo -->
-    <link id="app-manifest" rel="manifest" href="/manifest.webmanifest" />
-    <!-- Site da igreja (/igreja): o iPhone lê o manifest uma vez, quando a página carrega, e
-         ignora a troca feita depois pelo React. Por isso o manifest da igreja já entra aqui
-         (mesma URL que siteManifestUrl em src/services/site.ts). -->
+    <!-- App web: ao "Adicionar à Tela de Início" no iPhone/Android abre como aplicativo.
+         O manifest entra por script, já com o endereço certo: no site da igreja (/igreja) é o
+         da igreja (mesma URL que siteManifestUrl em src/services/site.ts), no resto é o do
+         LouvorFlow. O Safari do iPhone guarda o primeiro manifest que vê e ignora trocas
+         feitas depois, então não pode haver um <link rel="manifest"> fixo no HTML. -->
     <script>
       (function () {
+        var href = '/manifest.webmanifest'
         try {
           var p = location.pathname
-          if (p !== '/igreja' && p.indexOf('/igreja/') !== 0) return
-          var q = new URLSearchParams()
-          var s = (new URLSearchParams(location.search).get('s') || '').toLowerCase().replace(/[^a-z0-9-]/g, '')
-          if (s) q.set('slug', s)
-          q.set('origin', location.origin)
-          document.getElementById('app-manifest').href =
-            '%VITE_POCKETBASE_URL%'.replace(/\/$/, '') + '/backend/v1/public/site/manifest?' + q.toString()
+          if (p === '/igreja' || p.indexOf('/igreja/') === 0) {
+            var q = new URLSearchParams()
+            var s = (new URLSearchParams(location.search).get('s') || '').toLowerCase().replace(/[^a-z0-9-]/g, '')
+            if (s) q.set('slug', s)
+            q.set('origin', location.origin)
+            href = '%VITE_POCKETBASE_URL%'.replace(/\/$/, '') + '/backend/v1/public/site/manifest?' + q.toString()
+          }
         } catch (e) {}
+        var l = document.createElement('link')
+        l.rel = 'manifest'
+        l.href = href
+        document.head.appendChild(l)
       })()
     </script>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
