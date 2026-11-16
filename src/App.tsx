@@ -42,6 +42,7 @@ import PublicCampaign from '@/pages/PublicCampaign'
 import PeopleList from '@/pages/membership/PeopleList'
 import PersonForm from '@/pages/membership/PersonForm'
 import Birthdays from '@/pages/membership/Birthdays'
+import ImportWhatsAppGroup from '@/pages/membership/ImportWhatsAppGroup'
 import PersonProfile from '@/pages/membership/PersonProfile'
 import MembershipDashboard from '@/pages/membership/MembershipDashboard'
 import Signups from '@/pages/membership/Signups'
@@ -503,6 +504,14 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="membresia.pessoas.novo">
                   <PersonForm />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/whatsapp-grupo"
+              element={
+                <RequireAuth requirePermission="membresia.pessoas.ver">
+                  <ImportWhatsAppGroup />
                 </RequireAuth>
               }
             />

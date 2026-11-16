@@ -21,6 +21,7 @@ import {
   IdCard,
   Mail,
   MapPin,
+  MessageCircle,
   MoreVertical,
   Phone,
   Plus,
@@ -162,6 +163,15 @@ export default function PeopleList() {
             >
               <IdCard className="h-4 w-4" />
               Carteirinhas
+            </Button>
+          </Link>
+          <Link to="/membros/whatsapp-grupo">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-slate-200 font-semibold gap-2"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Importar do WhatsApp
             </Button>
           </Link>
           <Link to="/membros/novo">
