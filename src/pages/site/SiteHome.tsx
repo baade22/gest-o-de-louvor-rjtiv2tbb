@@ -16,7 +16,16 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { WEEKDAYS, formatTime, mapsUrl, nextService, serviceNow, whenLabel } from '@/lib/site'
+import {
+  WEEKDAYS,
+  WEEKDAYS_SHORT,
+  brtClock,
+  formatTime,
+  mapsUrl,
+  nextService,
+  serviceNow,
+  whenLabel,
+} from '@/lib/site'
 import { getSiteVideos, siteFileUrl, type SiteVideos } from '@/services/site'
 import { useSite } from './siteContext'
 import { AgendaRow, Card, MoreLink, SectionTitle, SmartLink, VideoTile } from './siteParts'
@@ -162,6 +171,65 @@ function LiveCard({ videos }: { videos: SiteVideos | null }) {
       </span>
       <ChevronRight className="h-5 w-5 text-slate-400" />
     </Link>
+  )
+}
+
+/** Horários fixos da semana: um cartão por culto, com o dia em destaque e o próximo marcado. */
+function ServiceTimes() {
+  const { site } = useSite()
+  const today = brtClock(new Date()).day
+  const next = nextService(site.service_times)?.service
+  const list = [...site.service_times].sort((a, b) => a.day - b.day || a.time.localeCompare(b.time))
+  return (
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+      {list.map((t, i) => {
+        const isNext = t === next
+        const isToday = t.day === today
+        return (
+          <div
+            key={i}
+            className={cn(
+              'flex items-center gap-3.5 rounded-2xl border bg-white p-3',
+              isNext ? 'border-[var(--sa)] shadow-sm' : 'border-stone-200',
+            )}
+          >
+            <span
+              className={cn(
+                'grid h-14 w-16 shrink-0 place-items-center rounded-xl text-center leading-none',
+                isNext ? 'bg-[var(--sp)] text-[var(--sp-text)]' : 'bg-stone-100 text-[var(--sp)]',
+              )}
+            >
+              <span>
+                <span className="block text-[11px] font-bold uppercase tracking-wider opacity-80">
+                  {WEEKDAYS_SHORT[t.day]}
+                </span>
+                <span className="mt-1 block text-[17px] font-extrabold">{formatTime(t.time)}</span>
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">
+              {(isNext || isToday) && (
+                <span
+                  className={cn(
+                    'mb-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                    isNext
+                      ? 'bg-[color-mix(in_srgb,var(--sa)_18%,white)] text-slate-800'
+                      : 'bg-stone-100 text-slate-600',
+                  )}
+                >
+                  {isToday ? 'Hoje' : 'Próximo'}
+                </span>
+              )}
+              <span className="block truncate font-semibold text-slate-900">{t.label}</span>
+              <span className="block text-[13px] text-slate-500">
+                {t.day === 0 || t.day === 6
+                  ? `Todo ${WEEKDAYS[t.day].toLowerCase()}`
+                  : `Toda ${WEEKDAYS[t.day].toLowerCase()}-feira`}
+              </span>
+            </span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -345,16 +413,7 @@ export default function SiteHome() {
         {site.service_times.length > 0 && (
           <section className="space-y-3">
             <SectionTitle>Horários dos cultos</SectionTitle>
-            <Card className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-              {site.service_times.map((t, i) => (
-                <div key={i} className="flex items-center justify-between gap-3 text-[15px]">
-                  <span className="text-slate-600">
-                    {WEEKDAYS[t.day]} · {t.label}
-                  </span>
-                  <b>{formatTime(t.time)}</b>
-                </div>
-              ))}
-            </Card>
+            <ServiceTimes />
           </section>
         )}
 
