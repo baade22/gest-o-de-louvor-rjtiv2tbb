@@ -175,6 +175,80 @@ routerAdd(
       return out
     }
 
+    // Números dos participantes de grupos do WhatsApp (lidos na hora, direto da Evolution).
+    // Quem esconde o número no grupo (endereço @lid) fica de fora e entra em "hidden".
+    const groupNumbers = (cid, groups) => {
+      const out = []
+      let hidden = 0
+      const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
+        .replace(/\s+/g, '')
+        .replace(/\/+$/, '')
+      const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
+      let inst = ''
+      let own = ''
+      try {
+        const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', { c: cid })
+        inst = st.getString('instance')
+        own = String(st.getString('phone') || '').replace(/\D/g, '')
+      } catch (_) {}
+      if (!apiUrl || !apiKey || !inst) return { list: out, hidden: 0, error: 'sem conexão' }
+      const tail = (d) =>
+        d.indexOf('55') === 0 && d.length >= 12 ? d.slice(2, 4) + d.slice(-8) : d
+      const seen = {}
+      if (own) seen[tail(own)] = true
+      let error = ''
+      for (const g of Array.isArray(groups) ? groups : []) {
+        const gid = String((g && g.id) || '')
+        if (!GROUP_JID.test(gid)) continue
+        let res = null
+        try {
+          res = $http.send({
+            url:
+              apiUrl +
+              '/group/participants/' +
+              encodeURIComponent(inst) +
+              '?groupJid=' +
+              encodeURIComponent(gid),
+            method: 'GET',
+            headers: { apikey: apiKey },
+            timeout: 60,
+          })
+        } catch (_) {
+          error = 'sem resposta'
+          continue
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          error = 'código ' + res.statusCode
+          continue
+        }
+        let parts = []
+        try {
+          parts = (res.json && res.json.participants) || []
+        } catch (_) {}
+        for (const p of Array.isArray(parts) ? parts : []) {
+          const id = String((p && p.id) || '')
+          let raw = ''
+          if (id.indexOf('@s.whatsapp.net') !== -1) raw = id
+          else if (p && p.phoneNumber) raw = String(p.phoneNumber)
+          const d = raw.split('@')[0].split(':')[0].replace(/\D/g, '')
+          if (d.length < 10 || d.length > 15) {
+            hidden++
+            continue
+          }
+          const k = tail(d)
+          if (seen[k]) continue
+          seen[k] = true
+          out.push({
+            phone: d,
+            name: String((p && p.name) || '')
+              .trim()
+              .slice(0, 80),
+          })
+        }
+      }
+      return { list: out, hidden: hidden, error: error }
+    }
+
     // Público: lista de { phone, name } sem repetir número; conta quem ficou sem celular
     const resolveAudience = (aud) => {
       const out = []
@@ -200,6 +274,11 @@ routerAdd(
           out.push({ phone: id, name: String((g && g.name) || 'Grupo').trim() })
         }
         return { list: out, noPhone: 0 }
+      }
+      if (type === 'WA_NUMEROS') {
+        // Uma mensagem para cada número que está nos grupos escolhidos
+        const r = groupNumbers(churchId, aud.wa_groups)
+        return { list: r.list, noPhone: r.hidden, error: r.error }
       }
       const cong = String((aud && aud.congregation) || '')
       const okPerson = (p) =>
@@ -272,7 +351,7 @@ routerAdd(
     const cleanAudience = (a) => {
       a = a && typeof a === 'object' ? a : {}
       const type =
-        ['TODOS', 'GRUPO', 'EVENTO', 'PESSOAS', 'WHATSAPP'].indexOf(a.type) !== -1
+        ['TODOS', 'GRUPO', 'EVENTO', 'PESSOAS', 'WHATSAPP', 'WA_NUMEROS'].indexOf(a.type) !== -1
           ? a.type
           : 'TODOS'
       const out = { type: type, congregation: String(a.congregation || '').slice(0, 50) }
@@ -283,7 +362,7 @@ routerAdd(
       }
       if (type === 'GRUPO') out.group_id = String(a.group_id || '').slice(0, 40)
       if (type === 'EVENTO') out.event_id = String(a.event_id || '').slice(0, 40)
-      if (type === 'WHATSAPP') {
+      if (type === 'WHATSAPP' || type === 'WA_NUMEROS') {
         const seen = {}
         out.wa_groups = (Array.isArray(a.wa_groups) ? a.wa_groups : [])
           .map((g) => ({
@@ -445,7 +524,9 @@ routerAdd(
 
     if (action === 'audience_count') {
       const res = resolveAudience(cleanAudience(body.audience))
-      return e.json(200, { total: res.list.length, no_phone: res.noPhone })
+      const out = { total: res.list.length, no_phone: res.noPhone }
+      if (res.error) out.error = res.error
+      return e.json(200, out)
     }
 
     if (action === 'wa_groups') {
@@ -867,7 +948,13 @@ routerAdd(
           message:
             aud.type === 'WHATSAPP'
               ? 'Escolha pelo menos um grupo do WhatsApp.'
-              : 'Ninguém do público escolhido tem celular cadastrado.',
+              : aud.type === 'WA_NUMEROS'
+                ? res.error
+                  ? 'Não consegui ler os participantes do grupo (' +
+                    res.error +
+                    '). Confira se o WhatsApp está conectado.'
+                  : 'Nenhum número visível nos grupos escolhidos.'
+                : 'Ninguém do público escolhido tem celular cadastrado.',
         })
       r.set('status', 'PROGRAMADO')
       r.set('starts_at', iso(at))
@@ -1184,9 +1271,84 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
   const campCol = $app.findCollectionByNameOrId('whatsapp_campaigns')
 
   const GROUP_JID = /^[\d-]{5,50}@g\.us$/
+
+  // Números dos participantes de grupos do WhatsApp (lidos na hora, direto da Evolution).
+  // Quem esconde o número no grupo (endereço @lid) fica de fora e entra em "hidden".
+  const groupNumbers = (cid, groups) => {
+    const out = []
+    let hidden = 0
+    const apiUrl = String($os.getenv('WHATSAPP_API_URL') || '')
+      .replace(/\s+/g, '')
+      .replace(/\/+$/, '')
+    const apiKey = String($os.getenv('WHATSAPP_API_KEY') || '').trim()
+    let inst = ''
+    let own = ''
+    try {
+      const st = $app.findFirstRecordByFilter('whatsapp_settings', 'church_id = {:c}', { c: cid })
+      inst = st.getString('instance')
+      own = String(st.getString('phone') || '').replace(/\D/g, '')
+    } catch (_) {}
+    if (!apiUrl || !apiKey || !inst) return { list: out, hidden: 0, error: 'sem conexão' }
+    const tail = (d) => (d.indexOf('55') === 0 && d.length >= 12 ? d.slice(2, 4) + d.slice(-8) : d)
+    const seen = {}
+    if (own) seen[tail(own)] = true
+    let error = ''
+    for (const g of Array.isArray(groups) ? groups : []) {
+      const gid = String((g && g.id) || '')
+      if (!GROUP_JID.test(gid)) continue
+      let res = null
+      try {
+        res = $http.send({
+          url:
+            apiUrl +
+            '/group/participants/' +
+            encodeURIComponent(inst) +
+            '?groupJid=' +
+            encodeURIComponent(gid),
+          method: 'GET',
+          headers: { apikey: apiKey },
+          timeout: 60,
+        })
+      } catch (_) {
+        error = 'sem resposta'
+        continue
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        error = 'código ' + res.statusCode
+        continue
+      }
+      let parts = []
+      try {
+        parts = (res.json && res.json.participants) || []
+      } catch (_) {}
+      for (const p of Array.isArray(parts) ? parts : []) {
+        const id = String((p && p.id) || '')
+        let raw = ''
+        if (id.indexOf('@s.whatsapp.net') !== -1) raw = id
+        else if (p && p.phoneNumber) raw = String(p.phoneNumber)
+        const d = raw.split('@')[0].split(':')[0].replace(/\D/g, '')
+        if (d.length < 10 || d.length > 15) {
+          hidden++
+          continue
+        }
+        const k = tail(d)
+        if (seen[k]) continue
+        seen[k] = true
+        out.push({
+          phone: d,
+          name: String((p && p.name) || '')
+            .trim()
+            .slice(0, 80),
+        })
+      }
+    }
+    return { list: out, hidden: hidden, error: error }
+  }
+
   const resolveAudience = (churchId, aud) => {
     const out = []
     const seen = {}
+    if (aud && aud.type === 'WA_NUMEROS') return groupNumbers(churchId, aud.wa_groups).list
     if (aud && aud.type === 'WHATSAPP') {
       for (const g of Array.isArray(aud.wa_groups) ? aud.wa_groups : []) {
         const id = String((g && g.id) || '')
@@ -1342,7 +1504,9 @@ cronAdd('whatsapp_avisos_tick', '* * * * *', () => {
         'note',
         parseJson(c.getString('audience'), {}).type === 'WHATSAPP'
           ? 'Nenhum grupo do WhatsApp escolhido'
-          : 'Ninguém do público tem celular cadastrado',
+          : parseJson(c.getString('audience'), {}).type === 'WA_NUMEROS'
+            ? 'Nenhum número lido dos grupos escolhidos (WhatsApp desconectado?)'
+            : 'Ninguém do público tem celular cadastrado',
       )
       c.set('finished_at', iso(now))
       $app.save(c)

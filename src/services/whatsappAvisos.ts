@@ -118,7 +118,9 @@ export const saveAviso = (churchId: string, input: AvisoInput) =>
 export const deleteAviso = (churchId: string, id: string) =>
   call<{ id: string }>(churchId, 'delete', { id })
 export const countAudience = (churchId: string, audience: AvisoAudience) =>
-  call<{ total: number; no_phone: number }>(churchId, 'audience_count', { audience })
+  call<{ total: number; no_phone: number; error?: string }>(churchId, 'audience_count', {
+    audience,
+  })
 export interface WaGroup {
   id: string
   name: string

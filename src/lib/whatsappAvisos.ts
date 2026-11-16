@@ -17,7 +17,7 @@ export type AvisoStatus =
   | 'CANCELADO'
   | 'ATIVA'
   | 'INATIVA'
-export type AudienceType = 'TODOS' | 'GRUPO' | 'EVENTO' | 'PESSOAS' | 'WHATSAPP'
+export type AudienceType = 'TODOS' | 'GRUPO' | 'EVENTO' | 'PESSOAS' | 'WHATSAPP' | 'WA_NUMEROS'
 
 /** Grupo do WhatsApp escolhido no público (id = endereço "…@g.us") */
 export interface WaGroupRef {
@@ -99,11 +99,16 @@ export const AUDIENCE_TYPES: Array<{ value: AudienceType; label: string }> = [
   { value: 'EVENTO', label: 'Inscritos de um evento' },
   { value: 'PESSOAS', label: 'Escolher pessoas' },
   { value: 'WHATSAPP', label: 'Grupos do WhatsApp' },
+  { value: 'WA_NUMEROS', label: 'Números de um grupo do WhatsApp' },
 ]
 
 /** Público em grupos do WhatsApp: uma mensagem por grupo, sem nome de pessoa */
 export const isGroupAudience = (a: Pick<AvisoAudience, 'type'> | null | undefined) =>
   a?.type === 'WHATSAPP'
+
+/** Públicos que escolhem grupos do WhatsApp: o próprio grupo ou cada número que está nele */
+export const usesWaGroups = (a: Pick<AvisoAudience, 'type'> | null | undefined) =>
+  a?.type === 'WHATSAPP' || a?.type === 'WA_NUMEROS'
 
 /** Nos grupos os envios saem com 1 a 2 minutos entre um e outro */
 export const GROUP_PACE = { min: 1, max: 2 }
