@@ -20,6 +20,7 @@ import {
   estimateEnd,
   fromLocalInput,
   isGroupAudience,
+  usesWaGroups,
   previewText,
   serverMs,
   toLocalInput,
@@ -166,7 +167,9 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
   const [peopleQ, setPeopleQ] = useState('')
   const [peopleFound, setPeopleFound] = useState<AvisoOptions['people']>([])
   const [chosen, setChosen] = useState<AvisoOptions['people']>([])
-  const [count, setCount] = useState<{ total: number; no_phone: number } | null>(null)
+  const [count, setCount] = useState<{ total: number; no_phone: number; error?: string } | null>(
+    null,
+  )
   const [mode, setMode] = useState<'AGORA' | 'DATA'>('AGORA')
   const [startsAt, setStartsAt] = useState(() => toLocalInput(Date.now() + 3600 * 1000))
   const [localPreview, setLocalPreview] = useState('')
@@ -257,6 +260,8 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
 
   // Grupos do WhatsApp: lidos do celular da igreja quando esse público é escolhido
   const toGroups = isGroupAudience(form.audience)
+  const toGroupNumbers = form.audience.type === 'WA_NUMEROS'
+  const pickGroups = usesWaGroups(form.audience)
   const loadWaGroups = useCallback(async () => {
     if (!churchId) return
     setWaLoading(true)
@@ -270,8 +275,8 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
     }
   }, [churchId])
   useEffect(() => {
-    if (toGroups && waGroups === null && !waLoading && !waError) void loadWaGroups()
-  }, [toGroups, waGroups, waLoading, waError, loadWaGroups])
+    if (pickGroups && waGroups === null && !waLoading && !waError) void loadWaGroups()
+  }, [pickGroups, waGroups, waLoading, waError, loadWaGroups])
   const chosenGroups = form.audience.wa_groups || []
   const toggleGroup = (g: { id: string; name: string }) => {
     const on = chosenGroups.some((x) => x.id === g.id)
@@ -881,12 +886,21 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                   </div>
                 </div>
               )}
-              {toGroups && (
+              {pickGroups && (
                 <div className="space-y-2">
-                  <p className="text-sm text-slate-700">
-                    Sai uma mensagem em cada grupo escolhido. O número da igreja precisa estar no
-                    grupo e, se só administradores podem mandar mensagem, precisa ser administrador.
-                  </p>
+                  {toGroupNumbers ? (
+                    <p className="text-sm text-slate-700">
+                      Sai uma mensagem no privado para cada pessoa dos grupos escolhidos. Os números
+                      são lidos do grupo na hora do envio, então quem entrar ou sair já conta. O
+                      número da igreja precisa estar no grupo.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-700">
+                      Sai uma mensagem em cada grupo escolhido. O número da igreja precisa estar no
+                      grupo e, se só administradores podem mandar mensagem, precisa ser
+                      administrador.
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <Input
                       aria-label="Buscar grupo"
@@ -968,25 +982,27 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                   )}
                 </div>
               )}
-              {form.audience.type !== 'EVENTO' && form.audience.type !== 'PESSOAS' && !toGroups && (
-                <div className="space-y-1.5 max-w-xs">
-                  <label htmlFor="aud-cong" className="text-sm font-semibold text-slate-800">
-                    Congregação
-                  </label>
-                  <select
-                    id="aud-cong"
-                    className={fieldClass}
-                    value={form.audience.congregation || ''}
-                    onChange={(e) => setAud({ congregation: e.target.value })}
-                  >
-                    {CONGREGATIONS.map((c) => (
-                      <option key={c} value={c}>
-                        {c || 'Aldeia e Diamante'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {form.audience.type !== 'EVENTO' &&
+                form.audience.type !== 'PESSOAS' &&
+                !pickGroups && (
+                  <div className="space-y-1.5 max-w-xs">
+                    <label htmlFor="aud-cong" className="text-sm font-semibold text-slate-800">
+                      Congregação
+                    </label>
+                    <select
+                      id="aud-cong"
+                      className={fieldClass}
+                      value={form.audience.congregation || ''}
+                      onChange={(e) => setAud({ congregation: e.target.value })}
+                    >
+                      {CONGREGATIONS.map((c) => (
+                        <option key={c} value={c}>
+                          {c || 'Aldeia e Diamante'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               <p className="text-sm text-slate-700">
                 {toGroups ? (
                   <>
@@ -995,6 +1011,23 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                     </strong>{' '}
                     {chosenGroups.length === 1 ? 'escolhido' : 'escolhidos'} · 1 mensagem por grupo
                   </>
+                ) : toGroupNumbers ? (
+                  chosenGroups.length === 0 ? (
+                    'Escolha pelo menos um grupo.'
+                  ) : count?.error ? (
+                    <span className="text-red-700">
+                      Não consegui ler os participantes ({count.error}). Confira se o WhatsApp está
+                      conectado.
+                    </span>
+                  ) : count ? (
+                    <>
+                      <strong>{count.total} números</strong> nos grupos escolhidos
+                      {count.no_phone > 0 &&
+                        ` · ${count.no_phone} escondem o número no grupo e ficam de fora`}
+                    </>
+                  ) : (
+                    'Lendo os participantes…'
+                  )
                 ) : count ? (
                   <>
                     <strong>{count.total} pessoas</strong> com celular cadastrado

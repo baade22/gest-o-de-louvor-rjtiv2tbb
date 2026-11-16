@@ -3,6 +3,7 @@ import {
   estimateEnd,
   fromLocalInput,
   isGroupAudience,
+  usesWaGroups,
   nextSlot,
   previewText,
   toLocalInput,
@@ -60,6 +61,10 @@ describe('textos', () => {
     ).toBe('Olá! Hoje tem culto.')
     expect(isGroupAudience({ type: 'WHATSAPP' })).toBe(true)
     expect(isGroupAudience({ type: 'PESSOAS' })).toBe(false)
+    expect(isGroupAudience({ type: 'WA_NUMEROS' })).toBe(false)
+    expect(usesWaGroups({ type: 'WA_NUMEROS' })).toBe(true)
+    expect(usesWaGroups({ type: 'WHATSAPP' })).toBe(true)
+    expect(usesWaGroups({ type: 'TODOS' })).toBe(false)
   })
   it('diz quando, em palavras', () => {
     expect(whenLabel(at(16, 40), SAT_10)).toBe('hoje às 16:40')
