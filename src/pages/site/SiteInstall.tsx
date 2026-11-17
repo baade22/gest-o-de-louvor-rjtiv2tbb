@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, Download, Share, SquarePlus } from 'lucide-react'
 import { isIos, isStandalone } from '@/lib/site'
 import { useSite } from './siteContext'
-import { Card, SectionTitle } from './siteParts'
+import { Card, PageTitle } from './siteParts'
 import { SiteLogo } from './PublicSiteLayout'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -42,15 +42,15 @@ export default function SiteInstall() {
   }
 
   return (
-    <div className="space-y-5 px-4 pt-5 lg:px-8 lg:pt-10">
-      <SectionTitle>Ter a igreja no celular</SectionTitle>
+    <div className="space-y-5 px-4 pt-2 lg:px-8 lg:pt-10">
+      <PageTitle>Instalar o app</PageTitle>
       <div className="mx-auto max-w-lg space-y-4">
         <Card className="flex flex-col items-center gap-2 p-6 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[var(--sp)]">
-            <SiteLogo site={site} className="h-12 w-12" />
-          </span>
-          <p className="text-lg font-semibold">{site.short_name || site.title}</p>
-          <p className="text-sm text-slate-500">
+          <SiteLogo site={site} className="h-20 w-20" />
+          <p className="mt-2 text-[22px] font-extrabold tracking-tight">
+            Leve a {site.short_name || site.title} no celular
+          </p>
+          <p className="text-sm font-medium text-[var(--c-gray)]">
             Fica um ícone na tela de início, abre em tela cheia como um aplicativo. Não precisa
             baixar nada da loja e não ocupa espaço.
           </p>
@@ -65,7 +65,7 @@ export default function SiteInstall() {
           <button
             type="button"
             onClick={install}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--sa)] px-4 py-3.5 font-semibold text-[var(--sa-text)]"
+            className="inline-flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[var(--c-navy)] px-4 font-extrabold text-[var(--sp-text)]"
           >
             <Download className="h-5 w-5" /> Instalar o app
           </button>
@@ -73,18 +73,19 @@ export default function SiteInstall() {
 
         {!installed && (
           <Card className="space-y-4">
-            <p className="font-semibold">{ios ? 'No iPhone (Safari)' : 'Passo a passo'}</p>
+            <p className="font-extrabold">{ios ? 'No iPhone (Safari)' : 'Passo a passo'}</p>
             <Step n={1}>
               {ios ? (
                 <>
                   Toque em <b>Compartilhar</b>{' '}
-                  <Share className="inline h-4 w-4 align-[-2px] text-sky-600" /> na barra do Safari
+                  <Share className="inline h-4 w-4 align-[-2px] text-[var(--c-blue)]" /> na barra do
+                  Safari
                 </>
               ) : (
                 <>
                   Abra o menu do navegador (<b>⋮</b> no Chrome do Android ou{' '}
-                  <Share className="inline h-4 w-4 align-[-2px] text-sky-600" /> no Safari do
-                  iPhone)
+                  <Share className="inline h-4 w-4 align-[-2px] text-[var(--c-blue)]" /> no Safari
+                  do iPhone)
                 </>
               )}
             </Step>
@@ -97,7 +98,7 @@ export default function SiteInstall() {
               Toque em <b>Adicionar</b>. Depois é só abrir pelo ícone.
             </Step>
             {ios && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs font-medium text-[var(--c-gray)]">
                 Se abriu este link pelo Instagram ou WhatsApp, toque em ••• e escolha “Abrir no
                 Safari” primeiro.
               </p>
@@ -112,10 +113,10 @@ export default function SiteInstall() {
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3 text-sm">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-stone-100 font-bold text-[var(--sp)]">
+      <span className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full bg-[var(--c-sky)] text-[15px] font-extrabold text-[var(--c-navy)]">
         {n}
       </span>
-      <span className="pt-1.5">{children}</span>
+      <span className="pt-2 font-medium">{children}</span>
     </div>
   )
 }
