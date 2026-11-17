@@ -1,0 +1,10 @@
+Bíblia Livre (BLIVRE) - texto usado na aba Bíblia do site/app da igreja.
+
+Todas as Escrituras em português citadas são da Bíblia Livre (BLIVRE), Copyright © Diego Santos,
+Mario Sérgio, e Marco Teles, http://sites.google.com/site/biblialivre/ - fevereiro de 2018.
+Licença Creative Commons Atribuição 4.0 Brasil (http://creativecommons.org/licenses/by/4.0/br/).
+Reprodução permitida desde que devidamente mencionados fonte e autores.
+
+Fonte: https://ebible.org/porbr2018/ (arquivo porbr2018_vpl). O texto não foi alterado; só foi
+dividido em um arquivo JSON por livro: lista de capítulos, cada um com a lista de versículos.
+Palavras entre [colchetes] são acréscimos da tradução para dar sentido em português.

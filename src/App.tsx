@@ -82,6 +82,8 @@ import SiteWatch from '@/pages/site/SiteWatch'
 import SiteGive from '@/pages/site/SiteGive'
 import SitePrayer from '@/pages/site/SitePrayer'
 import SitePage from '@/pages/site/SitePage'
+import SiteBible from '@/pages/site/SiteBible'
+import SiteHymnal from '@/pages/site/SiteHymnal'
 import SiteInstall from '@/pages/site/SiteInstall'
 import SiteMe from '@/pages/site/SiteMe'
 import SiteAdmin from '@/pages/site/SiteAdmin'
@@ -131,6 +133,11 @@ const App = () => (
             <Route path="contribuir" element={<SiteGive />} />
             <Route path="oracao" element={<SitePrayer />} />
             <Route path="p/:page" element={<SitePage />} />
+            <Route path="biblia" element={<SiteBible />} />
+            <Route path="biblia/:book" element={<SiteBible />} />
+            <Route path="biblia/:book/:chapter" element={<SiteBible />} />
+            <Route path="hinario" element={<SiteHymnal />} />
+            <Route path="hinario/:id" element={<SiteHymnal />} />
             <Route path="instalar" element={<SiteInstall />} />
             <Route path="eu" element={<SiteMe />} />
           </Route>

@@ -55,6 +55,8 @@ export interface PublicSite {
   }[]
   notices: { id: string; title: string; body: string }[]
   pages: { title: string; slug: string }[]
+  /** hinários com hinos ativos (migração 0103); pode faltar em servidor antigo */
+  hymnals?: { name: string; count: number }[]
   agenda: PublicAgendaItem[]
   campaigns: { id: string; name: string; description: string; color: string; end_date: string }[]
   pix: { key: string; key_type: string; name: string; city: string } | null
@@ -78,6 +80,27 @@ export interface SiteVideos {
 }
 
 const q = (slug?: string) => (slug ? `?slug=${encodeURIComponent(slug)}` : '')
+
+export interface PublicHymnIndex {
+  hymnals: { name: string; hymns: { id: string; number: number; title: string }[] }[]
+}
+
+export interface PublicHymn {
+  id: string
+  hymnal: string
+  number: number
+  title: string
+  lyrics: string
+}
+
+export const getPublicHymns = (slug?: string) =>
+  pb.send<PublicHymnIndex>(`/backend/v1/public/site/hymns${q(slug)}`, { method: 'GET' })
+
+export const getPublicHymn = (id: string, slug?: string) =>
+  pb.send<PublicHymn>(
+    `/backend/v1/public/site/hymn?id=${encodeURIComponent(id)}${slug ? `&slug=${encodeURIComponent(slug)}` : ''}`,
+    { method: 'GET' },
+  )
 
 export const getPublicSite = (slug?: string) =>
   pb.send<PublicSite>(`/backend/v1/public/site${q(slug)}`, { method: 'GET' })
@@ -286,6 +309,32 @@ export async function savePage(churchId: string, id: string | null, data: Partia
 }
 
 export const deletePage = (id: string) => pb.collection('site_pages').delete(id)
+
+export interface SiteHymn {
+  id: string
+  church_id: string
+  hymnal: string
+  number: number
+  title: string
+  lyrics: string
+  active: boolean
+}
+
+export const listHymns = (churchId: string) =>
+  pb.collection('site_hymns').getFullList<SiteHymn>({
+    filter: pb.filter('church_id = {:c}', { c: churchId }),
+    sort: 'hymnal,number,title',
+    fields: 'id,church_id,hymnal,number,title,active',
+  })
+
+export const getHymn = (id: string) => pb.collection('site_hymns').getOne<SiteHymn>(id)
+
+export async function saveHymn(churchId: string, id: string | null, data: Partial<SiteHymn>) {
+  if (id) return pb.collection('site_hymns').update<SiteHymn>(id, data)
+  return pb.collection('site_hymns').create<SiteHymn>({ ...data, church_id: churchId })
+}
+
+export const deleteHymn = (id: string) => pb.collection('site_hymns').delete(id)
 
 export const getSiteOptions = (churchId: string) =>
   pb.send<SiteOptions>('/backend/v1/site/options', {
