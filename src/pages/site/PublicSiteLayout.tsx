@@ -240,6 +240,12 @@ export default function PublicSiteLayout() {
     ...tabs
       .filter((t) => t.path !== '/eu')
       .map((t) => ({ to: ctx.to(t.path), label: t.label, active: isTab(t.path) })),
+    ...(site.sections.biblia
+      ? [{ to: ctx.to('/biblia'), label: 'Bíblia', active: isTab('/biblia') }]
+      : []),
+    ...(site.sections.hinario && site.hymnals?.length
+      ? [{ to: ctx.to('/hinario'), label: 'Hinário', active: isTab('/hinario') }]
+      : []),
     ...site.pages.map((p) => ({
       to: ctx.to(`/p/${p.slug}`),
       label: p.title,
@@ -278,7 +284,7 @@ export default function PublicSiteLayout() {
             </span>
           </Link>
           <nav className="ml-auto hidden items-center gap-6 text-sm font-medium lg:flex">
-            {navLinks.slice(0, 7).map((l) => (
+            {navLinks.slice(0, 8).map((l) => (
               <Link
                 key={l.to}
                 to={l.to}
