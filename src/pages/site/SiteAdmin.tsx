@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Megaphone,
+  Music,
   Pencil,
   Plus,
   RefreshCw,
@@ -61,7 +62,6 @@ import {
 } from '@/services/site'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -82,55 +82,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { publicOrigin } from '@/lib/publicOrigin'
+import { Box, Field } from './siteAdminParts'
+import HymnsTab from './SiteAdminHymns'
 
 const day10 = (s?: string) => (s ? s.slice(0, 10) : '')
 const toDate = (s: string) => (s ? `${s} 12:00:00.000Z` : '')
 const fmtDay = (s: string) => {
   const d = day10(s)
   return d ? d.split('-').reverse().join('/') : ''
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string
-  hint?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-sm font-semibold text-slate-700">{label}</Label>
-      {children}
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
-    </div>
-  )
-}
-
-function Box({
-  title,
-  hint,
-  action,
-  children,
-}: {
-  title: string
-  hint?: string
-  action?: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-[12rem] flex-1">
-          <h2 className="font-semibold text-slate-900">{title}</h2>
-          {hint && <p className="text-sm text-slate-500">{hint}</p>}
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
 }
 
 // ---------------------------------------------------------------- Geral
@@ -1557,6 +1516,9 @@ export default function SiteAdmin() {
                 <TabsTrigger value="paginas" className="gap-1.5" disabled={!settings}>
                   <FileText className="h-4 w-4" /> Páginas
                 </TabsTrigger>
+                <TabsTrigger value="hinario" className="gap-1.5" disabled={!settings}>
+                  <Music className="h-4 w-4" /> Hinário
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="geral">
                 <GeneralTab
@@ -1587,6 +1549,9 @@ export default function SiteAdmin() {
               </TabsContent>
               <TabsContent value="paginas">
                 <PagesTab churchId={churchId} canEdit={canEdit} />
+              </TabsContent>
+              <TabsContent value="hinario">
+                <HymnsTab churchId={churchId} canEdit={canEdit} />
               </TabsContent>
             </Tabs>
           )}

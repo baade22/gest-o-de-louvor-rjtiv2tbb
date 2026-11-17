@@ -10,6 +10,7 @@ import {
   HandHeart,
   Megaphone,
   MapPin,
+  Music,
   QrCode,
   Radio,
   Smartphone,
@@ -264,6 +265,24 @@ export default function SiteHome() {
           tone: 'bg-indigo-50 text-indigo-700',
         }
       : null,
+    site.sections.biblia
+      ? {
+          to: to('/biblia'),
+          label: 'Bíblia',
+          hint: 'Ler e buscar versículos',
+          icon: BookOpen,
+          tone: 'bg-rose-50 text-rose-700',
+        }
+      : null,
+    site.sections.hinario && site.hymnals?.length
+      ? {
+          to: to('/hinario'),
+          label: 'Hinário',
+          hint: site.hymnals.map((h) => h.name).join(' e '),
+          icon: Music,
+          tone: 'bg-violet-50 text-violet-700',
+        }
+      : null,
     map
       ? {
           href: map,
@@ -319,10 +338,14 @@ export default function SiteHome() {
           <div
             className={cn(
               'grid gap-3',
-              ['grid-cols-1', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][
-                Math.min(shortcuts.length, 4)
-              ],
-              'lg:grid-cols-4',
+              shortcuts.length <= 4
+                ? ['grid-cols-1', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][
+                    shortcuts.length
+                  ]
+                : shortcuts.length <= 6
+                  ? 'grid-cols-3'
+                  : 'grid-cols-4',
+              shortcuts.length === 5 || shortcuts.length === 6 ? 'lg:grid-cols-3' : 'lg:grid-cols-4',
             )}
           >
             {shortcuts.map((s) => {

@@ -4,6 +4,8 @@
 // GET  /backend/v1/public/site/page?slug=&page= uma página (Quem somos, Ministérios...)
 // GET  /backend/v1/public/site/videos?slug=     últimos vídeos do canal do YouTube (feed público)
 // GET  /backend/v1/public/site/manifest?slug=   manifest do app (nome, cores e ícone da igreja)
+// GET  /backend/v1/public/site/hymns?slug=      índice do hinário (hinário, número e título)
+// GET  /backend/v1/public/site/hymn?slug=&id=   um hino com a letra (migração 0103)
 // POST /backend/v1/public/site/prayer           pedido de oração ou "fale conosco"
 //
 // Só responde para site publicado. "slug" vazio = o primeiro site publicado (a igreja principal).
@@ -62,6 +64,8 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
       oracao: true,
       avisos: true,
       novo: true,
+      biblia: true,
+      hinario: true,
     },
     json(site, 'sections', {}),
   )
@@ -213,6 +217,32 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
     for (const p of rows) pages.push({ title: p.getString('title'), slug: p.getString('slug') })
   } catch (_) {}
 
+  // Hinários com hinos ativos (só nome e quantidade; o índice vem de /site/hymns)
+  const hymnals = []
+  if (sections.hinario) {
+    try {
+      const rows = $app.findRecordsByFilter(
+        'site_hymns',
+        'church_id = {:c} && active = true',
+        'hymnal',
+        5000,
+        0,
+        { c: churchId },
+      )
+      const count = {}
+      for (const h of rows) {
+        const name = h.getString('hymnal')
+        if (!(name in count)) {
+          count[name] = 0
+          hymnals.push(name)
+        }
+        count[name]++
+      }
+      for (let i = 0; i < hymnals.length; i++)
+        hymnals[i] = { name: hymnals[i], count: count[hymnals[i]] }
+    } catch (_) {}
+  }
+
   let pix = null
   const campaigns = []
   if (sections.contribuir) {
@@ -286,6 +316,7 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
     highlights: highlights,
     notices: notices,
     pages: pages,
+    hymnals: hymnals,
     agenda: agenda.slice(0, 40),
     campaigns: campaigns,
     pix: pix,
@@ -625,4 +656,88 @@ routerAdd('POST', '/backend/v1/public/site/prayer', (e) => {
     return e.json(500, { message: 'Não foi possível enviar agora. Tente de novo em instantes.' })
   }
   return e.json(200, { ok: true })
+})
+
+routerAdd('GET', '/backend/v1/public/site/hymns', (e) => {
+  const q = e.requestInfo().query || {}
+  const slug = String(q.slug || '')
+    .trim()
+    .toLowerCase()
+  if (slug && !/^[a-z0-9-]{1,40}$/.test(slug))
+    return e.json(404, { message: 'Site não encontrado.' })
+  let site = null
+  try {
+    const list = slug
+      ? $app.findRecordsByFilter('site_settings', 'published = true && slug = {:s}', '', 1, 0, {
+          s: slug,
+        })
+      : $app.findRecordsByFilter('site_settings', 'published = true', 'created', 1, 0)
+    site = list.length ? list[0] : null
+  } catch (_) {}
+  if (!site) return e.json(404, { message: 'Site não encontrado.' })
+  let sections = {}
+  try {
+    sections = JSON.parse(site.getString('sections') || '{}') || {}
+  } catch (_) {}
+  if (sections.hinario === false) return e.json(200, { hymnals: [] })
+
+  const groups = {}
+  const order = []
+  try {
+    const rows = $app.findRecordsByFilter(
+      'site_hymns',
+      'church_id = {:c} && active = true',
+      'hymnal,number,title',
+      5000,
+      0,
+      { c: site.getString('church_id') },
+    )
+    for (const h of rows) {
+      const name = h.getString('hymnal')
+      if (!groups[name]) {
+        groups[name] = []
+        order.push(name)
+      }
+      groups[name].push({ id: h.id, number: h.getInt('number'), title: h.getString('title') })
+    }
+  } catch (_) {}
+  e.response.header().set('Cache-Control', 'public, max-age=300')
+  return e.json(200, { hymnals: order.map((n) => ({ name: n, hymns: groups[n] })) })
+})
+
+routerAdd('GET', '/backend/v1/public/site/hymn', (e) => {
+  const q = e.requestInfo().query || {}
+  const slug = String(q.slug || '')
+    .trim()
+    .toLowerCase()
+  const id = String(q.id || '').trim()
+  const notFound = () => e.json(404, { message: 'Hino não encontrado.' })
+  if ((slug && !/^[a-z0-9-]{1,40}$/.test(slug)) || !/^[a-z0-9]{15}$/.test(id)) return notFound()
+  let site = null
+  try {
+    const list = slug
+      ? $app.findRecordsByFilter('site_settings', 'published = true && slug = {:s}', '', 1, 0, {
+          s: slug,
+        })
+      : $app.findRecordsByFilter('site_settings', 'published = true', 'created', 1, 0)
+    site = list.length ? list[0] : null
+  } catch (_) {}
+  if (!site) return notFound()
+  try {
+    const h = $app.findFirstRecordByFilter(
+      'site_hymns',
+      'id = {:id} && church_id = {:c} && active = true',
+      { id: id, c: site.getString('church_id') },
+    )
+    e.response.header().set('Cache-Control', 'public, max-age=300')
+    return e.json(200, {
+      id: h.id,
+      hymnal: h.getString('hymnal'),
+      number: h.getInt('number'),
+      title: h.getString('title'),
+      lyrics: h.getString('lyrics'),
+    })
+  } catch (_) {
+    return notFound()
+  }
 })
