@@ -47,15 +47,15 @@ import {
 } from '@/lib/eventPage'
 import { pixPayload, type PixKeyType } from '@/lib/pix'
 import { toCalendarYMD } from '@/lib/dateUtils'
+import { useSiteFont } from '@/pages/site/siteFont'
+import '@/pages/site/siteTheme.css'
 
-const inputClass = 'rounded-xl border-slate-200 h-11 text-base sm:text-sm'
+const inputClass = 'h-[52px] rounded-[18px] border-[#e2e6ec] bg-white px-4 text-base'
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-6 text-center space-y-3">
-        {children}
-      </div>
+    <div className="site-c min-h-screen flex items-center justify-center p-4">
+      <div className="c-card max-w-md w-full p-6 text-center space-y-3">{children}</div>
     </div>
   )
 }
@@ -72,10 +72,10 @@ function Card({
   children: React.ReactNode
 }) {
   return (
-    <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-3">
-      <h2 className="flex items-center gap-2.5 text-base font-bold text-slate-900">
+    <section className="c-card p-5 space-y-3">
+      <h2 className="flex items-center gap-2.5 text-[16px] font-extrabold">
         <span
-          className="h-8 w-8 rounded-lg flex items-center justify-center"
+          className="h-9 w-9 rounded-full flex items-center justify-center"
           style={{ background: `${accent}1a`, color: accent }}
         >
           <Icon className="h-4 w-4" />
@@ -110,6 +110,7 @@ export default function PublicEventSignup() {
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<EventSignupResult | null>(null)
   const [copied, setCopied] = useState(false)
+  useSiteFont()
 
   useEffect(() => {
     getEventSignupInfo(key).then(setInfo)
@@ -192,7 +193,7 @@ export default function PublicEventSignup() {
 
   if (!info) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="site-c min-h-screen flex items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
       </div>
     )
@@ -225,35 +226,48 @@ export default function PublicEventSignup() {
   const firstName = name.trim().split(/\s+/)[0]
 
   const header = (
-    <header className="relative">
+    <header className="relative isolate overflow-hidden text-white lg:hidden">
       {cover ? (
-        <div className="relative lg:hidden">
-          <img src={cover} alt="" className="w-full aspect-video object-cover" />
-          {!info.hide_header && (
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent" />
-          )}
-        </div>
+        <img
+          src={cover}
+          alt=""
+          className={
+            info.hide_header
+              ? 'w-full aspect-video object-cover'
+              : 'absolute inset-0 -z-10 h-full w-full object-cover'
+          }
+        />
       ) : (
-        <div className="h-44 lg:hidden" style={{ background: accent }} />
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            background: `linear-gradient(160deg, ${accent} 0%, #14223a 80%)`,
+          }}
+        />
       )}
       {!info.hide_header && (
-        <div className="absolute inset-x-0 top-0 px-5 pt-6 text-white lg:hidden">
-          <p className="text-xs font-medium uppercase tracking-wide opacity-90 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: '#fff' }} />
-            {info.church_name}
-          </p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight drop-shadow">{info.title}</h1>
-        </div>
+        <>
+          {cover && <div className="c-hero-shade absolute inset-0 -z-10" />}
+          <div className="flex min-h-[300px] flex-col justify-end px-5 pb-12 pt-[calc(env(safe-area-inset-top)+24px)]">
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-[12px] font-bold backdrop-blur">
+              {info.open ? 'Inscrições abertas' : info.church_name}
+            </span>
+            <h1 className="mt-2.5 text-[32px] font-extrabold leading-[1.04] tracking-tight">
+              {info.title}
+            </h1>
+            <p className="mt-1.5 text-[13px] font-semibold opacity-80">{info.church_name}</p>
+          </div>
+        </>
       )}
     </header>
   )
 
   const desktopTitle = !info.hide_header && (
     <div className="hidden lg:block space-y-1">
-      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>
+      <p className="text-xs font-extrabold uppercase tracking-[0.1em]" style={{ color: accent }}>
         {info.church_name}
       </p>
-      <h1 className="text-3xl font-extrabold leading-tight text-slate-900">{info.title}</h1>
+      <h1 className="text-4xl font-extrabold leading-tight tracking-tight">{info.title}</h1>
     </div>
   )
 
@@ -329,14 +343,11 @@ export default function PublicEventSignup() {
   if (result) {
     body = (
       <>
-        <section className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm text-center space-y-3">
-          <div
-            className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto"
-            style={{ background: `${accent}1a`, color: accent }}
-          >
+        <section className="c-card p-6 text-center space-y-3">
+          <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto bg-[#ddf0e4] text-[#2d7a4b]">
             <Check className="h-8 w-8" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Inscrição feita!</h2>
+          <h2 className="text-2xl font-extrabold tracking-tight">Inscrição feita!</h2>
           {result.message ? (
             <RichTextView text={result.message} className="text-left" linkColor={accent} />
           ) : (
@@ -347,7 +358,7 @@ export default function PublicEventSignup() {
           )}
         </section>
         {amount > 0 && (
-          <section className="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm space-y-3">
+          <section className="c-card p-5 space-y-3">
             <p className="text-center">
               <span className="block text-sm text-slate-600">Falta o pagamento de</span>
               <span className="block text-3xl font-extrabold text-slate-900">
@@ -364,7 +375,7 @@ export default function PublicEventSignup() {
                 <PixQr payload={pixCode} className="mx-auto h-52 w-52" />
                 <Button
                   onClick={copyPix}
-                  className="h-12 w-full rounded-xl text-base text-white gap-2"
+                  className="h-[52px] w-full rounded-full text-base font-extrabold text-white gap-2"
                   style={{ background: accent }}
                 >
                   {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
@@ -375,8 +386,8 @@ export default function PublicEventSignup() {
                 </p>
                 <p className="text-xs text-slate-500">
                   O Pix cai na conta da igreja ({info.pix!.name} · chave{' '}
-                  {displayPixKey(info.pix!.key, info.pix!.key_type || undefined)}). A equipe
-                  confirma o pagamento pelo extrato.
+                  {displayPixKey(info.pix!.key, info.pix!.key_type || undefined)}
+                  ). A equipe confirma o pagamento pelo extrato.
                 </p>
               </div>
             )}
@@ -388,17 +399,22 @@ export default function PublicEventSignup() {
           </section>
         )}
         {result.checkin_code && (
-          <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm text-center space-y-2">
-            <h2 className="font-bold text-slate-900">Seu comprovante</h2>
-            <PixQr
-              payload={checkinUrl(result.checkin_code)}
-              label="QR do comprovante de inscrição"
-              className="mx-auto h-44 w-44"
-            />
-            <p className="text-sm text-slate-600">
-              Mostre este QR na entrada do evento. Tire um print desta tela para guardar.
-            </p>
-            <p className="font-mono text-xs text-slate-400">{result.checkin_code}</p>
+          <section className="overflow-hidden rounded-3xl bg-white text-center shadow-[0_8px_24px_rgba(20,34,58,0.08)]">
+            <div className="bg-[#14223a] px-5 py-4 text-left text-white">
+              <p className="text-[12px] font-bold opacity-75">{info.title}</p>
+              <h2 className="text-[19px] font-extrabold">Seu ingresso</h2>
+            </div>
+            <div className="space-y-2 border-t-2 border-dashed border-[#e2e6ec] p-5">
+              <PixQr
+                payload={checkinUrl(result.checkin_code)}
+                label="QR do comprovante de inscrição"
+                className="mx-auto h-44 w-44"
+              />
+              <p className="text-sm text-slate-600">
+                Mostre este QR na entrada do evento. Tire um print desta tela para guardar.
+              </p>
+              <p className="font-mono text-xs text-slate-400">{result.checkin_code}</p>
+            </div>
           </section>
         )}
         {infoCard}
@@ -415,7 +431,7 @@ export default function PublicEventSignup() {
         )}
         {infoCard}
         {!info.open ? (
-          <section className="bg-white rounded-2xl border border-slate-200/80 p-8 text-center space-y-2 shadow-sm">
+          <section className="c-card p-8 text-center space-y-2">
             {info.closed_reason === 'soon' ? (
               <CalendarDays className="h-12 w-12 mx-auto" style={{ color: accent }} />
             ) : (
@@ -431,12 +447,8 @@ export default function PublicEventSignup() {
             </p>
           </section>
         ) : (
-          <form
-            onSubmit={submit}
-            noValidate
-            className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4 shadow-sm"
-          >
-            <h2 className="text-base font-bold text-slate-900">
+          <form onSubmit={submit} noValidate className="c-card p-5 space-y-4">
+            <h2 className="text-[20px] font-extrabold tracking-tight">
               {info.couple_only ? 'Inscrição do casal' : 'Faça sua inscrição'}
             </h2>
             {typeof info.spots_left === 'number' && info.spots_left <= 10 && (
@@ -489,7 +501,7 @@ export default function PublicEventSignup() {
               />
             </div>
             {info.couple_only && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-[18px] bg-[#f1f3f6] p-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="ev-partner" className="text-sm font-semibold">
                     Nome do cônjuge <span className="text-red-500">*</span>
@@ -542,10 +554,14 @@ export default function PublicEventSignup() {
                           role="radio"
                           aria-checked={on}
                           onClick={() => setAnswers((a) => ({ ...a, [q.id]: on ? '' : opt }))}
-                          className="h-10 min-w-12 px-4 rounded-xl border text-sm font-medium"
+                          className="h-11 min-w-12 px-4 rounded-full border text-sm font-bold"
                           style={
                             on
-                              ? { background: accent, borderColor: accent, color: '#fff' }
+                              ? {
+                                  background: accent,
+                                  borderColor: accent,
+                                  color: '#fff',
+                                }
                               : { borderColor: '#e2e8f0', color: '#334155' }
                           }
                         >
@@ -581,7 +597,7 @@ export default function PublicEventSignup() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 rounded-xl"
+                    className="h-[52px] rounded-full px-5"
                     onClick={applyCoupon}
                     disabled={!couponInput.trim()}
                   >
@@ -629,7 +645,7 @@ export default function PublicEventSignup() {
             <Button
               type="submit"
               disabled={sending}
-              className="w-full h-12 rounded-xl text-white text-base font-semibold gap-2 hover:opacity-90"
+              className="w-full h-[54px] rounded-full text-white text-[15px] font-extrabold gap-2 hover:opacity-90"
               style={{ background: accent }}
             >
               <Send className="h-4 w-4" />
@@ -642,7 +658,7 @@ export default function PublicEventSignup() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 lg:flex">
+    <div className="site-c min-h-screen lg:flex">
       {/* Computador: a arte vira faixa lateral fixa */}
       <aside className="hidden lg:block lg:w-[38%] xl:w-[34%] shrink-0">
         <div className="sticky top-0 h-screen overflow-hidden" style={{ background: accent }}>
@@ -651,7 +667,12 @@ export default function PublicEventSignup() {
       </aside>
       <div className="flex-1 min-w-0">
         {header}
-        <main className="max-w-xl mx-auto px-4 pb-10 pt-4 lg:pt-10 space-y-4 relative">
+        <main
+          className={
+            'max-w-xl mx-auto px-4 pb-10 lg:pt-10 space-y-4 relative z-[3] bg-[#f1f3f6] ' +
+            (info.hide_header ? 'pt-4' : '-mt-7 rounded-t-[28px] pt-5 lg:mt-0 lg:rounded-none')
+          }
+        >
           {body}
           <footer className="pt-4 text-center text-xs text-slate-400">
             © {new Date().getFullYear()} · {info.church_name}

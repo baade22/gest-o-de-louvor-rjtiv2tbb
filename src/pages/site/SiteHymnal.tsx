@@ -23,7 +23,7 @@ import {
   type PublicHymnIndex,
 } from '@/services/site'
 import { useSite } from './siteContext'
-import { Card, SectionTitle } from './siteParts'
+import { Card, PageTitle } from './siteParts'
 
 const SIZE_KEY = 'site_hymn_size'
 const SIZES = ['text-[16px]', 'text-[18px]', 'text-[21px]', 'text-[24px]']
@@ -64,7 +64,7 @@ function useHymnIndex(slug: string) {
 export default function SiteHymnal() {
   const { id = '' } = useParams()
   return (
-    <div className="space-y-5 px-4 pt-5 lg:px-8 lg:pt-10">{id ? <Hymn id={id} /> : <Index />}</div>
+    <div className="space-y-5 px-4 pt-2 lg:px-8 lg:pt-10">{id ? <Hymn id={id} /> : <Index />}</div>
   )
 }
 
@@ -87,23 +87,25 @@ function Index() {
   }, [current, query])
 
   if (error)
-    return <p className="pt-10 text-center text-slate-500">Não foi possível abrir o hinário.</p>
+    return (
+      <p className="pt-10 text-center text-[var(--c-gray)]">Não foi possível abrir o hinário.</p>
+    )
   if (!data)
     return (
       <div className="grid place-items-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-[var(--c-gray)]" />
       </div>
     )
 
   return (
     <>
-      <SectionTitle>Hinário</SectionTitle>
+      <PageTitle>Hinário</PageTitle>
       {!hymnals.length ? (
-        <Card className="p-8 text-center text-slate-500">Nenhum hino cadastrado ainda.</Card>
+        <Card className="p-8 text-center text-[var(--c-gray)]">Nenhum hino cadastrado ainda.</Card>
       ) : (
         <>
           {hymnals.length > 1 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex rounded-full bg-[#e3e8ef] p-1">
               {hymnals.map((h) => (
                 <button
                   key={h.name}
@@ -114,10 +116,10 @@ function Index() {
                     setQuery('')
                   }}
                   className={cn(
-                    'rounded-full border px-4 py-2 text-sm font-semibold',
+                    'h-[38px] min-w-0 flex-1 truncate rounded-full px-3 text-[13.5px] font-extrabold',
                     current?.name === h.name
-                      ? 'border-[var(--sp)] bg-[var(--sp)] text-[var(--sp-text)]'
-                      : 'border-stone-200 bg-white text-slate-700',
+                      ? 'bg-white text-[var(--c-navy)] shadow-[0_2px_6px_rgba(20,34,58,0.08)]'
+                      : 'text-[var(--c-gray)]',
                   )}
                 >
                   {h.name}
@@ -126,40 +128,42 @@ function Index() {
             </div>
           )}
           <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--c-gray)]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Número ou título no ${current?.name || 'hinário'}`}
               inputMode="search"
-              className="w-full rounded-2xl border border-stone-200 bg-white py-3.5 pl-12 pr-10 text-[16px] outline-none focus:border-[var(--sa)]"
+              className="c-card w-full border border-transparent py-3.5 pl-12 pr-10 text-[16px] outline-none focus:border-[var(--c-blue)]"
             />
             {query && (
               <button
                 type="button"
                 aria-label="Limpar"
                 onClick={() => setQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[var(--c-gray)]"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
           {list.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">Nenhum hino com "{query}".</p>
+            <p className="py-6 text-center text-sm text-[var(--c-gray)]">
+              Nenhum hino com "{query}".
+            </p>
           ) : (
-            <Card className="divide-y divide-stone-100 p-0">
+            <Card className="divide-y divide-[#eef1f5] p-0">
               {list.map((h) => (
                 <Link
                   key={h.id}
                   to={to(`/hinario/${h.id}`)}
-                  className="flex items-center gap-3 px-4 py-3"
+                  className="flex items-center gap-3.5 px-3.5 py-[11px]"
                 >
-                  <span className="grid h-10 min-w-[2.75rem] shrink-0 place-items-center rounded-xl bg-stone-100 px-2 text-[15px] font-extrabold text-[var(--sp)]">
+                  <span className="grid h-[42px] min-w-[42px] shrink-0 place-items-center rounded-full bg-[var(--c-sky)] px-2 text-[14px] font-extrabold text-[var(--c-navy)]">
                     {h.number || <Music className="h-4 w-4" />}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{h.title}</span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{h.title}</span>
+                  <ChevronRight className="h-[18px] w-[18px] shrink-0 text-[#b3bbc7]" />
                 </Link>
               ))}
             </Card>
@@ -223,7 +227,7 @@ function Hymn({ id }: { id: string }) {
       <div className="flex items-center gap-2">
         <Link
           to={to('/hinario')}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500"
+          className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--c-gray)]"
         >
           <ArrowLeft className="h-4 w-4" /> Hinário
         </Link>
@@ -233,7 +237,7 @@ function Hymn({ id }: { id: string }) {
             aria-label="Diminuir letra"
             onClick={() => changeSize(-1)}
             disabled={size === 0}
-            className="grid h-9 w-9 place-items-center rounded-full border border-stone-200 bg-white disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-[0_2px_8px_rgba(20,34,58,0.06)] disabled:opacity-40"
           >
             <Minus className="h-4 w-4" />
           </button>
@@ -242,7 +246,7 @@ function Hymn({ id }: { id: string }) {
             aria-label="Aumentar letra"
             onClick={() => changeSize(1)}
             disabled={size === SIZES.length - 1}
-            className="grid h-9 w-9 place-items-center rounded-full border border-stone-200 bg-white disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-[0_2px_8px_rgba(20,34,58,0.06)] disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -250,51 +254,64 @@ function Hymn({ id }: { id: string }) {
       </div>
 
       {error ? (
-        <p className="pt-10 text-center text-slate-500">Hino não encontrado.</p>
+        <p className="pt-10 text-center text-[var(--c-gray)]">Hino não encontrado.</p>
       ) : !hymn ? (
         <div className="grid place-items-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--c-gray)]" />
         </div>
       ) : (
         <>
-          <div className="text-center">
-            <p className="text-xs font-bold uppercase tracking-wider text-[var(--sa)]">
+          <div className="px-1">
+            <p className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[var(--c-blue)]">
               {hymn.hymnal}
+              {hymn.number ? ` · Hino ${hymn.number}` : ''}
             </p>
-            <h2 className="mt-1 font-serif text-2xl font-bold text-slate-900 lg:text-4xl">
-              {hymn.number ? `${hymn.number}. ` : ''}
+            <h2 className="mt-2 text-[28px] font-extrabold leading-tight tracking-tight lg:text-4xl">
               {hymn.title}
             </h2>
           </div>
-          <Card className="space-y-5 p-5 text-center lg:p-8">
+          <div className="space-y-[18px] px-1">
             {stanzas.length ? (
-              stanzas.map((lines, i) => (
-                <div key={i} className={cn('leading-relaxed text-slate-800', SIZES[size])}>
-                  {lines.map((l, j) =>
-                    isLabel(l) ? (
-                      <p
-                        key={j}
-                        className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400"
-                      >
-                        {l.replace(/^\[|\]$|:$/g, '')}
-                      </p>
-                    ) : (
-                      <p key={j}>{l}</p>
-                    ),
-                  )}
-                </div>
-              ))
+              stanzas.map((lines, i) => {
+                const chorus = isLabel(lines[0] || '') && /coro|refr/i.test(lines[0])
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'font-semibold leading-[1.6] text-[#253247]',
+                      SIZES[size],
+                      chorus &&
+                        'rounded-[18px] border-l-4 border-[var(--c-blue)] bg-white px-4 py-3.5 text-[var(--c-navy)]',
+                    )}
+                  >
+                    {lines.map((l, j) =>
+                      isLabel(l) ? (
+                        <p
+                          key={j}
+                          className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.1em] text-[#9aa6b6]"
+                        >
+                          {l.replace(/^\[|\]$|:$/g, '')}
+                        </p>
+                      ) : (
+                        <p key={j}>{l}</p>
+                      ),
+                    )}
+                  </div>
+                )
+              })
             ) : (
-              <p className="text-slate-500">A letra deste hino ainda não foi cadastrada.</p>
+              <Card className="text-center text-[var(--c-gray)]">
+                A letra deste hino ainda não foi cadastrada.
+              </Card>
             )}
-          </Card>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {prev ? (
               <Link
                 to={to(`/hinario/${prev.id}`)}
-                className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white p-3 text-sm font-semibold"
+                className="flex items-center gap-2 c-card p-3 text-sm font-semibold"
               >
-                <ChevronLeft className="h-5 w-5 shrink-0 text-slate-400" />
+                <ChevronLeft className="h-5 w-5 shrink-0 text-[var(--c-gray)]" />
                 <span className="truncate">
                   {prev.number ? `${prev.number}. ` : ''}
                   {prev.title}
@@ -306,13 +323,13 @@ function Hymn({ id }: { id: string }) {
             {next ? (
               <Link
                 to={to(`/hinario/${next.id}`)}
-                className="flex items-center justify-end gap-2 rounded-2xl border border-stone-200 bg-white p-3 text-right text-sm font-semibold"
+                className="flex items-center justify-end gap-2 c-card p-3 text-right text-sm font-semibold"
               >
                 <span className="truncate">
                   {next.number ? `${next.number}. ` : ''}
                   {next.title}
                 </span>
-                <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                <ChevronRight className="h-5 w-5 shrink-0 text-[var(--c-gray)]" />
               </Link>
             ) : (
               <span />

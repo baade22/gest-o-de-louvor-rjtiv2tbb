@@ -32,7 +32,7 @@ import {
   type SearchHit,
 } from '@/lib/bible'
 import { useSite } from './siteContext'
-import { Card, SectionTitle } from './siteParts'
+import { Card, PageTitle } from './siteParts'
 
 const LAST_KEY = 'site_bible_last'
 const SIZE_KEY = 'site_bible_size'
@@ -58,7 +58,7 @@ function VerseText({ text }: { text: string }) {
     <>
       {verseParts(text).map((p, i) =>
         p.added ? (
-          <i key={i} className="text-slate-500">
+          <i key={i} className="text-[var(--c-gray)]">
             {p.text}
           </i>
         ) : (
@@ -75,7 +75,7 @@ export default function SiteBible() {
   const chapter = Number(chapterParam) || 0
 
   return (
-    <div className="space-y-5 px-4 pt-5 lg:px-8 lg:pt-10">
+    <div className="space-y-5 px-4 pt-2 lg:px-8 lg:pt-10">
       {book && chapter >= 1 && chapter <= book.chapters ? (
         <Reader book={book} chapter={chapter} />
       ) : book ? (
@@ -83,7 +83,7 @@ export default function SiteBible() {
       ) : (
         <Home />
       )}
-      <p className="mx-auto max-w-2xl pb-4 text-center text-[11px] leading-relaxed text-slate-400">
+      <p className="mx-auto max-w-2xl pb-4 text-center text-[11px] leading-relaxed text-[var(--c-gray)]">
         {BIBLE_CREDIT}
       </p>
     </div>
@@ -129,9 +129,9 @@ function Home() {
 
   return (
     <>
-      <SectionTitle>Bíblia</SectionTitle>
+      <PageTitle>Bíblia</PageTitle>
       <form onSubmit={submit} className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--c-gray)]" />
         <input
           value={query}
           onChange={(e) => {
@@ -140,7 +140,7 @@ function Home() {
           }}
           enterKeyHint="search"
           placeholder="Jo 3:16, Salmos 23 ou uma palavra"
-          className="w-full rounded-2xl border border-stone-200 bg-white py-3.5 pl-12 pr-32 text-[16px] outline-none focus:border-[var(--sa)]"
+          className="w-full c-card py-3.5 pl-12 pr-32 text-[16px] outline-none focus:border-[var(--c-blue)]"
         />
         {query && (
           <button
@@ -150,26 +150,26 @@ function Home() {
               setQuery('')
               setHits(null)
             }}
-            className="absolute right-[6.4rem] top-1/2 -translate-y-1/2 p-1 text-slate-400"
+            className="absolute right-[6.4rem] top-1/2 -translate-y-1/2 p-1 text-[var(--c-gray)]"
           >
             <X className="h-4 w-4" />
           </button>
         )}
         <button
           type="submit"
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-[var(--sp)] px-3.5 py-2 text-sm font-semibold text-[var(--sp-text)]"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-[var(--c-navy)] px-3.5 py-2 text-sm font-semibold text-[var(--sp-text)]"
         >
           {ref ? 'Abrir' : 'Buscar'}
         </button>
       </form>
 
       {searching ? (
-        <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-[var(--c-gray)]">
           <Loader2 className="h-5 w-5 animate-spin" /> Buscando em toda a Bíblia...
         </div>
       ) : hits ? (
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-[var(--c-gray)]">
             {hits.length === 0
               ? `Nada encontrado para "${searched}".`
               : `${hits.length >= 100 ? 'Os primeiros 100' : hits.length} versículo${hits.length === 1 ? '' : 's'} com "${searched}"`}
@@ -178,9 +178,9 @@ function Home() {
             <Link
               key={`${h.book.code}${h.chapter}:${h.verse}`}
               to={to(`/biblia/${h.book.code}/${h.chapter}`) + `#v${h.verse}`}
-              className="block rounded-2xl border border-stone-200 bg-white p-4"
+              className="block c-card p-4"
             >
-              <span className="block text-sm font-bold text-[var(--sp)]">
+              <span className="block text-sm font-bold text-[var(--c-navy)]">
                 {h.book.name} {h.chapter}:{h.verse}
               </span>
               <span className="mt-1 block text-[15px] leading-relaxed text-slate-700">
@@ -194,13 +194,13 @@ function Home() {
           {last && (
             <Link
               to={to(`/biblia/${last.book.code}/${last.chapter}`)}
-              className="flex items-center gap-3 rounded-2xl bg-[var(--sp)] p-4 text-[var(--sp-text)]"
+              className="flex items-center gap-3 rounded-3xl bg-[var(--c-navy)] p-4 text-[var(--sp-text)]"
             >
               <span className="flex-1">
                 <span className="block text-xs font-semibold uppercase tracking-wide opacity-70">
                   Continuar lendo
                 </span>
-                <span className="block font-serif text-lg font-bold">
+                <span className="block text-[17px] font-extrabold">
                   {last.book.name} {last.chapter}
                 </span>
               </span>
@@ -219,15 +219,15 @@ function BookGrid({ title, books }: { title: string; books: BibleBook[] }) {
   const { to } = useSite()
   return (
     <section className="space-y-2.5">
-      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</h3>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--c-gray)]">{title}</h3>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {books.map((b) => (
           <Link
             key={b.code}
             to={to(`/biblia/${b.code}`)}
-            className="flex items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-3 py-2.5"
+            className="flex items-center gap-2.5 rounded-2xl bg-white px-3 py-2.5"
           >
-            <span className="grid h-8 w-9 shrink-0 place-items-center rounded-lg bg-stone-100 text-[12px] font-bold text-[var(--sp)]">
+            <span className="grid h-8 w-9 shrink-0 place-items-center rounded-lg bg-[var(--c-sky)] text-[12px] font-bold text-[var(--c-navy)]">
               {b.abbr}
             </span>
             <span className="truncate text-[15px] font-medium">{b.name}</span>
@@ -246,17 +246,17 @@ function Chapters({ book }: { book: BibleBook }) {
     <>
       <Link
         to={to('/biblia')}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500"
+        className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--c-gray)]"
       >
         <ArrowLeft className="h-4 w-4" /> Livros
       </Link>
-      <SectionTitle>{book.name}</SectionTitle>
+      <PageTitle>{book.name}</PageTitle>
       <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-12">
         {Array.from({ length: book.chapters }, (_, i) => i + 1).map((n) => (
           <Link
             key={n}
             to={to(`/biblia/${book.code}/${n}`)}
-            className="grid h-12 place-items-center rounded-xl border border-stone-200 bg-white text-[15px] font-semibold"
+            className="grid h-12 place-items-center rounded-2xl bg-white text-[15px] font-semibold"
           >
             {n}
           </Link>
@@ -370,7 +370,7 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
       <div className="flex items-center gap-2">
         <Link
           to={to(`/biblia/${book.code}`)}
-          className="inline-flex min-w-0 items-center gap-1 text-sm font-semibold text-slate-500"
+          className="inline-flex min-w-0 items-center gap-1 text-sm font-semibold text-[var(--c-gray)]"
         >
           <ArrowLeft className="h-4 w-4 shrink-0" /> <span className="truncate">Capítulos</span>
         </Link>
@@ -380,7 +380,7 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
             aria-label="Diminuir letra"
             onClick={() => changeSize(-1)}
             disabled={size === 0}
-            className="grid h-9 w-9 place-items-center rounded-full border border-stone-200 bg-white disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-[0_2px_8px_rgba(20,34,58,0.06)] disabled:opacity-40"
           >
             <Minus className="h-4 w-4" />
           </button>
@@ -389,7 +389,7 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
             aria-label="Aumentar letra"
             onClick={() => changeSize(1)}
             disabled={size === SIZES.length - 1}
-            className="grid h-9 w-9 place-items-center rounded-full border border-stone-200 bg-white disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-[0_2px_8px_rgba(20,34,58,0.06)] disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -397,13 +397,13 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
             <button
               type="button"
               onClick={() => setVersionsOpen((v) => !v)}
-              className="h-9 rounded-full border border-stone-200 bg-white px-3 text-sm font-semibold"
+              className="h-9 rounded-full bg-white shadow-[0_2px_8px_rgba(20,34,58,0.06)] px-3 text-sm font-semibold"
             >
               Outras versões
             </button>
             {versionsOpen && (
-              <div className="absolute right-0 top-11 z-20 w-56 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
-                <p className="px-2 pb-1 pt-1 text-xs text-slate-500">Abre no Bible.com</p>
+              <div className="absolute right-0 top-11 z-20 w-56 c-card p-2 shadow-lg">
+                <p className="px-2 pb-1 pt-1 text-xs text-[var(--c-gray)]">Abre no Bible.com</p>
                 {OTHER_VERSIONS.map((v) => (
                   <a
                     key={v.id}
@@ -411,10 +411,10 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => setVersionsOpen(false)}
-                    className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-medium hover:bg-stone-50"
+                    className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-medium hover:bg-[var(--c-bg)]"
                   >
                     {book.name} {chapter} ({v.label})
-                    <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                    <ExternalLink className="h-3.5 w-3.5 text-[var(--c-gray)]" />
                   </a>
                 ))}
               </div>
@@ -423,21 +423,21 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
         </div>
       </div>
 
-      <h2 className="text-center font-serif text-2xl font-bold text-slate-900 lg:text-4xl">
+      <h2 className="text-center text-[28px] font-extrabold tracking-tight lg:text-4xl">
         {book.name} {chapter}
       </h2>
 
       <Card className="p-5 lg:p-8">
         {error ? (
-          <p className="py-8 text-center text-slate-500">
+          <p className="py-8 text-center text-[var(--c-gray)]">
             Não foi possível abrir este capítulo. Confira a internet e tente de novo.
           </p>
         ) : !verses ? (
           <div className="grid place-items-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--c-gray)]" />
           </div>
         ) : (
-          <p className={cn('font-serif leading-relaxed text-slate-800', SIZES[size])}>
+          <p className={cn('font-serif leading-[1.75] text-[#253247]', SIZES[size])}>
             {verses.map((t, i) => {
               const n = i + 1
               const on = selected.includes(n)
@@ -447,12 +447,12 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
                   id={`v${n}`}
                   onClick={() => toggle(n)}
                   className={cn(
-                    'cursor-pointer rounded decoration-[var(--sa)] decoration-2 underline-offset-4',
-                    on && 'underline',
+                    'cursor-pointer rounded-md box-decoration-clone',
+                    on && 'bg-[var(--c-sky)] shadow-[0_0_0_3px_var(--c-sky)]',
                     String(n) === target && !selected.length && 'bg-amber-100',
                   )}
                 >
-                  <sup className="mr-1 select-none font-sans text-[0.62em] font-bold text-[var(--sa)]">
+                  <sup className="mr-1 select-none font-sans text-[0.62em] font-bold text-[var(--c-blue)]">
                     {n}
                   </sup>
                   <VerseText text={t} />{' '}
@@ -467,9 +467,9 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
         {prev ? (
           <Link
             to={to(`/biblia/${prev.book.code}/${prev.chapter}`)}
-            className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white p-3 text-sm font-semibold"
+            className="flex items-center gap-2 c-card p-3 text-sm font-semibold"
           >
-            <ChevronLeft className="h-5 w-5 shrink-0 text-slate-400" />
+            <ChevronLeft className="h-5 w-5 shrink-0 text-[var(--c-gray)]" />
             <span className="truncate">
               {prev.book.name} {prev.chapter}
             </span>
@@ -480,12 +480,12 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
         {next ? (
           <Link
             to={to(`/biblia/${next.book.code}/${next.chapter}`)}
-            className="flex items-center justify-end gap-2 rounded-2xl border border-stone-200 bg-white p-3 text-right text-sm font-semibold"
+            className="flex items-center justify-end gap-2 c-card p-3 text-right text-sm font-semibold"
           >
             <span className="truncate">
               {next.book.name} {next.chapter}
             </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+            <ChevronRight className="h-5 w-5 shrink-0 text-[var(--c-gray)]" />
           </Link>
         ) : (
           <span />
@@ -494,10 +494,10 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
 
       {selected.length > 0 && (
         <div
-          className="fixed inset-x-0 bottom-20 z-40 flex justify-center px-4 lg:bottom-8"
+          className="fixed inset-x-0 bottom-[100px] z-40 flex justify-center px-4 lg:bottom-8"
           style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className="flex items-center gap-1 rounded-full bg-slate-900 p-1.5 pl-4 text-white shadow-xl">
+          <div className="flex items-center gap-1 rounded-full bg-[var(--c-navy)] p-1.5 pl-4 text-white shadow-xl">
             <span className="mr-2 text-sm font-semibold">
               {selected.length} versículo{selected.length === 1 ? '' : 's'}
             </span>

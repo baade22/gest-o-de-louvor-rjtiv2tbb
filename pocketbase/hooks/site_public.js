@@ -302,6 +302,7 @@ routerAdd('GET', '/backend/v1/public/site', (e) => {
     accent_color: site.getString('accent_color'),
     logo_url: fileUrl('site_settings', site, 'logo'),
     icon_url: fileUrl('site_settings', site, 'app_icon'),
+    hero_url: fileUrl('site_settings', site, 'hero_image'),
     address: site.getString('address'),
     maps_url: site.getString('maps_url'),
     phone: site.getString('phone'),
@@ -351,10 +352,62 @@ routerAdd('GET', '/backend/v1/public/site/page', (e) => {
       'church_id = {:c} && slug = {:p} && active = true',
       { c: site.getString('church_id'), p: page },
     )
+    // Blocos da página (0104): só tipos conhecidos, textos com limite e foto só se o arquivo
+    // for desta página. O endereço da foto é montado aqui.
+    const base = '/api/files/site_pages/' + p.id + '/'
+    const files = {}
+    let names = []
+    try {
+      names = p.getStringSlice('images') || []
+    } catch (_) {}
+    for (let i = 0; i < names.length; i++) files[String(names[i])] = true
+    const img = (n) => (n && files[String(n)] ? base + String(n) : '')
+    const str = (v, max) => String(v == null ? '' : v).slice(0, max)
+    let raw = []
+    try {
+      raw = JSON.parse(p.getString('blocks') || '[]')
+    } catch (_) {
+      raw = []
+    }
+    const blocks = []
+    for (const b of Array.isArray(raw) ? raw.slice(0, 120) : []) {
+      if (!b || typeof b !== 'object') continue
+      const t = String(b.t || '')
+      if (t === 'text' || t === 'h') blocks.push({ t: t, text: str(b.text, 6000) })
+      else if (t === 'image') {
+        const url = img(b.img)
+        if (url) blocks.push({ t: t, url: url, caption: str(b.caption, 200) })
+      } else if (t === 'gallery') {
+        const urls = (Array.isArray(b.imgs) ? b.imgs : []).map(img).filter((u) => u)
+        if (urls.length)
+          blocks.push({ t: t, urls: urls.slice(0, 24), caption: str(b.caption, 200) })
+      } else if (t === 'video') {
+        const m = /(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([A-Za-z0-9_-]{11})/.exec(
+          str(b.url, 300),
+        )
+        if (m) blocks.push({ t: t, id: m[1], caption: str(b.caption, 200) })
+      } else if (t === 'button') {
+        const link = str(b.link, 500).trim()
+        if (link && /^(https?:\/\/|\/|mailto:|tel:)/i.test(link))
+          blocks.push({ t: t, label: str(b.label, 60) || 'Saiba mais', link: link })
+      } else if (t === 'person') {
+        const name = str(b.name, 120).trim()
+        if (name)
+          blocks.push({
+            t: t,
+            name: name,
+            role: str(b.role, 160),
+            url: img(b.img),
+            text: str(b.text, 1000),
+          })
+      }
+    }
     return e.json(200, {
       title: p.getString('title'),
       slug: p.getString('slug'),
       body: p.getString('body'),
+      cover_url: p.getString('cover') ? base + p.getString('cover') : '',
+      blocks: blocks,
     })
   } catch (_) {
     return notFound()

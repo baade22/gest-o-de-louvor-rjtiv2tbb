@@ -34,6 +34,8 @@ export interface PublicSite {
   accent_color: string
   logo_url: string
   icon_url: string
+  /** foto do topo do Início (0104); pode faltar em servidor antigo */
+  hero_url?: string
   address: string
   maps_url: string
   phone: string
@@ -58,7 +60,13 @@ export interface PublicSite {
   /** hinários com hinos ativos (migração 0103); pode faltar em servidor antigo */
   hymnals?: { name: string; count: number }[]
   agenda: PublicAgendaItem[]
-  campaigns: { id: string; name: string; description: string; color: string; end_date: string }[]
+  campaigns: {
+    id: string
+    name: string
+    description: string
+    color: string
+    end_date: string
+  }[]
   pix: { key: string; key_type: string; name: string; city: string } | null
   signup_url: string
 }
@@ -82,7 +90,10 @@ export interface SiteVideos {
 const q = (slug?: string) => (slug ? `?slug=${encodeURIComponent(slug)}` : '')
 
 export interface PublicHymnIndex {
-  hymnals: { name: string; hymns: { id: string; number: number; title: string }[] }[]
+  hymnals: {
+    name: string
+    hymns: { id: string; number: number; title: string }[]
+  }[]
 }
 
 export interface PublicHymn {
@@ -94,7 +105,9 @@ export interface PublicHymn {
 }
 
 export const getPublicHymns = (slug?: string) =>
-  pb.send<PublicHymnIndex>(`/backend/v1/public/site/hymns${q(slug)}`, { method: 'GET' })
+  pb.send<PublicHymnIndex>(`/backend/v1/public/site/hymns${q(slug)}`, {
+    method: 'GET',
+  })
 
 export const getPublicHymn = (id: string, slug?: string) =>
   pb.send<PublicHymn>(
@@ -105,14 +118,33 @@ export const getPublicHymn = (id: string, slug?: string) =>
 export const getPublicSite = (slug?: string) =>
   pb.send<PublicSite>(`/backend/v1/public/site${q(slug)}`, { method: 'GET' })
 
+export type PublicPageBlock =
+  | { t: 'text' | 'h'; text: string }
+  | { t: 'image'; url: string; caption: string }
+  | { t: 'gallery'; urls: string[]; caption: string }
+  | { t: 'video'; id: string; caption: string }
+  | { t: 'button'; label: string; link: string }
+  | { t: 'person'; name: string; role: string; url: string; text: string }
+
+export interface PublicPage {
+  title: string
+  slug: string
+  body: string
+  /** 0104: capa e blocos; faltam em servidor antigo */
+  cover_url?: string
+  blocks?: PublicPageBlock[]
+}
+
 export const getPublicPage = (page: string, slug?: string) =>
-  pb.send<{ title: string; slug: string; body: string }>(
+  pb.send<PublicPage>(
     `/backend/v1/public/site/page?page=${encodeURIComponent(page)}${slug ? `&slug=${encodeURIComponent(slug)}` : ''}`,
     { method: 'GET' },
   )
 
 export const getSiteVideos = (slug?: string) =>
-  pb.send<SiteVideos>(`/backend/v1/public/site/videos${q(slug)}`, { method: 'GET' })
+  pb.send<SiteVideos>(`/backend/v1/public/site/videos${q(slug)}`, {
+    method: 'GET',
+  })
 
 export function siteManifestUrl(slug?: string): string {
   const params = new URLSearchParams()
@@ -158,6 +190,7 @@ export interface SiteSettings {
   accent_color: string
   logo: string
   app_icon: string
+  hero_image?: string
   address: string
   maps_url: string
   phone: string
@@ -203,6 +236,15 @@ export interface SiteNotice {
   active: boolean
 }
 
+/** Bloco de página como fica gravado (0104). Fotos guardam o nome do arquivo em "images". */
+export type SitePageBlock =
+  | { t: 'text' | 'h'; text: string }
+  | { t: 'image'; img: string; caption?: string }
+  | { t: 'gallery'; imgs: string[]; caption?: string }
+  | { t: 'video'; url: string; caption?: string }
+  | { t: 'button'; label: string; link: string }
+  | { t: 'person'; name: string; role?: string; img?: string; text?: string }
+
 export interface SitePage {
   id: string
   church_id: string
@@ -211,6 +253,11 @@ export interface SitePage {
   body: string
   order: number
   active: boolean
+  cover?: string
+  images?: string[]
+  blocks?: SitePageBlock[] | null
+  collectionId?: string
+  collectionName?: string
 }
 
 export type PrayerStatus = 'NOVO' | 'ACOMPANHANDO' | 'CONCLUIDO'
@@ -262,7 +309,10 @@ export async function saveSiteSettings(
   return pb.collection('site_settings').create<SiteSettings>(data)
 }
 
-export function siteSettingsFileUrl(rec: SiteSettings, field: 'logo' | 'app_icon'): string {
+export function siteSettingsFileUrl(
+  rec: SiteSettings,
+  field: 'logo' | 'app_icon' | 'hero_image',
+): string {
   return rec[field] ? pb.files.getURL(rec, rec[field]) : ''
 }
 
@@ -310,6 +360,28 @@ export async function savePage(churchId: string, id: string | null, data: Partia
 
 export const deletePage = (id: string) => pb.collection('site_pages').delete(id)
 
+/** Envia fotos para a página e devolve a página com os nomes novos em "images". */
+export function uploadPageImages(id: string, files: File[]) {
+  const fd = new FormData()
+  for (const f of files) fd.append('images+', f)
+  return pb.collection('site_pages').update<SitePage>(id, fd)
+}
+
+export function setPageCover(id: string, file: File | null) {
+  const fd = new FormData()
+  if (file) fd.set('cover', file)
+  else fd.set('cover', '')
+  return pb.collection('site_pages').update<SitePage>(id, fd)
+}
+
+export const removePageImages = (id: string, names: string[]) =>
+  pb.collection('site_pages').update<SitePage>(id, { 'images-': names })
+
+export function pageFileUrl(p: SitePage, name?: string, thumb = '') {
+  if (!name) return ''
+  return pb.files.getURL(p, name, thumb ? { thumb } : undefined)
+}
+
 export interface SiteHymn {
   id: string
   church_id: string
@@ -353,7 +425,10 @@ export const listPrayers = (churchId: string, status: PrayerStatus | 'TODOS') =>
     filter:
       status === 'TODOS'
         ? pb.filter('church_id = {:c}', { c: churchId })
-        : pb.filter('church_id = {:c} && status = {:s}', { c: churchId, s: status }),
+        : pb.filter('church_id = {:c} && status = {:s}', {
+            c: churchId,
+            s: status,
+          }),
     sort: '-created',
   })
 

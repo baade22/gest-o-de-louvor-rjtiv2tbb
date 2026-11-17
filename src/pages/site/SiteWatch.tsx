@@ -1,12 +1,11 @@
 // Assistir: cultos transmitidos e vídeos do canal do YouTube da igreja (entram sozinhos).
 
 import { useEffect, useState } from 'react'
-import { ExternalLink, Loader2, Radio } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ExternalLink, Loader2, Play, Radio } from 'lucide-react'
 import { serviceNow } from '@/lib/site'
-import { getSiteVideos, type SiteVideos } from '@/services/site'
+import { getSiteVideos, type SiteVideo, type SiteVideos } from '@/services/site'
 import { useSite } from './siteContext'
-import { SectionTitle, VideoTile } from './siteParts'
+import { PageTitle, Pills, VideoTile } from './siteParts'
 
 export default function SiteWatch() {
   const { site, slug } = useSite()
@@ -29,15 +28,15 @@ export default function SiteWatch() {
   const list = showTabs ? (tab === 'CULTO' ? cultos : videos) : cultos.length ? cultos : videos
 
   return (
-    <div className="space-y-5 px-4 pt-5 lg:space-y-8 lg:px-8 lg:pt-10">
-      <SectionTitle
+    <div className="space-y-4 px-4 pt-2 lg:space-y-8 lg:px-8 lg:pt-10">
+      <PageTitle
         action={
           data?.channel_url ? (
             <a
               href={data.channel_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--sa)]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2.5 text-[13px] font-bold text-[var(--c-navy)]"
             >
               Canal <ExternalLink className="h-4 w-4" />
             </a>
@@ -45,11 +44,11 @@ export default function SiteWatch() {
         }
       >
         Assistir
-      </SectionTitle>
+      </PageTitle>
 
       {live ? (
         <div className="space-y-2">
-          <div className="relative aspect-video overflow-hidden rounded-2xl bg-black">
+          <div className="relative aspect-video overflow-hidden rounded-3xl bg-black">
             <iframe
               title={live.title}
               src={`https://www.youtube-nocookie.com/embed/${live.id}?rel=0&playsinline=1`}
@@ -70,41 +69,29 @@ export default function SiteWatch() {
           href={data.live_url}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4"
+          className="c-card flex items-center gap-3 p-4"
         >
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-red-50 text-red-600">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-red-50 text-red-600">
             <Radio className="h-5 w-5" />
           </span>
           <span className="flex-1">
             <span className="block font-semibold">{inService.label} acontecendo agora</span>
-            <span className="block text-[13px] text-slate-500">Abrir a transmissão no YouTube</span>
+            <span className="block text-[13px] font-medium text-[var(--c-gray)]">
+              Abrir a transmissão no YouTube
+            </span>
           </span>
         </a>
       ) : null}
 
       {showTabs && (
-        <div className="flex gap-2">
-          {(
-            [
-              ['CULTO', 'Cultos'],
-              ['VIDEO', 'Vídeos'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setTab(k)}
-              className={cn(
-                'rounded-xl border px-3.5 py-1.5 text-sm font-semibold',
-                tab === k
-                  ? 'border-[var(--sp)] bg-[var(--sp)] text-[var(--sp-text)]'
-                  : 'border-stone-200 bg-white text-slate-700',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Pills
+          value={tab}
+          onChange={setTab}
+          options={[
+            ['CULTO', 'Cultos'],
+            ['VIDEO', 'Mensagens'],
+          ]}
+        />
       )}
 
       {loading ? (
@@ -112,14 +99,14 @@ export default function SiteWatch() {
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
         </div>
       ) : list.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-slate-500">
+        <p className="c-card p-8 text-center font-medium text-[var(--c-gray)]">
           Os vídeos não carregaram agora.{' '}
           {data?.channel_url && (
             <a
               href={data.channel_url}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-[var(--sa)]"
+              className="font-bold text-[var(--c-blue)]"
             >
               Ver no YouTube
             </a>
@@ -127,18 +114,68 @@ export default function SiteWatch() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 lg:hidden">
-            {list.map((v) => (
+          {!live && <FeaturedVideo key={list[0].id} video={list[0]} />}
+          {!live && list.length > 1 && (
+            <h2 className="pt-2 text-[18px] font-extrabold tracking-tight lg:hidden">
+              Mais recentes
+            </h2>
+          )}
+          <div className="grid grid-cols-1 gap-2.5 lg:hidden">
+            {(live ? list : list.slice(1)).map((v) => (
               <VideoTile key={v.id} video={v} />
             ))}
           </div>
           <div className="hidden grid-cols-3 gap-6 lg:grid">
-            {list.map((v) => (
+            {(live ? list : list.slice(1)).map((v) => (
               <VideoTile key={v.id} video={v} layout="card" />
             ))}
           </div>
         </>
       )}
     </div>
+  )
+}
+
+/** Vídeo mais recente em destaque (foto grande com botão de play); toca no lugar. */
+function FeaturedVideo({ video }: { video: SiteVideo }) {
+  const [playing, setPlaying] = useState(false)
+  if (playing) {
+    return (
+      <div className="aspect-video overflow-hidden rounded-3xl bg-black lg:max-w-4xl">
+        <iframe
+          title={video.title}
+          src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&playsinline=1`}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          className="h-full w-full"
+        />
+      </div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setPlaying(true)}
+      className="relative block h-[210px] w-full overflow-hidden rounded-3xl text-left text-white lg:h-[420px] lg:max-w-4xl"
+    >
+      <img
+        src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <span className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[color-mix(in_srgb,var(--sp)_92%,transparent)]" />
+      <span className="absolute left-1/2 top-[42%] grid h-[58px] w-[58px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-[var(--c-navy)]">
+        <Play className="ml-1 h-[22px] w-[22px] fill-current" />
+      </span>
+      <span className="absolute inset-x-4 bottom-3.5">
+        <span className="inline-block rounded-full border border-white/30 bg-white/20 px-3 py-1 text-[12px] font-bold backdrop-blur">
+          {video.kind === 'CULTO' ? 'Último culto' : 'Mais recente'}
+          {video.when ? ` · ${video.when}` : ''}
+        </span>
+        <span className="mt-2 line-clamp-2 block text-[19px] font-extrabold leading-tight">
+          {video.title}
+        </span>
+      </span>
+    </button>
   )
 }

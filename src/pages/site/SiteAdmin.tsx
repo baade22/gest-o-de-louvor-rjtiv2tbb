@@ -84,6 +84,7 @@ import {
 import { publicOrigin } from '@/lib/publicOrigin'
 import { Box, Field } from './siteAdminParts'
 import HymnsTab from './SiteAdminHymns'
+import PageEditor from './SiteAdminPageEditor'
 
 const day10 = (s?: string) => (s ? s.slice(0, 10) : '')
 const toDate = (s: string) => (s ? `${s} 12:00:00.000Z` : '')
@@ -190,6 +191,8 @@ function GeneralTab({
   const [form, setForm] = useState<GeneralForm>(() => toForm(settings, churchName))
   const [logo, setLogo] = useState<File | null>(null)
   const [icon, setIcon] = useState<File | null>(null)
+  const [hero, setHero] = useState<File | null>(null)
+  const [dropHero, setDropHero] = useState(false)
   const [saving, setSaving] = useState(false)
   useEffect(() => setForm(toForm(settings, churchName)), [settings, churchName])
   const set = <K extends keyof GeneralForm>(k: K, v: GeneralForm[K]) =>
@@ -222,9 +225,13 @@ function GeneralTab({
         fd.set(k, typeof v === 'boolean' ? String(v) : String(v ?? ''))
       if (logo) fd.set('logo', logo)
       if (icon) fd.set('app_icon', icon)
+      if (hero) fd.set('hero_image', hero)
+      else if (dropHero) fd.set('hero_image', '')
       const saved = await saveSiteSettings(churchId, settings?.id || null, fd)
       setLogo(null)
       setIcon(null)
+      setHero(null)
+      setDropHero(false)
       onSaved(saved)
       toast({
         title: 'Site salvo',
@@ -366,6 +373,41 @@ function GeneralTab({
                 onChange={(e) => setIcon(e.target.files?.[0] || null)}
                 disabled={!canEdit}
               />
+            </div>
+          </Field>
+          <Field
+            label="Foto do topo do Início"
+            hint="Foto deitada da igreja (ex.: o templo num culto). JPG ou WEBP até 5 MB. Sem foto, o topo usa o primeiro destaque ou a cor principal."
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              {settings?.hero_image && !hero && !dropHero && (
+                <img
+                  src={siteSettingsFileUrl(settings, 'hero_image')}
+                  alt=""
+                  className="h-12 w-20 rounded-lg border object-cover"
+                />
+              )}
+              <Input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  setHero(e.target.files?.[0] || null)
+                  setDropHero(false)
+                }}
+                disabled={!canEdit}
+                className="min-w-0 flex-1"
+              />
+              {settings?.hero_image && !hero && canEdit && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDropHero((v) => !v)}
+                  className={dropHero ? 'text-slate-600' : 'text-red-600'}
+                >
+                  {dropHero ? 'Manter foto' : 'Tirar foto'}
+                </Button>
+              )}
             </div>
           </Field>
         </div>
@@ -716,7 +758,10 @@ function HighlightsTab({
   const status = (h: SiteHighlight) => {
     if (!h.active) return { label: 'Desligado', cls: 'bg-slate-100 text-slate-600' }
     if (day10(h.starts_on) && day10(h.starts_on) > today)
-      return { label: `Entra em ${fmtDay(h.starts_on)}`, cls: 'bg-indigo-50 text-indigo-700' }
+      return {
+        label: `Entra em ${fmtDay(h.starts_on)}`,
+        cls: 'bg-indigo-50 text-indigo-700',
+      }
     if (day10(h.ends_on) && day10(h.ends_on) < today)
       return { label: 'Saiu do ar', cls: 'bg-slate-100 text-slate-600' }
     return { label: 'No ar', cls: 'bg-emerald-50 text-emerald-700' }
@@ -875,7 +920,10 @@ function HighlightsTab({
                 <Select
                   value={draft.linkType}
                   onValueChange={(v) =>
-                    setDraft({ ...draft, linkType: v as HighlightDraft['linkType'] })
+                    setDraft({
+                      ...draft,
+                      linkType: v as HighlightDraft['linkType'],
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -1066,7 +1114,11 @@ function NoticesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean 
                     size="icon"
                     aria-label="Alterar"
                     onClick={() =>
-                      setDraft({ ...n, starts_on: day10(n.starts_on), ends_on: day10(n.ends_on) })
+                      setDraft({
+                        ...n,
+                        starts_on: day10(n.starts_on),
+                        ends_on: day10(n.ends_on),
+                      })
                     }
                   >
                     <Pencil className="h-4 w-4" />
@@ -1168,6 +1220,7 @@ function PagesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean })
   const { confirm, dialog } = useConfirm()
   const [items, setItems] = useState<SitePage[] | null>(null)
   const [draft, setDraft] = useState<(Partial<SitePage> & { id: string | null }) | null>(null)
+  const [editing, setEditing] = useState<SitePage | null>(null)
   const [saving, setSaving] = useState(false)
   const load = useCallback(() => {
     listPages(churchId)
@@ -1188,15 +1241,17 @@ function PagesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean })
     }
     setSaving(true)
     try {
-      await savePage(churchId, draft.id, {
+      const created = await savePage(churchId, null, {
         title: draft.title.trim(),
         slug,
-        body: draft.body || '',
+        body: '',
+        blocks: [],
         active: draft.active ?? true,
-        order: draft.order ?? (items?.length || 0) + 1,
+        order: (items?.length || 0) + 1,
       })
       setDraft(null)
       load()
+      setEditing(created)
     } catch (err) {
       toast({
         title: 'Não foi possível salvar',
@@ -1246,7 +1301,7 @@ function PagesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean })
                     variant="ghost"
                     size="icon"
                     aria-label="Alterar"
-                    onClick={() => setDraft({ ...p })}
+                    onClick={() => setEditing(p)}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -1278,9 +1333,9 @@ function PagesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean })
       <Dialog open={!!draft} onOpenChange={(v) => !v && setDraft(null)}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{draft?.id ? 'Alterar página' : 'Nova página'}</DialogTitle>
+            <DialogTitle>Nova página</DialogTitle>
             <DialogDescription>
-              Escreva normalmente. Linha começando com # vira título; com - vira lista.
+              Dê um nome. Depois você monta a página com textos, fotos, galeria e vídeos.
             </DialogDescription>
           </DialogHeader>
           {draft && (
@@ -1307,21 +1362,6 @@ function PagesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean })
                   />
                 </Field>
               </div>
-              <Field label="Texto">
-                <Textarea
-                  value={draft.body || ''}
-                  onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-                  rows={14}
-                  maxLength={20000}
-                />
-              </Field>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={draft.active ?? true}
-                  onCheckedChange={(v) => setDraft({ ...draft, active: v })}
-                />
-                <span className="text-sm">Ligada</span>
-              </div>
             </div>
           )}
           <DialogFooter>
@@ -1333,11 +1373,12 @@ function PagesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean })
               disabled={saving}
               className="gap-1.5 bg-teal-700 text-white hover:bg-teal-800"
             >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />} Criar e montar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {editing && <PageEditor page={editing} onClose={() => setEditing(null)} onSaved={load} />}
       {dialog}
     </Box>
   )
@@ -1436,7 +1477,12 @@ export default function SiteAdmin() {
     getSiteOptions(churchId)
       .then(setOptions)
       .catch(() =>
-        setOptions({ events: [], signup_links: [], pix_configured: false, campaigns: [] }),
+        setOptions({
+          events: [],
+          signup_links: [],
+          pix_configured: false,
+          campaigns: [],
+        }),
       )
   }, [churchId])
 

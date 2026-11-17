@@ -1,110 +1,35 @@
-// Início do site/app da igreja: destaques, ao vivo/próximo culto, atalhos, avisos, agenda,
-// mensagens recentes e horários.
+// Início do site/app da igreja (visual "Azul IBMA", 2026-11-17): foto da igreja no topo com o
+// próximo culto (ou "ao vivo"), campo de oração, atalhos em círculo, avisos, agenda, destaques,
+// mensagens recentes, horários e quem somos.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BookOpen,
   ChevronRight,
   Clock,
-  HandHeart,
-  Megaphone,
+  Heart,
+  HeartHandshake,
   MapPin,
+  Megaphone,
   Music,
-  QrCode,
-  Radio,
+  Play,
   Smartphone,
   Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  WEEKDAYS,
-  WEEKDAYS_SHORT,
-  brtClock,
-  formatTime,
-  mapsUrl,
-  nextService,
-  serviceNow,
-  whenLabel,
-} from '@/lib/site'
+import { WEEKDAYS, brtClock, formatTime, mapsUrl, nextService, serviceNow } from '@/lib/site'
 import { getSiteVideos, siteFileUrl, type SiteVideos } from '@/services/site'
 import { useSite } from './siteContext'
-import { AgendaRow, Card, MoreLink, SectionTitle, SmartLink, VideoTile } from './siteParts'
+import { DateBadge, MoreLink, SectionTitle, SmartLink, VideoTile } from './siteParts'
 
-function Highlights() {
-  const { site } = useSite()
-  const [index, setIndex] = useState(0)
-  const ref = useRef<HTMLDivElement>(null)
-  const list = site.highlights
-  useEffect(() => {
-    if (list.length < 2) return
-    const t = setInterval(() => {
-      const el = ref.current
-      if (!el) return
-      const next = (Math.round(el.scrollLeft / el.clientWidth) + 1) % list.length
-      el.scrollTo({ left: next * el.clientWidth, behavior: 'smooth' })
-    }, 6000)
-    return () => clearInterval(t)
-  }, [list.length])
-  if (!list.length) return null
-  return (
-    <div className="relative">
-      <div
-        ref={ref}
-        onScroll={(e) => {
-          const el = e.currentTarget
-          setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)))
-        }}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] lg:rounded-b-3xl"
-      >
-        {list.map((h) => (
-          <div
-            key={h.id}
-            className="relative aspect-[16/10] w-full shrink-0 snap-center bg-gradient-to-br from-[var(--sa)] to-[var(--sp)] sm:aspect-[1920/635]"
-          >
-            {h.image_url && (
-              <img
-                src={siteFileUrl(h.image_url)}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent lg:bg-gradient-to-r lg:from-black/70 lg:via-black/30" />
-            <div className="absolute inset-x-0 bottom-0 p-5 text-white lg:bottom-auto lg:top-1/2 lg:max-w-2xl lg:-translate-y-1/2 lg:p-12">
-              <p className="font-serif text-2xl font-bold leading-tight lg:text-5xl">{h.title}</p>
-              {h.subtitle && (
-                <p className="mt-1 text-sm opacity-90 lg:mt-3 lg:text-lg">{h.subtitle}</p>
-              )}
-              {h.link && (
-                <SmartLink
-                  href={h.link}
-                  className="mt-3 inline-flex items-center gap-1 rounded-xl bg-[var(--sa)] px-4 py-2 text-sm font-semibold text-[var(--sa-text)] lg:mt-6 lg:px-6 lg:py-3 lg:text-base"
-                >
-                  {h.button_label || 'Saiba mais'} <ChevronRight className="h-4 w-4" />
-                </SmartLink>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-      {list.length > 1 && (
-        <div className="absolute right-4 top-4 flex gap-1.5">
-          {list.map((h, i) => (
-            <span
-              key={h.id}
-              className={cn(
-                'h-1.5 rounded-full bg-white transition-all',
-                i === index ? 'w-5' : 'w-1.5 opacity-60',
-              )}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
+/** "Domingo às 18h" / "Hoje às 19h30" / "Amanhã às 9h" */
+function whenText(daysAhead: number, day: number, time: string) {
+  const d = daysAhead === 0 ? 'Hoje' : daysAhead === 1 ? 'Amanhã' : WEEKDAYS[day]
+  return `${d} às ${formatTime(time)}`
 }
 
-function LiveCard({ videos }: { videos: SiteVideos | null }) {
+function Hero({ videos }: { videos: SiteVideos | null }) {
   const { site, to } = useSite()
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -113,123 +38,161 @@ function LiveCard({ videos }: { videos: SiteVideos | null }) {
   }, [])
   const current = serviceNow(site.service_times, now)
   const live = videos?.live || null
-  const liveUrl = videos?.live_url || ''
-  if (current || live) {
-    const href = live ? `https://www.youtube.com/watch?v=${live.id}` : liveUrl
-    const content = (
-      <>
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-red-50 text-red-600">
-          <Radio className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="inline-flex rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">
-            ● AO VIVO
-          </span>
-          <span className="mt-1 block font-semibold">
-            {live?.title || current?.label || 'Culto'}
-          </span>
-          <span className="block text-[13px] text-slate-500">
-            {href ? 'Toque para assistir no YouTube' : `Começou às ${formatTime(current!.time)}`}
-          </span>
-        </span>
-        <ChevronRight className="h-5 w-5 text-slate-400" />
-      </>
-    )
-    return href ? (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4"
-      >
-        {content}
-      </a>
-    ) : (
-      <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-white p-4">
-        {content}
-      </div>
-    )
-  }
+  const liveHref = live ? `https://www.youtube.com/watch?v=${live.id}` : videos?.live_url || ''
   const next = nextService(site.service_times, now)
-  if (!next) return null
+  const photo = siteFileUrl(site.hero_url) || siteFileUrl(site.highlights[0]?.image_url)
+  const map = mapsUrl(site.address, site.maps_url)
+  const onAir = !!(live || current)
+
+  const chip = onAir
+    ? 'Ao vivo agora'
+    : next
+      ? whenText(next.daysAhead, next.service.day, next.service.time)
+      : ''
+  const title = onAir
+    ? live?.title || current?.label || 'Culto'
+    : next?.service.label || site.short_name || site.title
+
   return (
-    <Link
-      to={to('/agenda')}
-      className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4"
-    >
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--sa)_16%,white)] text-[var(--sp)]">
-        <Clock className="h-5 w-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13px] text-slate-500">Próximo culto</span>
-        <span className="block font-semibold">
-          {whenLabel(next.daysAhead, next.service.day)}, {formatTime(next.service.time)} ·{' '}
-          {next.service.label}
-        </span>
-        {site.address && (
-          <span className="block truncate text-[13px] text-slate-500">{site.address}</span>
+    <section className="relative isolate h-[440px] overflow-hidden text-white lg:mx-8 lg:mt-8 lg:h-[460px] lg:rounded-[32px]">
+      {photo ? (
+        <img src={photo} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[var(--c-blue)] to-[var(--c-navy)]" />
+      )}
+      <div className="c-hero-shade absolute inset-0 -z-10" />
+      <div className="absolute inset-x-5 bottom-16 lg:bottom-14 lg:left-12 lg:max-w-2xl">
+        {chip && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-[12px] font-bold backdrop-blur">
+            {onAir && <span className="h-[7px] w-[7px] rounded-full bg-[#ff6b6b]" />}
+            {chip}
+          </span>
         )}
-      </span>
-      <ChevronRight className="h-5 w-5 text-slate-400" />
-    </Link>
+        <h1 className="mt-3 text-[31px] font-extrabold leading-[1.08] tracking-tight lg:text-5xl">
+          {title}
+        </h1>
+        {site.tagline && (
+          <p className="mt-2 max-w-xl text-[14px] font-medium leading-snug text-white/80 lg:text-lg">
+            {site.tagline}
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {onAir && liveHref ? (
+            <a
+              href={liveHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-3 text-[14px] font-bold text-[var(--c-navy)]"
+            >
+              <Play className="h-3.5 w-3.5 fill-current" /> Assistir agora
+            </a>
+          ) : site.sections.assistir ? (
+            <Link
+              to={to('/assistir')}
+              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-3 text-[14px] font-bold text-[var(--c-navy)]"
+            >
+              <Play className="h-3.5 w-3.5 fill-current" /> Assistir
+            </Link>
+          ) : null}
+          {map && (
+            <a
+              href={map}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-3 text-[14px] font-bold backdrop-blur"
+            >
+              <MapPin className="h-4 w-4" /> Como chegar
+            </a>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }
 
-/** Horários fixos da semana: um cartão por culto, com o dia em destaque e o próximo marcado. */
+interface Shortcut {
+  key: string
+  label: string
+  icon: typeof MapPin
+  to?: string
+  href?: string
+}
+
+function Circles({ items }: { items: Shortcut[] }) {
+  if (!items.length) return null
+  return (
+    <div
+      className={cn(
+        'c-scroll flex gap-1 overflow-x-auto px-[18px] pt-[22px] lg:gap-4 lg:px-0',
+        items.length <= 5 && 'justify-between lg:justify-start',
+      )}
+    >
+      {items.map((s) => {
+        const Icon = s.icon
+        const inner = (
+          <>
+            <span className="grid h-[58px] w-[58px] place-items-center rounded-full border-[1.6px] border-[var(--c-ring)] bg-white text-[var(--c-blue)] lg:h-16 lg:w-16">
+              <Icon className="h-[23px] w-[23px]" strokeWidth={1.8} />
+            </span>
+            <span className="text-[11.5px] font-bold leading-tight lg:text-[13px]">{s.label}</span>
+          </>
+        )
+        const cls = 'flex w-[66px] shrink-0 flex-col items-center gap-2 text-center lg:w-24'
+        return s.href ? (
+          <a key={s.key} href={s.href} target="_blank" rel="noreferrer" className={cls}>
+            {inner}
+          </a>
+        ) : s.to?.startsWith('#') ? (
+          <a key={s.key} href={s.to} className={cls}>
+            {inner}
+          </a>
+        ) : (
+          <Link key={s.key} to={s.to!} className={cls}>
+            {inner}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Faixa que rola de lado no celular e vira grade no computador. */
+function Rail({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 3 | 4 }) {
+  return (
+    <div
+      className={cn(
+        'c-scroll -mr-4 flex gap-3 overflow-x-auto pr-4 lg:mr-0 lg:grid lg:gap-5 lg:overflow-visible lg:pr-0',
+        cols === 2 ? 'lg:grid-cols-2' : cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 function ServiceTimes() {
   const { site } = useSite()
   const today = brtClock(new Date()).day
   const next = nextService(site.service_times)?.service
   const list = [...site.service_times].sort((a, b) => a.day - b.day || a.time.localeCompare(b.time))
   return (
-    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-      {list.map((t, i) => {
-        const isNext = t === next
-        const isToday = t.day === today
-        return (
-          <div
-            key={i}
-            className={cn(
-              'flex items-center gap-3.5 rounded-2xl border bg-white p-3',
-              isNext ? 'border-[var(--sa)] shadow-sm' : 'border-stone-200',
+    <div className="rounded-3xl bg-[var(--c-navy)] px-[18px] py-1.5 text-[var(--sp-text)] lg:grid lg:grid-cols-2 lg:gap-x-10 lg:px-8 lg:py-4">
+      {list.map((t, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between gap-3 border-b border-white/10 py-[13px] last:border-0 lg:[&:nth-last-child(2)]:border-0"
+        >
+          <span className="min-w-0 text-[14px] font-medium opacity-80">
+            {WEEKDAYS[t.day]} · {t.label}
+            {t === next && (
+              <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+                {t.day === today ? 'Hoje' : 'Próximo'}
+              </span>
             )}
-          >
-            <span
-              className={cn(
-                'grid h-14 w-16 shrink-0 place-items-center rounded-xl text-center leading-none',
-                isNext ? 'bg-[var(--sp)] text-[var(--sp-text)]' : 'bg-stone-100 text-[var(--sp)]',
-              )}
-            >
-              <span>
-                <span className="block text-[11px] font-bold uppercase tracking-wider opacity-80">
-                  {WEEKDAYS_SHORT[t.day]}
-                </span>
-                <span className="mt-1 block text-[17px] font-extrabold">{formatTime(t.time)}</span>
-              </span>
-            </span>
-            <span className="min-w-0 flex-1">
-              {(isNext || isToday) && (
-                <span
-                  className={cn(
-                    'mb-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                    isNext
-                      ? 'bg-[color-mix(in_srgb,var(--sa)_18%,white)] text-slate-800'
-                      : 'bg-stone-100 text-slate-600',
-                  )}
-                >
-                  {isToday ? 'Hoje' : 'Próximo'}
-                </span>
-              )}
-              <span className="block truncate font-semibold text-slate-900">{t.label}</span>
-              <span className="block text-[13px] text-slate-500">
-                {t.day === 0 || t.day === 6
-                  ? `Todo ${WEEKDAYS[t.day].toLowerCase()}`
-                  : `Toda ${WEEKDAYS[t.day].toLowerCase()}-feira`}
-              </span>
-            </span>
-          </div>
-        )
-      })}
+          </span>
+          <b className="shrink-0 text-[16px] font-extrabold">{formatTime(t.time)}</b>
+        </div>
+      ))}
     </div>
   )
 }
@@ -247,242 +210,231 @@ export default function SiteHome() {
 
   const map = mapsUrl(site.address, site.maps_url)
   const shortcuts = [
-    site.sections.contribuir && (site.pix || site.campaigns.length)
-      ? {
-          to: to('/contribuir'),
-          label: 'Pix',
-          hint: 'Dízimos e ofertas',
-          icon: QrCode,
-          tone: 'bg-amber-50 text-amber-700',
-        }
-      : null,
-    site.sections.oracao
-      ? {
-          to: to('/oracao'),
-          label: 'Oração',
-          hint: 'A pastoral ora por você',
-          icon: HandHeart,
-          tone: 'bg-indigo-50 text-indigo-700',
-        }
-      : null,
     site.sections.biblia
-      ? {
-          to: to('/biblia'),
-          label: 'Bíblia',
-          hint: 'Ler e buscar versículos',
-          icon: BookOpen,
-          tone: 'bg-rose-50 text-rose-700',
-        }
+      ? { key: 'biblia', to: to('/biblia'), label: 'Bíblia', icon: BookOpen }
       : null,
     site.sections.hinario && site.hymnals?.length
-      ? {
-          to: to('/hinario'),
-          label: 'Hinário',
-          hint: site.hymnals.map((h) => h.name).join(' e '),
-          icon: Music,
-          tone: 'bg-violet-50 text-violet-700',
-        }
-      : null,
-    map
-      ? {
-          href: map,
-          label: 'Como chegar',
-          hint: 'Abrir no mapa',
-          icon: MapPin,
-          tone: 'bg-emerald-50 text-emerald-700',
-        }
+      ? { key: 'hinario', to: to('/hinario'), label: 'Hinário', icon: Music }
       : null,
     site.sections.novo && site.signup_url
       ? {
+          key: 'novo',
           to: site.signup_url,
-          label: 'Sou novo',
-          hint: 'Primeira vez aqui?',
+          label: 'Sou novo aqui',
           icon: Sparkles,
-          tone: 'bg-sky-50 text-sky-700',
         }
       : null,
-  ].filter(Boolean) as {
-    to?: string
-    href?: string
-    label: string
-    hint: string
-    icon: typeof MapPin
-    tone: string
-  }[]
+    site.service_times.length
+      ? { key: 'horarios', to: '#horarios', label: 'Horários', icon: Clock }
+      : null,
+    site.sections.contribuir && (site.pix || site.campaigns.length)
+      ? {
+          key: 'ofertas',
+          to: to('/contribuir'),
+          label: 'Ofertas',
+          icon: HeartHandshake,
+        }
+      : null,
+    map ? { key: 'mapa', href: map, label: 'Como chegar', icon: MapPin } : null,
+  ].filter(Boolean) as Shortcut[]
 
-  const upcoming = site.agenda.slice(0, 4)
+  const upcoming = site.agenda.slice(0, 6)
   const recent = (videos?.items || []).filter((v) => !v.live).slice(0, 4)
+  // Sem foto própria no topo, a primeira foto dos destaques vai para o topo e sai da lista
+  const highlights = site.hero_url ? site.highlights : site.highlights.slice(1)
 
   return (
-    <div className="space-y-6 lg:space-y-12">
-      <Highlights />
+    <div>
+      <Hero videos={videos} />
 
-      <div
-        className={cn(
-          'space-y-6 px-4 lg:space-y-12 lg:px-8',
-          site.highlights.length ? '' : 'pt-4 lg:pt-10',
-        )}
-      >
-        {!site.highlights.length && (
-          <div className="rounded-3xl bg-[var(--sp)] p-6 text-[var(--sp-text)] lg:p-12">
-            <p className="font-serif text-2xl font-bold lg:text-5xl">{site.title}</p>
-            {site.tagline && <p className="mt-2 opacity-80 lg:text-lg">{site.tagline}</p>}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <LiveCard videos={videos} />
-        </div>
-
-        {shortcuts.length > 0 && (
-          <div
-            className={cn(
-              'grid gap-3',
-              shortcuts.length <= 4
-                ? ['grid-cols-1', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][
-                    shortcuts.length
-                  ]
-                : shortcuts.length <= 6
-                  ? 'grid-cols-3'
-                  : 'grid-cols-4',
-              shortcuts.length === 5 || shortcuts.length === 6
-                ? 'lg:grid-cols-3'
-                : 'lg:grid-cols-4',
-            )}
+      <div className="relative z-[3] -mt-8 rounded-t-[30px] bg-[var(--c-bg)] pt-5 lg:mx-auto lg:mt-0 lg:max-w-6xl lg:rounded-none lg:px-8 lg:pt-8">
+        {site.sections.oracao && (
+          <Link
+            to={to('/oracao')}
+            className="mx-4 flex h-[54px] items-center gap-2.5 rounded-full bg-white pl-5 pr-2 text-[14.5px] font-medium text-[#8a93a3] shadow-[0_6px_18px_rgba(20,34,58,0.07)] lg:mx-0 lg:max-w-xl"
           >
-            {shortcuts.map((s) => {
-              const Icon = s.icon
-              const inner = (
-                <>
-                  <span
-                    className={cn(
-                      'grid h-12 w-12 place-items-center rounded-2xl lg:h-11 lg:w-11 lg:rounded-xl',
-                      s.tone,
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold lg:text-[15px]">{s.label}</span>
-                    <span className="hidden text-[13px] text-slate-500 lg:block">{s.hint}</span>
-                  </span>
-                </>
-              )
-              const cls =
-                'flex flex-col items-center gap-1.5 text-center lg:flex-row lg:gap-3 lg:rounded-2xl lg:border lg:border-stone-200 lg:bg-white lg:p-4 lg:text-left'
-              return s.href ? (
-                <a key={s.label} href={s.href} target="_blank" rel="noreferrer" className={cls}>
-                  {inner}
-                </a>
-              ) : (
-                <Link key={s.label} to={s.to!} className={cls}>
-                  {inner}
-                </Link>
-              )
-            })}
-          </div>
+            <span className="flex-1 truncate">Como podemos orar por você hoje?</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--c-navy)] text-[var(--sp-text)]">
+              <Heart className="h-[18px] w-[18px]" />
+            </span>
+          </Link>
         )}
 
-        {site.notices.length > 0 && (
-          <section className="space-y-3">
-            <SectionTitle>Avisos da semana</SectionTitle>
-            <Card className="divide-y divide-stone-100 p-0">
-              {site.notices.map((n) => (
-                <div key={n.id} className="flex gap-3 p-4">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--sa)_16%,white)] text-[var(--sp)]">
-                    <Megaphone className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-semibold">{n.title}</p>
-                    {n.body && (
-                      <p className="whitespace-pre-line text-sm text-slate-600">{n.body}</p>
-                    )}
+        <Circles items={shortcuts} />
+
+        <div className="space-y-[26px] px-4 pt-[26px] lg:space-y-12 lg:px-0 lg:pt-10">
+          {site.notices.length > 0 && (
+            <section className="space-y-3.5">
+              <SectionTitle>Avisos</SectionTitle>
+              <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                {site.notices.map((n) => (
+                  <div key={n.id} className="c-card flex gap-3 p-4">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--c-sky)] text-[var(--c-blue)]">
+                      <Megaphone className="h-[18px] w-[18px]" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-bold">{n.title}</p>
+                      {n.body && (
+                        <p className="whitespace-pre-line text-[13.5px] font-medium leading-relaxed text-[var(--c-gray)]">
+                          {n.body}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </Card>
-          </section>
-        )}
+                ))}
+              </div>
+            </section>
+          )}
 
-        {site.sections.agenda && upcoming.length > 0 && (
-          <section className="space-y-3">
-            <SectionTitle action={<MoreLink to={to('/agenda')}>Ver agenda →</MoreLink>}>
-              Agenda
-            </SectionTitle>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {upcoming.map((it) => (
-                <AgendaRow
-                  key={`${it.kind}-${it.id}`}
-                  item={it}
-                  siteTitle={site.title}
-                  address={site.address}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {site.sections.assistir && recent.length > 0 && (
-          <section className="space-y-3">
-            <SectionTitle action={<MoreLink to={to('/assistir')}>Ver todos →</MoreLink>}>
-              Cultos e mensagens
-            </SectionTitle>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {recent.map((v) => (
-                <VideoTile key={v.id} video={v} layout="card" />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {site.service_times.length > 0 && (
-          <section className="space-y-3">
-            <SectionTitle>Horários dos cultos</SectionTitle>
-            <ServiceTimes />
-          </section>
-        )}
-
-        {site.about && (
-          <section className="space-y-3">
-            <SectionTitle>Quem somos</SectionTitle>
-            <Card>
-              <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-700">
-                {site.about}
-              </p>
-              {site.pages.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {site.pages.map((p) => (
-                    <Link
-                      key={p.slug}
-                      to={to(`/p/${p.slug}`)}
-                      className="inline-flex items-center gap-1 rounded-full border border-stone-200 px-3 py-1.5 text-sm font-medium"
-                    >
-                      <BookOpen className="h-4 w-4" /> {p.title}
+          {site.sections.agenda && upcoming.length > 0 && (
+            <section className="space-y-3.5">
+              <SectionTitle action={<MoreLink to={to('/agenda')}>Ver tudo</MoreLink>}>
+                Agenda
+              </SectionTitle>
+              <Rail cols={3}>
+                {upcoming.map((it) => {
+                  const body = (
+                    <>
+                      <DateBadge date={it.date} />
+                      <span className="min-w-0">
+                        <b className="line-clamp-2 block text-[14.5px] font-bold leading-tight">
+                          {it.title}
+                        </b>
+                        <span className="block truncate text-[12px] font-medium text-[var(--c-gray)]">
+                          {[it.time ? formatTime(it.time) : '', it.location]
+                            .filter(Boolean)
+                            .join(' · ') || (it.kind === 'CULTO' ? 'Culto' : 'Evento')}
+                        </span>
+                        {it.signup_open && (
+                          <span className="mt-1 inline-block rounded-md bg-[var(--c-sky)] px-1.5 py-0.5 text-[10px] font-extrabold text-[var(--c-blue)]">
+                            Inscrições abertas
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  )
+                  const cls = 'c-card flex w-[236px] shrink-0 items-center gap-3 p-3.5 lg:w-auto'
+                  return it.url ? (
+                    <Link key={`${it.kind}-${it.id}`} to={it.url} className={cls}>
+                      {body}
                     </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </section>
-        )}
+                  ) : (
+                    <div key={`${it.kind}-${it.id}`} className={cls}>
+                      {body}
+                    </div>
+                  )
+                })}
+              </Rail>
+            </section>
+          )}
 
-        <Link
-          to={to('/instalar')}
-          className="flex items-center gap-4 rounded-2xl border border-[color-mix(in_srgb,var(--sa)_40%,white)] bg-[color-mix(in_srgb,var(--sa)_12%,white)] p-4 lg:p-6"
-        >
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[var(--sp)] text-[var(--sp-text)]">
-            <Smartphone className="h-6 w-6" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-serif text-lg font-bold lg:text-2xl">
-              Tenha a igreja no seu celular
+          {highlights.length > 0 && (
+            <section className="space-y-3.5">
+              <SectionTitle>Destaques</SectionTitle>
+              <Rail>
+                {highlights.map((h) => {
+                  const inner = (
+                    <>
+                      <span className="relative block h-[112px] overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--c-blue)] to-[var(--c-navy)] lg:h-44">
+                        {h.image_url ? (
+                          <img
+                            src={siteFileUrl(h.image_url)}
+                            alt=""
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="absolute inset-x-3.5 bottom-3 text-[18px] font-extrabold leading-[1.05] text-white">
+                            {h.title}
+                          </span>
+                        )}
+                      </span>
+                      <b className="mt-2 line-clamp-2 block text-[14px] font-bold leading-tight">
+                        {h.image_url ? h.title : h.button_label || h.subtitle || h.title}
+                      </b>
+                      {h.subtitle && (
+                        <span className="line-clamp-2 block text-[12px] font-medium text-[var(--c-gray)]">
+                          {h.subtitle}
+                        </span>
+                      )}
+                    </>
+                  )
+                  const cls = 'block w-[156px] shrink-0 lg:w-auto'
+                  return h.link ? (
+                    <SmartLink key={h.id} href={h.link} className={cls}>
+                      {inner}
+                    </SmartLink>
+                  ) : (
+                    <div key={h.id} className={cls}>
+                      {inner}
+                    </div>
+                  )
+                })}
+              </Rail>
+            </section>
+          )}
+
+          {site.sections.assistir && recent.length > 0 && (
+            <section className="space-y-3.5">
+              <SectionTitle action={<MoreLink to={to('/assistir')}>Ver todos</MoreLink>}>
+                Cultos e mensagens
+              </SectionTitle>
+              <Rail>
+                {recent.map((v) => (
+                  <div key={v.id} className="w-[240px] shrink-0 lg:w-auto">
+                    <VideoTile video={v} layout="card" />
+                  </div>
+                ))}
+              </Rail>
+            </section>
+          )}
+
+          {site.service_times.length > 0 && (
+            <section id="horarios" className="scroll-mt-20 space-y-3.5">
+              <SectionTitle>Horários dos cultos</SectionTitle>
+              <ServiceTimes />
+            </section>
+          )}
+
+          {site.about && (
+            <section className="space-y-3.5">
+              <SectionTitle>Quem somos</SectionTitle>
+              <div className="c-card p-5">
+                <p className="whitespace-pre-line text-[15px] font-medium leading-relaxed text-[#2e3a4e]">
+                  {site.about}
+                </p>
+                {site.pages.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {site.pages.map((p) => (
+                      <Link
+                        key={p.slug}
+                        to={to(`/p/${p.slug}`)}
+                        className="inline-flex items-center gap-1 rounded-full bg-[var(--c-sky)] px-3.5 py-2 text-[13px] font-bold text-[var(--c-navy)]"
+                      >
+                        {p.title} <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          <Link to={to('/instalar')} className="c-card flex items-center gap-4 p-4 lg:p-6">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[var(--c-navy)] text-[var(--sp-text)]">
+              <Smartphone className="h-6 w-6" />
             </span>
-            <span className="block text-sm text-slate-600">
-              Agenda, avisos, cultos e Pix num ícone na tela de início. Sem baixar nada da loja.
+            <span className="min-w-0 flex-1">
+              <span className="block text-[16px] font-extrabold lg:text-xl">
+                Tenha a igreja no seu celular
+              </span>
+              <span className="block text-[13px] font-medium text-[var(--c-gray)]">
+                Agenda, avisos, cultos e Pix num ícone na tela de início.
+              </span>
             </span>
-          </span>
-          <ChevronRight className="h-5 w-5 text-slate-400" />
-        </Link>
+            <ChevronRight className="h-5 w-5 text-[#b3bbc7]" />
+          </Link>
+        </div>
       </div>
     </div>
   )
