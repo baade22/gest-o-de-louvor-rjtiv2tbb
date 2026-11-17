@@ -3,7 +3,7 @@
 // repertório do LouvorFlow. O app mostra o índice e a letra dos hinos ligados.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Loader2, Music, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Download, FileUp, Loader2, Music, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Box, Field } from './siteAdminParts'
+import HymnImportDialog from './SiteAdminHymnImport'
 
 const SUGGESTED = ['Cantor Cristão', 'Harpa Cristã']
 
@@ -47,6 +48,7 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
   const [loadingDraft, setLoadingDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [fileOpen, setFileOpen] = useState(false)
 
   const load = useCallback(() => {
     listHymns(churchId)
@@ -142,9 +144,14 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
       hint="Os hinos que a igreja canta (Cantor Cristão, Harpa Cristã ou outro). Aparecem na aba Hinário do app, com a letra."
       action={
         canEdit && (
-          <Button onClick={openNew} className="gap-1.5 rounded-xl bg-teal-700 text-white hover:bg-teal-800">
-            <Plus className="h-4 w-4" /> Novo hino
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setFileOpen(true)} className="gap-1.5 rounded-xl">
+              <FileUp className="h-4 w-4" /> Importar arquivo
+            </Button>
+            <Button onClick={openNew} className="gap-1.5 rounded-xl bg-teal-700 text-white hover:bg-teal-800">
+              <Plus className="h-4 w-4" /> Novo hino
+            </Button>
+          </div>
         )
       }
     >
@@ -157,7 +164,7 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
         <Skeleton className="h-24 rounded-xl" />
       ) : items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-          Nenhum hino cadastrado. Comece pelo botão "Novo hino".
+          Nenhum hino cadastrado. Use "Importar arquivo" (exportação do Holyrics) ou "Novo hino".
         </p>
       ) : (
         <>
@@ -329,6 +336,18 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
           setImportOpen(false)
           if (!draft) return
           setDraft({ ...draft, title: draft.title?.trim() ? draft.title : s.title, lyrics: s.lyrics })
+        }}
+      />
+      <HymnImportDialog
+        churchId={churchId}
+        open={fileOpen}
+        existing={items || []}
+        suggestions={[...new Set([...hymnals, ...SUGGESTED])]}
+        onClose={() => setFileOpen(false)}
+        onDone={(h) => {
+          setFileOpen(false)
+          setTab(h)
+          load()
         }}
       />
       {dialog}
