@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanTitle, numberFrom, parseJson, parseMufl } from './hymnImport'
+import { cleanTitle, numberFrom, parseHymnFile, parseJson, parseMufl } from './hymnImport'
 
 /** Monta um .mufl pequeno (Java serialization de um ArrayList de Music), igual ao do Holyrics. */
 function mufl(items: { title: string; lyrics: string; artist?: string; note?: string; archived?: boolean }[]) {
@@ -133,6 +133,23 @@ describe('parseJson', () => {
     expect(r.hymns.map((h) => h.number)).toEqual([1, 2])
     expect(r.hymns[0].lyrics).toBe('Linha\nlinha')
     expect(r.hymns[1].lyrics).toBe('Estrofe 1\n\nCoro\nAleluia\n\nEstrofe 2')
+  })
+
+  it('aceita objeto com o número como chave e estrofes numeradas (formato comum da Harpa)', async () => {
+    const json = JSON.stringify({
+      '-1': { Author: 'alguém' },
+      '2': { hino: '2 - Segundo', verses: { '2': 'B1 <br> B2', '1': 'A1 <br> A2' } },
+      '1': { hino: '1 - Primeiro', coro: 'C1 <br> C2', verses: { '1': 'X' } },
+    })
+    const r = await parseHymnFile(new File([json], 'harpa_crista_640_hinos.json'))
+    expect(r.hymnal).toBe('Harpa Cristã')
+    expect(r.skipped).toBe(1)
+    expect(r.hymns.map((h) => [h.number, h.title])).toEqual([
+      [1, 'Primeiro'],
+      [2, 'Segundo'],
+    ])
+    expect(r.hymns[0].lyrics).toBe('X\n\nCoro\nC1\nC2')
+    expect(r.hymns[1].lyrics).toBe('A1\nA2\n\nB1\nB2')
   })
 
   it('avisa JSON quebrado', () => {

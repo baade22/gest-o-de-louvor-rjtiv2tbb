@@ -118,6 +118,8 @@ export function parseJson(text: string): ImportResult {
     throw new Error('O arquivo JSON está com erro de formatação.')
   }
   const obj = data as Record<string, unknown>
+  // Lista, { hymns: [...] }, { hinos: [...] } ou um objeto com o número como chave ({ "1": {...} })
+  const keyed = !Array.isArray(data) && !Array.isArray(obj?.hymns) && !Array.isArray(obj?.hinos)
   const list: unknown[] = Array.isArray(data)
     ? data
     : Array.isArray(obj?.hymns)
@@ -125,25 +127,40 @@ export function parseJson(text: string): ImportResult {
       : Array.isArray(obj?.hinos)
         ? (obj.hinos as unknown[])
         : obj && typeof obj === 'object'
-          ? Object.values(obj)
+          ? Object.entries(obj).map(([k, v]) =>
+              v && typeof v === 'object' && !Array.isArray(v) ? { $key: k, ...(v as object) } : v,
+            )
           : []
   const pick = (o: Record<string, unknown>, keys: string[]) => {
     for (const k of keys) if (o[k] != null && o[k] !== '') return o[k]
     return undefined
   }
   const asText = (v: unknown): string => {
+    // estrofes como objeto ({ "1": "...", "2": "..." }) viram lista na ordem dos números
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const o = v as Record<string, unknown>
+      if (!Object.keys(o).some((k) => ['text', 'texto', 'lyrics', 'letra', 'verse'].includes(k)))
+        v = Object.keys(o)
+          .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
+          .map((k) => o[k])
+    }
     if (Array.isArray(v))
       return v
         .map((x) =>
           typeof x === 'string'
-            ? x
+            ? asText(x)
             : x && typeof x === 'object'
               ? asText(pick(x as Record<string, unknown>, ['text', 'texto', 'lyrics', 'letra', 'verse']))
               : '',
         )
         .filter(Boolean)
         .join('\n\n')
-    return typeof v === 'string' ? v.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '') : ''
+    return typeof v === 'string'
+      ? v
+          .replace(/\s*<br\s*\/?>\s*/gi, '\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/[ \t]+\n/g, '\n')
+      : ''
   }
   const hymns: ImportedHymn[] = []
   let skipped = 0
@@ -153,12 +170,13 @@ export function parseJson(text: string): ImportResult {
       continue
     }
     const o = raw as Record<string, unknown>
-    const title = clean(asText(pick(o, ['title', 'titulo', 'título', 'name', 'nome'])))
+    const title = clean(asText(pick(o, ['title', 'titulo', 'título', 'name', 'nome', 'hino', 'hymn'])))
     if (!title) {
       skipped++
       continue
     }
-    const n = Number(pick(o, ['number', 'numero', 'número', 'num', 'n', 'id']))
+    const keyN = keyed && /^\d{1,4}$/.test(String(o.$key)) ? Number(o.$key) : NaN
+    const n = Number(pick(o, ['number', 'numero', 'número', 'num', 'n', 'id']) ?? keyN)
     let lyrics = asText(pick(o, ['lyrics', 'letra', 'text', 'texto', 'verses', 'estrofes', 'stanzas']))
     const chorus = asText(pick(o, ['chorus', 'coro', 'refrao', 'refrão']))
     if (chorus && !lyrics.includes(chorus)) {
@@ -177,7 +195,10 @@ export function parseJson(text: string): ImportResult {
 export async function parseHymnFile(file: File): Promise<ImportResult> {
   const buf = new Uint8Array(await file.arrayBuffer())
   if (buf[0] === 0xac && buf[1] === 0xed) return parseMufl(buf)
-  return parseJson(new TextDecoder('utf-8').decode(buf))
+  const r = parseJson(new TextDecoder('utf-8').decode(buf))
+  // O JSON não diz o hinário: tenta pelo nome do arquivo ("harpa_crista_640_hinos.json")
+  if (!r.hymnal) r.hymnal = hymnalFrom(file.name.replace(/[_-]+/g, ' '))
+  return r
 }
 
 function sortHymns(list: ImportedHymn[]) {
