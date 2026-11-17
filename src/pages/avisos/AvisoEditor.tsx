@@ -46,6 +46,7 @@ import {
   type WaGroup,
 } from '@/services/whatsappAvisos'
 import { StatusBadge, errorText } from './AvisosPanel'
+import { getContactsOverview, type ContactsOverview } from '@/services/whatsappContacts'
 import { publicOrigin } from '@/lib/publicOrigin'
 
 const PACES = [
@@ -262,6 +263,31 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
   const toGroups = isGroupAudience(form.audience)
   const toGroupNumbers = form.audience.type === 'WA_NUMEROS'
   const pickGroups = usesWaGroups(form.audience)
+  const toLists = form.audience.type === 'LISTAS'
+  const [book, setBook] = useState<ContactsOverview | null>(null)
+  const [bookError, setBookError] = useState('')
+  const [bookQ, setBookQ] = useState('')
+  useEffect(() => {
+    if (!toLists || book || bookError || !churchId) return
+    getContactsOverview(churchId)
+      .then(setBook)
+      .catch((err) => setBookError(errorText(err)))
+  }, [toLists, book, bookError, churchId])
+  const chosenLists = form.audience.list_ids || []
+  const chosenContacts = form.audience.contact_ids || []
+  const bookFound = useMemo(() => {
+    const t = bookQ.trim().toLowerCase()
+    const d = t.replace(/\D/g, '')
+    if (!book || t.length < 2) return []
+    return book.contacts
+      .filter(
+        (c) =>
+          !chosenContacts.includes(c.id) &&
+          (c.name.toLowerCase().includes(t) || (d.length >= 3 && c.phone.includes(d))),
+      )
+      .slice(0, 20)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book, bookQ, chosenContacts.join(',')])
   const loadWaGroups = useCallback(async () => {
     if (!churchId) return
     setWaLoading(true)
@@ -886,6 +912,118 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                   </div>
                 </div>
               )}
+              {toLists && (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-700">
+                    Sai uma mensagem no privado para cada número das listas marcadas e dos números
+                    escolhidos.{' '}
+                    <Link to="/avisos/contatos" className="font-semibold text-teal-800 underline">
+                      Montar listas e carregar números
+                    </Link>
+                  </p>
+                  {bookError && (
+                    <p className="text-sm text-red-700" role="alert">
+                      {bookError}
+                    </p>
+                  )}
+                  {!book && !bookError && (
+                    <p className="text-sm text-slate-600 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Abrindo os contatos…
+                    </p>
+                  )}
+                  {book && book.lists.length === 0 && book.contacts.length === 0 && (
+                    <p className="text-sm text-slate-600">
+                      Ainda não há números na base. Use “Montar listas e carregar números”.
+                    </p>
+                  )}
+                  {book && book.lists.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {book.lists.map((l) => {
+                        const on = chosenLists.includes(l.id)
+                        return (
+                          <label
+                            key={l.id}
+                            className={`inline-flex items-center gap-2 min-h-11 px-3 rounded-xl border text-sm cursor-pointer ${
+                              on
+                                ? 'border-teal-700 bg-teal-50 text-teal-900 font-semibold'
+                                : 'border-slate-300 text-slate-700'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              onChange={() =>
+                                setAud({
+                                  list_ids: on
+                                    ? chosenLists.filter((x) => x !== l.id)
+                                    : [...chosenLists, l.id],
+                                })
+                              }
+                            />
+                            {l.name} ({l.count})
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {book && book.contacts.length > 0 && (
+                    <div className="space-y-2">
+                      <label htmlFor="aud-book" className="text-sm font-semibold text-slate-800">
+                        Mais números, um a um
+                      </label>
+                      <Input
+                        id="aud-book"
+                        value={bookQ}
+                        onChange={(e) => setBookQ(e.target.value)}
+                        placeholder="Buscar por nome ou número"
+                        className="rounded-xl min-h-11"
+                      />
+                      {bookFound.length > 0 && (
+                        <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-56 overflow-auto">
+                          {bookFound.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              className="w-full text-left px-3 min-h-11 text-sm hover:bg-slate-50 flex justify-between items-center gap-2"
+                              onClick={() => {
+                                setAud({ contact_ids: [...chosenContacts, c.id] })
+                                setBookQ('')
+                              }}
+                            >
+                              <span className="truncate">{c.name || 'Sem nome'}</span>
+                              <span className="text-slate-600 shrink-0">{c.display}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {chosenContacts.map((id) => {
+                          const c = book.contacts.find((x) => x.id === id)
+                          const label = c ? c.name || c.display : 'Número apagado'
+                          return (
+                            <span
+                              key={id}
+                              className="inline-flex items-center gap-1 text-sm bg-slate-100 rounded-full pl-3 pr-1 py-1"
+                            >
+                              {label}
+                              <button
+                                type="button"
+                                aria-label={`Tirar ${label}`}
+                                className="h-7 w-7 rounded-full hover:bg-slate-200 flex items-center justify-center"
+                                onClick={() =>
+                                  setAud({ contact_ids: chosenContacts.filter((x) => x !== id) })
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {pickGroups && (
                 <div className="space-y-2">
                   {toGroupNumbers ? (
@@ -984,7 +1122,8 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
               )}
               {form.audience.type !== 'EVENTO' &&
                 form.audience.type !== 'PESSOAS' &&
-                !pickGroups && (
+                !pickGroups &&
+                !toLists && (
                   <div className="space-y-1.5 max-w-xs">
                     <label htmlFor="aud-cong" className="text-sm font-semibold text-slate-800">
                       Congregação
@@ -1011,6 +1150,14 @@ export default function AvisoEditor({ kind }: { kind: 'AVULSO' | 'REGRA_CULTO' }
                     </strong>{' '}
                     {chosenGroups.length === 1 ? 'escolhido' : 'escolhidos'} · 1 mensagem por grupo
                   </>
+                ) : toLists ? (
+                  count ? (
+                    <>
+                      <strong>{count.total} números</strong> nas listas e escolhas
+                    </>
+                  ) : (
+                    'Contando…'
+                  )
                 ) : toGroupNumbers ? (
                   chosenGroups.length === 0 ? (
                     'Escolha pelo menos um grupo.'

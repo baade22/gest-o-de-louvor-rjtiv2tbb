@@ -12,6 +12,7 @@ import {
   Mic,
   Plus,
   RefreshCw,
+  Users,
   Video,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -187,6 +188,11 @@ export default function AvisosPanel() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="rounded-xl gap-1.5" asChild>
+            <Link to="/avisos/contatos">
+              <Users className="h-4 w-4" /> Contatos e listas
+            </Link>
+          </Button>
           <Button variant="outline" className="rounded-xl gap-1.5" asChild>
             <Link to="/avisos/cultos">
               <CalendarClock className="h-4 w-4" /> Avisos dos cultos
