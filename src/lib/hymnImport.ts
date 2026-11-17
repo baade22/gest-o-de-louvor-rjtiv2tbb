@@ -19,7 +19,8 @@ export interface ImportResult {
   skipped: number
 }
 
-const HYMNAL_RE = /(cantor\s+crist[aã]o|harpa\s+crist[aã]|hin[aá]rio\s+para\s+o\s+culto\s+crist[aã]o|hcc)/i
+const HYMNAL_RE =
+  /(cantor\s+crist[aã]o|harpa\s+crist[aã]|hin[aá]rio\s+para\s+o\s+culto\s+crist[aã]o|hcc)/i
 
 function clean(s: unknown): string {
   return typeof s === 'string' ? s.replace(/\r/g, '').trim() : ''
@@ -150,7 +151,9 @@ export function parseJson(text: string): ImportResult {
           typeof x === 'string'
             ? asText(x)
             : x && typeof x === 'object'
-              ? asText(pick(x as Record<string, unknown>, ['text', 'texto', 'lyrics', 'letra', 'verse']))
+              ? asText(
+                  pick(x as Record<string, unknown>, ['text', 'texto', 'lyrics', 'letra', 'verse']),
+                )
               : '',
         )
         .filter(Boolean)
@@ -170,14 +173,18 @@ export function parseJson(text: string): ImportResult {
       continue
     }
     const o = raw as Record<string, unknown>
-    const title = clean(asText(pick(o, ['title', 'titulo', 'título', 'name', 'nome', 'hino', 'hymn'])))
+    const title = clean(
+      asText(pick(o, ['title', 'titulo', 'título', 'name', 'nome', 'hino', 'hymn'])),
+    )
     if (!title) {
       skipped++
       continue
     }
     const keyN = keyed && /^\d{1,4}$/.test(String(o.$key)) ? Number(o.$key) : NaN
     const n = Number(pick(o, ['number', 'numero', 'número', 'num', 'n', 'id']) ?? keyN)
-    let lyrics = asText(pick(o, ['lyrics', 'letra', 'text', 'texto', 'verses', 'estrofes', 'stanzas']))
+    let lyrics = asText(
+      pick(o, ['lyrics', 'letra', 'text', 'texto', 'verses', 'estrofes', 'stanzas']),
+    )
     const chorus = asText(pick(o, ['chorus', 'coro', 'refrao', 'refrão']))
     if (chorus && !lyrics.includes(chorus)) {
       const parts = lyrics.split(/\n\s*\n/)
@@ -202,7 +209,9 @@ export async function parseHymnFile(file: File): Promise<ImportResult> {
 }
 
 function sortHymns(list: ImportedHymn[]) {
-  return list.sort((a, b) => (a.number || 99999) - (b.number || 99999) || a.title.localeCompare(b.title))
+  return list.sort(
+    (a, b) => (a.number || 99999) - (b.number || 99999) || a.title.localeCompare(b.title),
+  )
 }
 
 /** Para comparar títulos: sem acento, sem caixa e sem pontuação. */

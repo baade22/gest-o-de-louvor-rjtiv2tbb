@@ -3,7 +3,17 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Minus, Music, Plus, Search, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Minus,
+  Music,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { fold } from '@/lib/bible'
 import {
@@ -76,7 +86,8 @@ function Index() {
     return current.hymns.filter((h) => fold(h.title).includes(k))
   }, [current, query])
 
-  if (error) return <p className="pt-10 text-center text-slate-500">Não foi possível abrir o hinário.</p>
+  if (error)
+    return <p className="pt-10 text-center text-slate-500">Não foi possível abrir o hinário.</p>
   if (!data)
     return (
       <div className="grid place-items-center py-20">
@@ -139,7 +150,11 @@ function Index() {
           ) : (
             <Card className="divide-y divide-stone-100 p-0">
               {list.map((h) => (
-                <Link key={h.id} to={to(`/hinario/${h.id}`)} className="flex items-center gap-3 px-4 py-3">
+                <Link
+                  key={h.id}
+                  to={to(`/hinario/${h.id}`)}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
                   <span className="grid h-10 min-w-[2.75rem] shrink-0 place-items-center rounded-xl bg-stone-100 px-2 text-[15px] font-extrabold text-[var(--sp)]">
                     {h.number || <Music className="h-4 w-4" />}
                   </span>
@@ -206,7 +221,10 @@ function Hymn({ id }: { id: string }) {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center gap-2">
-        <Link to={to('/hinario')} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500">
+        <Link
+          to={to('/hinario')}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500"
+        >
           <ArrowLeft className="h-4 w-4" /> Hinário
         </Link>
         <div className="ml-auto flex items-center gap-1">
@@ -240,7 +258,9 @@ function Hymn({ id }: { id: string }) {
       ) : (
         <>
           <div className="text-center">
-            <p className="text-xs font-bold uppercase tracking-wider text-[var(--sa)]">{hymn.hymnal}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-[var(--sa)]">
+              {hymn.hymnal}
+            </p>
             <h2 className="mt-1 font-serif text-2xl font-bold text-slate-900 lg:text-4xl">
               {hymn.number ? `${hymn.number}. ` : ''}
               {hymn.title}
@@ -252,7 +272,10 @@ function Hymn({ id }: { id: string }) {
                 <div key={i} className={cn('leading-relaxed text-slate-800', SIZES[size])}>
                   {lines.map((l, j) =>
                     isLabel(l) ? (
-                      <p key={j} className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+                      <p
+                        key={j}
+                        className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400"
+                      >
                         {l.replace(/^\[|\]$|:$/g, '')}
                       </p>
                     ) : (

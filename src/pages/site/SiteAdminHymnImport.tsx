@@ -179,7 +179,8 @@ export default function HymnImportDialog({
               continue
             }
             failed++
-            if (!firstError) firstError = `${r.number ? `${r.number}. ` : ''}${r.title}: ${getErrorMessage(err)}`
+            if (!firstError)
+              firstError = `${r.number ? `${r.number}. ` : ''}${r.title}: ${getErrorMessage(err)}`
             break
           }
         }
@@ -228,8 +229,14 @@ export default function HymnImportDialog({
             disabled={reading}
             className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-10 text-center text-slate-600 hover:border-teal-600 hover:bg-teal-50/40"
           >
-            {reading ? <Loader2 className="h-8 w-8 animate-spin" /> : <FileUp className="h-8 w-8" />}
-            <span className="font-semibold">{reading ? 'Lendo o arquivo...' : 'Escolher arquivo'}</span>
+            {reading ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+              <FileUp className="h-8 w-8" />
+            )}
+            <span className="font-semibold">
+              {reading ? 'Lendo o arquivo...' : 'Escolher arquivo'}
+            </span>
             <span className="text-sm text-slate-500">
               No Holyrics: Arquivo › Exportar › Músicas. Depois escolha o arquivo .mufl aqui.
             </span>
@@ -280,13 +287,14 @@ export default function HymnImportDialog({
 
             <p className="text-sm text-slate-600">
               <b>{fileName}</b>: {rows.length} hinos. {checked.length} marcados: {toCreate} novos
-              {exists > 0 && `, ${exists} já existem (${mode === 'replace' ? 'serão trocados' : 'ficam como estão'})`}
+              {exists > 0 &&
+                `, ${exists} já existem (${mode === 'replace' ? 'serão trocados' : 'ficam como estão'})`}
               {noNumber > 0 && `, ${noNumber} sem número`}.
             </p>
             {repeated > 0 && (
               <p className="rounded-lg bg-red-50 p-2.5 text-sm text-red-800">
-                {repeated} hinos marcados têm o mesmo número de outro. Troque o número ou desmarque um
-                deles para poder importar.
+                {repeated} hinos marcados têm o mesmo número de outro. Troque o número ou desmarque
+                um deles para poder importar.
               </p>
             )}
 
@@ -301,12 +309,15 @@ export default function HymnImportDialog({
                   key={v}
                   type="button"
                   onClick={() => {
-                    if (v === 'review') setReviewKeys(new Set(rows.filter(needsReview).map((r) => r.key)))
+                    if (v === 'review')
+                      setReviewKeys(new Set(rows.filter(needsReview).map((r) => r.key)))
                     setFilter(v)
                   }}
                   className={cn(
                     'rounded-lg border px-3 py-1 font-medium',
-                    filter === v ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-white',
+                    filter === v
+                      ? 'border-slate-800 bg-slate-800 text-white'
+                      : 'border-slate-200 bg-white',
                   )}
                 >
                   {label}
@@ -349,17 +360,29 @@ export default function HymnImportDialog({
                       )}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className={cn('block truncate font-medium', !r.checked && 'text-slate-400')}>
+                      <span
+                        className={cn('block truncate font-medium', !r.checked && 'text-slate-400')}
+                      >
                         {r.title}
                       </span>
                       <span className="flex flex-wrap gap-1 text-[11px] font-semibold">
                         {r.hymnal && (
-                          <span className="rounded bg-violet-100 px-1.5 text-violet-800">{r.hymnal}</span>
+                          <span className="rounded bg-violet-100 px-1.5 text-violet-800">
+                            {r.hymnal}
+                          </span>
                         )}
-                        {!r.lyrics && <span className="rounded bg-slate-100 px-1.5 text-slate-600">sem letra</span>}
-                        {i?.noNumber && <span className="rounded bg-red-100 px-1.5 text-red-800">sem número</span>}
+                        {!r.lyrics && (
+                          <span className="rounded bg-slate-100 px-1.5 text-slate-600">
+                            sem letra
+                          </span>
+                        )}
+                        {i?.noNumber && (
+                          <span className="rounded bg-red-100 px-1.5 text-red-800">sem número</span>
+                        )}
                         {i?.repeated && (
-                          <span className="rounded bg-red-100 px-1.5 text-red-800">número repetido</span>
+                          <span className="rounded bg-red-100 px-1.5 text-red-800">
+                            número repetido
+                          </span>
                         )}
                         {i?.exists && (
                           <span className="rounded bg-amber-100 px-1.5 text-amber-900">
@@ -385,8 +408,8 @@ export default function HymnImportDialog({
                   />
                 </div>
                 <p className="text-center text-xs text-slate-500">
-                  Importando {progress.done} de {progress.total}... Deixe esta janela aberta (leva uns 2
-                  minutos a cada 500 hinos).
+                  Importando {progress.done} de {progress.total}... Deixe esta janela aberta (leva
+                  uns 2 minutos a cada 500 hinos).
                 </p>
               </div>
             )}

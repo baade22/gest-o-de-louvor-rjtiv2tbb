@@ -55,8 +55,14 @@ export const SECTION_LABELS: Record<keyof SiteSections, { title: string; hint: s
   oracao: { title: 'Pedido de oração', hint: 'Vai para a caixa da pastoral; nunca é publicado' },
   avisos: { title: 'Avisos da semana', hint: 'Os avisos cadastrados aqui, cada um com período' },
   novo: { title: 'Sou novo aqui', hint: 'Abre o link de autocadastro escolhido abaixo' },
-  biblia: { title: 'Bíblia', hint: 'Bíblia Livre completa, com busca; outras versões abrem no Bible.com' },
-  hinario: { title: 'Hinário', hint: 'Os hinos cadastrados na aba Hinário, com número, título e letra' },
+  biblia: {
+    title: 'Bíblia',
+    hint: 'Bíblia Livre completa, com busca; outras versões abrem no Bible.com',
+  },
+  hinario: {
+    title: 'Hinário',
+    hint: 'Os hinos cadastrados na aba Hinário, com número, título e letra',
+  },
 }
 
 export const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']

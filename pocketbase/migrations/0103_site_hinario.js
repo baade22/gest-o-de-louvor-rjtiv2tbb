@@ -47,9 +47,7 @@ migrate(
         { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
         { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
       ],
-      indexes: [
-        'CREATE INDEX idx_site_hymns_church ON site_hymns (church_id, hymnal, number)',
-      ],
+      indexes: ['CREATE INDEX idx_site_hymns_church ON site_hymns (church_id, hymnal, number)'],
     })
     app.save(col)
   },

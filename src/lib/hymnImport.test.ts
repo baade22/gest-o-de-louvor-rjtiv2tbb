@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { cleanTitle, numberFrom, parseHymnFile, parseJson, parseMufl } from './hymnImport'
 
 /** Monta um .mufl pequeno (Java serialization de um ArrayList de Music), igual ao do Holyrics. */
-function mufl(items: { title: string; lyrics: string; artist?: string; note?: string; archived?: boolean }[]) {
+function mufl(
+  items: { title: string; lyrics: string; artist?: string; note?: string; archived?: boolean }[],
+) {
   const out: number[] = []
   const u8 = (...b: number[]) => out.push(...b)
   const u16 = (n: number) => u8((n >> 8) & 255, n & 255)
@@ -95,11 +97,19 @@ describe('parseMufl', () => {
   it('lê a exportação do Holyrics', () => {
     const r = parseMufl(
       mufl([
-        { title: 'Santo', artist: 'Cantor Cristão - 9', lyrics: 'Santo! Santo! Santo!\r\n\r\nDeus' },
+        {
+          title: 'Santo',
+          artist: 'Cantor Cristão - 9',
+          lyrics: 'Santo! Santo! Santo!\r\n\r\nDeus',
+        },
         { title: 'Antífona', artist: 'Cantor Cristão - 1', lyrics: 'A Ti, ó Deus' },
         { title: 'Como agradecer - 422 HCC', artist: 'Cantor Cristão', lyrics: 'Como agradecer' },
         { title: 'Velho', artist: 'Cantor Cristão - 2', lyrics: 'x', archived: true },
-        { title: 'Santo', artist: 'Cantor Cristão - 9', lyrics: 'Santo! Santo! Santo!\n\nDeus Onipotente' },
+        {
+          title: 'Santo',
+          artist: 'Cantor Cristão - 9',
+          lyrics: 'Santo! Santo! Santo!\n\nDeus Onipotente',
+        },
       ]),
     )
     expect(r.hymnal).toBe('Cantor Cristão')

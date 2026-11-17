@@ -345,7 +345,9 @@ export default function SiteHome() {
                 : shortcuts.length <= 6
                   ? 'grid-cols-3'
                   : 'grid-cols-4',
-              shortcuts.length === 5 || shortcuts.length === 6 ? 'lg:grid-cols-3' : 'lg:grid-cols-4',
+              shortcuts.length === 5 || shortcuts.length === 6
+                ? 'lg:grid-cols-3'
+                : 'lg:grid-cols-4',
             )}
           >
             {shortcuts.map((s) => {

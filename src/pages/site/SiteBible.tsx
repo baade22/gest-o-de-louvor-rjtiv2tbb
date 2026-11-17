@@ -244,7 +244,10 @@ function Chapters({ book }: { book: BibleBook }) {
   const { to } = useSite()
   return (
     <>
-      <Link to={to('/biblia')} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500">
+      <Link
+        to={to('/biblia')}
+        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500"
+      >
         <ArrowLeft className="h-4 w-4" /> Livros
       </Link>
       <SectionTitle>{book.name}</SectionTitle>

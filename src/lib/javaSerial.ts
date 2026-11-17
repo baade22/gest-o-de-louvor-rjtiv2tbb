@@ -61,7 +61,8 @@ export class JavaReader {
 
   /** Lê o primeiro objeto do arquivo. */
   readStream(): unknown {
-    if (this.u16() !== STREAM_MAGIC) throw new Error('Arquivo não é do Holyrics (cabeçalho inválido).')
+    if (this.u16() !== STREAM_MAGIC)
+      throw new Error('Arquivo não é do Holyrics (cabeçalho inválido).')
     this.u16() // versão
     return this.content()
   }

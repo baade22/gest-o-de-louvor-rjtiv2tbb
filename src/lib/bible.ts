@@ -13,7 +13,14 @@ export interface BibleBook {
   nt: boolean
 }
 
-const B = (code: string, usfm: string, name: string, abbr: string, chapters: number, nt = false) => ({
+const B = (
+  code: string,
+  usfm: string,
+  name: string,
+  abbr: string,
+  chapters: number,
+  nt = false,
+) => ({
   code,
   usfm,
   name,
@@ -139,9 +146,10 @@ export interface BibleRef {
 
 /** "Jo 3:16", "joão 3 16", "Sl 23", "1 Co 13.4", "apocalipse" -> referência; senão null. */
 export function parseRef(input: string): BibleRef | null {
-  const m = /^\s*([1-3]?\s*[^\d\s:.,]+(?:\s+[^\d\s:.,]+)*)\s*(?:(\d+)(?:\s*[:.,\s]\s*(\d+))?)?\s*$/.exec(
-    input,
-  )
+  const m =
+    /^\s*([1-3]?\s*[^\d\s:.,]+(?:\s+[^\d\s:.,]+)*)\s*(?:(\d+)(?:\s*[:.,\s]\s*(\d+))?)?\s*$/.exec(
+      input,
+    )
   if (!m) return null
   const book = findBook(m[1])
   if (!book) return null
@@ -203,7 +211,9 @@ export async function searchBible(query: string, limit = 100): Promise<SearchHit
       .toLowerCase()
   // A frase exata vem primeiro; depois os versículos que têm todas as palavras
   const phrase = norm(query.trim()).replace(/\s+/g, ' ')
-  const books = await Promise.all(BIBLE_BOOKS.map((b) => loadBook(b.code).then((c) => [b, c] as const)))
+  const books = await Promise.all(
+    BIBLE_BOOKS.map((b) => loadBook(b.code).then((c) => [b, c] as const)),
+  )
   const exact: SearchHit[] = []
   const loose: SearchHit[] = []
   for (const [book, chapters] of books) {

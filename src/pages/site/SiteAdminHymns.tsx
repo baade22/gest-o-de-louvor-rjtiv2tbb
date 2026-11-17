@@ -93,7 +93,11 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
       const full = await getHymn(h.id)
       setDraft({ ...full })
     } catch (err) {
-      toast({ title: 'Não foi possível abrir', description: getErrorMessage(err), variant: 'destructive' })
+      toast({
+        title: 'Não foi possível abrir',
+        description: getErrorMessage(err),
+        variant: 'destructive',
+      })
     } finally {
       setLoadingDraft('')
     }
@@ -132,7 +136,11 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
       setDraft(null)
       load()
     } catch (err) {
-      toast({ title: 'Não foi possível salvar', description: getErrorMessage(err), variant: 'destructive' })
+      toast({
+        title: 'Não foi possível salvar',
+        description: getErrorMessage(err),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
@@ -145,10 +153,17 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
       action={
         canEdit && (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setFileOpen(true)} className="gap-1.5 rounded-xl">
+            <Button
+              variant="outline"
+              onClick={() => setFileOpen(true)}
+              className="gap-1.5 rounded-xl"
+            >
               <FileUp className="h-4 w-4" /> Importar arquivo
             </Button>
-            <Button onClick={openNew} className="gap-1.5 rounded-xl bg-teal-700 text-white hover:bg-teal-800">
+            <Button
+              onClick={openNew}
+              className="gap-1.5 rounded-xl bg-teal-700 text-white hover:bg-teal-800"
+            >
               <Plus className="h-4 w-4" /> Novo hino
             </Button>
           </div>
@@ -185,7 +200,9 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
                 )}
               >
                 {n}{' '}
-                <span className="opacity-70">({(items || []).filter((h) => h.hymnal === n).length})</span>
+                <span className="opacity-70">
+                  ({(items || []).filter((h) => h.hymnal === n).length})
+                </span>
               </button>
             ))}
           </div>
@@ -204,7 +221,12 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
                 <span className="grid h-9 min-w-[2.5rem] place-items-center rounded-lg bg-slate-100 px-1.5 text-sm font-bold text-slate-700">
                   {h.number || '–'}
                 </span>
-                <span className={cn('min-w-0 flex-1 truncate font-medium', !h.active && 'text-slate-400 line-through')}>
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate font-medium',
+                    !h.active && 'text-slate-400 line-through',
+                  )}
+                >
                   {h.title}
                 </span>
                 {canEdit && (
@@ -320,7 +342,11 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
             <Button variant="outline" onClick={() => setDraft(null)}>
               Cancelar
             </Button>
-            <Button onClick={save} disabled={saving} className="gap-1.5 bg-teal-700 text-white hover:bg-teal-800">
+            <Button
+              onClick={save}
+              disabled={saving}
+              className="gap-1.5 bg-teal-700 text-white hover:bg-teal-800"
+            >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
             </Button>
           </DialogFooter>
@@ -335,7 +361,11 @@ export default function HymnsTab({ churchId, canEdit }: { churchId: string; canE
         onPick={(s) => {
           setImportOpen(false)
           if (!draft) return
-          setDraft({ ...draft, title: draft.title?.trim() ? draft.title : s.title, lyrics: s.lyrics })
+          setDraft({
+            ...draft,
+            title: draft.title?.trim() ? draft.title : s.title,
+            lyrics: s.lyrics,
+          })
         }}
       />
       <HymnImportDialog
@@ -383,7 +413,10 @@ function RepertoirePicker({
     const t = setTimeout(() => {
       const q = query.trim()
       const filter = q
-        ? pb.filter("church_id = {:c} && lyrics != '' && (title ~ {:q} || artist ~ {:q})", { c: churchId, q })
+        ? pb.filter("church_id = {:c} && lyrics != '' && (title ~ {:q} || artist ~ {:q})", {
+            c: churchId,
+            q,
+          })
         : pb.filter("church_id = {:c} && lyrics != ''", { c: churchId })
       pb.collection('songs')
         .getList<RepertoireSong>(1, 30, { filter, sort: 'title', fields: 'id,title,artist,lyrics' })
@@ -409,15 +442,24 @@ function RepertoirePicker({
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Trazer letra do repertório</DialogTitle>
-          <DialogDescription>Músicas do LouvorFlow que já têm letra (as que vieram do Holyrics também).</DialogDescription>
+          <DialogDescription>
+            Músicas do LouvorFlow que já têm letra (as que vieram do Holyrics também).
+          </DialogDescription>
         </DialogHeader>
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Título ou artista" autoFocus />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Título ou artista"
+          autoFocus
+        />
         {error ? (
           <p className="text-sm text-red-600">Não foi possível ler o repertório: {error}</p>
         ) : rows === null ? (
           <Skeleton className="h-24 rounded-xl" />
         ) : rows.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-500">Nenhuma música com letra encontrada.</p>
+          <p className="py-4 text-center text-sm text-slate-500">
+            Nenhuma música com letra encontrada.
+          </p>
         ) : (
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
             {rows.map((s) => (
@@ -430,7 +472,9 @@ function RepertoirePicker({
                 <Music className="h-4 w-4 shrink-0 text-slate-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{s.title}</span>
-                  {s.artist && <span className="block truncate text-xs text-slate-500">{s.artist}</span>}
+                  {s.artist && (
+                    <span className="block truncate text-xs text-slate-500">{s.artist}</span>
+                  )}
                 </span>
               </button>
             ))}
