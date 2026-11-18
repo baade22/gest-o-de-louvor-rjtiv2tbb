@@ -3,7 +3,8 @@
 O LouvorFlow manda os avisos pelo WhatsApp da igreja do mesmo jeito que o Eklesia: o celular
 da igreja lê um QR Code e fica "conectado", como no WhatsApp Web. Quem mantém essa conexão
 ligada é a [Evolution API](https://github.com/EvolutionAPI/evolution-api) (gratuita), que roda
-neste servidor pequeno. O Skip continua com o resto do sistema.
+neste servidor pequeno. O próprio LouvorFlow (site + PocketBase) pode rodar neste mesmo servidor:
+veja [deploy/louvorflow/README.md](../louvorflow/README.md).
 
 ```
 LouvorFlow (Skip)  --  fila de mensagens  -->  Evolution API (este servidor)  -->  WhatsApp da igreja
