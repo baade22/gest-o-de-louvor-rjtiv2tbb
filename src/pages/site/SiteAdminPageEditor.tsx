@@ -239,7 +239,7 @@ export default function PageEditor({
                 ? b.url.trim()
                 : b.t === 'button'
                   ? b.link.trim()
-                  : b.name.trim(),
+                  : (b as { name: string }).name.trim(),
       )
       await savePage(rec.church_id, rec.id, {
         title: title.trim(),

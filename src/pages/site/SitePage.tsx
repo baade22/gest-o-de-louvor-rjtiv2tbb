@@ -36,7 +36,7 @@ function Video({ id, caption }: { id: string; caption: string }) {
   return (
     <figure>
       {playing ? (
-        <div className="aspect-video overflow-hidden rounded-[20px] bg-black">
+        <div className="[aspect-ratio:16/9] overflow-hidden rounded-[20px] bg-black">
           <iframe
             title={caption || 'Vídeo'}
             src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`}
@@ -49,7 +49,7 @@ function Video({ id, caption }: { id: string; caption: string }) {
         <button
           type="button"
           onClick={() => setPlaying(true)}
-          className="relative block aspect-video w-full overflow-hidden rounded-[20px] bg-slate-800"
+          className="relative block [aspect-ratio:16/9] w-full overflow-hidden rounded-[20px] bg-slate-800"
         >
           <img
             src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
@@ -302,7 +302,7 @@ export default function SitePage() {
   return (
     <article className="lg:px-8 lg:pt-10">
       {cover ? (
-        <header className="relative isolate mx-4 mt-1 h-[260px] overflow-hidden rounded-[28px] text-white lg:mx-0 lg:mt-0 lg:h-[420px] lg:rounded-[32px]">
+        <header className="relative isolate mx-4 mt-1 h-[260px] overflow-hidden rounded-[28px] text-white lg:mx-auto lg:mt-0 lg:h-[420px] lg:max-w-5xl lg:rounded-[32px]">
           <img src={cover} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover" />
           <div className="c-hero-shade absolute inset-0 -z-10" />
           <div className="absolute inset-x-5 bottom-5 lg:bottom-10 lg:left-10">
@@ -312,7 +312,7 @@ export default function SitePage() {
           </div>
         </header>
       ) : (
-        <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-2 lg:px-0">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-5 pb-2 pt-2 lg:px-0">
           <h1 className="text-[28px] font-extrabold leading-tight tracking-tight lg:text-4xl">
             {data.title}
           </h1>
