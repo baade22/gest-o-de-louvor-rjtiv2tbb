@@ -48,7 +48,7 @@ export default function SiteWatch() {
 
       {live ? (
         <div className="space-y-2">
-          <div className="relative aspect-video overflow-hidden rounded-3xl bg-black">
+          <div className="relative [aspect-ratio:16/9] overflow-hidden rounded-3xl bg-black">
             <iframe
               title={live.title}
               src={`https://www.youtube-nocookie.com/embed/${live.id}?rel=0&playsinline=1`}
@@ -141,7 +141,7 @@ function FeaturedVideo({ video }: { video: SiteVideo }) {
   const [playing, setPlaying] = useState(false)
   if (playing) {
     return (
-      <div className="aspect-video overflow-hidden rounded-3xl bg-black lg:max-w-4xl">
+      <div className="[aspect-ratio:16/9] w-full overflow-hidden rounded-3xl bg-black">
         <iframe
           title={video.title}
           src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&playsinline=1`}
@@ -156,10 +156,15 @@ function FeaturedVideo({ video }: { video: SiteVideo }) {
     <button
       type="button"
       onClick={() => setPlaying(true)}
-      className="relative block h-[210px] w-full overflow-hidden rounded-3xl text-left text-white lg:h-[420px] lg:max-w-4xl"
+      className="relative block h-[210px] w-full overflow-hidden rounded-3xl text-left text-white lg:[aspect-ratio:21/9] lg:h-auto"
     >
       <img
-        src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`}
+        src={`https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`}
+        onError={(e) => {
+          const img = e.currentTarget
+          const low = `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`
+          if (img.src !== low) img.src = low
+        }}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
       />

@@ -120,24 +120,46 @@ interface Shortcut {
 
 function Circles({ items }: { items: Shortcut[] }) {
   if (!items.length) return null
+  // Até 6 atalhos cabem numa linha no celular (colunas iguais, centralizadas); mais que isso rola
+  const fits = items.length <= 6
+  const small = items.length >= 6
   return (
     <div
       className={cn(
-        'c-scroll flex gap-1 overflow-x-auto px-[18px] pt-[22px] lg:gap-4 lg:px-0',
-        items.length <= 5 && 'justify-between lg:justify-start',
+        'pt-[22px] lg:flex lg:justify-center lg:gap-6 lg:px-0',
+        fits ? 'grid px-2.5' : 'c-scroll flex gap-1 overflow-x-auto px-[18px]',
       )}
+      style={fits ? { gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` } : undefined}
     >
       {items.map((s) => {
         const Icon = s.icon
         const inner = (
           <>
-            <span className="grid h-[58px] w-[58px] place-items-center rounded-full border-[1.6px] border-[var(--c-ring)] bg-white text-[var(--c-blue)] lg:h-16 lg:w-16">
-              <Icon className="h-[23px] w-[23px]" strokeWidth={1.8} />
+            <span
+              className={cn(
+                'grid place-items-center rounded-full border-[1.6px] border-[var(--c-ring)] bg-white text-[var(--c-blue)] lg:h-16 lg:w-16',
+                small ? 'h-[52px] w-[52px]' : 'h-[58px] w-[58px]',
+              )}
+            >
+              <Icon
+                className={small ? 'h-[21px] w-[21px]' : 'h-[23px] w-[23px]'}
+                strokeWidth={1.8}
+              />
             </span>
-            <span className="text-[11.5px] font-bold leading-tight lg:text-[13px]">{s.label}</span>
+            <span
+              className={cn(
+                'font-bold leading-tight lg:text-[13px]',
+                small ? 'text-[10.5px]' : 'text-[11.5px]',
+              )}
+            >
+              {s.label}
+            </span>
           </>
         )
-        const cls = 'flex w-[66px] shrink-0 flex-col items-center gap-2 text-center lg:w-24'
+        const cls = cn(
+          'flex shrink-0 flex-col items-center gap-2 text-center lg:w-24',
+          !fits && 'w-[66px]',
+        )
         return s.href ? (
           <a key={s.key} href={s.href} target="_blank" rel="noreferrer" className={cls}>
             {inner}
@@ -235,7 +257,7 @@ export default function SiteHome() {
           icon: HeartHandshake,
         }
       : null,
-    map ? { key: 'mapa', href: map, label: 'Como chegar', icon: MapPin } : null,
+    map ? { key: 'mapa', href: map, label: 'Mapa', icon: MapPin } : null,
   ].filter(Boolean) as Shortcut[]
 
   const upcoming = site.agenda.slice(0, 6)
@@ -251,7 +273,7 @@ export default function SiteHome() {
         {site.sections.oracao && (
           <Link
             to={to('/oracao')}
-            className="mx-4 flex h-[54px] items-center gap-2.5 rounded-full bg-white pl-5 pr-2 text-[14.5px] font-medium text-[#8a93a3] shadow-[0_6px_18px_rgba(20,34,58,0.07)] lg:mx-0 lg:max-w-xl"
+            className="mx-4 flex h-[54px] items-center gap-2.5 rounded-full bg-white pl-5 pr-2 text-[14.5px] font-medium text-[#8a93a3] shadow-[0_6px_18px_rgba(20,34,58,0.07)] lg:mx-auto lg:max-w-2xl"
           >
             <span className="flex-1 truncate">Como podemos orar por você hoje?</span>
             <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--c-navy)] text-[var(--sp-text)]">
@@ -266,7 +288,12 @@ export default function SiteHome() {
           {site.notices.length > 0 && (
             <section className="space-y-3.5">
               <SectionTitle>Avisos</SectionTitle>
-              <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+              <div
+                className={cn(
+                  'grid grid-cols-1 gap-2.5',
+                  site.notices.length > 1 && 'lg:grid-cols-2',
+                )}
+              >
                 {site.notices.map((n) => (
                   <div key={n.id} className="c-card flex gap-3 p-4">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--c-sky)] text-[var(--c-blue)]">
