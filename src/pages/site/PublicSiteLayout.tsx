@@ -5,7 +5,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import {
+  BookOpen,
   CalendarDays,
+  ChevronRight,
+  FileText,
+  Heart,
   HeartHandshake,
   House,
   Instagram,
@@ -14,9 +18,11 @@ import {
   Mail,
   MapPin,
   Menu,
+  Music,
   Phone,
   PlayCircle,
   Share,
+  Sparkles,
   UserRound,
   X,
   Youtube,
@@ -41,6 +47,8 @@ import {
 } from '@/lib/site'
 import { getPublicSite, siteFileUrl, siteManifestUrl, type PublicSite } from '@/services/site'
 import type { SiteCtx } from './siteContext'
+import './siteTheme.css'
+import { useSiteFont } from './siteFont'
 
 const INSTALL_DISMISS_KEY = 'site_install_dismissed'
 
@@ -71,13 +79,19 @@ function useSiteHead(site: PublicSite | null, slug: string) {
       ),
       setMeta(
         'meta[name="theme-color"]',
-        () => Object.assign(document.createElement('meta'), { name: 'theme-color' }),
+        () =>
+          Object.assign(document.createElement('meta'), {
+            name: 'theme-color',
+          }),
         'content',
         color,
       ),
       setMeta(
         'meta[name="apple-mobile-web-app-title"]',
-        () => Object.assign(document.createElement('meta'), { name: 'apple-mobile-web-app-title' }),
+        () =>
+          Object.assign(document.createElement('meta'), {
+            name: 'apple-mobile-web-app-title',
+          }),
         'content',
         site.short_name || site.title,
       ),
@@ -92,7 +106,10 @@ function useSiteHead(site: PublicSite | null, slug: string) {
       ),
       setMeta(
         'meta[name="description"]',
-        () => Object.assign(document.createElement('meta'), { name: 'description' }),
+        () =>
+          Object.assign(document.createElement('meta'), {
+            name: 'description',
+          }),
         'content',
         site.tagline || site.title,
       ),
@@ -101,7 +118,10 @@ function useSiteHead(site: PublicSite | null, slug: string) {
       undo.push(
         setMeta(
           'link[rel="apple-touch-icon"]',
-          () => Object.assign(document.createElement('link'), { rel: 'apple-touch-icon' }),
+          () =>
+            Object.assign(document.createElement('link'), {
+              rel: 'apple-touch-icon',
+            }),
           'href',
           siteFileUrl(site.icon_url),
         ),
@@ -146,8 +166,18 @@ export function SiteLogo({ site, className }: { site: PublicSite; className?: st
 const TABS = [
   { path: '', label: 'Início', icon: House, section: null },
   { path: '/agenda', label: 'Agenda', icon: CalendarDays, section: 'agenda' },
-  { path: '/assistir', label: 'Assistir', icon: PlayCircle, section: 'assistir' },
-  { path: '/contribuir', label: 'Contribuir', icon: HeartHandshake, section: 'contribuir' },
+  {
+    path: '/assistir',
+    label: 'Assistir',
+    icon: PlayCircle,
+    section: 'assistir',
+  },
+  {
+    path: '/contribuir',
+    label: 'Contribuir',
+    icon: HeartHandshake,
+    section: 'contribuir',
+  },
   { path: '/eu', label: 'Eu', icon: UserRound, section: null },
 ] as const
 
@@ -178,6 +208,16 @@ export default function PublicSiteLayout() {
   }, [slug])
 
   useSiteHead(site, slug)
+  useSiteFont()
+
+  // Fundo cinza claro também atrás da página (rolagem elástica do iPhone)
+  useEffect(() => {
+    const prev = document.body.style.background
+    document.body.style.background = '#f1f3f6'
+    return () => {
+      document.body.style.background = prev
+    }
+  }, [])
 
   useEffect(() => {
     setMenuOpen(false)
@@ -203,7 +243,7 @@ export default function PublicSiteLayout() {
 
   if (error) {
     return (
-      <div className="grid min-h-screen place-items-center bg-stone-50 p-6 text-center">
+      <div className="grid min-h-screen place-items-center bg-[#f1f3f6] p-6 text-center">
         <div>
           <p className="text-lg font-semibold text-slate-800">Site não encontrado</p>
           <p className="mt-1 text-sm text-slate-500">
@@ -215,7 +255,7 @@ export default function PublicSiteLayout() {
   }
   if (!site || !ctx) {
     return (
-      <div className="grid min-h-screen place-items-center bg-stone-50">
+      <div className="grid min-h-screen place-items-center bg-[#f1f3f6]">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     )
@@ -239,12 +279,22 @@ export default function PublicSiteLayout() {
   const navLinks = [
     ...tabs
       .filter((t) => t.path !== '/eu')
-      .map((t) => ({ to: ctx.to(t.path), label: t.label, active: isTab(t.path) })),
+      .map((t) => ({
+        to: ctx.to(t.path),
+        label: t.label,
+        active: isTab(t.path),
+      })),
     ...(site.sections.biblia
       ? [{ to: ctx.to('/biblia'), label: 'Bíblia', active: isTab('/biblia') }]
       : []),
     ...(site.sections.hinario && site.hymnals?.length
-      ? [{ to: ctx.to('/hinario'), label: 'Hinário', active: isTab('/hinario') }]
+      ? [
+          {
+            to: ctx.to('/hinario'),
+            label: 'Hinário',
+            active: isTab('/hinario'),
+          },
+        ]
       : []),
     ...site.pages.map((p) => ({
       to: ctx.to(`/p/${p.slug}`),
@@ -252,7 +302,13 @@ export default function PublicSiteLayout() {
       active: location.pathname === `/igreja/p/${p.slug}`,
     })),
     ...(site.sections.oracao
-      ? [{ to: ctx.to('/oracao'), label: 'Pedido de oração', active: isTab('/oracao') }]
+      ? [
+          {
+            to: ctx.to('/oracao'),
+            label: 'Pedido de oração',
+            active: isTab('/oracao'),
+          },
+        ]
       : []),
   ]
   const dismissInstall = () => {
@@ -264,33 +320,96 @@ export default function PublicSiteLayout() {
     }
   }
 
+  const map = mapsUrl(site.address, site.maps_url)
+  const isHome = location.pathname === '/igreja' || location.pathname === '/igreja/'
+  const menuGroups: { title: string; items: MenuItem[] }[] = [
+    {
+      title: 'A igreja',
+      items: [
+        ...site.pages.map((p) => ({
+          to: ctx.to(`/p/${p.slug}`),
+          label: p.title,
+          icon: FileText,
+        })),
+        ...(site.sections.novo && site.signup_url
+          ? [{ to: site.signup_url, label: 'Sou novo aqui', icon: Sparkles }]
+          : []),
+        ...(map
+          ? [
+              {
+                href: map,
+                label: 'Como chegar',
+                icon: MapPin,
+                hint: site.address,
+              },
+            ]
+          : []),
+        ...(site.sections.oracao
+          ? [{ to: ctx.to('/oracao'), label: 'Pedido de oração', icon: Heart }]
+          : []),
+      ],
+    },
+    {
+      title: 'Para o dia a dia',
+      items: [
+        ...(site.sections.biblia
+          ? [{ to: ctx.to('/biblia'), label: 'Bíblia', icon: BookOpen }]
+          : []),
+        ...(site.sections.hinario && site.hymnals?.length
+          ? [
+              {
+                to: ctx.to('/hinario'),
+                label: 'Hinário',
+                icon: Music,
+                hint: site.hymnals.map((h) => h.name).join(' · '),
+              },
+            ]
+          : []),
+        ...tabs
+          .filter((t) => t.path && t.path !== '/eu')
+          .map((t) => ({ to: ctx.to(t.path), label: t.label, icon: t.icon })),
+        { to: ctx.to('/instalar'), label: 'Instalar o app', icon: Share },
+        { to: ctx.to('/eu'), label: 'Entrar', icon: LogIn },
+      ],
+    },
+  ].filter((g) => g.items.length > 0)
+
   return (
-    <div style={style} className="min-h-screen bg-stone-100 text-slate-900 lg:bg-stone-50">
-      {/* Topo */}
+    <div style={style} className="site-c min-h-screen">
+      {/* Topo: transparente sobre a foto no Início (celular); claro nas outras telas */}
       <header
-        className="sticky top-0 z-30 bg-[var(--sp)] text-[var(--sp-text)]"
+        className={cn(
+          'z-30 lg:sticky lg:top-0 lg:border-b lg:border-[var(--c-line)] lg:bg-white/95 lg:text-[var(--c-ink)] lg:backdrop-blur',
+          isHome
+            ? 'absolute inset-x-0 top-0 text-white'
+            : 'sticky top-0 bg-[color-mix(in_srgb,var(--c-bg)_92%,transparent)] backdrop-blur',
+        )}
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 lg:h-20 lg:px-8">
-          <Link to={ctx.to('')} className="flex min-w-0 items-center gap-3">
-            <SiteLogo site={site} className="h-10 w-10 shrink-0 lg:h-12 lg:w-12" />
+          <Link to={ctx.to('')} className="flex min-w-0 items-center gap-2.5">
+            <SiteLogo site={site} className="h-10 w-10 shrink-0 lg:h-11 lg:w-11" />
             <span className="min-w-0 leading-tight">
-              <span className="block truncate font-semibold lg:text-lg">
+              <span className="block truncate text-[18px] font-extrabold tracking-wide">
                 {site.short_name || site.title}
               </span>
               {site.tagline && (
-                <span className="block truncate text-xs opacity-75 lg:text-sm">{site.tagline}</span>
+                <span className="hidden truncate text-xs text-[var(--c-gray)] lg:block">
+                  {site.tagline}
+                </span>
               )}
             </span>
           </Link>
-          <nav className="ml-auto hidden items-center gap-6 text-sm font-medium lg:flex">
+          <nav className="ml-auto hidden items-center gap-6 text-[14px] font-bold lg:flex">
             {navLinks.slice(0, 8).map((l) => (
               <Link
                 key={l.to}
                 to={l.to}
                 className={cn(
-                  'border-b-2 pb-1 opacity-85 transition hover:opacity-100',
-                  l.active ? 'border-[var(--sa)] opacity-100' : 'border-transparent',
+                  'whitespace-nowrap border-b-2 pb-1 transition',
+                  l.active
+                    ? 'border-[var(--c-navy)] text-[var(--c-navy)]'
+                    : 'border-transparent text-[var(--c-gray)] hover:text-[var(--c-navy)]',
                 )}
               >
                 {l.label}
@@ -298,7 +417,7 @@ export default function PublicSiteLayout() {
             ))}
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--sa)] px-4 py-2 font-semibold text-[var(--sa-text)]"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--c-navy)] px-5 py-2.5 text-[var(--sp-text)]"
             >
               <LogIn className="h-4 w-4" /> Entrar
             </Link>
@@ -306,30 +425,75 @@ export default function PublicSiteLayout() {
           <button
             type="button"
             aria-label="Menu"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="ml-auto grid h-10 w-10 place-items-center rounded-full bg-white/10 lg:hidden"
+            onClick={() => setMenuOpen(true)}
+            className={cn(
+              'ml-auto grid h-10 w-10 place-items-center rounded-full lg:hidden',
+              isHome
+                ? 'bg-white/15 backdrop-blur'
+                : 'bg-white shadow-[0_2px_8px_rgba(20,34,58,0.06)]',
+            )}
           >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <Menu className="h-5 w-5" />
           </button>
         </div>
-        {menuOpen && (
-          <div className="border-t border-white/10 px-4 pb-4 lg:hidden">
-            {navLinks.map((l) => (
-              <Link key={l.to} to={l.to} className="block py-3 text-base font-medium">
-                {l.label}
-              </Link>
-            ))}
-            <Link to={ctx.to('/instalar')} className="block py-3 text-base font-medium">
-              Ter o app no celular
-            </Link>
-          </div>
-        )}
       </header>
 
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-[var(--c-bg)] pb-10 lg:hidden"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          role="dialog"
+          aria-label="Menu"
+        >
+          <div className="flex items-center gap-3 px-5 pb-4 pt-4">
+            <SiteLogo site={site} className="h-12 w-12" />
+            <span className="min-w-0 flex-1 leading-tight">
+              <b className="block truncate text-[18px] font-extrabold">
+                {site.short_name || site.title}
+              </b>
+              {site.title !== (site.short_name || site.title) && (
+                <span className="block truncate text-[12.5px] font-medium text-[var(--c-gray)]">
+                  {site.title}
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={() => setMenuOpen(false)}
+              className="grid h-10 w-10 place-items-center rounded-full bg-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {menuGroups.map((g) => (
+            <div key={g.title}>
+              <p className="mx-5 mb-2.5 mt-2 text-[12px] font-extrabold uppercase tracking-[0.1em] text-[var(--c-gray)]">
+                {g.title}
+              </p>
+              <div className="c-card mx-4 mb-4 divide-y divide-[#eef1f5] py-1">
+                {g.items.map((it) => (
+                  <MenuRow key={it.label} item={it} onClose={() => setMenuOpen(false)} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <main className="mx-auto max-w-6xl pb-32 lg:pb-16">
+        <Outlet context={ctx} />
+      </main>
+
+      <SiteFooter site={site} />
+
       {installHint && !location.pathname.startsWith('/igreja/instalar') && (
-        <div className="flex items-center gap-3 bg-[var(--sa)] px-4 py-2.5 text-sm text-[var(--sa-text)] lg:hidden">
+        <div
+          className="fixed inset-x-4 z-30 flex items-center gap-3 rounded-2xl bg-[var(--c-navy)] px-4 py-3 text-sm text-[var(--sp-text)] shadow-[0_12px_28px_rgba(20,34,58,0.25)] lg:hidden"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}
+        >
           <Share className="h-4 w-4 shrink-0" />
-          <Link to={ctx.to('/instalar')} className="min-w-0 flex-1 font-medium">
+          <Link to={ctx.to('/instalar')} className="min-w-0 flex-1 font-bold">
             Ponha o app da igreja na tela de início
           </Link>
           <button type="button" aria-label="Fechar" onClick={dismissInstall} className="p-1">
@@ -338,21 +502,12 @@ export default function PublicSiteLayout() {
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl pb-28 lg:pb-16">
-        <Outlet context={ctx} />
-      </main>
-
-      <SiteFooter site={site} />
-
-      {/* Abas do app (celular) */}
+      {/* Abas do app (celular): barra flutuante, a aba atual vira pílula com o nome */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur lg:hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="fixed inset-x-[18px] z-30 lg:hidden"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 18px)' }}
       >
-        <div
-          className="mx-auto grid max-w-lg"
-          style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
-        >
+        <div className="mx-auto flex h-16 max-w-md items-center justify-between rounded-full border border-[var(--c-line)] bg-white/95 px-2 shadow-[0_14px_34px_rgba(20,34,58,0.18)] backdrop-blur">
           {tabs.map((t) => {
             const Icon = t.icon
             const on = isTab(t.path)
@@ -360,19 +515,57 @@ export default function PublicSiteLayout() {
               <NavLink
                 key={t.path}
                 to={ctx.to(t.path)}
+                aria-label={t.label}
                 className={cn(
-                  'flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold',
-                  on ? 'text-[var(--sp)]' : 'text-slate-400',
+                  'flex h-12 items-center justify-center gap-2 rounded-full text-[14px] font-bold transition-all',
+                  on ? 'bg-[var(--c-navy)] px-[18px] text-[var(--sp-text)]' : 'w-12 text-[#8a93a3]',
                 )}
               >
-                <Icon className={cn('h-5 w-5', on && 'text-[var(--sa)]')} />
-                {t.label}
+                <Icon className="h-5 w-5" />
+                {on && t.label}
               </NavLink>
             )
           })}
         </div>
       </nav>
     </div>
+  )
+}
+
+interface MenuItem {
+  to?: string
+  href?: string
+  label: string
+  icon: typeof House
+  hint?: string
+}
+
+function MenuRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
+  const Icon = item.icon
+  const inner = (
+    <>
+      <span className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full bg-[var(--c-sky)] text-[var(--c-blue)]">
+        <Icon className="h-[19px] w-[19px]" />
+      </span>
+      <span className="min-w-0 flex-1 text-[15px] font-bold">{item.label}</span>
+      {item.hint ? (
+        <span className="max-w-[45%] truncate text-[12px] font-semibold text-[var(--c-gray)]">
+          {item.hint}
+        </span>
+      ) : (
+        <ChevronRight className="h-[18px] w-[18px] text-[#b3bbc7]" />
+      )}
+    </>
+  )
+  const cls = 'flex items-center gap-3.5 px-4 py-3'
+  return item.href ? (
+    <a href={item.href} target="_blank" rel="noreferrer" className={cls} onClick={onClose}>
+      {inner}
+    </a>
+  ) : (
+    <Link to={item.to!} className={cls} onClick={onClose}>
+      {inner}
+    </Link>
   )
 }
 

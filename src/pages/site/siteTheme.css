@@ -1,0 +1,41 @@
+/* Novo visual do site/app da igreja (opção C "Azul IBMA", aprovada pelo Pedro em 2026-11-17).
+   Tudo fica dentro de .site-c: cores derivadas da cor principal do site (--sp), fundo cinza
+   claro, letra Manrope, cartões brancos bem arredondados e barra de abas flutuante. */
+.site-c {
+  --c-navy: var(--sp, #14223a);
+  --c-blue: color-mix(in srgb, var(--c-navy) 62%, #4b82c4);
+  --c-sky: color-mix(in srgb, var(--c-blue) 14%, white);
+  --c-ring: color-mix(in srgb, var(--c-blue) 30%, white);
+  --c-bg: #f1f3f6;
+  --c-line: #e2e6ec;
+  --c-gray: #687385;
+  --c-ink: #14223a;
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  -webkit-font-smoothing: antialiased;
+}
+.site-c .c-scroll {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.site-c .c-scroll::-webkit-scrollbar {
+  display: none;
+}
+.site-c .c-card {
+  background: #fff;
+  border-radius: 22px;
+  box-shadow: 0 4px 14px rgba(20, 34, 58, 0.05);
+}
+.site-c .c-hero-shade {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c-navy) 60%, transparent) 0%,
+    color-mix(in srgb, var(--c-navy) 25%, transparent) 30%,
+    color-mix(in srgb, var(--c-navy) 78%, transparent) 62%,
+    color-mix(in srgb, var(--c-navy) 97%, transparent) 100%
+  );
+}
+.site-c .c-serif {
+  font-family: Georgia, 'Times New Roman', serif;
+}
