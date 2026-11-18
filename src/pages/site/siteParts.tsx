@@ -71,8 +71,8 @@ export function Pills<K extends string>({
   options,
 }: {
   value: K
-  onChange: (k: K) => void
-  options: [K, string][]
+  onChange: (k: NoInfer<K>) => void
+  options: [NoInfer<K>, string][]
 }) {
   return (
     <div className="c-scroll -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0">
@@ -236,7 +236,7 @@ export function EventCard({ item }: { item: PublicAgendaItem }) {
     <Card className="overflow-hidden p-0">
       <Link to={item.url} className="block">
         <div
-          className="relative aspect-[16/7] bg-gradient-to-br from-[var(--c-blue)] to-[var(--c-navy)]"
+          className="relative [aspect-ratio:16/7] bg-gradient-to-br from-[var(--c-blue)] to-[var(--c-navy)]"
           style={
             item.cover_url
               ? {
@@ -295,7 +295,7 @@ export function VideoTile({
   if (playing) {
     return (
       <div className={cn(layout === 'row' && 'col-span-full')}>
-        <div className="aspect-video overflow-hidden rounded-2xl bg-black">
+        <div className="[aspect-ratio:16/9] overflow-hidden rounded-2xl bg-black">
           <iframe
             title={video.title}
             src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&playsinline=1`}
@@ -309,12 +309,12 @@ export function VideoTile({
     )
   }
   const thumb = (
-    <span className="relative block aspect-video shrink-0 overflow-hidden rounded-[14px] bg-slate-800">
+    <span className="relative block [aspect-ratio:16/9] shrink-0 overflow-hidden rounded-[14px] bg-slate-800">
       <img
         src={videoThumb(video.id)}
         alt=""
         loading="lazy"
-        className="h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover"
       />
       <span className="absolute inset-0 grid place-items-center">
         <span className="grid h-10 w-10 place-items-center rounded-full bg-white/95 text-[var(--c-navy)]">
@@ -334,7 +334,7 @@ export function VideoTile({
   )
   if (layout === 'card') {
     return (
-      <button type="button" onClick={() => setPlaying(true)} className="text-left">
+      <button type="button" onClick={() => setPlaying(true)} className="block w-full text-left">
         {thumb}
         <p className="mt-2 line-clamp-2 text-[14px] font-bold leading-snug">{video.title}</p>
         {video.when && <p className="text-[12px] font-medium text-[var(--c-gray)]">{video.when}</p>}

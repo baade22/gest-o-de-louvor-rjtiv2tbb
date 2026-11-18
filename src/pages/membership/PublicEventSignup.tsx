@@ -233,7 +233,7 @@ export default function PublicEventSignup() {
           alt=""
           className={
             info.hide_header
-              ? 'w-full aspect-video object-cover'
+              ? 'w-full [aspect-ratio:16/9] object-cover'
               : 'absolute inset-0 -z-10 h-full w-full object-cover'
           }
         />
