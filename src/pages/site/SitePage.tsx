@@ -4,32 +4,11 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Loader2, Play, Share2, X } from 'lucide-react'
-import { parseBlocks } from '@/lib/site'
+import { splitMarks } from '@/lib/richText'
 import { getPublicPage, siteFileUrl, type PublicPage, type PublicPageBlock } from '@/services/site'
 import { useSite } from './siteContext'
+import { RichText } from './RichText'
 import { SmartLink } from './siteParts'
-
-function Paragraphs({ text }: { text: string }) {
-  return (
-    <>
-      {parseBlocks(text).map((b, i) =>
-        b.kind === 'h' ? (
-          <h2 key={i} className="pt-2 text-[20px] font-extrabold tracking-tight lg:text-2xl">
-            {b.text}
-          </h2>
-        ) : b.kind === 'ul' ? (
-          <ul key={i} className="list-disc space-y-1 pl-5">
-            {b.items.map((it, j) => (
-              <li key={j}>{it}</li>
-            ))}
-          </ul>
-        ) : (
-          <p key={i}>{b.text}</p>
-        ),
-      )}
-    </>
-  )
-}
 
 function Video({ id, caption }: { id: string; caption: string }) {
   const [playing, setPlaying] = useState(false)
@@ -141,16 +120,13 @@ function Viewer({ urls, index, onClose }: { urls: string[]; index: number; onClo
 
 function Block({ b, onOpen }: { b: PublicPageBlock; onOpen: (urls: string[], i: number) => void }) {
   switch (b.t) {
-    case 'h':
-      return (
-        <h2 className="pt-3 text-[20px] font-extrabold tracking-tight lg:text-2xl">{b.text}</h2>
-      )
+    case 'h': {
+      // título: as marcas de alinhamento/tamanho vêm antes do "# "
+      const sm = splitMarks(b.text)
+      return <RichText text={b.text.slice(0, b.text.length - sm.rest.length) + '# ' + sm.rest} />
+    }
     case 'text':
-      return (
-        <div className="space-y-3.5">
-          <Paragraphs text={b.text} />
-        </div>
-      )
+      return <RichText text={b.text} className="space-y-3.5" />
     case 'image':
       return (
         <figure>
@@ -242,15 +218,16 @@ function Block({ b, onOpen }: { b: PublicPageBlock; onOpen: (urls: string[], i: 
                 .toUpperCase()}
             </span>
           )}
-          <span className="min-w-0">
+          <div className="min-w-0 flex-1">
             <b className="block text-[16px] font-extrabold leading-tight">{b.name}</b>
             {b.role && <span className="block text-[13px] font-medium opacity-80">{b.role}</span>}
             {b.text && (
-              <span className="mt-1 block text-[13px] font-medium leading-snug opacity-80">
-                {b.text}
-              </span>
+              <RichText
+                text={b.text}
+                className="mt-1 space-y-1.5 text-[13px] font-medium leading-snug opacity-80"
+              />
             )}
-          </span>
+          </div>
         </div>
       )
     default:
@@ -329,7 +306,7 @@ export default function SitePage() {
             <Block key={i} b={b} onOpen={(urls, idx) => setViewer({ urls, i: idx })} />
           ))
         ) : (
-          <Paragraphs text={data.body} />
+          <RichText text={data.body} className="space-y-3.5" />
         )}
         <button
           type="button"

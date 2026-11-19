@@ -64,6 +64,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { richToPlain } from '@/lib/richText'
+import { RichTextEditor } from './RichTextEditor'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -613,9 +615,9 @@ function GeneralTab({
         title="Quem somos"
         hint="Texto curto na página inicial. Para páginas maiores use a aba Páginas."
       >
-        <Textarea
+        <RichTextEditor
           value={form.about}
-          onChange={(e) => set('about', e.target.value)}
+          onChange={(v) => set('about', v)}
           rows={5}
           maxLength={8000}
           disabled={!canEdit}
@@ -1162,11 +1164,11 @@ function NoticesTab({ churchId, canEdit }: { churchId: string; canEdit: boolean 
                 />
               </Field>
               <Field label="Texto (opcional)">
-                <Textarea
+                <RichTextEditor
                   value={draft.body || ''}
-                  onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                  onChange={(v) => setDraft({ ...draft, body: v })}
                   maxLength={1000}
-                  rows={3}
+                  rows={5}
                 />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
