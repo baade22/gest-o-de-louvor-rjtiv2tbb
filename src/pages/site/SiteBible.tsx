@@ -437,7 +437,13 @@ function Reader({ book, chapter }: { book: BibleBook; chapter: number }) {
             <Loader2 className="h-6 w-6 animate-spin text-[var(--c-gray)]" />
           </div>
         ) : (
-          <p className={cn('font-serif leading-[1.75] text-[#253247]', SIZES[size])}>
+          <p
+            lang="pt-BR"
+            className={cn(
+              'hyphens-auto text-justify font-serif leading-[1.75] text-[#253247]',
+              SIZES[size],
+            )}
+          >
             {verses.map((t, i) => {
               const n = i + 1
               const on = selected.includes(n)

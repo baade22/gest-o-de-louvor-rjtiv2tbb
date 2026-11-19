@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils'
 import { WEEKDAYS, brtClock, formatTime, mapsUrl, nextService, serviceNow } from '@/lib/site'
 import { getSiteVideos, siteFileUrl, type SiteVideos } from '@/services/site'
+import { RichText } from './RichText'
 import { useSite } from './siteContext'
 import { DateBadge, MoreLink, SectionTitle, SmartLink, VideoTile } from './siteParts'
 
@@ -299,12 +300,13 @@ export default function SiteHome() {
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--c-sky)] text-[var(--c-blue)]">
                       <Megaphone className="h-[18px] w-[18px]" />
                     </span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[15px] font-bold">{n.title}</p>
                       {n.body && (
-                        <p className="whitespace-pre-line text-[13.5px] font-medium leading-relaxed text-[var(--c-gray)]">
-                          {n.body}
-                        </p>
+                        <RichText
+                          text={n.body}
+                          className="mt-0.5 space-y-2.5 text-[13.5px] font-medium leading-relaxed text-[var(--c-gray)]"
+                        />
                       )}
                     </div>
                   </div>
@@ -427,9 +429,10 @@ export default function SiteHome() {
             <section className="space-y-3.5">
               <SectionTitle>Quem somos</SectionTitle>
               <div className="c-card p-5">
-                <p className="whitespace-pre-line text-[15px] font-medium leading-relaxed text-[#2e3a4e]">
-                  {site.about}
-                </p>
+                <RichText
+                  text={site.about}
+                  className="text-[15px] font-medium leading-relaxed text-[#2e3a4e]"
+                />
                 {site.pages.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {site.pages.map((p) => (
