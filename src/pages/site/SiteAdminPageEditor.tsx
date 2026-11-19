@@ -34,7 +34,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from './RichTextEditor'
 import {
   Dialog,
   DialogContent,
@@ -357,21 +357,22 @@ export default function PageEditor({
               </div>
               <div className="space-y-3 p-3">
                 {b.t === 'text' && (
-                  <Textarea
+                  <RichTextEditor
                     value={b.text}
-                    onChange={(e) => set(i, { ...b, text: e.target.value })}
-                    rows={5}
+                    onChange={(v) => set(i, { ...b, text: v })}
+                    rows={6}
                     maxLength={6000}
-                    placeholder="Escreva aqui. Linha em branco separa parágrafos; linha começando com - vira lista."
+                    placeholder="Escreva aqui. Linha em branco separa parágrafos. Use a barra acima para formatar."
                   />
                 )}
                 {b.t === 'h' && (
-                  <Input
+                  <RichTextEditor
                     value={b.text}
-                    onChange={(e) => set(i, { ...b, text: e.target.value })}
+                    onChange={(v) => set(i, { ...b, text: v.replace(/\n+/g, ' ') })}
+                    rows={1}
                     maxLength={200}
                     placeholder="Ex.: Nosso propósito"
-                    className="font-semibold"
+                    compact
                   />
                 )}
                 {b.t === 'image' && (
@@ -516,12 +517,13 @@ export default function PageEditor({
                         maxLength={160}
                         placeholder="Função (ex.: Pastor presidente)"
                       />
-                      <Textarea
+                      <RichTextEditor
                         value={b.text || ''}
-                        onChange={(e) => set(i, { ...b, text: e.target.value })}
+                        onChange={(v) => set(i, { ...b, text: v })}
                         rows={2}
                         maxLength={1000}
                         placeholder="Texto curto (opcional)"
+                        compact
                       />
                     </div>
                   </div>
