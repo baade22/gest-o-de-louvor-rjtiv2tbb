@@ -1,0 +1,80 @@
+# Publica o LouvorFlow na VPS da igreja a cada merge na main: testa, gera o site, envia
+# site + hooks + migrações e reinicia o PocketBase (que aplica as migrações novas sozinho).
+# Fica desligado até a variável DEPLOY_HOST existir no repositório
+# (Settings → Secrets and variables → Actions). Passo a passo em deploy/louvorflow/README.md.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # O site fala com o PocketBase no mesmo endereço; passa por cima do .env (que aponta o Skip).
+      VITE_POCKETBASE_URL: ${{ vars.SITE_URL }}
+      DEST: deploy@${{ vars.DEPLOY_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Preparar hooks e migrações
+        # O PocketBase só carrega hooks terminados em .pb.js.
+        run: |
+          mkdir -p out/pb_hooks out/pb_migrations
+          for f in pocketbase/hooks/*.js; do
+            cp "$f" "out/pb_hooks/$(basename "${f%.js}").pb.js"
+          done
+          cp pocketbase/migrations/*.js out/pb_migrations/
+
+      - name: Chave SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Enviar migrações, hooks e site
+        run: |
+          rsync -rlz --delete --chmod=D755,F644 out/pb_migrations/ "$DEST:/opt/louvorflow/pb_migrations/"
+          rsync -rlz --delete --chmod=D755,F644 out/pb_hooks/ "$DEST:/opt/louvorflow/pb_hooks/"
+          rsync -rlz --delete-after --delay-updates --chmod=D755,F644 dist/ "$DEST:/opt/louvorflow/site/"
+
+      - name: Reiniciar (com cópia do banco antes) e conferir
+        run: |
+          ssh "$DEST" sudo /usr/local/sbin/louvorflow-reiniciar
+          for i in $(seq 1 20); do
+            if curl -fsS "${{ vars.SITE_URL }}/api/health" >/dev/null; then
+              echo "No ar."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "O site não respondeu depois do deploy." >&2
+          exit 1

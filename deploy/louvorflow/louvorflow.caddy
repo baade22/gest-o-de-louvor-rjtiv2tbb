@@ -1,0 +1,41 @@
+# LouvorFlow: o site e o PocketBase no mesmo endereço (LOUVORFLOW_DOMAIN no .env da pasta
+# deploy/whatsapp). instalar.sh copia este arquivo para deploy/whatsapp/sites/.
+{$LOUVORFLOW_DOMAIN} {
+	encode zstd gzip
+
+	# Mídias aceitam até 100 MB (migração 0023).
+	request_body {
+		max_size 110MB
+	}
+
+	# "?" só põe o cabeçalho se o PocketBase não tiver mandado o dele.
+	header {
+		?Strict-Transport-Security "max-age=31536000"
+		?X-Frame-Options SAMEORIGIN
+		?X-Content-Type-Options nosniff
+		?Referrer-Policy strict-origin-when-cross-origin
+		?Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+		-Server
+	}
+
+	# O Caddy põe no X-Forwarded-For o IP real de quem chamou. A migração 0042 usa esse
+	# cabeçalho para a trava de login contar por pessoa, e não todo mundo junto.
+	# Por isso, na Cloudflare, este endereço fica com a nuvem CINZA (só DNS).
+	@backend path /api/* /_/* /_ /backend/*
+	handle @backend {
+		reverse_proxy pocketbase:8090
+	}
+
+	handle {
+		root * /srv/louvorflow
+		# Arquivos com hash no nome nunca mudam; a página principal sempre é buscada de novo.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pagina not path /assets/*
+		header @pagina Cache-Control "no-cache"
+		@manifest path *.webmanifest
+		header @manifest Content-Type application/manifest+json
+		try_files {path} /index.html
+		file_server
+	}
+}

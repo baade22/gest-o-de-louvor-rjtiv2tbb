@@ -8,3 +8,7 @@
 		reverse_proxy evolution:8080
 	}
 }
+
+# Outros sites deste servidor (o LouvorFlow). Os arquivos são criados no servidor por
+# deploy/louvorflow/instalar.sh; sem nenhum, só o WhatsApp acima fica no ar.
+import /etc/caddy/sites/*.caddy

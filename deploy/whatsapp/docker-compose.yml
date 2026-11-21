@@ -1,5 +1,7 @@
 # Servidor do WhatsApp do LouvorFlow: Evolution API (WhatsApp Web pareado por QR Code)
 # + Postgres + Caddy (HTTPS automático). Passo a passo no README.md desta pasta.
+# O próprio LouvorFlow (PocketBase + site) roda aqui também; quem liga o endereço dele é
+# deploy/louvorflow/instalar.sh (veja deploy/louvorflow/README.md).
 services:
   evolution:
     image: evoapicloud/evolution-api:v2.3.7
@@ -65,6 +67,20 @@ services:
     volumes:
       - youtube_data:/data
 
+  # LouvorFlow: banco, arquivos enviados, hooks e regras. Não abre porta para fora: só o
+  # Caddy fala com ele. O GitHub Actions publica hooks, migrações e o site em /opt/louvorflow
+  # a cada merge na main.
+  pocketbase:
+    build: ./pocketbase
+    restart: unless-stopped
+    env_file:
+      - path: /etc/louvorflow/louvorflow.env
+        required: false
+    volumes:
+      - /opt/louvorflow/pb_data:/pb/pb_data
+      - /opt/louvorflow/pb_hooks:/pb/pb_hooks:ro
+      - /opt/louvorflow/pb_migrations:/pb/pb_migrations:ro
+
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped
@@ -73,8 +89,15 @@ services:
       - '443:443'
     environment:
       WHATSAPP_DOMAIN: ${WHATSAPP_DOMAIN}
+    # LOUVORFLOW_DOMAIN fica neste arquivo (criado pelo instalar.sh), e não no .env, para não
+    # mexer no ambiente da Evolution: qualquer mudança lá reinicia a conexão do WhatsApp.
+    env_file:
+      - path: ./louvorflow.env
+        required: false
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+      - /opt/louvorflow/site:/srv/louvorflow:ro
       - caddy_data:/data
     depends_on:
       - evolution
