@@ -46,6 +46,11 @@ export interface Assembly {
   notes?: string
   minutes?: AtaSnapshot | null
   finalized_at?: string
+  /** Link público de votação on-line da chapa (migração 0107). */
+  vote_key?: string
+  vote_open?: boolean
+  /** Só quem está na lista de presença como votante pode votar on-line. */
+  vote_only_present?: boolean
   created: string
   updated: string
 }
@@ -73,6 +78,7 @@ export interface AssemblyItem {
   approved?: boolean
   result_note?: string
   office_date?: string
+  updated?: string
 }
 
 export interface AssemblyCandidate {
@@ -211,8 +217,16 @@ export function quorumStatus(
   eligible: number,
   presentVoters: number,
 ): QuorumStatus {
-  const first = requiredPresent(assembly.quorum_first || 'MAIORIA_ABSOLUTA', eligible, assembly.quorum_min)
-  const second = requiredPresent(assembly.quorum_second || 'QUALQUER', eligible, assembly.quorum_min)
+  const first = requiredPresent(
+    assembly.quorum_first || 'MAIORIA_ABSOLUTA',
+    eligible,
+    assembly.quorum_min,
+  )
+  const second = requiredPresent(
+    assembly.quorum_second || 'QUALQUER',
+    eligible,
+    assembly.quorum_min,
+  )
   let reachedOn: CallOpened | null = null
   if (first == null || presentVoters >= first) reachedOn = 'PRIMEIRA'
   else if ((second == null && presentVoters > 0) || (second != null && presentVoters >= second))
@@ -434,7 +448,9 @@ export function qualificationText(p: Partial<Person> & G): string {
   const nat = genderize(p.nationality || '', p) || miss
   const civil = p.marital_status ? gw(p, ...MARITAL_TEXT[p.marital_status]) : miss
   const prof = p.profession?.trim().toLowerCase() || miss
-  const rg = p.rg?.trim() ? `${p.rg.trim()}${p.rg_issuer?.trim() ? ` ${p.rg_issuer.trim()}` : ''}` : miss
+  const rg = p.rg?.trim()
+    ? `${p.rg.trim()}${p.rg_issuer?.trim() ? ` ${p.rg_issuer.trim()}` : ''}`
+    : miss
   const cpf = isValidCPF(p.document || '') ? formatCPF(p.document || '') : miss
   const addr = addressLine(p) || miss
   return (
@@ -468,7 +484,18 @@ const UNITS = [
   'dezoito',
   'dezenove',
 ]
-const TENS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa']
+const TENS = [
+  '',
+  '',
+  'vinte',
+  'trinta',
+  'quarenta',
+  'cinquenta',
+  'sessenta',
+  'setenta',
+  'oitenta',
+  'noventa',
+]
 const HUNDREDS = [
   '',
   'cento',
@@ -619,7 +646,13 @@ export interface SnapshotInput {
 
 function ataPerson(p: Person | undefined): AtaPerson | null {
   if (!p) return null
-  return { id: p.id, name: p.name, gender: p.gender || '', qualification: qualificationText(p), missing: missingQualification(p) }
+  return {
+    id: p.id,
+    name: p.name,
+    gender: p.gender || '',
+    qualification: qualificationText(p),
+    missing: missingQualification(p),
+  }
 }
 
 export function buildSnapshot(input: SnapshotInput): AtaSnapshot {
@@ -700,11 +733,21 @@ export function buildSnapshot(input: SnapshotInput): AtaSnapshot {
 
 /** Quem a ata declara eleito ou reconduzido, com o cargo e o mandato. */
 export function electedList(s: AtaSnapshot) {
-  const out: { office: string; person: AtaPerson; term_start: string; term_end: string; office_date: string }[] = []
+  const out: {
+    office: string
+    person: AtaPerson
+    term_start: string
+    term_end: string
+    office_date: string
+  }[] = []
   for (const it of s.items) {
     if (it.kind === 'DELIBERACAO') continue
     const chosen =
-      it.kind === 'REFERENDO' ? (it.approved ? it.candidates : []) : it.candidates.filter((c) => c.elected)
+      it.kind === 'REFERENDO'
+        ? it.approved
+          ? it.candidates
+          : []
+        : it.candidates.filter((c) => c.elected)
     for (const c of chosen)
       out.push({
         office: it.title,
@@ -743,7 +786,9 @@ export function ataProblems(s: AtaSnapshot): string[] {
 function voteSummary(it: AtaItem): string {
   if (it.method === 'ACLAMACAO') return 'por aclamação'
   const extras = [
-    it.votes_blank ? `${it.votes_blank} ${it.votes_blank === 1 ? 'voto em branco' : 'votos em branco'}` : '',
+    it.votes_blank
+      ? `${it.votes_blank} ${it.votes_blank === 1 ? 'voto em branco' : 'votos em branco'}`
+      : '',
     it.votes_null ? `${it.votes_null} ${it.votes_null === 1 ? 'voto nulo' : 'votos nulos'}` : '',
   ].filter(Boolean)
   if (it.kind === 'ELEICAO') {
@@ -755,7 +800,9 @@ function voteSummary(it: AtaItem): string {
   const parts = [
     `${it.votes_yes} ${it.votes_yes === 1 ? 'voto favorável' : 'votos favoráveis'}`,
     `${it.votes_no} ${it.votes_no === 1 ? 'voto contrário' : 'votos contrários'}`,
-    it.votes_abstain ? `${it.votes_abstain} ${it.votes_abstain === 1 ? 'abstenção' : 'abstenções'}` : '',
+    it.votes_abstain
+      ? `${it.votes_abstain} ${it.votes_abstain === 1 ? 'abstenção' : 'abstenções'}`
+      : '',
     ...extras,
   ].filter(Boolean)
   return `com ${parts.join(', ')}`
@@ -765,7 +812,12 @@ function termText(it: { term_start: string; term_end: string }): string {
   return `para o mandato de ${dateNumeric(it.term_start)} a ${dateNumeric(it.term_end)}`
 }
 
-const TERM_NAMES: Record<number, string> = { 2: 'BIÊNIO', 3: 'TRIÊNIO', 4: 'QUADRIÊNIO', 5: 'QUINQUÊNIO' }
+const TERM_NAMES: Record<number, string> = {
+  2: 'BIÊNIO',
+  3: 'TRIÊNIO',
+  4: 'QUADRIÊNIO',
+  5: 'QUINQUÊNIO',
+}
 
 /** "QUADRIÊNIO 2022-2026 (de 18/12/2022 a 30/11/2026)", como na ata de 2022. */
 export function mandateLabel(start: string, end: string): string {
@@ -782,7 +834,13 @@ export function boardGroups(s: AtaSnapshot) {
   for (const e of electedList(s)) {
     const g = out.find((x) => x.office === e.office)
     if (g) g.people.push(e.person)
-    else out.push({ office: e.office, people: [e.person], term_start: e.term_start, term_end: e.term_end })
+    else
+      out.push({
+        office: e.office,
+        people: [e.person],
+        term_start: e.term_start,
+        term_end: e.term_end,
+      })
   }
   return out
 }
@@ -791,7 +849,10 @@ export function boardGroups(s: AtaSnapshot) {
 function agendaLine(s: AtaSnapshot): string {
   const a = s.assembly
   return a.agenda?.trim()
-    ? a.agenda.trim().replace(/\s*\n+\s*/g, '; ').replace(/[.;]\s*$/, '')
+    ? a.agenda
+        .trim()
+        .replace(/\s*\n+\s*/g, '; ')
+        .replace(/[.;]\s*$/, '')
     : s.items.map((it) => it.title).join('; ')
 }
 
@@ -815,7 +876,10 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
     `Estavam presentes ${s.presentTotal} ${s.presentTotal === 1 ? 'pessoa' : 'pessoas'}, das quais ${s.presentVoters} ${s.presentVoters === 1 ? 'membro com direito a voto' : 'membros com direito a voto'}, de um total de ${s.eligible} ${s.eligible === 1 ? 'membro votante' : 'membros votantes'}, conforme lista de presença anexa, verificando-se o quórum exigido pelo estatuto${a.opened_on === 'SEGUNDA' ? ' para a segunda convocação' : ''}${quorumNote ? ` (${quorumNote})` : ''}.`,
   )
   p.push(
-    `${pres ? `${gw(pres, 'O senhor presidente', 'A senhora presidente')}, ${pres.name},` : 'O presidente,'} iniciou os trabalhos fazendo uma oração, convidou ${sec ? sec.name : '[secretário]'} para secretariar a assembleia e lavrar a presente ata e, em seguida, declarou aberta a assembleia ${kind} e o motivo de sua convocação: ${agendaLine(s).toLocaleUpperCase('pt-BR')}.`.replace(/\s+/g, ' '),
+    `${pres ? `${gw(pres, 'O senhor presidente', 'A senhora presidente')}, ${pres.name},` : 'O presidente,'} iniciou os trabalhos fazendo uma oração, convidou ${sec ? sec.name : '[secretário]'} para secretariar a assembleia e lavrar a presente ata e, em seguida, declarou aberta a assembleia ${kind} e o motivo de sua convocação: ${agendaLine(s).toLocaleUpperCase('pt-BR')}.`.replace(
+      /\s+/g,
+      ' ',
+    ),
   )
   for (const it of s.items) {
     const head = `${it.order}) ${it.title}.`
@@ -830,21 +894,31 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
       const cands = it.candidates.map((c) => c.name).join(', ')
       const elected = it.candidates.filter((c) => c.elected)
       p.push(
-        `${head}${desc} Para ${it.seats > 1 ? `${it.seats} vagas` : 'o cargo'} ${it.seats > 1 ? `de ${it.title}` : ''} ${it.candidates.length === 1 ? 'apresentou-se a candidatura de' : 'apresentaram-se as candidaturas de'} ${cands || '[candidatos]'}.${method}. ${elected.length ? `${elected.length === 1 ? `Foi ${gw(elected[0].person, 'declarado eleito', 'declarada eleita')}` : 'Foram declarados eleitos'} ${elected.map((c) => c.name).join(', ')}, ${termText(it)}.` : 'Nenhum candidato foi declarado eleito.'}${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(/\s+/g, ' '),
+        `${head}${desc} Para ${it.seats > 1 ? `${it.seats} vagas` : 'o cargo'} ${it.seats > 1 ? `de ${it.title}` : ''} ${it.candidates.length === 1 ? 'apresentou-se a candidatura de' : 'apresentaram-se as candidaturas de'} ${cands || '[candidatos]'}.${method}. ${elected.length ? `${elected.length === 1 ? `Foi ${gw(elected[0].person, 'declarado eleito', 'declarada eleita')}` : 'Foram declarados eleitos'} ${elected.map((c) => c.name).join(', ')}, ${termText(it)}.` : 'Nenhum candidato foi declarado eleito.'}${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(
+          /\s+/g,
+          ' ',
+        ),
       )
     } else if (it.kind === 'REFERENDO') {
       const who = it.candidates.map((c) => c.name).join(', ') || '[nome]'
       p.push(
-        `${head}${desc} ${who} ${it.candidates.length > 1 ? 'colocaram seus cargos' : 'colocou o cargo'} de ${it.title} à disposição da assembleia, que deliberou sobre a recondução.${method}. ${it.approved ? `A recondução foi aprovada, ${termText(it)}.` : 'A recondução não foi aprovada.'}${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(/\s+/g, ' '),
+        `${head}${desc} ${who} ${it.candidates.length > 1 ? 'colocaram seus cargos' : 'colocou o cargo'} de ${it.title} à disposição da assembleia, que deliberou sobre a recondução.${method}. ${it.approved ? `A recondução foi aprovada, ${termText(it)}.` : 'A recondução não foi aprovada.'}${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(
+          /\s+/g,
+          ' ',
+        ),
       )
     } else {
       p.push(
-        `${head}${desc}${method}. A proposta foi ${it.approved ? 'aprovada' : 'rejeitada'}.${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(/\s+/g, ' '),
+        `${head}${desc}${method}. A proposta foi ${it.approved ? 'aprovada' : 'rejeitada'}.${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(
+          /\s+/g,
+          ' ',
+        ),
       )
     }
   }
   const elected = electedList(s)
-  const allNow = elected.length > 0 && elected.every((e) => e.office_date && e.office_date === a.date)
+  const allNow =
+    elected.length > 0 && elected.every((e) => e.office_date && e.office_date === a.date)
   if (elected.length > 1) {
     const groups = boardGroups(s)
     const sameTerm = groups.every(
@@ -861,7 +935,9 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
     )
   } else if (elected.length === 1) {
     const e = elected[0]
-    p.push(`Qualificação ${gw(e.person, 'do eleito', 'da eleita')} para o cargo de ${e.office}: ${e.person.qualification}.`)
+    p.push(
+      `Qualificação ${gw(e.person, 'do eleito', 'da eleita')} para o cargo de ${e.office}: ${e.person.qualification}.`,
+    )
   }
   const postNow = elected.filter((e) => e.office_date && e.office_date === a.date)
   if (postNow.length)
@@ -912,4 +988,66 @@ export function requerimentoParagraphs(s: AtaSnapshot): string[] {
     'Seguem, em duas vias: ata da assembleia, edital de convocação, lista de presença, termo de posse e cópia dos documentos de identificação dos eleitos. Declara que foram observados os requisitos legais e estatutários de convocação, instalação e quórum.',
     'Nestes termos, pede deferimento.',
   ]
+}
+
+/* ---------------- votação on-line da chapa ---------------- */
+
+export type OnlineChoice = 'SIM' | 'NAO' | 'ABSTENCAO'
+export interface OnlineCounts {
+  SIM: number
+  NAO: number
+  ABSTENCAO: number
+}
+
+export function countBallots(ballots: { choice: string }[]): OnlineCounts {
+  const out: OnlineCounts = { SIM: 0, NAO: 0, ABSTENCAO: 0 }
+  for (const b of ballots) if (b.choice in out) out[b.choice as OnlineChoice]++
+  return out
+}
+
+/** Chave do link: 32 letras e números. */
+export function newVoteKey(): string {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => abc[b % abc.length]).join('')
+}
+
+/**
+ * Lança o resultado da votação da chapa em cada cargo da pauta: a chapa inteira foi votada
+ * de uma vez (sim/não/abstenção), então todos os cargos recebem os mesmos números. Na
+ * eleição, os candidatos da chapa ficam eleitos se a chapa foi aprovada.
+ */
+export function onlineResultPatches(
+  items: AssemblyItem[],
+  candidates: AssemblyCandidate[],
+  counts: OnlineCounts,
+) {
+  const total = counts.SIM + counts.NAO + counts.ABSTENCAO
+  const note = `Votação on-line da chapa: ${counts.SIM} ${counts.SIM === 1 ? 'voto' : 'votos'} SIM, ${counts.NAO} NÃO e ${counts.ABSTENCAO} ${counts.ABSTENCAO === 1 ? 'abstenção' : 'abstenções'}, de ${total} ${total === 1 ? 'votante' : 'votantes'}.`
+  return items
+    .filter((it) => it.kind !== 'DELIBERACAO' && candidates.some((c) => c.item_id === it.id))
+    .map((it) => {
+      const base = {
+        method: 'ESCRUTINIO_SECRETO' as const,
+        voters: total,
+        votes_yes: counts.SIM,
+        votes_no: counts.NAO,
+        votes_abstain: counts.ABSTENCAO,
+        votes_blank: 0,
+        votes_null: 0,
+      }
+      const approved = tallyItem({ ...it, ...base, kind: 'REFERENDO' }, [], total).approved
+      return {
+        item: it,
+        patch: { ...base, approved, decided: true, result_note: note },
+        candidates: candidates
+          .filter((c) => c.item_id === it.id)
+          .map((c) => ({
+            id: c.id,
+            votes: it.kind === 'ELEICAO' ? counts.SIM : 0,
+            elected: approved,
+          })),
+      }
+    })
 }

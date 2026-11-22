@@ -61,6 +61,7 @@ import AssemblyDocuments from '@/pages/membership/assemblies/AssemblyDocuments'
 import PersonDocuments from '@/pages/membership/documents/PersonDocuments'
 import MemberCards from '@/pages/membership/documents/MemberCards'
 import PublicSignup from '@/pages/membership/PublicSignup'
+import PublicAssemblyVote from '@/pages/membership/PublicAssemblyVote'
 import NotFound from '@/pages/NotFound'
 import FinancePanel from '@/pages/finance/FinancePanel'
 import FinanceTransactions from '@/pages/finance/FinanceTransactions'
@@ -105,6 +106,7 @@ const App = () => (
           {/* Rota pública de aceite de convite e definição de senha */}
           <Route path="/convite/:token" element={<InviteAccept />} />
           <Route path="/cadastro/:key" element={<PublicSignup />} />
+          <Route path="/votar/:key" element={<PublicAssemblyVote />} />
           <Route path="/inscricao/:key" element={<PublicEventSignup />} />
 
           {/* Documentos para imprimir: fora do Layout, para sair só a folha */}

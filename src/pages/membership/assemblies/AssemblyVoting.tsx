@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { errorMessage } from '../shared'
 import { Field, Panel, inputClass, selectClass, type AssemblyCtx } from './common'
+import OnlineVotePanel from './OnlineVotePanel'
 
 function NumberBox({
   id,
@@ -73,7 +74,9 @@ function ItemVote({
   const [cv, setCv] = useState<Record<string, { votes: number; elected: boolean }>>({})
   const [saving, setSaving] = useState(false)
   useEffect(() => {
-    setCv(Object.fromEntries(mine.map((c) => [c.id, { votes: c.votes || 0, elected: !!c.elected }])))
+    setCv(
+      Object.fromEntries(mine.map((c) => [c.id, { votes: c.votes || 0, elected: !!c.elected }])),
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidates])
 
@@ -87,7 +90,10 @@ function ItemVote({
     if (item.kind === 'ELEICAO') {
       setCv((p) =>
         Object.fromEntries(
-          Object.entries(p).map(([id, x]) => [id, { ...x, elected: tally.electedIds.includes(id) }]),
+          Object.entries(p).map(([id, x]) => [
+            id,
+            { ...x, elected: tally.electedIds.includes(id) },
+          ]),
         ),
       )
     } else set('approved', tally.approved)
@@ -96,8 +102,7 @@ function ItemVote({
   const save = async () => {
     setSaving(true)
     try {
-      const approved =
-        item.kind === 'ELEICAO' ? merged.some((c) => c.elected) : v.approved
+      const approved = item.kind === 'ELEICAO' ? merged.some((c) => c.elected) : v.approved
       await saveItem(ctx.assembly, item.id, { ...v, approved, decided: true })
       for (const c of mine) {
         const now = cv[c.id]
@@ -191,7 +196,9 @@ function ItemVote({
             const x = cv[c.id] || { votes: 0, elected: false }
             return (
               <li key={c.id} className="flex items-center gap-3 px-3 py-2">
-                <span className="flex-1 min-w-0 text-sm truncate">{p?.name || 'Ficha removida'}</span>
+                <span className="flex-1 min-w-0 text-sm truncate">
+                  {p?.name || 'Ficha removida'}
+                </span>
                 {item.kind === 'ELEICAO' && !accl && (
                   <Input
                     type="number"
@@ -250,7 +257,10 @@ function ItemVote({
                   ? 'empate, a mesa decide pelo critério do estatuto'
                   : tally.electedIds.length
                     ? tally.electedIds
-                        .map((id) => peopleById.get(mine.find((c) => c.id === id)?.person_id || '')?.name)
+                        .map(
+                          (id) =>
+                            peopleById.get(mine.find((c) => c.id === id)?.person_id || '')?.name,
+                        )
                         .join(', ')
                     : 'ninguém atingiu a maioria'
                 : tally.approved
@@ -428,18 +438,29 @@ export default function AssemblyVoting({ ctx }: { ctx: AssemblyCtx }) {
         </fieldset>
         {canTally && (
           <div className="flex justify-end">
-            <Button onClick={saveMesa} disabled={saving} className="rounded-xl bg-teal-700 hover:bg-teal-800">
+            <Button
+              onClick={saveMesa}
+              disabled={saving}
+              className="rounded-xl bg-teal-700 hover:bg-teal-800"
+            >
               Salvar mesa
             </Button>
           </div>
         )}
       </Panel>
 
+      {items.length > 0 && <OnlineVotePanel ctx={ctx} />}
+
       {items.length === 0 ? (
         <p className="text-sm text-slate-500">Monte a pauta antes de registrar a votação.</p>
       ) : (
         items.map((it) => (
-          <ItemVote key={it.id} ctx={ctx} item={it} presentVoters={presentVoters} />
+          <ItemVote
+            key={`${it.id}-${it.updated || ''}`}
+            ctx={ctx}
+            item={it}
+            presentVoters={presentVoters}
+          />
         ))
       )}
     </div>
