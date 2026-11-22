@@ -132,6 +132,15 @@ export const ACCESS_MODULES: AccessModule[] = [
         actions: ['ver'],
         specials: [{ key: 'exportar', label: 'Exportar CSV' }],
       },
+      {
+        key: 'assembleias',
+        label: 'Assembleias e votações',
+        actions: ALL,
+        specials: [
+          { key: 'apurar', label: 'Presença e resultado da votação' },
+          { key: 'ata', label: 'Finalizar a ata e reabrir' },
+        ],
+      },
     ],
   },
   {

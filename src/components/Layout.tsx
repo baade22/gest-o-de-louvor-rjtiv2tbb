@@ -54,6 +54,7 @@ import {
   type LucideIcon,
   Globe,
   HandHeart,
+  Gavel,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -306,6 +307,12 @@ export default function Layout() {
           label: 'Relatórios',
           icon: FileBarChart,
           allowed: mem('relatorios'),
+        },
+        {
+          to: '/membros/assembleias',
+          label: 'Assembleias',
+          icon: Gavel,
+          allowed: mem('assembleias'),
         },
       ],
     },

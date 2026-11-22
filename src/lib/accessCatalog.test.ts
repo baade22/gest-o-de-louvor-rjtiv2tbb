@@ -99,6 +99,7 @@ describe('catálogo dos perfis de acesso', () => {
   it('as regras (0073) e os hooks só conferem chaves que existem', () => {
     const files = [
       RULES,
+      'pocketbase/migrations/0105_assembleias.js',
       ...readdirSync(join(root, 'pocketbase/hooks'))
         .filter((f) => f.endsWith('.js'))
         .map((f) => `pocketbase/hooks/${f}`),

@@ -55,6 +55,9 @@ import ChurchEventForm from '@/pages/membership/ChurchEventForm'
 import ChurchEventDetail from '@/pages/membership/ChurchEventDetail'
 import PublicEventSignup from '@/pages/membership/PublicEventSignup'
 import EventCheckin from '@/pages/membership/EventCheckin'
+import Assemblies from '@/pages/membership/assemblies/Assemblies'
+import AssemblyDetail from '@/pages/membership/assemblies/AssemblyDetail'
+import AssemblyDocuments from '@/pages/membership/assemblies/AssemblyDocuments'
 import PersonDocuments from '@/pages/membership/documents/PersonDocuments'
 import MemberCards from '@/pages/membership/documents/MemberCards'
 import PublicSignup from '@/pages/membership/PublicSignup'
@@ -118,6 +121,14 @@ const App = () => (
             element={
               <RequireAuth requirePermission="membresia.documentos.ver">
                 <MemberCards />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/membros/assembleias/:id/documentos"
+            element={
+              <RequireAuth requirePermission="membresia.assembleias.ver">
+                <AssemblyDocuments />
               </RequireAuth>
             }
           />
@@ -559,6 +570,22 @@ const App = () => (
               element={
                 <RequireAuth requirePermission="membresia.relatorios.ver">
                   <Reports />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/assembleias"
+              element={
+                <RequireAuth requirePermission="membresia.assembleias.ver">
+                  <Assemblies />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/membros/assembleias/:id"
+              element={
+                <RequireAuth requirePermission="membresia.assembleias.ver">
+                  <AssemblyDetail />
                 </RequireAuth>
               }
             />
