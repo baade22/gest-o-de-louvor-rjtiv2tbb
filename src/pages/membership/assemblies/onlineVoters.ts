@@ -45,3 +45,40 @@ export function votersCsv(rows: OnlineVoterRow[]): string {
     .map((l) => l.map(q).join(';'))
     .join('\r\n')
 }
+
+export interface PresenceRow {
+  name: string
+  cpf: string
+  /** "Assinado digitalmente em 22/11/2026 às 13:40" para quem votou on-line; vazio = assina no papel. */
+  signed: string
+  ip: string
+}
+
+const key = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/**
+ * Lista de presença: os presentes marcados na assembleia mais quem votou on-line (com ou
+ * sem ficha). Quem votou on-line sai como assinado digitalmente, com data e hora.
+ */
+export function presenceRows(
+  attendees: { name: string }[],
+  voters: OnlineVoterRow[],
+): PresenceRow[] {
+  const byName = new Map<string, PresenceRow>()
+  for (const a of attendees) byName.set(key(a.name), { name: a.name, cpf: '', signed: '', ip: '' })
+  for (const v of voters) {
+    const [date, time] = v.when.split(' ')
+    const row = byName.get(key(v.name)) || { name: v.name, cpf: '', signed: '', ip: '' }
+    row.cpf = v.cpf || row.cpf
+    row.signed = date ? `Assinado digitalmente em ${date} às ${time}` : 'Assinado digitalmente'
+    row.ip = v.ip
+    byName.set(key(v.name), row)
+  }
+  return [...byName.values()].sort((x, y) => x.name.localeCompare(y.name, 'pt-BR'))
+}
