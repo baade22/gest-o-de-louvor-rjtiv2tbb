@@ -60,7 +60,7 @@ function Signature({ church, today }: { church: Church; today: string }) {
 
 function Sheet({ children }: { children: React.ReactNode }) {
   return (
-    <div className="print-sheet bg-white shadow-lg border border-slate-200 mx-auto w-[210mm] min-h-[297mm] px-[22mm] py-[20mm] text-slate-900 font-serif">
+    <div className="print-sheet print-fluid bg-white shadow-lg border border-slate-200 mx-auto w-[210mm] min-h-[297mm] px-[22mm] py-[20mm] text-slate-900 font-serif">
       {children}
     </div>
   )
