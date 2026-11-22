@@ -3,6 +3,9 @@ import type { Person } from '@/types'
 import {
   ageOn,
   ataParagraphs,
+  countBallots,
+  newVoteKey,
+  onlineResultPatches,
   mandateLabel,
   ataProblems,
   buildSnapshot,
@@ -354,5 +357,61 @@ describe('ata', () => {
     expect(probs).toContain('A lista de presença está vazia.')
     expect(probs).toContain('Pastor Presidente: falta o início e o fim do mandato.')
     expect(probs.some((p) => p.startsWith('Ana Lima: falta'))).toBe(true)
+  })
+})
+
+describe('votação on-line da chapa', () => {
+  const item = (id: string, kind: AssemblyItem['kind']): AssemblyItem => ({
+    id,
+    church_id: 'c',
+    assembly_id: 'as',
+    order: 1,
+    kind,
+    title: id,
+  })
+  const cand = (id: string, item_id: string): AssemblyCandidate => ({
+    id,
+    church_id: 'c',
+    assembly_id: 'as',
+    item_id,
+    person_id: 'p' + id,
+  })
+
+  it('conta os votos e ignora escolha desconhecida', () => {
+    expect(
+      countBallots([{ choice: 'SIM' }, { choice: 'SIM' }, { choice: 'NAO' }, { choice: 'X' }]),
+    ).toEqual({ SIM: 2, NAO: 1, ABSTENCAO: 0 })
+  })
+
+  it('lança o mesmo resultado em cada cargo da chapa', () => {
+    const items = [item('Presidente', 'REFERENDO'), item('Conselho', 'ELEICAO'), item('Pauta', 'DELIBERACAO')]
+    const cands = [cand('a', 'Presidente'), cand('b', 'Conselho'), cand('c', 'Conselho')]
+    const out = onlineResultPatches(items, cands, { SIM: 30, NAO: 2, ABSTENCAO: 1 })
+    expect(out.map((o) => o.item.id)).toEqual(['Presidente', 'Conselho'])
+    expect(out[0].patch).toMatchObject({
+      method: 'ESCRUTINIO_SECRETO',
+      voters: 33,
+      votes_yes: 30,
+      votes_no: 2,
+      votes_abstain: 1,
+      approved: true,
+    })
+    expect(out[0].patch.result_note).toBe(
+      'Votação on-line da chapa: 30 votos SIM, 2 NÃO e 1 abstenção, de 33 votantes.',
+    )
+    expect(out[1].candidates).toEqual([
+      { id: 'b', votes: 30, elected: true },
+      { id: 'c', votes: 30, elected: true },
+    ])
+  })
+
+  it('chapa rejeitada não elege ninguém', () => {
+    const out = onlineResultPatches([item('X', 'ELEICAO')], [cand('a', 'X')], { SIM: 2, NAO: 5, ABSTENCAO: 0 })
+    expect(out[0].patch.approved).toBe(false)
+    expect(out[0].candidates[0].elected).toBe(false)
+  })
+
+  it('gera chave de link no formato aceito pela rota', () => {
+    expect(newVoteKey()).toMatch(/^[A-Za-z0-9]{32}$/)
   })
 })

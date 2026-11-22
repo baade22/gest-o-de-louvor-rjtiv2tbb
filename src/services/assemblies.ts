@@ -143,3 +143,52 @@ export async function updateAttendee(
 export async function removeAttendee(id: string): Promise<void> {
   await pb.collection('assembly_attendees').delete(id)
 }
+
+/* ---------------- votação on-line ---------------- */
+
+export async function listOnlineVoters(
+  assemblyId: string,
+): Promise<{ id: string; person_id: string; created: string }[]> {
+  return pb
+    .collection('assembly_online_voters')
+    .getFullList({ filter: byAssembly(assemblyId), sort: '-created' })
+}
+
+export async function listOnlineBallots(
+  assemblyId: string,
+): Promise<{ id: string; choice: string }[]> {
+  return pb.collection('assembly_online_ballots').getFullList({ filter: byAssembly(assemblyId) })
+}
+
+export interface VoteInfo {
+  church_name: string
+  title: string
+  date: string
+  open: boolean
+  chapa: { office: string; names: string[] }[]
+}
+
+export async function getVoteInfo(key: string): Promise<VoteInfo | { message: string }> {
+  try {
+    return await pb.send<VoteInfo>(
+      `/backend/v1/assembly-vote/info?key=${encodeURIComponent(key)}`,
+      {
+        method: 'GET',
+      },
+    )
+  } catch (err) {
+    const data = (err as { response?: { message?: string } }).response
+    return { message: data?.message || 'Não foi possível abrir a votação.' }
+  }
+}
+
+export async function submitVote(payload: {
+  key: string
+  name: string
+  cpf: string
+  birth_date: string
+  choice: string
+  website: string
+}): Promise<{ first_name?: string }> {
+  return pb.send('/backend/v1/assembly-vote', { method: 'POST', body: payload })
+}
