@@ -195,15 +195,31 @@ export default function AssemblyDocuments() {
       </>
     )
   } else if (kind === 'ata') {
+    const board = electedList(snap)
     body = (
       <>
         <Head s={snap} title={`Ata da Assembleia Geral${kindLabel} de ${dateNumeric(a.date)}`} />
         <Paragraphs items={ataParagraphs(snap)} />
         <p className="mt-[10mm] text-right">{placeDate(snap, a.date)}</p>
-        <div className="mt-[18mm] flex justify-between gap-[10mm]">
-          <Sign name={presName} role="Presidente da assembleia" />
+        <div className="mt-[18mm] flex justify-between gap-[10mm] break-inside-avoid">
           <Sign name={secName} role="Secretário(a)" />
+          <Sign name={presName} role="Presidente" />
         </div>
+        {board.length > 0 && (
+          <div className="mt-[12mm] break-inside-avoid">
+            <p className="font-bold uppercase">
+              {board.length > 1 ? 'Nova diretoria:' : 'Eleito(a):'}
+            </p>
+            <div className="mt-[14mm] grid grid-cols-2 gap-x-[10mm] gap-y-[16mm] justify-items-center">
+              {board.map((e) => (
+                <Sign key={`${e.office}-${e.person.id}`} name={e.person.name} role={e.office} />
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="mt-[10mm] text-[3mm] text-slate-600">
+          Todas as assinaturas com firma reconhecida em cartório.
+        </p>
       </>
     )
   } else if (kind === 'posse') {

@@ -14,6 +14,11 @@ const FIELDS: Array<[keyof ChurchDocSettings, string, string]> = [
   ['doc_city', 'Cidade', 'Ex: Camaragibe - PE'],
   ['doc_address', 'Endereço da igreja', 'Rua, número, bairro'],
   ['doc_cnpj', 'CNPJ', '00.000.000/0000-00'],
+  [
+    'doc_statute_registry',
+    'Registro do estatuto (sai na ata de assembleia)',
+    'Ex: registrado em 20/11/2006 no Cartório de Registro de Pessoas Jurídicas de Camaragibe sob o nº 2774, fls. 225v',
+  ],
 ]
 
 /** Dados da igreja que saem em todos os documentos; salvos uma vez para todos. */
@@ -37,6 +42,7 @@ export function ChurchDocSettingsPanel({
       doc_city: church.doc_city || '',
       doc_address: church.doc_address || '',
       doc_cnpj: church.doc_cnpj || '',
+      doc_statute_registry: church.doc_statute_registry || '',
     })
   }, [church])
 
@@ -81,7 +87,10 @@ export function ChurchDocSettingsPanel({
         <div className="px-4 pb-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {FIELDS.map(([key, label, placeholder]) => (
-              <div key={key} className="space-y-1">
+              <div
+                key={key}
+                className={`space-y-1 ${key === 'doc_statute_registry' ? 'sm:col-span-2' : ''}`}
+              >
                 <Label htmlFor={`doc-${key}`} className="text-xs font-semibold text-slate-700">
                   {label}
                 </Label>

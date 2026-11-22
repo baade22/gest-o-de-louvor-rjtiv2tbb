@@ -3,7 +3,7 @@ import type { Church } from '@/types'
 
 export type ChurchDocSettings = Pick<
   Church,
-  'doc_signer_name' | 'doc_signer_title' | 'doc_city' | 'doc_address' | 'doc_cnpj'
+  'doc_signer_name' | 'doc_signer_title' | 'doc_city' | 'doc_address' | 'doc_cnpj' | 'doc_statute_registry'
 >
 
 /** Igreja com os dados dos documentos (o login guarda uma cópia antiga). */

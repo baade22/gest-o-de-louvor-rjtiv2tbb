@@ -32,6 +32,8 @@ export interface Church {
   doc_city?: string
   doc_address?: string
   doc_cnpj?: string
+  /** Onde o estatuto está registrado (sai na ata de assembleia). */
+  doc_statute_registry?: string
   /** Mensagens de parabéns pelo WhatsApp; vazias usam o texto padrão. */
   greeting_birthday?: string
   greeting_wedding?: string

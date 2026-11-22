@@ -41,7 +41,7 @@ export default function Assemblies() {
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
-  const [kind, setKind] = useState<AssemblyKind>('ORDINARIA')
+  const [kind, setKind] = useState<AssemblyKind>('EXTRAORDINARIA')
   const [date, setDate] = useState(getLocalTodayYMD())
   const [saving, setSaving] = useState(false)
 

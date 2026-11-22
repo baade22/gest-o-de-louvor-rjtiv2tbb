@@ -3,6 +3,7 @@ import type { Person } from '@/types'
 import {
   ageOn,
   ataParagraphs,
+  mandateLabel,
   ataProblems,
   buildSnapshot,
   dateInWords,
@@ -87,9 +88,9 @@ describe('qualificação', () => {
 
   it('monta a qualificação completa', () => {
     expect(qualificationText(full)).toBe(
-      'MARIA DA SILVA, brasileira, casada, professora, portadora do RG nº 1234567 SDS/PE, ' +
-        'inscrita no CPF sob o nº 529.982.247-25, residente e domiciliada em Rua das Flores, 10, ' +
-        'bairro Aldeia, Camaragibe/PE, CEP 54789-000',
+      'MARIA DA SILVA, brasileira, casada, professora, residente e domiciliada em Rua das Flores, 10, ' +
+        'bairro Aldeia, Camaragibe/PE, CEP 54789-000, portadora do RG nº 1234567 SDS/PE, ' +
+        'inscrita no CPF sob o nº 529.982.247-25',
     )
     expect(missingQualification(full)).toEqual([])
   })
@@ -258,7 +259,13 @@ describe('ata', () => {
   }))
   const people = [full, sec, person({ id: 'p3', name: 'Ana Lima' }), person({ id: 'p4', name: 'Rui Alves' })]
   const snap = buildSnapshot({
-    church: { name: 'Igreja Batista Missionária em Aldeia', doc_cnpj: '00.000.000/0001-00', doc_address: 'Estrada de Aldeia', doc_city: 'Camaragibe/PE' },
+    church: {
+      name: 'Igreja Batista Missionária em Aldeia',
+      doc_cnpj: '00.000.000/0001-00',
+      doc_address: 'Estrada de Aldeia',
+      doc_city: 'Camaragibe/PE',
+      doc_statute_registry: 'registrado no Cartório de Pessoas Jurídicas sob o nº 100, fls. 1.',
+    },
     assembly,
     items,
     candidates,
@@ -285,13 +292,44 @@ describe('ata', () => {
     expect(text).toContain('Aos vinte e dois dias do mês de novembro do ano de dois mil e vinte e seis, às 19h, em templo sede')
     expect(text).toContain('em primeira convocação')
     expect(text).toContain('Estavam presentes 3 pessoas, das quais 3 membros com direito a voto, de um total de 4 membros votantes')
-    expect(text).toContain('Assumiu a presidência dos trabalhos Maria da Silva')
-    expect(text).toContain('recondução de Maria da Silva ao cargo de Pastor Presidente')
+    expect(text).toContain('nos termos do estatuto social, registrado no Cartório de Pessoas Jurídicas sob o nº 100, fls. 1.')
+    expect(text).toContain(
+      'A senhora presidente, Maria da Silva, iniciou os trabalhos fazendo uma oração, convidou José Souza para secretariar',
+    )
+    expect(text).toContain('o motivo de sua convocação: PASTOR PRESIDENTE.')
+    expect(text).toContain('Maria da Silva colocou o cargo de Pastor Presidente à disposição da assembleia')
     expect(text).toContain('3 votos favoráveis, 0 votos contrários')
     expect(text).toContain('para o mandato de 01/01/2027 a 31/12/2028')
-    expect(text).toContain('Pastor Presidente: MARIA DA SILVA, brasileira, casada')
-    expect(text).toContain('empossado')
-    expect(text).toContain('encerrou a assembleia às 21h15')
+    expect(text).toContain('Qualificação da eleita para o cargo de Pastor Presidente: MARIA DA SILVA, brasileira, casada')
+    expect(text).toContain('a eleita foi empossada')
+    expect(text).toContain('deu por encerrada a assembleia às 21h15')
+    expect(text).toContain('lavrada por mim, José Souza, secretário, e, lida e aprovada, vai assinada por mim, pela senhora presidente.')
+  })
+
+  it('monta o bloco da nova diretoria como na ata de 2022', () => {
+    const term = { term_start: '2022-12-18', term_end: '2026-11-30', office_date: '2026-11-22' }
+    const board = buildSnapshot({
+      church: { name: 'Igreja Batista Missionária em Aldeia' },
+      assembly,
+      items: [
+        { id: 'b1', church_id: 'c', assembly_id: 'as', order: 1, kind: 'ELEICAO', title: 'Presidente', seats: 1, method: 'ACLAMACAO', ...term },
+        { id: 'b2', church_id: 'c', assembly_id: 'as', order: 2, kind: 'ELEICAO', title: 'Conselho Fiscal', seats: 2, method: 'ACLAMACAO', ...term },
+      ],
+      candidates: [
+        { id: 'x1', church_id: 'c', assembly_id: 'as', item_id: 'b1', person_id: 'p1', elected: true },
+        { id: 'x2', church_id: 'c', assembly_id: 'as', item_id: 'b2', person_id: 'p3', elected: true },
+        { id: 'x3', church_id: 'c', assembly_id: 'as', item_id: 'b2', person_id: 'p4', elected: true },
+      ],
+      attendees,
+      people,
+    })
+    const text = ataParagraphs(board).join('\n')
+    expect(text).toContain(
+      'neste ato assumem a NOVA DIRETORIA DA IGREJA BATISTA MISSIONÁRIA EM ALDEIA PARA O EXERCÍCIO DO SEU MANDATO QUADRIÊNIO 2022-2026 (de 18/12/2022 a 30/11/2026): Presidente: MARIA DA SILVA',
+    )
+    expect(text).toContain('CONSELHO FISCAL: ANA LIMA')
+    expect(text).toContain('e por toda a diretoria eleita e empossada.')
+    expect(mandateLabel('2027-01-01', '2028-12-31')).toBe('BIÊNIO 2027-2028 (de 01/01/2027 a 31/12/2028)')
   })
 
   it('edital e termo de posse', () => {
