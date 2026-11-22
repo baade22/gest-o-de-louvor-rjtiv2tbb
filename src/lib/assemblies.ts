@@ -424,8 +424,9 @@ export function addressLine(p: Partial<Person>): string {
 }
 
 /**
- * "MARIA DA SILVA, brasileira, casada, professora, portadora do RG nº 1234567 SDS/PE,
- * inscrita no CPF sob o nº 123.456.789-09, residente e domiciliada na Rua X, 10, ..."
+ * Na ordem da ata de 2022 da IBMA: "MARIA DA SILVA, brasileira, casada, professora,
+ * residente e domiciliada em Rua X, 10, ..., portadora do RG nº 1234567 SDS/PE,
+ * inscrita no CPF sob o nº 123.456.789-09".
  * O que faltar na ficha sai como [a completar], para ninguém levar ao cartório sem ver.
  */
 export function qualificationText(p: Partial<Person> & G): string {
@@ -438,8 +439,8 @@ export function qualificationText(p: Partial<Person> & G): string {
   const addr = addressLine(p) || miss
   return (
     `${(p.name || '').trim().toUpperCase()}, ${nat}, ${civil}, ${prof}, ` +
-    `${gw(p, 'portador', 'portadora')} do RG nº ${rg}, ${gw(p, 'inscrito', 'inscrita')} no CPF sob o nº ${cpf}, ` +
-    `${gw(p, 'residente e domiciliado', 'residente e domiciliada')} em ${addr}`
+    `${gw(p, 'residente e domiciliado', 'residente e domiciliada')} em ${addr}, ` +
+    `${gw(p, 'portador', 'portadora')} do RG nº ${rg}, ${gw(p, 'inscrito', 'inscrita')} no CPF sob o nº ${cpf}`
   )
 }
 
@@ -569,7 +570,8 @@ export interface AtaItem {
 
 /** Tudo o que a ata e os outros papéis usam, copiado no momento de finalizar. */
 export interface AtaSnapshot {
-  church: { name: string; cnpj: string; address: string; city: string }
+  /** statute_registry falta nas atas finalizadas antes de existir o campo. */
+  church: { name: string; cnpj: string; address: string; city: string; statute_registry?: string }
   assembly: {
     title: string
     kind: AssemblyKind | ''
@@ -600,7 +602,13 @@ export interface AtaSnapshot {
 }
 
 export interface SnapshotInput {
-  church: { name: string; doc_cnpj?: string; doc_address?: string; doc_city?: string }
+  church: {
+    name: string
+    doc_cnpj?: string
+    doc_address?: string
+    doc_city?: string
+    doc_statute_registry?: string
+  }
   assembly: Assembly
   items: AssemblyItem[]
   candidates: AssemblyCandidate[]
@@ -626,6 +634,7 @@ export function buildSnapshot(input: SnapshotInput): AtaSnapshot {
       cnpj: church.doc_cnpj || '',
       address: church.doc_address || '',
       city: church.doc_city || '',
+      statute_registry: church.doc_statute_registry || '',
     },
     assembly: {
       title: a.title,
@@ -756,7 +765,37 @@ function termText(it: { term_start: string; term_end: string }): string {
   return `para o mandato de ${dateNumeric(it.term_start)} a ${dateNumeric(it.term_end)}`
 }
 
-/** Parágrafos da ata. */
+const TERM_NAMES: Record<number, string> = { 2: 'BIÊNIO', 3: 'TRIÊNIO', 4: 'QUADRIÊNIO', 5: 'QUINQUÊNIO' }
+
+/** "QUADRIÊNIO 2022-2026 (de 18/12/2022 a 30/11/2026)", como na ata de 2022. */
+export function mandateLabel(start: string, end: string): string {
+  if (!start || !end) return '[mandato]'
+  const days = (Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86400000
+  const years = Math.round(days / 365.25)
+  const name = TERM_NAMES[years] || 'MANDATO'
+  return `${name} ${start.slice(0, 4)}-${end.slice(0, 4)} (de ${dateNumeric(start)} a ${dateNumeric(end)})`
+}
+
+/** Eleitos agrupados por cargo, na ordem da pauta (Conselho Fiscal vira um grupo só). */
+export function boardGroups(s: AtaSnapshot) {
+  const out: { office: string; people: AtaPerson[]; term_start: string; term_end: string }[] = []
+  for (const e of electedList(s)) {
+    const g = out.find((x) => x.office === e.office)
+    if (g) g.people.push(e.person)
+    else out.push({ office: e.office, people: [e.person], term_start: e.term_start, term_end: e.term_end })
+  }
+  return out
+}
+
+/** Ordem do dia numa linha só (o edital usa uma linha por ponto). */
+function agendaLine(s: AtaSnapshot): string {
+  const a = s.assembly
+  return a.agenda?.trim()
+    ? a.agenda.trim().replace(/\s*\n+\s*/g, '; ').replace(/[.;]\s*$/, '')
+    : s.items.map((it) => it.title).join('; ')
+}
+
+/** Parágrafos da ata, no modelo da ata de 2022 registrada pela IBMA. */
 export function ataParagraphs(s: AtaSnapshot): string[] {
   const a = s.assembly
   const kind = a.kind ? ASSEMBLY_KIND_LABELS[a.kind].toLowerCase() : ''
@@ -765,8 +804,9 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
   const sec = s.secretary
   const time = timeText(a.opened_on === 'SEGUNDA' ? a.second_call : a.first_call)
   const call = a.opened_on === 'SEGUNDA' ? 'em segunda convocação' : 'em primeira convocação'
+  const reg = s.church.statute_registry?.trim().replace(/[.;,]\s*$/, '')
   p.push(
-    `${dateInWords(a.date)}, às ${time}, ${a.place ? `em ${a.place}` : 'na sede da igreja'}, reuniram-se em Assembleia Geral ${kind} os membros da ${s.church.name}${s.church.cnpj ? `, inscrita no CNPJ sob o nº ${s.church.cnpj}` : ''}${s.church.address ? `, com sede em ${s.church.address}` : ''}, ${call}, ${a.call_date ? `conforme edital de convocação de ${dateNumeric(a.call_date)}${a.call_means ? `, ${a.call_means}` : ''}` : 'conforme edital de convocação'}, nos termos do estatuto.`,
+    `${dateInWords(a.date)}, às ${time}, ${a.place ? `em ${a.place}` : 'na sede da igreja'}, reuniram-se em Assembleia Geral ${kind} os membros da ${s.church.name}${s.church.cnpj ? `, inscrita no CNPJ sob o nº ${s.church.cnpj}` : ''}${s.church.address ? `, com sede em ${s.church.address}` : ''}, ${call}, ${a.call_date ? `conforme edital de convocação de ${dateNumeric(a.call_date)}${a.call_means ? `, ${a.call_means}` : ''}` : 'conforme edital de convocação'}, nos termos do estatuto social${reg ? `, ${reg}` : ''}.`,
   )
   const firstRule =
     a.opened_on !== 'SEGUNDA' && a.quorum_first ? QUORUM_LABELS[a.quorum_first].toLowerCase() : ''
@@ -775,7 +815,7 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
     `Estavam presentes ${s.presentTotal} ${s.presentTotal === 1 ? 'pessoa' : 'pessoas'}, das quais ${s.presentVoters} ${s.presentVoters === 1 ? 'membro com direito a voto' : 'membros com direito a voto'}, de um total de ${s.eligible} ${s.eligible === 1 ? 'membro votante' : 'membros votantes'}, conforme lista de presença anexa, verificando-se o quórum exigido pelo estatuto${a.opened_on === 'SEGUNDA' ? ' para a segunda convocação' : ''}${quorumNote ? ` (${quorumNote})` : ''}.`,
   )
   p.push(
-    `Assumiu a presidência dos trabalhos ${pres ? pres.name : '[presidente]'}, que convidou ${sec ? sec.name : '[secretário]'} para secretariar a assembleia e lavrar a presente ata. Declarada aberta a sessão, foi lida a ordem do dia: ${a.agenda?.trim() ? a.agenda.trim().replace(/\s*\n+\s*/g, '; ') : s.items.map((it) => it.title).join('; ')}.`,
+    `${pres ? `${gw(pres, 'O senhor presidente', 'A senhora presidente')}, ${pres.name},` : 'O presidente,'} iniciou os trabalhos fazendo uma oração, convidou ${sec ? sec.name : '[secretário]'} para secretariar a assembleia e lavrar a presente ata e, em seguida, declarou aberta a assembleia ${kind} e o motivo de sua convocação: ${agendaLine(s).toLocaleUpperCase('pt-BR')}.`.replace(/\s+/g, ' '),
   )
   for (const it of s.items) {
     const head = `${it.order}) ${it.title}.`
@@ -795,7 +835,7 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
     } else if (it.kind === 'REFERENDO') {
       const who = it.candidates.map((c) => c.name).join(', ') || '[nome]'
       p.push(
-        `${head}${desc} Foi submetida à assembleia a recondução de ${who} ao cargo de ${it.title}.${method}. ${it.approved ? `A recondução foi aprovada, ${termText(it)}.` : 'A recondução não foi aprovada.'}${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(/\s+/g, ' '),
+        `${head}${desc} ${who} ${it.candidates.length > 1 ? 'colocaram seus cargos' : 'colocou o cargo'} de ${it.title} à disposição da assembleia, que deliberou sobre a recondução.${method}. ${it.approved ? `A recondução foi aprovada, ${termText(it)}.` : 'A recondução não foi aprovada.'}${it.result_note ? ` ${it.result_note.trim()}` : ''}`.replace(/\s+/g, ' '),
       )
     } else {
       p.push(
@@ -804,19 +844,40 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
     }
   }
   const elected = electedList(s)
-  if (elected.length) {
-    const postNow = elected.filter((e) => e.office_date && e.office_date === a.date)
-    p.push(
-      `Qualificação dos eleitos e reconduzidos: ${elected.map((e) => `${e.office}: ${e.person.qualification}`).join('; ')}.`,
+  const allNow = elected.length > 0 && elected.every((e) => e.office_date && e.office_date === a.date)
+  if (elected.length > 1) {
+    const groups = boardGroups(s)
+    const sameTerm = groups.every(
+      (g) => g.term_start === groups[0].term_start && g.term_end === groups[0].term_end,
     )
-    if (postNow.length)
-      p.push(
-        `Ato contínuo, ${postNow.length === 1 ? 'o eleito foi empossado' : 'os eleitos foram empossados'} em seus cargos, conforme termo de posse anexo, ${postNow.length === 1 ? 'declarando' : 'declarando cada um'} não estar impedido de exercer a administração da entidade.`,
+    const list = groups
+      .map(
+        (g) =>
+          `${g.people.length > 1 ? g.office.toLocaleUpperCase('pt-BR') : g.office}: ${g.people.map((x) => x.qualification).join('; ')}${sameTerm ? '' : `, ${termText(g)}`}`,
       )
+      .join('; ')
+    p.push(
+      `Concluídas as votações, foram apresentados os nomes dos que ${allNow ? 'neste ato assumem' : 'assumirão'} a NOVA DIRETORIA DA ${s.church.name.toLocaleUpperCase('pt-BR')}${sameTerm ? ` PARA O EXERCÍCIO DO SEU MANDATO ${mandateLabel(groups[0].term_start, groups[0].term_end)}` : ''}: ${list}.`,
+    )
+  } else if (elected.length === 1) {
+    const e = elected[0]
+    p.push(`Qualificação ${gw(e.person, 'do eleito', 'da eleita')} para o cargo de ${e.office}: ${e.person.qualification}.`)
   }
+  const postNow = elected.filter((e) => e.office_date && e.office_date === a.date)
+  if (postNow.length)
+    p.push(
+      `Ato contínuo, ${postNow.length === 1 ? `${gw(postNow[0].person, 'o eleito foi empossado', 'a eleita foi empossada')}` : 'os eleitos foram empossados'} em seus cargos, conforme termo de posse anexo, ${postNow.length === 1 ? 'declarando' : 'declarando cada um'} não estar ${postNow.length === 1 ? gw(postNow[0].person, 'impedido', 'impedida') : 'impedido'} de exercer a administração da entidade.`,
+    )
   if (a.notes?.trim()) p.push(a.notes.trim().replace(/\s*\n+\s*/g, ' '))
+  const others = elected.filter((e) => e.person.id !== pres?.id)
+  const signers =
+    elected.length > 1
+      ? ` e por toda a diretoria ${allNow ? 'eleita e empossada' : 'eleita'}`
+      : others.length === 1
+        ? ` e ${gw(others[0].person, 'pelo eleito', 'pela eleita')}`
+        : ''
   p.push(
-    `Nada mais havendo a tratar, o presidente agradeceu a presença de todos e encerrou a assembleia${a.ended_at ? ` às ${timeText(a.ended_at)}` : ''}, e eu, ${sec ? sec.name : '[secretário]'}, ${sec ? gw(sec, 'secretário', 'secretária') : 'secretário(a)'}, lavrei a presente ata, que, lida e aprovada, vai assinada por mim e pelo presidente.`,
+    `Não havendo mais nada a tratar, ${pres ? gw(pres, 'o presidente', 'a presidente') : 'o presidente'} agradeceu a presença de todos e deu por encerrada a assembleia${a.ended_at ? ` às ${timeText(a.ended_at)}` : ''}. A presente ata foi lavrada por mim, ${sec ? sec.name : '[secretário]'}, ${sec ? gw(sec, 'secretário', 'secretária') : 'secretário(a)'}, e, lida e aprovada, vai assinada por mim, ${pres ? gw(pres, 'pelo senhor presidente', 'pela senhora presidente') : 'pelo presidente'}${signers}.`,
   )
   return p
 }

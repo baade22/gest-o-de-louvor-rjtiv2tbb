@@ -21,7 +21,7 @@ export default function AssemblySetup({ ctx }: { ctx: AssemblyCtx }) {
   const { toast } = useToast()
   const [f, setF] = useState({
     title: a.title,
-    kind: (a.kind || 'ORDINARIA') as AssemblyKind,
+    kind: (a.kind || 'EXTRAORDINARIA') as AssemblyKind,
     date: ymd(a.date),
     place: a.place || '',
     first_call: a.first_call || '',
