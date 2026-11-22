@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import type { Church } from '@/types'
-import { saveChurchDocSettings, type ChurchDocSettings } from '@/services/churchDocs'
+import {
+  churchLogoUrl,
+  saveChurchDocSettings,
+  uploadChurchLogo,
+  type ChurchDocSettings,
+} from '@/services/churchDocs'
 import { ChevronDown, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +14,11 @@ import { useToast } from '@/hooks/use-toast'
 import { errorMessage } from '../shared'
 
 const FIELDS: Array<[keyof ChurchDocSettings, string, string]> = [
+  [
+    'doc_legal_name',
+    'Nome completo da igreja (como no estatuto)',
+    'Ex: Igreja Batista Missionária em Aldeia',
+  ],
   ['doc_signer_name', 'Quem assina', 'Ex: Pr. João da Silva'],
   ['doc_signer_title', 'Cargo de quem assina', 'Ex: Pastor Presidente'],
   ['doc_city', 'Cidade', 'Ex: Camaragibe - PE'],
@@ -42,6 +52,7 @@ export function ChurchDocSettingsPanel({
       doc_city: church.doc_city || '',
       doc_address: church.doc_address || '',
       doc_cnpj: church.doc_cnpj || '',
+      doc_legal_name: church.doc_legal_name || '',
       doc_statute_registry: church.doc_statute_registry || '',
     })
   }, [church])
@@ -89,7 +100,7 @@ export function ChurchDocSettingsPanel({
             {FIELDS.map(([key, label, placeholder]) => (
               <div
                 key={key}
-                className={`space-y-1 ${key === 'doc_statute_registry' ? 'sm:col-span-2' : ''}`}
+                className={`space-y-1 ${key === 'doc_statute_registry' || key === 'doc_legal_name' ? 'sm:col-span-2' : ''}`}
               >
                 <Label htmlFor={`doc-${key}`} className="text-xs font-semibold text-slate-700">
                   {label}
@@ -103,6 +114,49 @@ export function ChurchDocSettingsPanel({
                 />
               </div>
             ))}
+          </div>
+          <div className="flex items-center gap-3">
+            {churchLogoUrl(church) ? (
+              <img
+                src={churchLogoUrl(church)}
+                alt="Logo da igreja"
+                className="h-14 w-14 object-contain rounded-lg border border-slate-200 bg-white"
+              />
+            ) : (
+              <div className="h-14 w-14 rounded-lg border border-dashed border-slate-300 text-[10px] text-slate-400 flex items-center justify-center text-center">
+                sem logo
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label htmlFor="doc-logo" className="text-xs font-semibold text-slate-700">
+                Logo nos documentos (PNG ou JPG)
+              </Label>
+              <Input
+                id="doc-logo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={saving}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setSaving(true)
+                  try {
+                    onSaved(await uploadChurchLogo(church.id, file))
+                    toast({ title: 'Logo salvo' })
+                  } catch (err) {
+                    toast({
+                      title: 'Não foi possível salvar o logo',
+                      description: errorMessage(err, 'Use uma imagem de até 5 MB.'),
+                      variant: 'destructive',
+                    })
+                  } finally {
+                    setSaving(false)
+                    e.target.value = ''
+                  }
+                }}
+                className="rounded-xl h-9 text-xs"
+              />
+            </div>
           </div>
           <Button
             size="sm"
