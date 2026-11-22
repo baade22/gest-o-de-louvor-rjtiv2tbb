@@ -3,11 +3,12 @@
 // GET  /backend/v1/assembly-vote/info?key=...  → igreja, assembleia e a chapa (cargos e nomes)
 // POST /backend/v1/assembly-vote               → { key, name, cpf, birth_date, choice }
 //
-// Qualquer pessoa que recebeu o link vota uma vez por CPF (migração 0108: só o hash do CPF
-// fica gravado). Se a pessoa tem ficha na igreja, o voto fica ligado a ela e ela entra na
+// Qualquer pessoa que recebeu o link vota uma vez por CPF. Quem votou fica registrado com
+// nome, CPF, nascimento, IP e aparelho (migração 0109), para a ata; o voto fica em outra
+// coleção, sem ligação. Quem votou antes da 0109 completa os dados abrindo o link de novo. Se a pessoa tem ficha na igreja, o voto fica ligado a ela e ela entra na
 // lista de presença. Com "só presentes" ligado, precisa estar na lista de presença.
 // Voto secreto: quem votou e o voto vão para coleções separadas (migração 0107).
-// CPF e nascimento não são gravados. Limite por IP na migração 0107.
+// Limite por IP na migração 0107.
 
 routerAdd('GET', '/backend/v1/assembly-vote/info', (e) => {
   let key = ''
@@ -109,8 +110,8 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
   }
   const churchId = a.getString('church_id')
 
-  // Qualquer pessoa que recebeu o link vota (pedido do Pedro, 22/11/2026). O CPF só serve para
-  // impedir voto duplicado: grava-se um hash dele, nunca o número. Se a pessoa tem ficha na
+  // Qualquer pessoa que recebeu o link vota (pedido do Pedro, 22/11/2026), uma vez por CPF
+  // (o hash do CPF com o id da assembleia barra o segundo voto). Se a pessoa tem ficha na
   // igreja (nome bate e, quando a ficha tem, CPF e nascimento também), o voto fica ligado à
   // ficha e ela entra na lista de presença.
   const cpfOk = (() => {
@@ -167,14 +168,40 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
   }
 
   const ALREADY = 'Já existe um voto registrado com este CPF. Cada pessoa vota uma vez só.'
+  const typedName = text(body.name, 200).replace(/\s+/g, ' ')
+  let ip = ''
   try {
-    $app.findFirstRecordByFilter(
+    ip = e.realIP()
+  } catch (_) {}
+  let ua = ''
+  try {
+    ua = String(e.request.header.get('User-Agent') || '').slice(0, 300)
+  } catch (_) {}
+  const cpfFmt = cpf.slice(0, 3) + '.' + cpf.slice(3, 6) + '.' + cpf.slice(6, 9) + '-' + cpf.slice(9)
+  let existing = null
+  try {
+    existing = $app.findFirstRecordByFilter(
       'assembly_online_voters',
       'assembly_id = {:a} && cpf_hash = {:h}',
       { a: a.id, h: cpfHash },
     )
-    return e.json(409, { message: ALREADY })
   } catch (_) {}
+  if (existing) {
+    // Votou antes de o sistema guardar os dados: o CPF confere com o hash, então completa
+    // nome, CPF, nascimento, IP e aparelho para a ata. O voto não muda.
+    if (!existing.getString('cpf')) {
+      try {
+        existing.set('cpf', cpfFmt)
+        existing.set('birth_date', birth)
+        if (!existing.getString('name')) existing.set('name', typedName)
+        existing.set('ip', ip)
+        existing.set('user_agent', ua)
+        $app.save(existing)
+        return e.json(200, { ok: true, confirmed: true, first_name: typedName.split(' ')[0] })
+      } catch (_) {}
+    }
+    return e.json(409, { message: ALREADY })
+  }
   if (person) {
     try {
       $app.findFirstRecordByFilter(
@@ -186,7 +213,6 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
     } catch (_) {}
   }
 
-  const typedName = text(body.name, 200).replace(/\s+/g, ' ')
   try {
     $app.runInTransaction((tx) => {
       const voter = new Record(tx.findCollectionByNameOrId('assembly_online_voters'))
@@ -195,6 +221,10 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
       voter.set('person_id', person ? person.id : '')
       voter.set('name', person ? person.getString('name') : typedName)
       voter.set('cpf_hash', cpfHash)
+      voter.set('cpf', cpfFmt)
+      voter.set('birth_date', birth)
+      voter.set('ip', ip)
+      voter.set('user_agent', ua)
       tx.save(voter)
 
       const ballot = new Record(tx.findCollectionByNameOrId('assembly_online_ballots'))

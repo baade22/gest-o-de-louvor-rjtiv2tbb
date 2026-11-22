@@ -25,6 +25,7 @@ export default function PublicAssemblyVote() {
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const [done, setDone] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
 
   useEffect(() => {
     getVoteInfo(key).then((r) => ('title' in r ? setInfo(r) : setLoadError(r.message)))
@@ -42,6 +43,7 @@ export default function PublicAssemblyVote() {
     setSending(true)
     try {
       const r = await submitVote({ key, ...form, choice })
+      setConfirmed(!!r.confirmed)
       setDone(r.first_name || 'irmão(ã)')
     } catch (err) {
       const msg = (err as { response?: { message?: string } }).response?.message
@@ -94,9 +96,13 @@ export default function PublicAssemblyVote() {
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center space-y-2">
                 <Check className="mx-auto h-8 w-8 text-emerald-700" />
                 <p className="text-lg font-bold text-emerald-900">
-                  Voto registrado. Obrigado, {done}!
+                  {confirmed ? 'Dados confirmados' : 'Voto registrado'}. Obrigado, {done}!
                 </p>
-                <p className="text-sm text-emerald-800">Seu voto é secreto e já foi contado.</p>
+                <p className="text-sm text-emerald-800">
+                  {confirmed
+                    ? 'Seu voto anterior continua valendo e não foi alterado.'
+                    : 'Seu voto é secreto e já foi contado.'}
+                </p>
               </div>
             ) : !info.open ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
@@ -109,8 +115,10 @@ export default function PublicAssemblyVote() {
               >
                 <p className="text-sm text-slate-600">
                   Para votar, informe seu nome completo, CPF e data de nascimento. Eles só servem
-                  para garantir que cada pessoa vota uma vez; seu voto é secreto e o CPF não fica
-                  gravado.
+                  para garantir que cada pessoa vota uma vez e ficam registrados para a ata da
+                  assembleia, sem ligação com o seu voto, que é secreto. Já votou antes? Preencha
+                  seus dados de novo e escolha qualquer opção: o voto anterior não muda, só
+                  completamos seus dados para a ata.
                 </p>
                 <div className="space-y-1.5">
                   <Label htmlFor="v-name" className="text-sm font-semibold text-slate-700">

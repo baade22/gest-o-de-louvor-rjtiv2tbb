@@ -5,9 +5,12 @@ import {
   saveItem,
   updateAssembly,
   updateCandidate,
+  type OnlineVoter,
 } from '@/services/assemblies'
 import { countBallots, newVoteKey, onlineResultPatches, type OnlineCounts } from '@/lib/assemblies'
-import { Copy, ExternalLink, Lock, RefreshCw, Unlock } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Copy, Download, ExternalLink, Lock, Printer, RefreshCw, Unlock } from 'lucide-react'
+import { onlineVoterRows, votersCsv } from './onlineVoters'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -21,9 +24,7 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
   const { assembly: a, items, candidates, peopleById, canTally, reload } = ctx
   const { toast } = useToast()
   const { confirm, dialog } = useConfirm()
-  const [voters, setVoters] = useState<
-    { id: string; person_id: string; name?: string; created: string }[]
-  >([])
+  const [voters, setVoters] = useState<OnlineVoter[]>([])
   const [counts, setCounts] = useState<OnlineCounts>({ SIM: 0, NAO: 0, ABSTENCAO: 0 })
   const [busy, setBusy] = useState(false)
 
@@ -31,13 +32,10 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
 
   const load = useCallback(async () => {
     if (!a.vote_key) return
-    try {
-      const [v, b] = await Promise.all([listOnlineVoters(a.id), listOnlineBallots(a.id)])
-      setVoters(v)
-      setCounts(countBallots(b))
-    } catch {
-      /* sem permissão ou coleção ainda não criada: o painel fica sem números */
-    }
+    // Quem só vê a assembleia não lê os dados pessoais dos votantes: cada lista falha sozinha
+    const [v, b] = await Promise.allSettled([listOnlineVoters(a.id), listOnlineBallots(a.id)])
+    if (v.status === 'fulfilled') setVoters(v.value)
+    if (b.status === 'fulfilled') setCounts(countBallots(b.value))
   }, [a.id, a.vote_key])
 
   useEffect(() => {
@@ -87,6 +85,16 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
   }
 
   const total = counts.SIM + counts.NAO + counts.ABSTENCAO
+  const rows = onlineVoterRows(voters, peopleById)
+  const downloadCsv = () => {
+    const blob = new Blob(['\ufeff' + votersCsv(rows)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const el = document.createElement('a')
+    el.href = url
+    el.download = `votantes-${a.title.replace(/[^\w-]+/g, '-').toLowerCase()}.csv`
+    el.click()
+    URL.revokeObjectURL(url)
+  }
   const patches = onlineResultPatches(items, candidates, counts)
 
   const apply = () =>
@@ -107,7 +115,7 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
   return (
     <Panel
       title="Votação on-line da chapa"
-      description="Quem receber o link vota, uma vez por CPF, informando nome completo, CPF e data de nascimento. Quem tem ficha na igreja entra sozinho na lista de presença. O voto é secreto: o sistema mostra quem votou, mas não em quê, e o CPF não fica gravado."
+      description="Quem receber o link vota, uma vez por CPF, informando nome completo, CPF e data de nascimento. Quem tem ficha na igreja entra sozinho na lista de presença. O voto é secreto: o sistema guarda quem votou (nome, CPF, horário e IP, para a ata), mas não em quê."
       actions={
         canTally ? (
           a.vote_open ? (
@@ -234,16 +242,52 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
               <summary className="cursor-pointer text-slate-700 font-semibold">
                 Quem já votou ({voters.length})
               </summary>
-              <ul className="mt-2 divide-y divide-slate-100">
-                {voters
-                  .map((v) => peopleById.get(v.person_id)?.name || v.name || 'Sem nome')
-                  .sort((x, y) => x.localeCompare(y, 'pt-BR'))
-                  .map((name, i) => (
-                    <li key={i} className="py-1.5 text-slate-700">
-                      {name}
-                    </li>
-                  ))}
-              </ul>
+              {rows.some((r) => !r.cpf) && (
+                <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  {rows.filter((r) => !r.cpf).length} votaram antes de o sistema guardar CPF e IP.
+                  Peça que abram o link de novo e preencham os dados: o voto não muda, só os dados
+                  são completados.
+                </p>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadCsv}
+                  className="rounded-xl gap-1.5"
+                >
+                  <Download className="h-4 w-4" />
+                  Baixar planilha (CSV)
+                </Button>
+                <Link to={`/membros/assembleias/${a.id}/documentos?doc=votantes`}>
+                  <Button variant="outline" size="sm" className="rounded-xl gap-1.5">
+                    <Printer className="h-4 w-4" />
+                    Lista para a ata
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-slate-500">
+                      <th className="py-1 pr-2">Nome</th>
+                      <th className="py-1 pr-2">CPF</th>
+                      <th className="py-1 pr-2">Horário</th>
+                      <th className="py-1">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {rows.map((r) => (
+                      <tr key={r.id} className="text-slate-700">
+                        <td className="py-1.5 pr-2">{r.name}</td>
+                        <td className="py-1.5 pr-2 whitespace-nowrap">{r.cpf || '—'}</td>
+                        <td className="py-1.5 pr-2 whitespace-nowrap">{r.when}</td>
+                        <td className="py-1.5 whitespace-nowrap">{r.ip || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </details>
           )}
         </>

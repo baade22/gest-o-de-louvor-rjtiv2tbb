@@ -3,7 +3,14 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { listPeople } from '@/services/people'
 import { getChurchForDocs } from '@/services/churchDocs'
-import { getAssembly, listAttendees, listCandidates, listItems } from '@/services/assemblies'
+import {
+  getAssembly,
+  listAttendees,
+  listCandidates,
+  listItems,
+  listOnlineVoters,
+} from '@/services/assemblies'
+import { onlineVoterRows, type OnlineVoterRow } from './onlineVoters'
 import {
   ASSEMBLY_KIND_LABELS,
   ataParagraphs,
@@ -20,10 +27,11 @@ import { getLocalTodayYMD } from '@/lib/dateUtils'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-type DocKind = 'edital' | 'presenca' | 'ata' | 'posse' | 'requerimento'
+type DocKind = 'edital' | 'presenca' | 'votantes' | 'ata' | 'posse' | 'requerimento'
 const LABELS: Record<DocKind, string> = {
   edital: 'Edital de convocação',
   presenca: 'Lista de presença',
+  votantes: 'Votantes on-line',
   ata: 'Ata',
   posse: 'Termo de posse',
   requerimento: 'Requerimento',
@@ -46,7 +54,9 @@ function Sheet({ children, draft }: { children: React.ReactNode; draft: boolean 
 }
 
 function Head({ s, title }: { s: AtaSnapshot; title: string }) {
-  const line = [s.church.address, s.church.cnpj && `CNPJ ${s.church.cnpj}`].filter(Boolean).join(' · ')
+  const line = [s.church.address, s.church.cnpj && `CNPJ ${s.church.cnpj}`]
+    .filter(Boolean)
+    .join(' · ')
   return (
     <div className="text-center mb-[8mm]">
       <p className="text-[5mm] font-extrabold uppercase">{s.church.name}</p>
@@ -89,6 +99,7 @@ export default function AssemblyDocuments() {
   const [snap, setSnap] = useState<AtaSnapshot | null>(null)
   const [draft, setDraft] = useState(true)
   const [error, setError] = useState('')
+  const [voters, setVoters] = useState<OnlineVoterRow[]>([])
 
   useEffect(() => {
     if (!currentChurch) return
@@ -103,7 +114,13 @@ export default function AssemblyDocuments() {
       .then(([a, items, candidates, attendees, people, church]) => {
         const frozen = a.status === 'FINALIZADA' && a.minutes ? a.minutes : null
         setDraft(!frozen)
-        setSnap(frozen || buildSnapshot({ church, assembly: a, items, candidates, attendees, people }))
+        setSnap(
+          frozen || buildSnapshot({ church, assembly: a, items, candidates, attendees, people }),
+        )
+        if (a.vote_key)
+          listOnlineVoters(id)
+            .then((v) => setVoters(onlineVoterRows(v, new Map(people.map((p) => [p.id, p])))))
+            .catch(() => setVoters([]))
       })
       .catch(() => setError('Não foi possível abrir a assembleia.'))
   }, [id, currentChurch])
@@ -168,7 +185,9 @@ export default function AssemblyDocuments() {
               <tr key={i}>
                 <td className="border border-slate-500 px-[2mm] py-[2.5mm] text-center">{i + 1}</td>
                 <td className="border border-slate-500 px-[2mm]">{r.name}</td>
-                <td className="border border-slate-500 px-[2mm] text-center">{r.voter ? 'sim' : 'não'}</td>
+                <td className="border border-slate-500 px-[2mm] text-center">
+                  {r.voter ? 'sim' : 'não'}
+                </td>
                 <td className="border border-slate-500" />
               </tr>
             ))}
@@ -192,6 +211,65 @@ export default function AssemblyDocuments() {
           <Sign name={presName} role="Presidente da assembleia" />
           <Sign name={secName} role="Secretário(a)" />
         </div>
+      </>
+    )
+  } else if (kind === 'votantes') {
+    body = (
+      <>
+        <Head
+          s={snap}
+          title={`Votantes on-line · Assembleia Geral${kindLabel} de ${dateNumeric(a.date)}`}
+        />
+        {voters.length === 0 ? (
+          <p>Nenhum voto on-line registrado (ou sem permissão para ver os votantes).</p>
+        ) : (
+          <>
+            <p className="mb-[4mm] text-justify">
+              Relação das pessoas que votaram pelo link de votação on-line, identificadas por nome
+              completo, CPF e data de nascimento, com a data, a hora e o endereço IP de cada voto. O
+              voto é secreto: o sistema registra quem votou, mas não a escolha de cada um.
+            </p>
+            <table className="w-full border-collapse text-[3.2mm]">
+              <thead>
+                <tr>
+                  <th className="border border-slate-500 px-[1.5mm] py-[1.5mm] w-[8mm]">Nº</th>
+                  <th className="border border-slate-500 px-[1.5mm] py-[1.5mm] text-left">Nome</th>
+                  <th className="border border-slate-500 px-[1.5mm] py-[1.5mm]">CPF</th>
+                  <th className="border border-slate-500 px-[1.5mm] py-[1.5mm]">Nascimento</th>
+                  <th className="border border-slate-500 px-[1.5mm] py-[1.5mm]">Data e hora</th>
+                  <th className="border border-slate-500 px-[1.5mm] py-[1.5mm]">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {voters.map((r, i) => (
+                  <tr key={r.id}>
+                    <td className="border border-slate-500 px-[1.5mm] py-[1.5mm] text-center">
+                      {i + 1}
+                    </td>
+                    <td className="border border-slate-500 px-[1.5mm]">{r.name}</td>
+                    <td className="border border-slate-500 px-[1.5mm] text-center whitespace-nowrap">
+                      {r.cpf || '—'}
+                    </td>
+                    <td className="border border-slate-500 px-[1.5mm] text-center">
+                      {r.birth || '—'}
+                    </td>
+                    <td className="border border-slate-500 px-[1.5mm] text-center whitespace-nowrap">
+                      {r.when}
+                    </td>
+                    <td className="border border-slate-500 px-[1.5mm] text-center">
+                      {r.ip || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-[4mm] text-[3.4mm]">Total de votantes on-line: {voters.length}</p>
+            <div className="mt-[16mm] flex justify-between gap-[10mm]">
+              <Sign name={secName} role="Secretário(a)" />
+              <Sign name={presName} role="Presidente" />
+            </div>
+          </>
+        )}
       </>
     )
   } else if (kind === 'ata') {
@@ -232,9 +310,7 @@ export default function AssemblyDocuments() {
         ) : (
           <>
             <Paragraphs items={posseParagraphs(snap)} />
-            <p className="mt-[10mm] text-right">
-              {placeDate(snap, list[0].office_date || a.date)}
-            </p>
+            <p className="mt-[10mm] text-right">{placeDate(snap, list[0].office_date || a.date)}</p>
             <div className="mt-[14mm] grid grid-cols-2 gap-x-[10mm] gap-y-[16mm] justify-items-center">
               {list.map((e) => (
                 <Sign key={`${e.office}-${e.person.id}`} name={e.person.name} role={e.office} />
