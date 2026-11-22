@@ -7,7 +7,7 @@ const CONFIG_FILE = path.join(process.cwd(), 'agent.config.json')
 
 export const DEFAULT_CONFIG: AgentConfig = {
   saasUrl:
-    process.env.LOUVORFLOW_URL || 'https://gestao-de-louvor-f51d5.shrd00.internal.goskip.dev',
+    process.env.LOUVORFLOW_URL || 'https://gestao.ibmaldeia.com.br',
   agentId: '',
   agentToken: '',
   churchId: '',
