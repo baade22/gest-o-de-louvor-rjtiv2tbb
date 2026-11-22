@@ -10,7 +10,7 @@ import {
   listItems,
   listOnlineVoters,
 } from '@/services/assemblies'
-import { onlineVoterRows, type OnlineVoterRow } from './onlineVoters'
+import { onlineVoterRows, presenceRows, type OnlineVoterRow } from './onlineVoters'
 import {
   ASSEMBLY_KIND_LABELS,
   ataParagraphs,
@@ -163,8 +163,10 @@ export default function AssemblyDocuments() {
       </>
     )
   } else if (kind === 'presenca') {
-    const rows = snap.attendees.length ? snap.attendees : []
-    const blanks = Math.max(0, 25 - rows.length)
+    const rows = presenceRows(snap.attendees, voters)
+    const digital = rows.filter((r) => r.signed).length
+    // Com votação on-line a lista já vem completa; sem ela, sobram linhas para assinar no papel
+    const blanks = voters.length ? 0 : Math.max(0, 25 - rows.length)
     body = (
       <>
         <Head
@@ -176,8 +178,8 @@ export default function AssemblyDocuments() {
             <tr>
               <th className="border border-slate-500 px-[2mm] py-[1.5mm] w-[10mm]">Nº</th>
               <th className="border border-slate-500 px-[2mm] py-[1.5mm] text-left">Nome</th>
-              <th className="border border-slate-500 px-[2mm] py-[1.5mm] w-[16mm]">Vota</th>
-              <th className="border border-slate-500 px-[2mm] py-[1.5mm] w-[70mm]">Assinatura</th>
+              <th className="border border-slate-500 px-[2mm] py-[1.5mm] w-[32mm]">CPF</th>
+              <th className="border border-slate-500 px-[2mm] py-[1.5mm] w-[62mm]">Assinatura</th>
             </tr>
           </thead>
           <tbody>
@@ -185,10 +187,17 @@ export default function AssemblyDocuments() {
               <tr key={i}>
                 <td className="border border-slate-500 px-[2mm] py-[2.5mm] text-center">{i + 1}</td>
                 <td className="border border-slate-500 px-[2mm]">{r.name}</td>
-                <td className="border border-slate-500 px-[2mm] text-center">
-                  {r.voter ? 'sim' : 'não'}
+                <td className="border border-slate-500 px-[2mm] text-center whitespace-nowrap">
+                  {r.cpf}
                 </td>
-                <td className="border border-slate-500" />
+                <td className="border border-slate-500 px-[2mm] text-[3mm] leading-tight">
+                  {r.signed && (
+                    <>
+                      <span className="italic">{r.signed}</span>
+                      {r.ip && <span className="block text-[2.6mm] text-slate-600">IP {r.ip}</span>}
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
             {Array.from({ length: blanks }).map((_, i) => (
@@ -204,8 +213,8 @@ export default function AssemblyDocuments() {
           </tbody>
         </table>
         <p className="mt-[4mm] text-[3.4mm]">
-          Presentes: {snap.presentTotal} · com direito a voto: {snap.presentVoters} · membros
-          votantes: {snap.eligible}
+          Total de presentes: {rows.length}
+          {digital > 0 ? ` (${digital} com assinatura digital pelo link de votação on-line)` : ''}
         </p>
         <div className="mt-[16mm] flex justify-between gap-[10mm]">
           <Sign name={presName} role="Presidente da assembleia" />
