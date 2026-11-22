@@ -13,7 +13,7 @@ import {
 import { onlineVoterRows, presenceRows, type OnlineVoterRow } from './onlineVoters'
 import {
   ASSEMBLY_KIND_LABELS,
-  ataParagraphs,
+  ataText,
   buildSnapshot,
   dateNumeric,
   editalParagraphs,
@@ -23,7 +23,7 @@ import {
   type AtaSnapshot,
 } from '@/lib/assemblies'
 import { longDate } from '@/lib/documents'
-import { churchLegalName, churchLogoUrl } from '@/services/churchDocs'
+import { churchDocLogo, churchLegalName } from '@/services/churchDocs'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -122,8 +122,20 @@ export default function AssemblyDocuments() {
       .then(([a, items, candidates, attendees, people, church]) => {
         const frozen = a.status === 'FINALIZADA' && a.minutes ? a.minutes : null
         setDraft(!frozen)
-        setSnap(
-          frozen || buildSnapshot({ church, assembly: a, items, candidates, attendees, people }),
+        const base =
+          frozen || buildSnapshot({ church, assembly: a, items, candidates, attendees, people })
+        // Timbre sempre com os dados atuais da igreja (nome completo, CNPJ, endereço e logo)
+        setSnap({
+          ...base,
+          church: {
+            ...base.church,
+            name: churchLegalName(church),
+            cnpj: church.doc_cnpj || base.church.cnpj,
+            address: church.doc_address || base.church.address,
+          },
+        })
+        churchDocLogo(church).then((logo) =>
+          setSnap((cur) => (cur ? { ...cur, church: { ...cur.church, logo } } : cur)),
         )
         if (a.vote_key)
           listOnlineVoters(id)
@@ -294,7 +306,7 @@ export default function AssemblyDocuments() {
     body = (
       <>
         <Head s={snap} title={`Ata da Assembleia Geral${kindLabel} de ${dateNumeric(a.date)}`} />
-        <Paragraphs items={ataParagraphs(snap)} />
+        <Paragraphs items={ataText(snap)} />
         <p className="mt-[10mm] text-right">{placeDate(snap, a.date)}</p>
         <div className="mt-[18mm] flex justify-between gap-[10mm] break-inside-avoid">
           <Sign name={secName} role="Secretário(a)" />

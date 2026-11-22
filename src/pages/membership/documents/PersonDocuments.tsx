@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { getPerson } from '@/services/people'
-import { churchLegalName, churchLogoUrl, getChurchForDocs } from '@/services/churchDocs'
+import { churchDocLogo, churchLegalName, getChurchForDocs } from '@/services/churchDocs'
 import type { Church, Person } from '@/types'
 import {
   DOCUMENT_LABELS,
@@ -28,7 +28,10 @@ function Letterhead({ church }: { church: Church }) {
   const line = [church.doc_address, church.doc_city, church.doc_cnpj && `CNPJ ${church.doc_cnpj}`]
     .filter(Boolean)
     .join(' · ')
-  const logo = churchLogoUrl(church)
+  const [logo, setLogo] = useState('')
+  useEffect(() => {
+    churchDocLogo(church).then(setLogo)
+  }, [church])
   return (
     <div className="flex items-center gap-[5mm] border-b-2 border-teal-700 pb-[5mm]">
       {logo && <img src={logo} alt="" className="h-[20mm] w-[20mm] object-contain" />}
