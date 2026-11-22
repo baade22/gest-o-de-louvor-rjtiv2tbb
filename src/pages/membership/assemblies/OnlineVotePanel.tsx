@@ -21,7 +21,9 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
   const { assembly: a, items, candidates, peopleById, canTally, reload } = ctx
   const { toast } = useToast()
   const { confirm, dialog } = useConfirm()
-  const [voters, setVoters] = useState<{ id: string; person_id: string; created: string }[]>([])
+  const [voters, setVoters] = useState<
+    { id: string; person_id: string; name?: string; created: string }[]
+  >([])
   const [counts, setCounts] = useState<OnlineCounts>({ SIM: 0, NAO: 0, ABSTENCAO: 0 })
   const [busy, setBusy] = useState(false)
 
@@ -105,7 +107,7 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
   return (
     <Panel
       title="Votação on-line da chapa"
-      description="Mande o link só para os membros presentes. Cada um informa nome completo, CPF e data de nascimento, e o voto só vale se bater com a ficha. O voto é secreto: o sistema mostra quem votou, mas não em quê."
+      description="Quem receber o link vota, uma vez por CPF, informando nome completo, CPF e data de nascimento. Quem tem ficha na igreja entra sozinho na lista de presença. O voto é secreto: o sistema mostra quem votou, mas não em quê, e o CPF não fica gravado."
       actions={
         canTally ? (
           a.vote_open ? (
@@ -186,7 +188,8 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
           <span>
             Só quem já está na lista de presença pode votar.
             <span className="block text-xs text-slate-500">
-              Desmarcado, quem vota on-line entra sozinho na lista de presença.
+              Desmarcado, qualquer pessoa com o link vota; quem tem ficha entra sozinho na lista de
+              presença.
             </span>
           </span>
         </label>
@@ -233,7 +236,7 @@ export default function OnlineVotePanel({ ctx }: { ctx: AssemblyCtx }) {
               </summary>
               <ul className="mt-2 divide-y divide-slate-100">
                 {voters
-                  .map((v) => peopleById.get(v.person_id)?.name || 'Pessoa removida')
+                  .map((v) => peopleById.get(v.person_id)?.name || v.name || 'Sem nome')
                   .sort((x, y) => x.localeCompare(y, 'pt-BR'))
                   .map((name, i) => (
                     <li key={i} className="py-1.5 text-slate-700">

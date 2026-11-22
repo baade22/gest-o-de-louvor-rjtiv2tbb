@@ -3,10 +3,9 @@
 // GET  /backend/v1/assembly-vote/info?key=...  → igreja, assembleia e a chapa (cargos e nomes)
 // POST /backend/v1/assembly-vote               → { key, name, cpf, birth_date, choice }
 //
-// O voto só vale se nome, CPF e data de nascimento batem com uma ficha da igreja, se a pessoa
-// vota pelas regras da convocação (situação e idade mínima) e se ainda não votou. Com
-// "só presentes" ligado, precisa estar na lista de presença como votante; sem ele, votar
-// on-line já coloca a pessoa na lista de presença.
+// Qualquer pessoa que recebeu o link vota uma vez por CPF (migração 0108: só o hash do CPF
+// fica gravado). Se a pessoa tem ficha na igreja, o voto fica ligado a ela e ela entra na
+// lista de presença. Com "só presentes" ligado, precisa estar na lista de presença.
 // Voto secreto: quem votou e o voto vão para coleções separadas (migração 0107).
 // CPF e nascimento não são gravados. Limite por IP na migração 0107.
 
@@ -80,8 +79,6 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
       .replace(/\s+/g, ' ')
       .trim()
   const digits = (s) => String(s || '').replace(/\D/g, '')
-  const NOT_FOUND =
-    'Não encontramos um membro com esses dados. Confira o nome completo, o CPF e a data de nascimento, ou procure a secretaria da igreja.'
 
   // Campo invisível no formulário: robôs preenchem, pessoas não
   if (text(body.website, 200) !== '') return e.json(200, { ok: true })
@@ -112,91 +109,92 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
   }
   const churchId = a.getString('church_id')
 
-  // Ficha: mesmo CPF e mesma data de nascimento, e o nome tem que bater
+  // Qualquer pessoa que recebeu o link vota (pedido do Pedro, 22/11/2026). O CPF só serve para
+  // impedir voto duplicado: grava-se um hash dele, nunca o número. Se a pessoa tem ficha na
+  // igreja (nome bate e, quando a ficha tem, CPF e nascimento também), o voto fica ligado à
+  // ficha e ela entra na lista de presença.
+  const cpfOk = (() => {
+    if (/^(\d)\1{10}$/.test(cpf)) return false
+    const calc = (n) => {
+      let sum = 0
+      for (let i = 0; i < n; i++) sum += Number(cpf[i]) * (n + 1 - i)
+      const r = (sum * 10) % 11
+      return r === 10 ? 0 : r
+    }
+    return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10])
+  })()
+  if (!cpfOk) return e.json(400, { message: 'Confira o CPF: o número não é válido.' })
+  const cpfHash = $security.sha256(a.id + ':' + cpf)
+
   let person = null
   try {
-    const list = $app.findRecordsByFilter(
-      'people',
-      "church_id = {:c} && document != ''",
-      '',
-      5000,
-      0,
-      { c: churchId },
-    )
+    const list = $app.findRecordsByFilter('people', 'church_id = {:c}', '', 10000, 0, {
+      c: churchId,
+    })
+    const tw = name.split(' ')
+    const matches = []
     for (const p of list) {
-      if (digits(p.getString('document')) !== cpf) continue
-      if (p.getString('birth_date').slice(0, 10) !== birth) continue
       const real = norm(p.getString('name'))
       const rw = real.split(' ')
-      const tw = name.split(' ')
       const same =
         real === name || (rw[0] === tw[0] && rw[rw.length - 1] === tw[tw.length - 1])
-      if (same) {
-        person = p
-        break
-      }
+      if (!same) continue
+      const doc = digits(p.getString('document'))
+      const fb = p.getString('birth_date').slice(0, 10)
+      if (doc && doc !== cpf) continue
+      if (fb && fb !== birth) continue
+      matches.push({ p: p, strong: !!doc })
     }
-  } catch (err) {
-    return e.json(500, { message: 'Não foi possível votar agora. Tente de novo em instantes.' })
-  }
-  if (!person) return e.json(404, { message: NOT_FOUND })
-
-  // Regras da convocação: situação e idade mínima
-  let statuses = []
-  try {
-    statuses = JSON.parse(a.getString('voter_statuses') || '[]') || []
+    const strong = matches.filter((m) => m.strong)
+    if (strong.length === 1) person = strong[0].p
+    else if (strong.length === 0 && matches.length === 1) person = matches[0].p
   } catch (_) {}
-  if (!Array.isArray(statuses) || statuses.length === 0) statuses = ['MEMBRO']
-  if (statuses.indexOf(person.getString('status')) < 0) {
-    return e.json(403, {
-      message: 'Pelas regras do estatuto, sua situação na igreja não dá direito a voto nesta assembleia.',
-    })
-  }
-  const minAge = a.getInt('voter_min_age')
-  if (minAge > 0) {
-    const on = a.getString('date').slice(0, 10)
-    const by = Number(birth.slice(0, 4))
-    const bm = Number(birth.slice(5, 7))
-    const bd = Number(birth.slice(8, 10))
-    const y = Number(on.slice(0, 4))
-    const m = Number(on.slice(5, 7))
-    const d = Number(on.slice(8, 10))
-    let age = y - by
-    if (m < bm || (m === bm && d < bd)) age--
-    if (on && age < minAge) {
-      return e.json(403, { message: 'Pelas regras do estatuto, a idade mínima para votar é ' + minAge + ' anos.' })
-    }
-  }
 
   let attendee = null
-  try {
-    attendee = $app.findFirstRecordByFilter(
-      'assembly_attendees',
-      'assembly_id = {:a} && person_id = {:p}',
-      { a: a.id, p: person.id },
-    )
-  } catch (_) {}
+  if (person) {
+    try {
+      attendee = $app.findFirstRecordByFilter(
+        'assembly_attendees',
+        'assembly_id = {:a} && person_id = {:p}',
+        { a: a.id, p: person.id },
+      )
+    } catch (_) {}
+  }
   if (a.getBool('vote_only_present') && (!attendee || !attendee.getBool('voter'))) {
     return e.json(403, {
       message: 'Seu nome não está na lista de presença desta assembleia. Procure a secretaria da igreja.',
     })
   }
 
+  const ALREADY = 'Já existe um voto registrado com este CPF. Cada pessoa vota uma vez só.'
   try {
     $app.findFirstRecordByFilter(
       'assembly_online_voters',
-      'assembly_id = {:a} && person_id = {:p}',
-      { a: a.id, p: person.id },
+      'assembly_id = {:a} && cpf_hash = {:h}',
+      { a: a.id, h: cpfHash },
     )
-    return e.json(409, { message: 'Seu voto já foi registrado. Cada membro vota uma vez só.' })
+    return e.json(409, { message: ALREADY })
   } catch (_) {}
+  if (person) {
+    try {
+      $app.findFirstRecordByFilter(
+        'assembly_online_voters',
+        'assembly_id = {:a} && person_id = {:p}',
+        { a: a.id, p: person.id },
+      )
+      return e.json(409, { message: 'Seu voto já foi registrado. Cada pessoa vota uma vez só.' })
+    } catch (_) {}
+  }
 
+  const typedName = text(body.name, 200).replace(/\s+/g, ' ')
   try {
     $app.runInTransaction((tx) => {
       const voter = new Record(tx.findCollectionByNameOrId('assembly_online_voters'))
       voter.set('church_id', churchId)
       voter.set('assembly_id', a.id)
-      voter.set('person_id', person.id)
+      voter.set('person_id', person ? person.id : '')
+      voter.set('name', person ? person.getString('name') : typedName)
+      voter.set('cpf_hash', cpfHash)
       tx.save(voter)
 
       const ballot = new Record(tx.findCollectionByNameOrId('assembly_online_ballots'))
@@ -205,7 +203,7 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
       ballot.set('choice', choice)
       tx.save(ballot)
 
-      if (!attendee) {
+      if (person && !attendee) {
         // Horário de Recife (UTC-3) na lista de presença
         const t = new Date(Date.now() - 3 * 3600 * 1000)
         const hh = String(t.getUTCHours()).padStart(2, '0')
@@ -221,8 +219,8 @@ routerAdd('POST', '/backend/v1/assembly-vote', (e) => {
     })
   } catch (err) {
     // Dois envios ao mesmo tempo: o índice único segura o segundo
-    return e.json(409, { message: 'Seu voto já foi registrado. Cada membro vota uma vez só.' })
+    return e.json(409, { message: ALREADY })
   }
-  const first = person.getString('name').trim().split(/\s+/)[0]
+  const first = typedName.split(' ')[0]
   return e.json(200, { ok: true, first_name: first })
 })

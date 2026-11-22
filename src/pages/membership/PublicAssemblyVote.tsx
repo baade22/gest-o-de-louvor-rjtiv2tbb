@@ -108,8 +108,9 @@ export default function PublicAssemblyVote() {
                 className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4"
               >
                 <p className="text-sm text-slate-600">
-                  Para votar, informe seus dados como estão na sua ficha de membro. Eles só servem
-                  para conferir que você é membro e que vota uma vez só; seu voto é secreto.
+                  Para votar, informe seu nome completo, CPF e data de nascimento. Eles só servem
+                  para garantir que cada pessoa vota uma vez; seu voto é secreto e o CPF não fica
+                  gravado.
                 </p>
                 <div className="space-y-1.5">
                   <Label htmlFor="v-name" className="text-sm font-semibold text-slate-700">
