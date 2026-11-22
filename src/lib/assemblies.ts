@@ -51,6 +51,8 @@ export interface Assembly {
   vote_open?: boolean
   /** Só quem está na lista de presença como votante pode votar on-line. */
   vote_only_present?: boolean
+  /** Texto da ata ajustado à mão (parágrafos separados por linha em branco). */
+  minutes_text?: string
   created: string
   updated: string
 }
@@ -622,6 +624,8 @@ export interface AtaSnapshot {
     ended_at: string
     notes: string
     statute_note: string
+    /** Texto editado à mão; vazio = texto automático. */
+    minutes_text?: string
     quorum_first: QuorumRule | ''
     quorum_second: QuorumRule | ''
     quorum_min: number
@@ -693,6 +697,7 @@ export function buildSnapshot(input: SnapshotInput): AtaSnapshot {
       ended_at: a.ended_at || '',
       notes: a.notes || '',
       statute_note: a.statute_note || '',
+      minutes_text: a.minutes_text || '',
       quorum_first: a.quorum_first || '',
       quorum_second: a.quorum_second || '',
       quorum_min: a.quorum_min || 0,
@@ -965,6 +970,16 @@ export function ataParagraphs(s: AtaSnapshot): string[] {
     `Não havendo mais nada a tratar, ${pres ? gw(pres, 'o presidente', 'a presidente') : 'o presidente'} agradeceu a presença de todos e deu por encerrada a assembleia${a.ended_at ? ` às ${timeText(a.ended_at)}` : ''}. A presente ata foi lavrada por mim, ${sec ? sec.name : '[secretário]'}, ${sec ? gw(sec, 'secretário', 'secretária') : 'secretário(a)'}, e, lida e aprovada, vai assinada por mim, ${pres ? gw(pres, 'pelo senhor presidente', 'pela senhora presidente') : 'pelo presidente'}${signers}.`,
   )
   return p
+}
+
+/** Parágrafos que saem na ata: o texto editado à mão, se houver; senão, o automático. */
+export function ataText(s: AtaSnapshot): string[] {
+  const custom = s.assembly.minutes_text?.trim()
+  if (!custom) return ataParagraphs(s)
+  return custom
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+    .filter(Boolean)
 }
 
 /** Texto do edital de convocação. */

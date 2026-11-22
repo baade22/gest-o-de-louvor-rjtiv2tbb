@@ -1,5 +1,6 @@
 import pb from '@/lib/pocketbase/client'
 import type { Church } from '@/types'
+import { getSiteSettings, siteSettingsFileUrl } from '@/services/site'
 
 export type ChurchDocSettings = Pick<
   Church,
@@ -36,4 +37,31 @@ export async function uploadChurchLogo(id: string, file: File): Promise<Church> 
   const fd = new FormData()
   fd.set('logo', file)
   return pb.collection('churches').update<Church>(id, fd)
+}
+
+/**
+ * Logo para os documentos: o da igreja (dados da igreja nos documentos) ou, sem ele, o logo
+ * já enviado no painel do Site e App da igreja.
+ */
+export async function churchDocLogo(church: Pick<Church, 'id' | 'logo'>): Promise<string> {
+  const own = churchLogoUrl(church)
+  if (own) return own
+  try {
+    const site = await getSiteSettings(church.id)
+    return site ? siteSettingsFileUrl(site, 'logo') : ''
+  } catch {
+    return ''
+  }
+}
+
+/** Mensagem de erro do PocketBase com o motivo do campo, quando vier. */
+export function uploadErrorDetail(err: unknown): string {
+  const data = (err as { response?: { data?: Record<string, { message?: string }> } }).response
+    ?.data
+  return data
+    ? Object.values(data)
+        .map((v) => v?.message)
+        .filter(Boolean)
+        .join(' ')
+    : ''
 }

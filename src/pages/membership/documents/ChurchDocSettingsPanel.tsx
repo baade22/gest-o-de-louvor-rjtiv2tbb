@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import type { Church } from '@/types'
 import {
-  churchLogoUrl,
+  churchDocLogo,
   saveChurchDocSettings,
   uploadChurchLogo,
+  uploadErrorDetail,
   type ChurchDocSettings,
 } from '@/services/churchDocs'
 import { ChevronDown, Save } from 'lucide-react'
@@ -44,6 +45,10 @@ export function ChurchDocSettingsPanel({
   const [open, setOpen] = useState(missing)
   const [form, setForm] = useState<ChurchDocSettings>({})
   const [saving, setSaving] = useState(false)
+  const [logoUrl, setLogoUrl] = useState('')
+  useEffect(() => {
+    churchDocLogo(church).then(setLogoUrl)
+  }, [church])
 
   useEffect(() => {
     setForm({
@@ -116,9 +121,9 @@ export function ChurchDocSettingsPanel({
             ))}
           </div>
           <div className="flex items-center gap-3">
-            {churchLogoUrl(church) ? (
+            {logoUrl ? (
               <img
-                src={churchLogoUrl(church)}
+                src={logoUrl}
                 alt="Logo da igreja"
                 className="h-14 w-14 object-contain rounded-lg border border-slate-200 bg-white"
               />
@@ -146,7 +151,9 @@ export function ChurchDocSettingsPanel({
                   } catch (err) {
                     toast({
                       title: 'Não foi possível salvar o logo',
-                      description: errorMessage(err, 'Use uma imagem de até 5 MB.'),
+                      description:
+                        uploadErrorDetail(err) ||
+                        errorMessage(err, 'Use uma imagem PNG ou JPG de até 5 MB.'),
                       variant: 'destructive',
                     })
                   } finally {

@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { errorMessage } from '../shared'
 import { Panel, type AssemblyCtx } from './common'
+import AtaTextEditor from './AtaTextEditor'
 
 const CHECKLIST = [
   'Requerimento assinado pelo presidente, com firma reconhecida',
@@ -68,7 +69,8 @@ export default function AssemblyMinutes({ ctx }: { ctx: AssemblyCtx }) {
   const reopen = () =>
     confirm({
       title: 'Reabrir a assembleia?',
-      description: 'Use só para corrigir algo antes de levar ao cartório. A ata volta a ser montada com os dados atuais.',
+      description:
+        'Use só para corrigir algo antes de levar ao cartório. A ata volta a ser montada com os dados atuais.',
       confirmLabel: 'Reabrir',
       destructive: true,
       onConfirm: async () => {
@@ -96,25 +98,23 @@ export default function AssemblyMinutes({ ctx }: { ctx: AssemblyCtx }) {
             : 'O que falta para o cartório aceitar. Os documentos já podem ser vistos como rascunho.'
         }
         actions={
-          locked ? (
-            canAta && (
-              <Button variant="outline" onClick={reopen} className="rounded-xl gap-1.5">
-                <Unlock className="h-4 w-4" />
-                Reabrir
-              </Button>
-            )
-          ) : (
-            canAta && (
-              <Button
-                onClick={finalize}
-                disabled={busy || problems.length > 0}
-                className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
-              >
-                <Lock className="h-4 w-4" />
-                Finalizar ata
-              </Button>
-            )
-          )
+          locked
+            ? canAta && (
+                <Button variant="outline" onClick={reopen} className="rounded-xl gap-1.5">
+                  <Unlock className="h-4 w-4" />
+                  Reabrir
+                </Button>
+              )
+            : canAta && (
+                <Button
+                  onClick={finalize}
+                  disabled={busy || problems.length > 0}
+                  className="rounded-xl gap-1.5 bg-teal-700 hover:bg-teal-800"
+                >
+                  <Lock className="h-4 w-4" />
+                  Finalizar ata
+                </Button>
+              )
         }
       >
         {locked ? (
@@ -162,11 +162,14 @@ export default function AssemblyMinutes({ ctx }: { ctx: AssemblyCtx }) {
         </Panel>
       )}
 
+      <AtaTextEditor ctx={ctx} live={snap} />
+
       <Panel title="Documentos" description="Abrem numa folha A4: Imprimir ou salvar PDF.">
         <div className="flex flex-wrap gap-2">
           {[
             ['edital', 'Edital de convocação'],
             ['presenca', 'Lista de presença'],
+            ['votantes', 'Votantes on-line'],
             ['ata', 'Ata'],
             ['posse', 'Termo de posse'],
             ['requerimento', 'Requerimento ao cartório'],
@@ -181,7 +184,10 @@ export default function AssemblyMinutes({ ctx }: { ctx: AssemblyCtx }) {
         </div>
       </Panel>
 
-      <Panel title="O que levar ao cartório (RCPJ)" description="Código de Normas do TJPE, arts. 892 a 904.">
+      <Panel
+        title="O que levar ao cartório (RCPJ)"
+        description="Código de Normas do TJPE, arts. 892 a 904."
+      >
         <ul className="space-y-1.5 text-sm text-slate-700 list-disc pl-5">
           {CHECKLIST.map((c) => (
             <li key={c}>{c}</li>

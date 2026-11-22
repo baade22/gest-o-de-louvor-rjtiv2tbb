@@ -3,6 +3,7 @@ import type { Person } from '@/types'
 import {
   ageOn,
   ataParagraphs,
+  ataText,
   countBallots,
   newVoteKey,
   onlineResultPatches,
@@ -413,5 +414,12 @@ describe('votação on-line da chapa', () => {
 
   it('gera chave de link no formato aceito pela rota', () => {
     expect(newVoteKey()).toMatch(/^[A-Za-z0-9]{32}$/)
+  })
+})
+
+describe('texto da ata editado', () => {
+  it('usa o texto editado, com um parágrafo por bloco', () => {
+    const s = { assembly: { minutes_text: 'Primeiro\nparágrafo.\n\n\nSegundo.' } } as never
+    expect(ataText(s)).toEqual(['Primeiro parágrafo.', 'Segundo.'])
   })
 })
