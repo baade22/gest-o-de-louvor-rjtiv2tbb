@@ -598,7 +598,15 @@ export interface AtaItem {
 /** Tudo o que a ata e os outros papéis usam, copiado no momento de finalizar. */
 export interface AtaSnapshot {
   /** statute_registry falta nas atas finalizadas antes de existir o campo. */
-  church: { name: string; cnpj: string; address: string; city: string; statute_registry?: string }
+  church: {
+    name: string
+    cnpj: string
+    address: string
+    city: string
+    statute_registry?: string
+    /** Só para exibir o timbre; não é gravado na ata finalizada. */
+    logo?: string
+  }
   assembly: {
     title: string
     kind: AssemblyKind | ''
@@ -635,6 +643,7 @@ export interface SnapshotInput {
     doc_address?: string
     doc_city?: string
     doc_statute_registry?: string
+    doc_legal_name?: string
   }
   assembly: Assembly
   items: AssemblyItem[]
@@ -663,7 +672,7 @@ export function buildSnapshot(input: SnapshotInput): AtaSnapshot {
   const ymd = (d?: string) => toCalendarYMD(d) || ''
   return {
     church: {
-      name: church.name,
+      name: church.doc_legal_name?.trim() || church.name,
       cnpj: church.doc_cnpj || '',
       address: church.doc_address || '',
       city: church.doc_city || '',

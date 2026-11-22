@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { getPerson } from '@/services/people'
-import { getChurchForDocs } from '@/services/churchDocs'
+import { churchLegalName, churchLogoUrl, getChurchForDocs } from '@/services/churchDocs'
 import type { Church, Person } from '@/types'
 import {
   DOCUMENT_LABELS,
@@ -28,10 +28,17 @@ function Letterhead({ church }: { church: Church }) {
   const line = [church.doc_address, church.doc_city, church.doc_cnpj && `CNPJ ${church.doc_cnpj}`]
     .filter(Boolean)
     .join(' · ')
+  const logo = churchLogoUrl(church)
   return (
-    <div className="text-center border-b-2 border-teal-700 pb-[5mm]">
-      <p className="text-[6mm] font-extrabold text-teal-800 tracking-tight">{church.name}</p>
-      {line && <p className="text-[3.2mm] text-slate-600 mt-[1mm]">{line}</p>}
+    <div className="flex items-center gap-[5mm] border-b-2 border-teal-700 pb-[5mm]">
+      {logo && <img src={logo} alt="" className="h-[20mm] w-[20mm] object-contain" />}
+      <div className="flex-1 text-center">
+        <p className="text-[6mm] font-extrabold text-teal-800 tracking-tight">
+          {churchLegalName(church)}
+        </p>
+        {line && <p className="text-[3.2mm] text-slate-600 mt-[1mm]">{line}</p>}
+      </div>
+      {logo && <div className="w-[20mm]" />}
     </div>
   )
 }
@@ -90,12 +97,13 @@ export default function PersonDocuments() {
 
   if (error) return <p className="p-6 text-red-700">{error}</p>
   if (!person || !church) return <p className="p-6 text-slate-500">Carregando...</p>
+  const docChurch = { ...church, name: churchLegalName(church) }
 
   const letter =
     kind === 'transferencia'
-      ? transferLetterBody({ person, church, destination, extra })
+      ? transferLetterBody({ person, church: docChurch, destination, extra })
       : kind === 'recomendacao'
-        ? recommendationLetterBody({ person, church, destination, extra })
+        ? recommendationLetterBody({ person, church: docChurch, destination, extra })
         : null
 
   return (
@@ -186,13 +194,13 @@ export default function PersonDocuments() {
             <div className="h-full p-[10mm]">
               <div className="h-full border-[1.5mm] border-double border-teal-700 rounded-[3mm] flex flex-col items-center justify-center text-center px-[25mm] font-serif text-slate-900">
                 <p className="text-[4mm] uppercase tracking-[0.35em] text-teal-800">
-                  {church.name}
+                  {churchLegalName(church)}
                 </p>
                 <h1 className="text-[13mm] font-bold mt-[6mm] text-teal-900">
                   Certificado de Batismo
                 </h1>
                 <p className="text-[5mm] leading-relaxed mt-[8mm] max-w-[210mm]">
-                  {baptismCertificateText(person, church)}
+                  {baptismCertificateText(person, docChurch)}
                 </p>
                 <p className="text-[4mm] italic text-slate-600 mt-[6mm]">
                   "Portanto, ide, fazei discípulos de todas as nações, batizando-os em nome do Pai,

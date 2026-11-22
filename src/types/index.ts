@@ -32,6 +32,8 @@ export interface Church {
   doc_city?: string
   doc_address?: string
   doc_cnpj?: string
+  /** Nome completo do estatuto (razão social), usado nos documentos no lugar do nome curto. */
+  doc_legal_name?: string
   /** Onde o estatuto está registrado (sai na ata de assembleia). */
   doc_statute_registry?: string
   /** Mensagens de parabéns pelo WhatsApp; vazias usam o texto padrão. */

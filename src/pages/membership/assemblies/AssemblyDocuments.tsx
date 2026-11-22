@@ -23,6 +23,7 @@ import {
   type AtaSnapshot,
 } from '@/lib/assemblies'
 import { longDate } from '@/lib/documents'
+import { churchLegalName, churchLogoUrl } from '@/services/churchDocs'
 import { getLocalTodayYMD } from '@/lib/dateUtils'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -53,15 +54,22 @@ function Sheet({ children, draft }: { children: React.ReactNode; draft: boolean 
   )
 }
 
+/** Timbre: logo à esquerda, nome completo e CNPJ, como na ata de 2022. */
 function Head({ s, title }: { s: AtaSnapshot; title: string }) {
-  const line = [s.church.address, s.church.cnpj && `CNPJ ${s.church.cnpj}`]
-    .filter(Boolean)
-    .join(' · ')
+  const { name, cnpj, address } = s.church
+  const logo = s.church.logo || ''
   return (
-    <div className="text-center mb-[8mm]">
-      <p className="text-[5mm] font-extrabold uppercase">{s.church.name}</p>
-      {line && <p className="text-[3.2mm] text-slate-600">{line}</p>}
-      <p className="mt-[6mm] text-[4.4mm] font-bold uppercase">{title}</p>
+    <div className="mb-[8mm]">
+      <div className="flex items-center gap-[5mm] border-b border-slate-400 pb-[4mm]">
+        {logo && <img src={logo} alt="" className="h-[22mm] w-[22mm] object-contain" />}
+        <div className="flex-1 text-center">
+          <p className="text-[5.4mm] font-bold leading-tight">{name}</p>
+          {cnpj && <p className="text-[3.4mm] text-slate-700">CNPJ {cnpj}</p>}
+          {address && <p className="text-[3vmm] text-[3mm] text-slate-600">{address}</p>}
+        </div>
+        {logo && <div className="w-[22mm]" />}
+      </div>
+      <p className="mt-[6mm] text-center text-[4.4mm] font-bold uppercase">{title}</p>
     </div>
   )
 }
