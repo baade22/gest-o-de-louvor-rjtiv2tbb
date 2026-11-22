@@ -146,9 +146,18 @@ export async function removeAttendee(id: string): Promise<void> {
 
 /* ---------------- votação on-line ---------------- */
 
-export async function listOnlineVoters(
-  assemblyId: string,
-): Promise<{ id: string; person_id: string; name?: string; created: string }[]> {
+export interface OnlineVoter {
+  id: string
+  person_id: string
+  name?: string
+  cpf?: string
+  birth_date?: string
+  ip?: string
+  user_agent?: string
+  created: string
+}
+
+export async function listOnlineVoters(assemblyId: string): Promise<OnlineVoter[]> {
   return pb
     .collection('assembly_online_voters')
     .getFullList({ filter: byAssembly(assemblyId), sort: '-created' })
@@ -189,6 +198,6 @@ export async function submitVote(payload: {
   birth_date: string
   choice: string
   website: string
-}): Promise<{ first_name?: string }> {
+}): Promise<{ first_name?: string; confirmed?: boolean }> {
   return pb.send('/backend/v1/assembly-vote', { method: 'POST', body: payload })
 }
