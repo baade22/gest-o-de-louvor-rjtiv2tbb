@@ -41,7 +41,7 @@ const KINDS = Object.keys(LABELS) as DocKind[]
 
 function Sheet({ children, draft }: { children: React.ReactNode; draft: boolean }) {
   return (
-    <div className="print-sheet relative bg-white shadow-lg border border-slate-200 mx-auto w-[210mm] min-h-[297mm] px-[22mm] py-[20mm] text-slate-900 font-serif text-[3.9mm] leading-[1.55]">
+    <div className="print-sheet print-fluid relative bg-white shadow-lg border border-slate-200 mx-auto w-[210mm] min-h-[297mm] px-[22mm] py-[20mm] text-slate-900 font-serif text-[3.9mm] leading-[1.55]">
       {draft && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
           <span className="rotate-[-30deg] text-[22mm] font-bold text-slate-200/70 select-none">
@@ -408,7 +408,7 @@ export default function AssemblyDocuments() {
           </p>
         )}
       </div>
-      <div className="pb-10 print:pb-0 overflow-x-auto">
+      <div className="pb-10 print:pb-0 overflow-x-auto print:overflow-visible">
         <Sheet draft={draft && ['ata', 'posse', 'requerimento'].includes(kind)}>{body}</Sheet>
       </div>
     </div>

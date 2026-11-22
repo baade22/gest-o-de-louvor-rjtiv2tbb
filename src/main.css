@@ -373,6 +373,14 @@
   .print-sheet:last-child {
     break-after: auto;
   }
+  /* Folhas de texto (ata, cartas): alguns navegadores (Safari do iPhone) ignoram a
+     margem 0 e somam a própria margem; com largura fixa de 210mm o texto saía
+     cortado na direita. Na impressão a folha ocupa a largura útil do papel. */
+  .print-fluid {
+    width: auto !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+  }
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
