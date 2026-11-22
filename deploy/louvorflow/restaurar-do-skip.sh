@@ -58,6 +58,30 @@ if [ "${#rodar[@]}" -gt 0 ]; then
   echo "   Vão rodar ao ligar: ${rodar[*]}"
 fi
 
+echo "==> Tirando o que é só do Skip"
+# O PocketBase do Skip é modificado: tem o tipo de campo "vector" (memória da IA do Skip,
+# coleção _agent_memory_chunks, guardada em tabelas virtuais _vec_*). O PocketBase oficial
+# não abre um banco com esse tipo de campo. O LouvorFlow não usa nada disso.
+vcols="$(sqlite3 "$DB" "select distinct c.name from _collections c, json_each(c.fields) f where json_extract(f.value,'\$.type') = 'vector'")"
+vtabs="$(sqlite3 "$DB" "select name from sqlite_master where type = 'table' and rootpage = 0 and name like '\_vec\_%' escape '\'")"
+vshadow="$(sqlite3 "$DB" "select name from sqlite_master where type = 'table' and rootpage > 0 and name like '\_vec\_%' escape '\'")"
+for t in $vtabs; do
+  # Tabela virtual sem o módulo sqlite-vec: só dá para tirar do esquema (não ocupa páginas).
+  sqlite3 -cmd ".dbconfig defensive off" "$DB" \
+    "PRAGMA writable_schema=ON; DELETE FROM sqlite_master WHERE type='table' AND rootpage=0 AND name='$t'; PRAGMA writable_schema=OFF;" >/dev/null
+done
+for t in $vshadow; do sqlite3 "$DB" "DROP TABLE IF EXISTS \"$t\""; done
+for c in $vcols; do
+  echo "   coleção do Skip removida: $c"
+  sqlite3 "$DB" "DELETE FROM _collections WHERE name='$c'; DROP TABLE IF EXISTS \"$c\";"
+done
+estranhos="$(sqlite3 "$DB" "select c.name || '.' || json_extract(f.value,'\$.name') || ' (' || json_extract(f.value,'\$.type') || ')' from _collections c, json_each(c.fields) f where json_extract(f.value,'\$.type') not in ('text','number','bool','email','url','editor','date','autodate','select','file','relation','json','password','geoPoint')")"
+if [ -n "$estranhos" ]; then
+  echo "Ainda há campos que o PocketBase oficial não conhece: $estranhos" >&2
+  exit 1
+fi
+[ "$(sqlite3 "$DB" 'PRAGMA integrity_check')" = "ok" ] || { echo "O banco não passou na conferência (integrity_check)." >&2; exit 1; }
+
 if [ "$MODO" = "--ensaio" ]; then
   echo "==> Ensaio: desligando e-mail e backup automático do PocketBase nesta cópia"
   sqlite3 "$DB" "update _params set value = json_set(cast(value as text),
