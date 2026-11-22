@@ -148,7 +148,7 @@ export async function removeAttendee(id: string): Promise<void> {
 
 export async function listOnlineVoters(
   assemblyId: string,
-): Promise<{ id: string; person_id: string; created: string }[]> {
+): Promise<{ id: string; person_id: string; name?: string; created: string }[]> {
   return pb
     .collection('assembly_online_voters')
     .getFullList({ filter: byAssembly(assemblyId), sort: '-created' })
