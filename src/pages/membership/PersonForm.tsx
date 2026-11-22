@@ -57,6 +57,10 @@ const EMPTY: FormState = {
   phone: '',
   email: '',
   document: '',
+  rg: '',
+  rg_issuer: '',
+  nationality: '',
+  profession: '',
   address: '',
   neighborhood: '',
   city: '',
@@ -211,6 +215,10 @@ export default function PersonForm() {
       name: form.name.trim(),
       email: form.email?.trim(),
       document: form.document?.trim(),
+      rg: form.rg?.trim(),
+      rg_issuer: form.rg_issuer?.trim().toUpperCase(),
+      nationality: form.nationality?.trim(),
+      profession: form.profession?.trim(),
       congregation: form.congregation?.trim(),
       state: form.state?.trim().toUpperCase(),
     }
@@ -448,13 +456,53 @@ export default function PersonForm() {
                 className={inputClass}
               />
             </Field>
-            <Field id="document" label="CPF (sai no informe de contribuições)">
+            <Field id="document" label="CPF (informe de contribuições e atas)">
               <Input
                 id="document"
                 value={form.document}
                 onChange={(e) => set('document', e.target.value)}
                 placeholder="000.000.000-00"
                 inputMode="numeric"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="rg" label="RG">
+              <Input
+                id="rg"
+                value={form.rg}
+                onChange={(e) => set('rg', e.target.value)}
+                placeholder="Número do RG"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="rg_issuer" label="Órgão emissor do RG">
+              <Input
+                id="rg_issuer"
+                value={form.rg_issuer}
+                onChange={(e) => set('rg_issuer', e.target.value)}
+                placeholder="SDS/PE"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="nationality" label="Nacionalidade">
+              <Input
+                id="nationality"
+                value={form.nationality}
+                onChange={(e) => set('nationality', e.target.value)}
+                placeholder="brasileiro(a)"
+                list="nationality-options"
+                className={inputClass}
+              />
+              <datalist id="nationality-options">
+                <option value="brasileiro(a)" />
+              </datalist>
+            </Field>
+            <Field id="profession" label="Profissão">
+              <Input
+                id="profession"
+                value={form.profession}
+                onChange={(e) => set('profession', e.target.value)}
+                placeholder="Ex: professora"
                 className={inputClass}
               />
             </Field>

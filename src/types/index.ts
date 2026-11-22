@@ -486,6 +486,11 @@ export interface Person {
   user_id?: string
   /** CPF, usado no informe de contribuições do Financeiro. */
   document?: string
+  /** Qualificação para a ata de eleição (Assembleias, migração 0105). */
+  nationality?: string
+  profession?: string
+  rg?: string
+  rg_issuer?: string
   /** false = arquivada no Financeiro (some das listas de contribuinte). */
   is_active?: boolean
   followup_stage?: FollowupStage | ''
