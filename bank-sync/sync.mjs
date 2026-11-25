@@ -28,6 +28,7 @@ import {
   coraLines,
   ddmmyyyy,
   splitPeriod,
+  withRetry,
 } from './banks.mjs'
 
 const HOSTS = {
@@ -50,8 +51,9 @@ const BRADESCO_TOKEN_PATH = {
   TESTE: '/auth/server-mtls/v2/token',
 }
 
-// No GitHub Actions os segredos chegam todos juntos em BANK_SYNC_SECRETS (JSON); aproveita só
-// os do conector, assim dá para ter credenciais com sufixo sem mexer no workflow
+// Compatibilidade: versões antigas do workflow mandavam todos os segredos juntos em
+// BANK_SYNC_SECRETS (JSON); aproveita só os do conector. O workflow atual passa cada segredo
+// pelo nome, para o conector não receber segredos que não são dele (ex.: a chave do deploy).
 try {
   const all = JSON.parse(process.env.BANK_SYNC_SECRETS || '{}')
   for (const [k, v] of Object.entries(all)) {
@@ -343,14 +345,30 @@ class BankError extends Error {
 
 async function louvorflow(path, body) {
   const base = env('LOUVORFLOW_URL').replace(/\/$/, '')
-  const res = await fetch(`${base}${path}`, {
-    method: body ? 'POST' : 'GET',
-    headers: { 'x-bank-sync-token': env('BANK_SYNC_TOKEN'), 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
+  return withRetry(async () => {
+    let res
+    try {
+      res = await fetch(`${base}${path}`, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'x-bank-sync-token': env('BANK_SYNC_TOKEN'), 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(120_000),
+      })
+    } catch (err) {
+      // "fetch failed" sozinho não diz nada: mostra a causa (ex.: ECONNRESET, ETIMEDOUT)
+      const cause = err.cause?.code || err.cause?.message
+      const e = new Error(`Sem conexão com o LouvorFlow${cause ? ` (${cause})` : ''}`)
+      e.transient = true
+      throw e
+    }
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const e = new Error(`LouvorFlow ${res.status}: ${json.message || ''}`)
+      e.transient = [502, 503, 504].includes(res.status)
+      throw e
+    }
+    return json
   })
-  const json = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(`LouvorFlow ${res.status}: ${json.message || ''}`)
-  return json
 }
 
 async function main() {

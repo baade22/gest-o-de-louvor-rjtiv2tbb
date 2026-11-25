@@ -5,6 +5,7 @@ import {
   bradescoPixList,
   backfill,
   splitPeriod,
+  withRetry,
   bradescoBalance,
   bradescoError,
   bradescoLines,
@@ -433,4 +434,36 @@ test('Pix iguais de pessoas diferentes sem nome no extrato ficam sem dono', () =
   ]
   addPixPayers(lines, pix)
   expect(lines.every((l) => !l.counterparty_doc)).toBe(true)
+})
+
+test('withRetry repete só falhas de conexão e para na 3ª tentativa', async () => {
+  const waits = []
+  const opts = { wait: async (ms) => waits.push(ms), log: () => {} }
+  const fail = (message, transient) => Object.assign(new Error(message), { transient })
+  let n = 0
+  const ok = await withRetry(async () => {
+    n++
+    if (n < 3) throw fail('Sem conexão', true)
+    return 'ok'
+  }, opts)
+  expect(ok).toBe('ok')
+  expect(waits).toEqual([5000, 15000])
+
+  n = 0
+  await expect(
+    withRetry(async () => {
+      n++
+      throw fail('LouvorFlow 401', false)
+    }, opts),
+  ).rejects.toThrow('401')
+  expect(n).toBe(1)
+
+  n = 0
+  await expect(
+    withRetry(async () => {
+      n++
+      throw fail('LouvorFlow 503', true)
+    }, opts),
+  ).rejects.toThrow('503')
+  expect(n).toBe(3)
 })

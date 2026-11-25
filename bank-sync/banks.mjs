@@ -364,3 +364,25 @@ export function addPixPayers(lines, pixList) {
   pass(false)
   return lines
 }
+
+/**
+ * Repete uma chamada ao LouvorFlow quando a conexão cai ("fetch failed", tempo esgotado) ou o
+ * servidor responde 502/503/504 (ex.: reinício do PocketBase durante um deploy). Outros erros
+ * voltam na hora. Repetir o envio do extrato é seguro: o servidor não grava o mesmo movimento
+ * duas vezes.
+ */
+export async function withRetry(
+  fn,
+  { tries = 3, delays = [5000, 15000], wait = sleep, log = console.log } = {},
+) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (!err?.transient || attempt >= tries) throw err
+      const ms = delays[Math.min(attempt - 1, delays.length - 1)]
+      log(`${err.message}; tentando de novo em ${ms / 1000} s.`)
+      await wait(ms)
+    }
+  }
+}
