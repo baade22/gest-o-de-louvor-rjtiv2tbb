@@ -53,6 +53,8 @@ export interface Assembly {
   vote_only_present?: boolean
   /** Texto da ata ajustado à mão (parágrafos separados por linha em branco). */
   minutes_text?: string
+  /** Textos, títulos e tamanho de letra dos outros documentos ajustados à mão (migração 0112). */
+  doc_texts?: DocTexts | null
   created: string
   updated: string
 }
@@ -1012,6 +1014,87 @@ export function requerimentoParagraphs(s: AtaSnapshot): string[] {
     'Seguem, em duas vias: ata da assembleia, edital de convocação, lista de presença, termo de posse e cópia dos documentos de identificação dos eleitos. Declara que foram observados os requisitos legais e estatutários de convocação, instalação e quórum.',
     'Nestes termos, pede deferimento.',
   ]
+}
+
+/* ---------------- documentos editáveis ---------------- */
+
+export type AssemblyDocKind = 'edital' | 'presenca' | 'votantes' | 'ata' | 'posse' | 'requerimento'
+/** Documentos com corpo de texto editável (a ata fica em minutes_text). */
+export type DocBodyKind = 'edital' | 'votantes' | 'ata' | 'posse' | 'requerimento'
+export const DOC_BODY_KINDS: DocBodyKind[] = ['edital', 'votantes', 'ata', 'posse', 'requerimento']
+
+export interface DocTexts {
+  body?: Partial<Record<Exclude<DocBodyKind, 'ata'>, string>>
+  title?: Partial<Record<AssemblyDocKind, string>>
+  /** Tamanho da letra do documento: 1 = normal (0,8 a 1,3). */
+  scale?: Partial<Record<AssemblyDocKind, number>>
+}
+
+export const DOC_SCALE_MIN = 0.8
+export const DOC_SCALE_MAX = 1.3
+
+export function clampScale(n: number | undefined): number {
+  if (!n || !Number.isFinite(n)) return 1
+  return Math.round(Math.min(DOC_SCALE_MAX, Math.max(DOC_SCALE_MIN, n)) * 100) / 100
+}
+
+/** Título automático de cada documento. */
+export function autoDocTitle(kind: AssemblyDocKind, s: AtaSnapshot): string {
+  const a = s.assembly
+  const k = a.kind ? ` ${ASSEMBLY_KIND_LABELS[a.kind]}` : ''
+  switch (kind) {
+    case 'edital':
+      return `Edital de convocação da Assembleia Geral${k}`
+    case 'presenca':
+      return `Lista de presença · Assembleia Geral${k} de ${dateNumeric(a.date)}`
+    case 'votantes':
+      return `Votantes on-line · Assembleia Geral${k} de ${dateNumeric(a.date)}`
+    case 'ata':
+      return `Ata da Assembleia Geral${k} de ${dateNumeric(a.date)}`
+    case 'posse':
+      return 'Termo de posse'
+    default:
+      return ''
+  }
+}
+
+const VOTANTES_INTRO =
+  'Relação das pessoas que votaram pelo link de votação on-line, identificadas por nome completo, CPF e data de nascimento, com a data, a hora e o endereço IP de cada voto. O voto é secreto: o sistema registra quem votou, mas não a escolha de cada um.'
+
+/**
+ * Texto automático do corpo de cada documento, no formato do editor (src/lib/richText.ts):
+ * parágrafos separados por linha em branco, justificados por padrão.
+ */
+export function autoDocBody(kind: DocBodyKind, s: AtaSnapshot, presidentName: string): string {
+  switch (kind) {
+    case 'ata':
+      return ataParagraphs(s).join('\n\n')
+    case 'edital': {
+      const [first, ...rest] = editalParagraphs(s, presidentName)
+      const quorum = rest.pop() || ''
+      // cada linha da pauta vira item de lista numerada
+      const agenda = rest.map((l, i) => (/^\d{1,3}[.)]\s/.test(l) ? l : `${i + 1}. ${l}`))
+      return [first, agenda.join('\n'), quorum].filter(Boolean).join('\n\n')
+    }
+    case 'posse':
+      return posseParagraphs(s).join('\n\n')
+    case 'votantes':
+      return VOTANTES_INTRO
+    case 'requerimento':
+      return [
+        `{esquerda}Ilmo(a). Sr(a). Oficial do Registro Civil das Pessoas Jurídicas${s.church.city ? ` de ${s.church.city.split('/')[0]}` : ''}`,
+        ...requerimentoParagraphs(s),
+      ].join('\n\n')
+  }
+}
+
+/** Corpo salvo à mão (vazio = automático). */
+export function customDocBody(
+  kind: DocBodyKind,
+  a: Pick<Assembly, 'minutes_text' | 'doc_texts'>,
+): string {
+  const v = kind === 'ata' ? a.minutes_text : a.doc_texts?.body?.[kind]
+  return v?.trim() || ''
 }
 
 /* ---------------- votação on-line da chapa ---------------- */

@@ -112,3 +112,27 @@ describe('edição', () => {
     expect(formatAt(r.value, 3)).toEqual({ align: 'center', size: 'large' })
   })
 })
+
+describe('alinhamento padrão justificado (documentos)', () => {
+  it('parágrafo sem marca sai justificado e {esquerda} vale', () => {
+    const b = parseRich('um\n\n{esquerda}dois\n\n{centro}três', 'justify')
+    expect(b.map((x) => x.align)).toEqual(['justify', 'left', 'center'])
+  })
+
+  it('alinhar à esquerda grava {esquerda}; justificar tira a marca', () => {
+    const left = setBlockFormat('texto', 0, 0, { align: 'left' }, 'justify')
+    expect(left.value).toBe('{esquerda}texto')
+    expect(formatAt(left.value, 12, 'justify').align).toBe('left')
+    const back = setBlockFormat(left.value, 0, 0, { align: 'justify' }, 'justify')
+    expect(back.value).toBe('texto')
+  })
+})
+
+describe('lista numerada separada por linha em branco', () => {
+  it('continua a numeração escrita', () => {
+    const b = parseRich('1) um\n\n2) dois')
+    expect(b).toHaveLength(2)
+    expect(b[1]).toMatchObject({ kind: 'ol', start: 2 })
+    expect(b[0]).not.toHaveProperty('start')
+  })
+})

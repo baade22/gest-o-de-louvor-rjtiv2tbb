@@ -90,6 +90,8 @@ export function RichTextEditor({
   placeholder,
   disabled,
   compact,
+  defaultAlign = 'left',
+  previewClassName,
 }: {
   value: string
   onChange: (v: string) => void
@@ -99,13 +101,17 @@ export function RichTextEditor({
   disabled?: boolean
   /** Sem títulos e listas (para textos curtos). */
   compact?: boolean
+  /** Alinhamento dos parágrafos sem marca (documentos usam justificado). */
+  defaultAlign?: RichAlign
+  /** Classes da prévia (cor, tamanho e fonte do lugar onde o texto sai). */
+  previewClassName?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const [preview, setPreview] = useState(false)
   const [panel, setPanel] = useState<'' | 'link' | 'color'>('')
   const [link, setLink] = useState('')
   const [cursor, setCursor] = useState(0)
-  const cur = formatAt(value, cursor)
+  const cur = formatAt(value, cursor, defaultAlign)
 
   const apply = (fn: (v: string, s: number, e: number) => Edit) => {
     const el = ref.current
@@ -123,13 +129,14 @@ export function RichTextEditor({
     })
   }
   const wrap = (open: string, close = open) => apply((v, s, e) => toggleWrap(v, s, e, open, close))
-  const align = (a: RichAlign) => apply((v, s, e) => setBlockFormat(v, s, e, { align: a }))
+  const align = (a: RichAlign) =>
+    apply((v, s, e) => setBlockFormat(v, s, e, { align: a }, defaultAlign))
   const size = (dir: 1 | -1) =>
     apply((v, s, e) => {
-      const now = formatAt(v, s).size
+      const now = formatAt(v, s, defaultAlign).size
       const next =
         dir === 1 ? (now === 'small' ? 'normal' : 'large') : now === 'large' ? 'normal' : 'small'
-      return setBlockFormat(v, s, e, { size: next })
+      return setBlockFormat(v, s, e, { size: next }, defaultAlign)
     })
   const addLink = () => {
     const href = safeLink(link)
@@ -335,9 +342,14 @@ export function RichTextEditor({
 
       {preview ? (
         <div className="site-c min-h-[80px] bg-[#f1f3f6] p-3">
-          <div className="rounded-2xl bg-white p-4 text-[15px] font-medium leading-relaxed text-[#2e3a4e]">
+          <div
+            className={cn(
+              'rounded-2xl bg-white p-4 text-[15px] font-medium leading-relaxed text-[#2e3a4e]',
+              previewClassName,
+            )}
+          >
             {value.trim() ? (
-              <RichText text={value} />
+              <RichText text={value} defaultAlign={defaultAlign} />
             ) : (
               <p className="text-slate-400">Nada escrito ainda.</p>
             )}
