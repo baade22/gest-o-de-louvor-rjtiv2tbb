@@ -33,7 +33,7 @@ export type RichInline =
 type Common = { align: RichAlign; size: RichSize }
 export type RichBlock =
   | (Common & { kind: 'p' | 'h' | 'h3' | 'quote'; text: string })
-  | (Common & { kind: 'ul' | 'ol'; items: string[] })
+  | (Common & { kind: 'ul' | 'ol'; items: string[]; start?: number })
 
 const ALIGN_WORDS: Record<string, RichAlign> = {
   esquerda: 'left',
@@ -108,7 +108,11 @@ export function blockStarts(lines: string[]): number[] {
   return out
 }
 
-export function parseRich(body: string): RichBlock[] {
+/**
+ * `defaultAlign`: alinhamento dos parágrafos sem marca (o site usa esquerda; os documentos da
+ * assembleia, justificado). Com ele diferente de esquerda, {esquerda} passa a valer.
+ */
+export function parseRich(body: string, defaultAlign: RichAlign = 'left'): RichBlock[] {
   const out: RichBlock[] = []
   let cur: RichBlock | null = null
   const flush = () => {
@@ -123,7 +127,7 @@ export function parseRich(body: string): RichBlock[] {
       continue
     }
     const c = cur as RichBlock | null
-    const fmt = { align: align || 'left', size: size || 'normal' } as Common
+    const fmt = { align: align || defaultAlign, size: size || 'normal' } as Common
     if (kind === 'h' || kind === 'h3') {
       flush()
       out.push({ kind, text, ...fmt })
@@ -133,7 +137,9 @@ export function parseRich(body: string): RichBlock[] {
       if (c && c.kind === kind) c.items.push(text)
       else {
         flush()
-        cur = { kind, items: [text], ...fmt }
+        // lista numerada começa no número escrito (itens separados por linha em branco seguem 1, 2, 3)
+        const n = kind === 'ol' ? Number(/^\s*(\d{1,3})/.exec(rest)?.[1] || 1) : undefined
+        cur = { kind, items: [text], ...fmt, ...(n && n > 1 ? { start: n } : {}) }
       }
       continue
     }
@@ -286,6 +292,7 @@ export function setBlockFormat(
   start: number,
   end: number,
   fmt: { align?: RichAlign; size?: RichSize },
+  defaultAlign: RichAlign = 'left',
 ): Edit {
   const lines = v.split('\n')
   const whole = start === end
@@ -307,9 +314,11 @@ export function setBlockFormat(
   const out = lines.map((line, i) => {
     if (!targets.has(i)) return line
     const sm = splitMarks(line)
-    const align = fmt.align ?? sm.align ?? 'left'
+    const align = fmt.align ?? sm.align ?? defaultAlign
     const size = fmt.size ?? sm.size ?? 'normal'
-    return ALIGN_MARK[align] + SIZE_MARK[size] + sm.rest.replace(/^\s+/, '')
+    // o alinhamento padrão fica sem marca; esquerda ganha {esquerda} quando o padrão é outro
+    const mark = align === defaultAlign ? '' : ALIGN_MARK[align] || '{esquerda}'
+    return mark + SIZE_MARK[size] + sm.rest.replace(/^\s+/, '')
   })
   const value = out.join('\n')
   if (whole)
@@ -320,11 +329,11 @@ export function setBlockFormat(
 }
 
 /** Alinhamento e tamanho do bloco onde está o cursor (para acender o botão certo). */
-export function formatAt(v: string, pos: number): Common {
+export function formatAt(v: string, pos: number, defaultAlign: RichAlign = 'left'): Common {
   const lines = v.split('\n')
   const line = v.slice(0, pos).split('\n').length - 1
   let owner = -1
   for (const s of blockStarts(lines)) if (s <= line) owner = s
   const sm = owner >= 0 ? splitMarks(lines[owner]) : { align: undefined, size: undefined }
-  return { align: sm.align || 'left', size: sm.size || 'normal' }
+  return { align: sm.align || defaultAlign, size: sm.size || 'normal' }
 }

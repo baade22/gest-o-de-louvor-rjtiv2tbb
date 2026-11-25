@@ -12,6 +12,8 @@ import {
   buildSnapshot,
   dateInWords,
   editalParagraphs,
+  autoDocBody,
+  customDocBody,
   electedList,
   formatCPF,
   genderize,
@@ -159,7 +161,11 @@ describe('apuração', () => {
   })
 
   it('maioria absoluta é sobre os votos válidos', () => {
-    const r = tallyItem({ kind: 'ELEICAO', seats: 1, majority: 'ABSOLUTA', votes_blank: 5 }, cands, 80)
+    const r = tallyItem(
+      { kind: 'ELEICAO', seats: 1, majority: 'ABSOLUTA', votes_blank: 5 },
+      cands,
+      80,
+    )
     expect(r.valid).toBe(75)
     expect(r.needed).toBe(38)
     expect(r.electedIds).toEqual(['a'])
@@ -194,7 +200,9 @@ describe('apuração', () => {
   })
 
   it('recondução: sim contra não, ou maioria qualificada', () => {
-    expect(tallyItem({ kind: 'REFERENDO', votes_yes: 50, votes_no: 20 }, [], 80).approved).toBe(true)
+    expect(tallyItem({ kind: 'REFERENDO', votes_yes: 50, votes_no: 20 }, [], 80).approved).toBe(
+      true,
+    )
     expect(tallyItem({ kind: 'REFERENDO', votes_yes: 20, votes_no: 20 }, [], 80).tie).toBe(true)
     const two = tallyItem(
       { kind: 'REFERENDO', majority: 'DOIS_TERCOS', votes_yes: 50, votes_no: 25, votes_abstain: 5 },
@@ -261,7 +269,12 @@ describe('ata', () => {
     person_id: pid,
     voter: true,
   }))
-  const people = [full, sec, person({ id: 'p3', name: 'Ana Lima' }), person({ id: 'p4', name: 'Rui Alves' })]
+  const people = [
+    full,
+    sec,
+    person({ id: 'p3', name: 'Ana Lima' }),
+    person({ id: 'p4', name: 'Rui Alves' }),
+  ]
   const snap = buildSnapshot({
     church: {
       name: 'Igreja Batista Missionária em Aldeia',
@@ -293,21 +306,33 @@ describe('ata', () => {
 
   it('monta a ata com abertura, quórum, resultado, qualificação e encerramento', () => {
     const text = ataParagraphs(snap).join('\n')
-    expect(text).toContain('Aos vinte e dois dias do mês de novembro do ano de dois mil e vinte e seis, às 19h, em templo sede')
+    expect(text).toContain(
+      'Aos vinte e dois dias do mês de novembro do ano de dois mil e vinte e seis, às 19h, em templo sede',
+    )
     expect(text).toContain('em primeira convocação')
-    expect(text).toContain('Estavam presentes 3 pessoas, das quais 3 membros com direito a voto, de um total de 4 membros votantes')
-    expect(text).toContain('nos termos do estatuto social, registrado no Cartório de Pessoas Jurídicas sob o nº 100, fls. 1.')
+    expect(text).toContain(
+      'Estavam presentes 3 pessoas, das quais 3 membros com direito a voto, de um total de 4 membros votantes',
+    )
+    expect(text).toContain(
+      'nos termos do estatuto social, registrado no Cartório de Pessoas Jurídicas sob o nº 100, fls. 1.',
+    )
     expect(text).toContain(
       'A senhora presidente, Maria da Silva, iniciou os trabalhos fazendo uma oração, convidou José Souza para secretariar',
     )
     expect(text).toContain('o motivo de sua convocação: PASTOR PRESIDENTE.')
-    expect(text).toContain('Maria da Silva colocou o cargo de Pastor Presidente à disposição da assembleia')
+    expect(text).toContain(
+      'Maria da Silva colocou o cargo de Pastor Presidente à disposição da assembleia',
+    )
     expect(text).toContain('3 votos favoráveis, 0 votos contrários')
     expect(text).toContain('para o mandato de 01/01/2027 a 31/12/2028')
-    expect(text).toContain('Qualificação da eleita para o cargo de Pastor Presidente: MARIA DA SILVA, brasileira, casada')
+    expect(text).toContain(
+      'Qualificação da eleita para o cargo de Pastor Presidente: MARIA DA SILVA, brasileira, casada',
+    )
     expect(text).toContain('a eleita foi empossada')
     expect(text).toContain('deu por encerrada a assembleia às 21h15')
-    expect(text).toContain('lavrada por mim, José Souza, secretário, e, lida e aprovada, vai assinada por mim, pela senhora presidente.')
+    expect(text).toContain(
+      'lavrada por mim, José Souza, secretário, e, lida e aprovada, vai assinada por mim, pela senhora presidente.',
+    )
   })
 
   it('monta o bloco da nova diretoria como na ata de 2022', () => {
@@ -316,13 +341,54 @@ describe('ata', () => {
       church: { name: 'Igreja Batista Missionária em Aldeia' },
       assembly,
       items: [
-        { id: 'b1', church_id: 'c', assembly_id: 'as', order: 1, kind: 'ELEICAO', title: 'Presidente', seats: 1, method: 'ACLAMACAO', ...term },
-        { id: 'b2', church_id: 'c', assembly_id: 'as', order: 2, kind: 'ELEICAO', title: 'Conselho Fiscal', seats: 2, method: 'ACLAMACAO', ...term },
+        {
+          id: 'b1',
+          church_id: 'c',
+          assembly_id: 'as',
+          order: 1,
+          kind: 'ELEICAO',
+          title: 'Presidente',
+          seats: 1,
+          method: 'ACLAMACAO',
+          ...term,
+        },
+        {
+          id: 'b2',
+          church_id: 'c',
+          assembly_id: 'as',
+          order: 2,
+          kind: 'ELEICAO',
+          title: 'Conselho Fiscal',
+          seats: 2,
+          method: 'ACLAMACAO',
+          ...term,
+        },
       ],
       candidates: [
-        { id: 'x1', church_id: 'c', assembly_id: 'as', item_id: 'b1', person_id: 'p1', elected: true },
-        { id: 'x2', church_id: 'c', assembly_id: 'as', item_id: 'b2', person_id: 'p3', elected: true },
-        { id: 'x3', church_id: 'c', assembly_id: 'as', item_id: 'b2', person_id: 'p4', elected: true },
+        {
+          id: 'x1',
+          church_id: 'c',
+          assembly_id: 'as',
+          item_id: 'b1',
+          person_id: 'p1',
+          elected: true,
+        },
+        {
+          id: 'x2',
+          church_id: 'c',
+          assembly_id: 'as',
+          item_id: 'b2',
+          person_id: 'p3',
+          elected: true,
+        },
+        {
+          id: 'x3',
+          church_id: 'c',
+          assembly_id: 'as',
+          item_id: 'b2',
+          person_id: 'p4',
+          elected: true,
+        },
       ],
       attendees,
       people,
@@ -333,11 +399,16 @@ describe('ata', () => {
     )
     expect(text).toContain('CONSELHO FISCAL: ANA LIMA')
     expect(text).toContain('e por toda a diretoria eleita e empossada.')
-    expect(mandateLabel('2027-01-01', '2028-12-31')).toBe('BIÊNIO 2027-2028 (de 01/01/2027 a 31/12/2028)')
+    expect(mandateLabel('2027-01-01', '2028-12-31')).toBe(
+      'BIÊNIO 2027-2028 (de 01/01/2027 a 31/12/2028)',
+    )
   })
 
   it('edital e termo de posse', () => {
     const ed = editalParagraphs(snap, 'Maria da Silva')
+    const edBody = autoDocBody('edital', snap, 'Maria da Silva').split('\n\n')
+    expect(edBody).toHaveLength(3)
+    expect(edBody[1].split('\n').every((l) => /^\d+[.)] /.test(l))).toBe(true)
     expect(ed[0]).toContain('em primeira convocação às 19h e em segunda convocação às 19h30')
     expect(ed[1]).toBe('1) Pastor Presidente')
     expect(posseParagraphs(snap)[0]).toContain('eleita para o cargo de Pastor Presidente')
@@ -385,7 +456,11 @@ describe('votação on-line da chapa', () => {
   })
 
   it('lança o mesmo resultado em cada cargo da chapa', () => {
-    const items = [item('Presidente', 'REFERENDO'), item('Conselho', 'ELEICAO'), item('Pauta', 'DELIBERACAO')]
+    const items = [
+      item('Presidente', 'REFERENDO'),
+      item('Conselho', 'ELEICAO'),
+      item('Pauta', 'DELIBERACAO'),
+    ]
     const cands = [cand('a', 'Presidente'), cand('b', 'Conselho'), cand('c', 'Conselho')]
     const out = onlineResultPatches(items, cands, { SIM: 30, NAO: 2, ABSTENCAO: 1 })
     expect(out.map((o) => o.item.id)).toEqual(['Presidente', 'Conselho'])
@@ -407,7 +482,11 @@ describe('votação on-line da chapa', () => {
   })
 
   it('chapa rejeitada não elege ninguém', () => {
-    const out = onlineResultPatches([item('X', 'ELEICAO')], [cand('a', 'X')], { SIM: 2, NAO: 5, ABSTENCAO: 0 })
+    const out = onlineResultPatches([item('X', 'ELEICAO')], [cand('a', 'X')], {
+      SIM: 2,
+      NAO: 5,
+      ABSTENCAO: 0,
+    })
     expect(out[0].patch.approved).toBe(false)
     expect(out[0].candidates[0].elected).toBe(false)
   })
@@ -421,5 +500,13 @@ describe('texto da ata editado', () => {
   it('usa o texto editado, com um parágrafo por bloco', () => {
     const s = { assembly: { minutes_text: 'Primeiro\nparágrafo.\n\n\nSegundo.' } } as never
     expect(ataText(s)).toEqual(['Primeiro parágrafo.', 'Segundo.'])
+  })
+})
+
+describe('documentos editáveis', () => {
+  it('texto salvo à mão vale; vazio volta ao automático', () => {
+    expect(customDocBody('ata', { minutes_text: '  Ata  ' })).toBe('Ata')
+    expect(customDocBody('edital', { doc_texts: { body: { edital: 'Edital' } } })).toBe('Edital')
+    expect(customDocBody('posse', { doc_texts: { body: { posse: '  ' } } })).toBe('')
   })
 })

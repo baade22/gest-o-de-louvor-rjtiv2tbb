@@ -106,6 +106,7 @@ function Block({ b }: { b: RichBlock }) {
       const List = b.kind === 'ul' ? 'ul' : 'ol'
       return (
         <List
+          start={b.kind === 'ol' ? b.start : undefined}
           className={cn(
             'space-y-1 pl-5',
             b.kind === 'ul' ? 'list-disc' : 'list-decimal',
@@ -131,8 +132,17 @@ function Block({ b }: { b: RichBlock }) {
 }
 
 /** Texto formatado. `className` vai no contêiner (cor, tamanho base e espaço entre parágrafos). */
-export function RichText({ text, className }: { text: string; className?: string }) {
-  const blocks = parseRich(text)
+export function RichText({
+  text,
+  className,
+  defaultAlign,
+}: {
+  text: string
+  className?: string
+  /** Alinhamento dos parágrafos sem marca (padrão: esquerda). */
+  defaultAlign?: RichAlign
+}) {
+  const blocks = parseRich(text, defaultAlign)
   if (!blocks.length) return null
   return (
     <div lang="pt-BR" className={cn('space-y-3', className)}>
