@@ -75,7 +75,12 @@ Quem preferir deixar as credenciais só no GitHub ainda pode: no servidor, crie 
 segredo do GitHub; depois crie os segredos `CORA_CLIENT_ID`, `CORA_CERT`, `CORA_KEY`,
 `BRADESCO_CLIENT_ID`, `BRADESCO_CLIENT_SECRET`, `BRADESCO_CERT`, `BRADESCO_KEY` (com sufixo,
 ex.: `CORA_DIAMANTE_CERT`, para conjuntos com nome). O conector usa as credenciais do
-LouvorFlow quando existem e, se não, as dos segredos. `BANK_SYNC_GITHUB_REPO` e
+LouvorFlow quando existem e, se não, as dos segredos. O workflow só entrega ao conector os
+segredos que ele lista pelo nome (os do deploy ficam de fora): um segredo com sufixo precisa
+ganhar a sua linha em `.github/workflows/bank-sync.yml`.
+
+Se a conexão com o LouvorFlow cair no meio (ex.: o servidor reiniciando num deploy), o conector
+tenta de novo duas vezes, depois de 5 s e de 15 s, antes de marcar a rodada como falha. `BANK_SYNC_GITHUB_REPO` e
 `BANK_SYNC_GITHUB_TOKEN` no servidor também continuam valendo para o "Atualizar agora".
 
 ## Rodar em outro computador

@@ -2,6 +2,8 @@
 # Configure os segredos do repositório (Settings > Secrets and variables > Actions):
 #   LOUVORFLOW_URL e BANK_SYNC_TOKEN (gerados em Configurações > Integrações > Bancos).
 # As credenciais dos bancos vêm do LouvorFlow; os segredos CORA_* e BRADESCO_* são opcionais.
+# Só os segredos listados no passo "Buscar saldos e extratos" chegam ao conector; uma credencial
+# com sufixo (ex.: CORA_DIAMANTE_*) precisa ganhar a sua linha lá.
 # Sem LOUVORFLOW_URL e BANK_SYNC_TOKEN o job termina sem fazer nada. Detalhes em bank-sync/README.md.
 name: Conector bancário
 
@@ -24,13 +26,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           sparse-checkout: bank-sync
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - name: Buscar saldos e extratos
         run: node bank-sync/sync.mjs
         env:
-          BANK_SYNC_SECRETS: ${{ toJSON(secrets) }}
+          # Cada segredo pelo nome: o conector não recebe os segredos do deploy (chave SSH etc.)
+          LOUVORFLOW_URL: ${{ secrets.LOUVORFLOW_URL }}
+          BANK_SYNC_TOKEN: ${{ secrets.BANK_SYNC_TOKEN }}
+          CORA_CLIENT_ID: ${{ secrets.CORA_CLIENT_ID }}
+          CORA_CERT: ${{ secrets.CORA_CERT }}
+          CORA_KEY: ${{ secrets.CORA_KEY }}
+          BRADESCO_CLIENT_ID: ${{ secrets.BRADESCO_CLIENT_ID }}
+          BRADESCO_CLIENT_SECRET: ${{ secrets.BRADESCO_CLIENT_SECRET }}
+          BRADESCO_CERT: ${{ secrets.BRADESCO_CERT }}
+          BRADESCO_KEY: ${{ secrets.BRADESCO_KEY }}
+          BRADESCO_PIX_CLIENT_ID: ${{ secrets.BRADESCO_PIX_CLIENT_ID }}
+          BRADESCO_PIX_CLIENT_SECRET: ${{ secrets.BRADESCO_PIX_CLIENT_SECRET }}
