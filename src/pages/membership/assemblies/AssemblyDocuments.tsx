@@ -444,7 +444,7 @@ export default function AssemblyDocuments() {
   } else {
     body = (
       <>
-        {title && <p className="mb-[8mm] text-center text-[1.13em] font-bold uppercase">{title}</p>}
+        <Head s={snap} title={title} />
         <DocBody text={text} />
         <p className="mt-[10mm] text-right">{placeDate(snap, getLocalTodayYMD())}</p>
         <div className="mt-[18mm] flex justify-center">
@@ -523,19 +523,17 @@ export default function AssemblyDocuments() {
                 automáticos. Deixe uma linha em branco entre um parágrafo e outro.
               </p>
             </div>
-            {kind !== 'requerimento' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="doc-title" className="text-sm font-semibold text-slate-700">
-                  Título
-                </Label>
-                <Input
-                  id="doc-title"
-                  value={edit.title}
-                  onChange={(e) => setEdit({ ...edit, title: e.target.value })}
-                  className="rounded-xl"
-                />
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="doc-title" className="text-sm font-semibold text-slate-700">
+                Título
+              </Label>
+              <Input
+                id="doc-title"
+                value={edit.title}
+                onChange={(e) => setEdit({ ...edit, title: e.target.value })}
+                className="rounded-xl"
+              />
+            </div>
             {isBody(kind) && (
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-slate-700">Texto</p>
