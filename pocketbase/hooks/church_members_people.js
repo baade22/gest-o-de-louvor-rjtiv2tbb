@@ -40,7 +40,9 @@ const churchMemberPeopleSync = (e) => {
     if (email) {
       const byEmail = e.app.findRecordsByFilter(
         'people',
-        "church_id = {:c} && email = {:e} && user_id = ''",
+        // Também a ficha que só tinha a conta do app do membro (e-mail técnico @membros.invalid,
+        // member_area.js): ela passa para a conta da equipe
+        "church_id = {:c} && email = {:e} && (user_id = '' || user_id.email ~ '@membros.invalid')",
         '',
         1,
         0,

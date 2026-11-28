@@ -164,7 +164,7 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
   const DAILY_AFTER = 250
   const BULK_SHARE = 0.7 // avisos em massa e parabéns: até 70% do limite do dia
   const BULK_KINDS = ['AVISO', 'ANIVERSARIO', 'CASAMENTO']
-  const FREE_KINDS = ['TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR'] // não contam
+  const FREE_KINDS = ['TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR', 'CODIGO'] // não contam
   const FAIL_PAUSE = 5
   const PAUSE_MS = 15 * 60 * 1000
   const BRT = 3 * 3600 * 1000
@@ -281,7 +281,7 @@ cronAdd('whatsapp_send_queue', '* * * * *', () => {
             c.dailySent = $app.countRecords(
               'whatsapp_messages',
               $dbx.exp(
-                "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR')",
+                "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR', 'CODIGO')",
                 {
                   c: churchId,
                   d: new Date(brtDayStart(Date.now())).toISOString().replace('T', ' '),
