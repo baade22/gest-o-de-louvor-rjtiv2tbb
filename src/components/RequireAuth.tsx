@@ -1,6 +1,7 @@
 import React from 'react'
 import { Navigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { isMemberOnlyAccount } from '@/lib/memberArea'
 import { ShieldAlert, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -35,7 +36,7 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
   requireRole,
   requirePermission,
 }) => {
-  const { isAuthenticated, isLoading, isMaster, can, canAny } = useAuth()
+  const { isAuthenticated, isLoading, isMaster, can, canAny, user } = useAuth()
   const location = useLocation()
 
   if (isLoading) {
@@ -51,6 +52,11 @@ export const RequireAuth: React.FC<RouteGuardProps> = ({
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // Conta do app do membro (entrou pelo código do WhatsApp): não usa o LouvorFlow
+  if (isMemberOnlyAccount(user?.email)) {
+    return <Navigate to="/igreja/eu" replace />
   }
 
   if (requireRole === 'MASTER' && !isMaster) {

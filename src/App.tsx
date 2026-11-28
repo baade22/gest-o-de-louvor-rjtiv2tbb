@@ -90,6 +90,10 @@ import SiteBible from '@/pages/site/SiteBible'
 import SiteHymnal from '@/pages/site/SiteHymnal'
 import SiteInstall from '@/pages/site/SiteInstall'
 import SiteMe from '@/pages/site/SiteMe'
+import MemberData from '@/pages/site/member/MemberData'
+import MemberFamily from '@/pages/site/member/MemberFamily'
+import MemberCard from '@/pages/site/member/MemberCard'
+import CardCheck from '@/pages/site/member/CardCheck'
 import SiteAdmin from '@/pages/site/SiteAdmin'
 import SitePrayers from '@/pages/site/SitePrayers'
 
@@ -153,6 +157,10 @@ const App = () => (
             <Route path="hinario/:id" element={<SiteHymnal />} />
             <Route path="instalar" element={<SiteInstall />} />
             <Route path="eu" element={<SiteMe />} />
+            <Route path="eu/dados" element={<MemberData />} />
+            <Route path="eu/familia" element={<MemberFamily />} />
+            <Route path="eu/carteirinha" element={<MemberCard />} />
+            <Route path="carteirinha/:code" element={<CardCheck />} />
           </Route>
 
           {/* Authenticated Layout and Routes */}

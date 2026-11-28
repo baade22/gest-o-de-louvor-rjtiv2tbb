@@ -67,7 +67,7 @@ export const WHATSAPP_AUTO: Array<{
 ]
 
 export const WHATSAPP_KIND_LABEL: Record<
-  WhatsAppAutoKind | 'TESTE' | 'AVISO' | 'EVENTO_MENSAGEM',
+  WhatsAppAutoKind | 'TESTE' | 'AVISO' | 'EVENTO_MENSAGEM' | 'CODIGO',
   string
 > = {
   ESCALA: 'Escala',
@@ -81,6 +81,7 @@ export const WHATSAPP_KIND_LABEL: Record<
   EVENTO_MENSAGEM: 'Mensagem do evento',
   TESTE: 'Teste',
   AVISO: 'Aviso',
+  CODIGO: 'Código de entrada no app',
 }
 
 /** Número como o servidor guarda (55 + DDD + número) ou vazio quando não dá. */

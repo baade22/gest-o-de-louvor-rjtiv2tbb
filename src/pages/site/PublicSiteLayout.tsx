@@ -27,6 +27,7 @@ import {
   X,
   Youtube,
 } from 'lucide-react'
+import pb from '@/lib/pocketbase/client'
 import { cn } from '@/lib/utils'
 import {
   DEFAULT_ACCENT,
@@ -270,6 +271,7 @@ export default function PublicSiteLayout() {
     '--sa-text': contrastText(accent),
   } as CSSProperties
   const tabs = TABS.filter((t) => !t.section || site.sections[t.section])
+  const logged = pb.authStore.isValid
   const isTab = (p: string) => {
     const full = `/igreja${p}`
     return p === ''
@@ -369,7 +371,7 @@ export default function PublicSiteLayout() {
           .filter((t) => t.path && t.path !== '/eu')
           .map((t) => ({ to: ctx.to(t.path), label: t.label, icon: t.icon })),
         { to: ctx.to('/instalar'), label: 'Instalar o app', icon: Share },
-        { to: ctx.to('/eu'), label: 'Entrar', icon: LogIn },
+        { to: ctx.to('/eu'), label: logged ? 'Área do membro' : 'Entrar', icon: LogIn },
       ],
     },
   ].filter((g) => g.items.length > 0)
@@ -416,10 +418,11 @@ export default function PublicSiteLayout() {
               </Link>
             ))}
             <Link
-              to="/login"
+              to={ctx.to('/eu')}
               className="inline-flex items-center gap-2 rounded-full bg-[var(--c-navy)] px-5 py-2.5 text-[var(--sp-text)]"
             >
-              <LogIn className="h-4 w-4" /> Entrar
+              {logged ? <UserRound className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+              {logged ? 'Eu' : 'Entrar'}
             </Link>
           </nav>
           <button

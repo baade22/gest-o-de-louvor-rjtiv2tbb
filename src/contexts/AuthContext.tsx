@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { isMemberOnlyAccount } from '@/lib/memberArea'
 import pb from '@/lib/pocketbase/client'
 import type { User, Church, ChurchMember, AppRole, OperationalRole, UserPermissions } from '@/types'
 
@@ -128,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setOperationalRoles(ops)
           }
         }
-      } else {
+      } else if (!isMemberOnlyAccount(currentUser.email)) {
         const allChurches = await pb.collection('churches').getList<Church>(1, 1, {
           filter: 'is_active = true',
         })

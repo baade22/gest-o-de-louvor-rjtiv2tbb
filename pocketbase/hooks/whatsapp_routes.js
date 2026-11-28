@@ -233,7 +233,7 @@ routerAdd(
         sent = $app.countRecords(
           'whatsapp_messages',
           $dbx.exp(
-            "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR')",
+            "church_id = {:c} AND status = 'ENVIADO' AND sent_at >= {:d} AND kind NOT IN ('TESTE', 'COMPROVANTE', 'CONTATO', 'CONECTOR', 'CODIGO')",
             { c: churchId, d: new Date(dayStart(Date.now())).toISOString().replace('T', ' ') },
           ),
         )
