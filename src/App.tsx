@@ -93,6 +93,7 @@ import SiteMe from '@/pages/site/SiteMe'
 import MemberData from '@/pages/site/member/MemberData'
 import MemberFamily from '@/pages/site/member/MemberFamily'
 import MemberCard from '@/pages/site/member/MemberCard'
+import MemberGiving from '@/pages/site/member/MemberGiving'
 import CardCheck from '@/pages/site/member/CardCheck'
 import SiteAdmin from '@/pages/site/SiteAdmin'
 import SitePrayers from '@/pages/site/SitePrayers'
@@ -160,6 +161,7 @@ const App = () => (
             <Route path="eu/dados" element={<MemberData />} />
             <Route path="eu/familia" element={<MemberFamily />} />
             <Route path="eu/carteirinha" element={<MemberCard />} />
+            <Route path="eu/contribuicoes" element={<MemberGiving />} />
             <Route path="carteirinha/:code" element={<CardCheck />} />
           </Route>
 

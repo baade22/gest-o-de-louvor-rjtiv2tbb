@@ -2,6 +2,7 @@
 
 import pb from '@/lib/pocketbase/client'
 import type { RecordModel } from 'pocketbase'
+import type { FinPaymentMethod } from '@/types/finance'
 
 export interface MemberCodeResult {
   sent: boolean
@@ -184,4 +185,40 @@ export async function refreshMemberSession(): Promise<boolean> {
     if ((err as { status?: number }).status === 401) pb.authStore.clear()
     return pb.authStore.isValid
   }
+}
+
+export interface MemberGivingItem {
+  id: string
+  type: 'ENTRADA'
+  status: 'CONFIRMADO'
+  is_anonymous: false
+  person_id: string
+  date: string
+  amount_cents: number
+  category_id: string
+  campaign: string
+  payment_method: FinPaymentMethod | ''
+  from_count: boolean
+}
+
+export interface MemberGiving {
+  church_name: string
+  today: string
+  person: { id: string; name: string; document: string }
+  categories: { id: string; name: string; is_contribution: true }[]
+  /** Só o que já vale no saldo (conciliado), do mais recente ao mais antigo. */
+  items: MemberGivingItem[]
+  settings: {
+    legal_name: string
+    cnpj: string
+    address: string
+    city: string
+    statement_note: string
+  } | null
+  signers: { id: string; name: string; title: string; document: string; is_active: true }[]
+}
+
+export function getMemberGiving(slug: string): Promise<MemberGiving> {
+  const q = slug ? `?slug=${encodeURIComponent(slug)}` : ''
+  return pb.send<MemberGiving>(`/backend/v1/member/giving${q}`, { method: 'GET' })
 }

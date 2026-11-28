@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  centsFromTyping,
   daysUntil,
+  giveMessage,
+  giveTxid,
+  giveTypes,
+  givingLine,
   familyLine,
   firstName,
   formatCpfInput,
@@ -66,5 +71,39 @@ describe('área do membro', () => {
     expect(missingLabel(['CPF', 'endereço', 'cidade', 'bairro', 'CEP'])).toBe(
       'Faltam CPF, endereço, cidade e mais 2',
     )
+  })
+})
+
+describe('contribuir logado', () => {
+  it('monta os tipos com as campanhas públicas', () => {
+    expect(giveTypes([{ id: 'abc', name: 'Reforma' }])).toEqual([
+      { id: 'DIZIMO', label: 'Dízimo' },
+      { id: 'OFERTA', label: 'Oferta' },
+      { id: 'CAMPabc', label: 'Reforma' },
+    ])
+  })
+
+  it('lê o valor pelos centavos, como no app do banco', () => {
+    expect(centsFromTyping('R$ 350,00')).toBe(35000)
+    expect(centsFromTyping('5')).toBe(5)
+    expect(centsFromTyping('')).toBe(0)
+    expect(centsFromTyping('000120')).toBe(120)
+    expect(centsFromTyping('12345678901')).toBe(123456789)
+  })
+
+  it('o identificador do Pix não leva dado pessoal', () => {
+    expect(giveTxid('DIZIMO')).toBe('DIZIMO')
+    expect(giveTxid('CAMPx1y2z3-abcdefghijklmnop')).toBe('CAMPx1y2z3abcdefghijklmno')
+    expect(giveMessage('Dízimo', 'Ana Souza')).toBe('Dízimo - Ana Souza')
+  })
+
+  it('descreve cada contribuição', () => {
+    expect(givingLine({ date: '2026-11-04 12:00:00', payment_method: 'PIX' }, 2026)).toBe(
+      '04/11 · Pix',
+    )
+    expect(givingLine({ date: '2025-09-05', from_count: true }, 2026)).toBe(
+      '05/09/2025 · Envelope no culto',
+    )
+    expect(givingLine({ date: '2026-01-02', payment_method: '' }, 2026)).toBe('02/01')
   })
 })

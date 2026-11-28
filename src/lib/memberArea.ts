@@ -120,3 +120,55 @@ export function missingLabel(missing: string[]): string {
 export function cardCheckPath(code: string): string {
   return `/igreja/carteirinha/${encodeURIComponent(code)}`
 }
+
+// ---- Contribuir logado (etapa 2) ----
+
+/** O que a pessoa escolhe ao contribuir: dízimo, oferta ou uma campanha pública. */
+export interface GiveType {
+  id: string
+  label: string
+}
+
+export function giveTypes(campaigns: { id: string; name: string }[]): GiveType[] {
+  return [
+    { id: 'DIZIMO', label: 'Dízimo' },
+    { id: 'OFERTA', label: 'Oferta' },
+    ...campaigns.map((c) => ({ id: `CAMP${c.id}`, label: c.name })),
+  ]
+}
+
+/** Valor digitado como no app do banco: os números entram pelos centavos ("35000" = R$ 350,00). */
+export function centsFromTyping(v: string): number {
+  const digits = v.replace(/\D/g, '').replace(/^0+/, '').slice(0, 9)
+  return digits ? Number(digits) : 0
+}
+
+/** Identificador do Pix (até 25 letras e números): o tipo escolhido, sem dado pessoal. */
+export function giveTxid(typeId: string): string {
+  return typeId.replace(/[^A-Za-z0-9]/g, '').slice(0, 25)
+}
+
+/** Mensagem que o banco mostra: o tipo e o nome de quem contribui. */
+export function giveMessage(label: string, name: string): string {
+  return `${label} - ${name}`.trim()
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  DINHEIRO: 'Dinheiro',
+  PIX: 'Pix',
+  CARTAO: 'Cartão',
+  TRANSFERENCIA: 'Transferência',
+  BOLETO: 'Boleto',
+  CHEQUE: 'Cheque',
+}
+
+/** "04/11 · Pix", "05/09/2025 · Envelope no culto" */
+export function givingLine(
+  tx: { date: string; payment_method?: string; from_count?: boolean },
+  currentYear: number,
+): string {
+  const [y, m, d] = tx.date.slice(0, 10).split('-')
+  const date = Number(y) === currentYear ? `${d}/${m}` : `${d}/${m}/${y}`
+  const how = tx.from_count ? 'Envelope no culto' : METHOD_LABEL[tx.payment_method || ''] || ''
+  return [date, how].filter(Boolean).join(' · ')
+}
