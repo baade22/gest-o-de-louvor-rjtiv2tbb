@@ -8,6 +8,8 @@
 //   GET  /backend/v1/member/me?slug=        painel, dados, família, carteirinha, escala
 //   POST /backend/v1/member/me              grava os campos pessoais
 //   POST /backend/v1/member/family          pede a inclusão de um familiar (vai para aprovação)
+//   GET  /backend/v1/member/giving?slug=    minhas contribuições (só o que já vale no saldo) e
+//                                           os dados do informe anual
 // Carteirinha:
 //   GET  /backend/v1/public/member/card?c=  diz se a carteirinha do QR é válida
 //
@@ -881,6 +883,205 @@ routerAdd(
       return e.json(500, { message: 'Não foi possível enviar agora.' })
     }
     return e.json(200, { ok: true })
+  },
+  $apis.requireAuth(),
+)
+
+// Minhas contribuições: as entradas com o nome da pessoa, em categoria de contribuição, que já
+// valem no saldo (na conta bancária, só depois de conciliadas com o extrato; antes do início da
+// conciliação da conta, em caixa e em fundo, vale tudo, como em realizedBalance.ts). Nunca
+// aparece o que está "a conciliar". Anônimas e estornadas nunca entram.
+routerAdd(
+  'GET',
+  '/backend/v1/member/giving',
+  (e) => {
+    const q = e.requestInfo().query || {}
+    const slug = String(q.slug || '')
+      .trim()
+      .toLowerCase()
+    let churchId = ''
+    try {
+      const list = slug
+        ? $app.findRecordsByFilter('site_settings', 'published = true && slug = {:s}', '', 1, 0, {
+            s: slug,
+          })
+        : $app.findRecordsByFilter('site_settings', 'published = true', 'created', 1, 0)
+      if (list.length) churchId = list[0].getString('church_id')
+    } catch (_) {}
+    if (!churchId) return e.json(404, { message: 'Site não encontrado.' })
+    let person = null
+    try {
+      const list = $app.findRecordsByFilter(
+        'people',
+        'church_id = {:c} && user_id = {:u}',
+        '',
+        1,
+        0,
+        { c: churchId, u: e.auth.id },
+      )
+      person = list.length ? list[0] : null
+    } catch (_) {}
+    if (!person) {
+      return e.json(404, {
+        no_profile: true,
+        message: 'Sua conta ainda não tem ficha nesta igreja. Fale com a secretaria.',
+      })
+    }
+
+    const BRT = 3 * 3600 * 1000
+    const today = new Date(Date.now() - BRT).toISOString().slice(0, 10)
+    const fromYear = Number(today.slice(0, 4)) - 5
+
+    let churchName = ''
+    try {
+      churchName = $app.findRecordById('churches', churchId).getString('name')
+    } catch (_) {}
+
+    // Categorias de contribuição (dízimo, ofertas, missões...)
+    const categories = []
+    const catName = {}
+    try {
+      const cats = $app.findRecordsByFilter(
+        'fin_categories',
+        'church_id = {:c} && is_contribution = true',
+        'name',
+        0,
+        0,
+        { c: churchId },
+      )
+      for (const c of cats) {
+        catName[c.id] = c.getString('name')
+        categories.push({ id: c.id, name: c.getString('name'), is_contribution: true })
+      }
+    } catch (_) {}
+
+    // Onde a conciliação de cada conta começa (o primeiro movimento do extrato que entra nela)
+    const starts = {}
+    const startOf = (accountId) => {
+      if (starts[accountId]) return starts[accountId]
+      const s = { day: '', fund: false }
+      try {
+        const first = $app.findRecordsByFilter(
+          'fin_bank_lines',
+          "church_id = {:c} && account_id = {:a} && status != 'EXTRATO'",
+          'date',
+          1,
+          0,
+          { c: churchId, a: accountId },
+        )
+        if (first.length) {
+          s.day = first[0].getString('date').slice(0, 10)
+          const own = $app.findRecordsByFilter(
+            'fin_bank_lines',
+            "church_id = {:c} && account_id = {:a} && fitid !~ '%|inv'",
+            '',
+            1,
+            0,
+            { c: churchId, a: accountId },
+          )
+          if (!own.length) s.fund = true
+        }
+      } catch (_) {}
+      starts[accountId] = s
+      return s
+    }
+
+    const campaignName = {}
+    const campaignOf = (id) => {
+      if (!id) return ''
+      if (campaignName[id] === undefined) {
+        try {
+          campaignName[id] = $app.findRecordById('fin_campaigns', id).getString('name')
+        } catch (_) {
+          campaignName[id] = ''
+        }
+      }
+      return campaignName[id]
+    }
+
+    const items = []
+    try {
+      const txs = $app.findRecordsByFilter(
+        'fin_transactions',
+        "church_id = {:c} && person_id = {:p} && type = 'ENTRADA' && is_anonymous = false && status = 'CONFIRMADO' && date >= {:from}",
+        '-date,-created',
+        2000,
+        0,
+        { c: churchId, p: person.id, from: fromYear + '-01-01 00:00:00' },
+      )
+      for (const tx of txs) {
+        const cat = tx.getString('category_id')
+        if (!catName[cat]) continue
+        const ymd = tx.getString('date').slice(0, 10)
+        const s = startOf(tx.getString('account_id'))
+        const realized = !s.day || ymd < s.day || s.fund || !!tx.getString('bank_line_id')
+        if (!realized) continue
+        items.push({
+          id: tx.id,
+          type: 'ENTRADA',
+          status: 'CONFIRMADO',
+          is_anonymous: false,
+          person_id: person.id,
+          date: ymd,
+          amount_cents: tx.getInt('amount_cents'),
+          category_id: cat,
+          campaign: campaignOf(tx.getString('campaign_id')),
+          payment_method: tx.getString('payment_method'),
+          from_count: !!tx.getString('count_id'),
+        })
+      }
+    } catch (_) {}
+
+    // Dados do informe anual: igreja, rodapé e quem assina
+    let settings = null
+    try {
+      const st = $app.findRecordsByFilter('fin_settings', 'church_id = {:c}', '', 1, 0, {
+        c: churchId,
+      })
+      if (st.length) {
+        settings = {
+          legal_name: st[0].getString('legal_name'),
+          cnpj: st[0].getString('cnpj'),
+          address: st[0].getString('address'),
+          city: st[0].getString('city'),
+          statement_note: st[0].getString('statement_note'),
+        }
+      }
+    } catch (_) {}
+    const signers = []
+    try {
+      const rows = $app.findRecordsByFilter(
+        'fin_signers',
+        'church_id = {:c} && is_active = true',
+        'created',
+        10,
+        0,
+        { c: churchId },
+      )
+      for (const r of rows) {
+        signers.push({
+          id: r.id,
+          name: r.getString('name'),
+          title: r.getString('title'),
+          document: r.getString('document'),
+          is_active: true,
+        })
+      }
+    } catch (_) {}
+
+    return e.json(200, {
+      church_name: churchName,
+      today: today,
+      person: {
+        id: person.id,
+        name: person.getString('name'),
+        document: person.getString('document').replace(/\D/g, ''),
+      },
+      categories: categories,
+      items: items,
+      settings: settings,
+      signers: signers,
+    })
   },
   $apis.requireAuth(),
 )

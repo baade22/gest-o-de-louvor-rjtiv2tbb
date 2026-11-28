@@ -1,15 +1,33 @@
 // Contribuir: PIX da igreja (QR e "copia e cola", sem valor) e campanhas públicas do Financeiro.
-// Nenhum valor, meta ou saldo aparece aqui.
+// Nenhum valor, meta ou saldo aparece aqui. Quem entrou no app vê o Contribuir identificado
+// (member/MemberGive.tsx), com tipo e valor; o anônimo continua a um toque.
 
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, ChevronRight, Copy, Flag, Lock, QrCode, ReceiptText } from 'lucide-react'
+import pb from '@/lib/pocketbase/client'
 import { pixPayload, type PixKeyType } from '@/lib/pix'
 import { PixQr, displayPixKey } from '@/pages/finance/PixQr'
 import { useSite } from './siteContext'
 import { Card, PageTitle } from './siteParts'
+import MemberGive from './member/MemberGive'
+import { Spinner, useMemberMe } from './member/memberParts'
 
 export default function SiteGive() {
+  const [anonymous, setAnonymous] = useState(!pb.authStore.isValid)
+  if (anonymous) return <AnonymousGive />
+  return <LoggedGive onAnonymous={() => setAnonymous(true)} />
+}
+
+function LoggedGive({ onAnonymous }: { onAnonymous: () => void }) {
+  const { me, loading } = useMemberMe(false)
+  if (loading) return <Spinner />
+  // Sem ficha nesta igreja (ou sem sessão): o Contribuir de sempre
+  if (!me) return <AnonymousGive />
+  return <MemberGive me={me} onAnonymous={onAnonymous} />
+}
+
+function AnonymousGive() {
   const { site, to } = useSite()
   const [copied, setCopied] = useState<'code' | 'key' | ''>('')
   const [showQr, setShowQr] = useState(false)

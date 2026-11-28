@@ -10,6 +10,7 @@ import {
   HeartHandshake,
   IdCard,
   LogOut,
+  ReceiptText,
   Music,
   Ticket,
   UserRound,
@@ -199,6 +200,12 @@ export default function SiteMe() {
           icon={UserRound}
           title="Meus dados"
           hint="Contato, endereço e CPF"
+        />
+        <RowLink
+          to={to('/eu/contribuicoes')}
+          icon={ReceiptText}
+          title="Minhas contribuições"
+          hint="Histórico e informe anual"
         />
         {site.sections.oracao !== false && (
           <RowLink to={to('/oracao')} icon={HeartHandshake} title="Pedir oração" />
